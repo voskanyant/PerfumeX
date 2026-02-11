@@ -1,0 +1,23 @@
+{% extends "prices/base.html" %}
+
+{% block title %}Import Prices{% endblock %}
+
+{% block content %}
+    <div class="card">
+        <h1>Import Prices</h1>
+        <p class="muted">Choose supplier and upload the price list.</p>
+        <form method="post" enctype="multipart/form-data">
+            {% csrf_token %}
+            <fieldset style="border: 0; padding: 0; margin: 0 0 12px;">
+                <legend style="font-weight: 600; margin-bottom: 8px;">Import</legend>
+                <p>{{ form.supplier.label_tag }} {{ form.supplier }}</p>
+                <p>{{ form.file_kind.label_tag }} {{ form.file_kind }}</p>
+                <p>{{ form.file.label_tag }} {{ form.file }}</p>
+            </fieldset>
+            <div class="actions">
+                <button class="button" type="submit">Create import</button>
+                <a href="{% url 'prices:supplier_overview' %}">Cancel</a>
+            </div>
+        </form>
+    </div>
+{% endblock %}

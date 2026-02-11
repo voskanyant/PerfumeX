@@ -1,0 +1,599 @@
+from __future__ import annotations
+
+import csv
+from dataclasses import dataclass
+from decimal import Decimal, InvalidOperation
+from pathlib import Path
+from typing import Iterable
+import re
+import io
+
+from django.utils import timezone
+
+from prices import models
+
+
+@dataclass
+class ParsedRow:
+    sku: str
+    name: str
+    price: Decimal
+
+
+def _parse_decimal(value) -> Decimal | None:
+    if value is None:
+        return None
+    if isinstance(value, Decimal):
+        return value
+    text = str(value).strip()
+    if not text:
+        return None
+    text = text.replace(" ", "")
+    match = re.search(r"-?\d+(?:[.,]\d+)?", text)
+    if match:
+        text = match.group(0)
+    text = text.replace(",", ".")
+    try:
+        return Decimal(text)
+    except InvalidOperation:
+        return None
+
+
+def _count_cyrillic(text: str) -> int:
+    return len(re.findall(r"[\u0400-\u04FF]", text))
+
+
+def _fix_mojibake(text: str) -> str:
+    if not text:
+        return text
+    if _count_cyrillic(text):
+        return text
+    if not re.search(r"[\u00C0-\u00FF]", text):
+        return text
+    best = text
+    best_score = _count_cyrillic(text)
+    for encoding in ("cp1251", "utf-8"):
+        try:
+            candidate = text.encode("latin-1").decode(encoding)
+        except (UnicodeEncodeError, UnicodeDecodeError):
+            continue
+        score = _count_cyrillic(candidate)
+        if score > best_score:
+            best = candidate
+            best_score = score
+    return best
+
+
+def _read_csv_text_from_bytes(raw: bytes) -> str:
+    if not raw:
+        return ""
+    best_text = ""
+    best_score = -1
+    for encoding in ("utf-8-sig", "cp1251"):
+        try:
+            decoded = raw.decode(encoding)
+        except UnicodeDecodeError:
+            continue
+        score = _count_cyrillic(decoded)
+        if score > best_score:
+            best_score = score
+            best_text = decoded
+    if best_text:
+        return best_text
+    return raw.decode("utf-8-sig", errors="ignore")
+
+
+def _normalize_sku(value) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, bool):
+        return ""
+    if isinstance(value, int):
+        return str(value)
+    if isinstance(value, float):
+        if value.is_integer():
+            return str(int(value))
+        return str(value)
+    if isinstance(value, Decimal):
+        if value == value.to_integral():
+            return str(int(value))
+        return str(value.normalize())
+    text = str(value).strip()
+    if not text:
+        return ""
+    if re.match(r"^-?\d+\.0+$", text):
+        return text.split(".")[0]
+    return text
+
+
+def _legacy_sku_variants(sku: str) -> list[str]:
+    if not sku:
+        return []
+    variants = []
+    if re.match(r"^-?\d+$", sku):
+        variants.append(f"{sku}.0")
+    if re.match(r"^-?\d+\.0+$", sku):
+        variants.append(sku.split(".")[0])
+    return variants
+
+
+def _iter_rows_csv(path: Path, start_row: int) -> Iterable[list[str]]:
+    raw = path.read_bytes()
+    text = _read_csv_text_from_bytes(raw)
+    reader = csv.reader(io.StringIO(text))
+    for index, row in enumerate(reader, start=1):
+        if index < start_row:
+            continue
+        yield row
+
+
+def _iter_rows_csv_file(file_obj, start_row: int) -> Iterable[list[str]]:
+    file_obj.seek(0)
+    raw = file_obj.read()
+    text = _read_csv_text_from_bytes(raw)
+    reader = csv.reader(io.StringIO(text))
+    for index, row in enumerate(reader, start=1):
+        if index < start_row:
+            continue
+        yield row
+
+
+def _iter_rows_xlsx(
+    path: Path, sheet_name: str, sheet_index: int | None, start_row: int
+):
+    try:
+        import openpyxl
+    except ImportError as exc:
+        raise RuntimeError("openpyxl is required to read .xlsx files") from exc
+
+    workbook = openpyxl.load_workbook(path, data_only=True, read_only=True)
+    try:
+        if sheet_name:
+            sheet = workbook[sheet_name]
+        elif sheet_index is not None:
+            sheet = workbook.worksheets[sheet_index]
+        else:
+            sheet = workbook.active
+
+        for row in sheet.iter_rows(min_row=start_row, values_only=True):
+            yield list(row)
+    finally:
+        workbook.close()
+
+
+def _iter_rows_xlsx_file(file_obj, sheet_name: str, sheet_index: int | None, start_row: int):
+    try:
+        import openpyxl
+    except ImportError as exc:
+        raise RuntimeError("openpyxl is required to read .xlsx files") from exc
+
+    file_obj.seek(0)
+    workbook = openpyxl.load_workbook(file_obj, data_only=True, read_only=True)
+    try:
+        if sheet_name:
+            sheet = workbook[sheet_name]
+        elif sheet_index is not None:
+            sheet = workbook.worksheets[sheet_index]
+        else:
+            sheet = workbook.active
+
+        for row in sheet.iter_rows(min_row=start_row, values_only=True):
+            yield list(row)
+    finally:
+        workbook.close()
+
+
+def _iter_rows_xls_path(path: Path, sheet_name: str, sheet_index: int | None, start_row: int):
+    try:
+        import xlrd
+    except ImportError as exc:
+        raise RuntimeError("xlrd is required to read .xls files") from exc
+
+    workbook = xlrd.open_workbook(path)
+    if sheet_name:
+        sheet = workbook.sheet_by_name(sheet_name)
+    elif sheet_index is not None:
+        sheet = workbook.sheet_by_index(sheet_index)
+    else:
+        sheet = workbook.sheet_by_index(0)
+    for row_idx in range(start_row - 1, sheet.nrows):
+        yield sheet.row_values(row_idx)
+
+
+def _iter_rows_xls_file(file_obj, sheet_name: str, sheet_index: int | None, start_row: int):
+    try:
+        import xlrd
+    except ImportError as exc:
+        raise RuntimeError("xlrd is required to read .xls files") from exc
+
+    file_obj.seek(0)
+    workbook = xlrd.open_workbook(file_contents=file_obj.read())
+    if sheet_name:
+        sheet = workbook.sheet_by_name(sheet_name)
+    elif sheet_index is not None:
+        sheet = workbook.sheet_by_index(sheet_index)
+    else:
+        sheet = workbook.sheet_by_index(0)
+    for row_idx in range(start_row - 1, sheet.nrows):
+        yield sheet.row_values(row_idx)
+
+
+def _parse_rows(
+    rows: Iterable[list],
+    sku_col: int,
+    name_cols: list[int],
+    price_col: int,
+    skip_until_valid: bool = True,
+) -> Iterable[ParsedRow]:
+    sku_idx = sku_col - 1 if sku_col else None
+    name_indexes = [value - 1 for value in name_cols if value]
+    price_idx = price_col - 1
+    found_data = not skip_until_valid
+    for row in rows:
+        max_index = max([price_idx, *name_indexes, sku_idx if sku_idx is not None else 0])
+        if len(row) <= max_index:
+            continue
+        sku = ""
+        if sku_idx is not None and sku_idx < len(row):
+            sku = _normalize_sku(row[sku_idx])
+        name_parts = []
+        for index in name_indexes:
+            value = row[index] if index < len(row) else None
+            text = str(value).strip() if value is not None else ""
+            text = _fix_mojibake(text)
+            if text and not re.match(r"^-?\d+(?:[.,]\d+)?$", text):
+                name_parts.append(text)
+        name = " ".join(name_parts).strip()
+        price = _parse_decimal(row[price_idx])
+        if not name or price is None or price == 0:
+            if not found_data:
+                continue
+            continue
+        found_data = True
+        yield ParsedRow(sku=sku, name=name, price=price)
+
+
+def _identity_key(sku: str, name: str) -> str:
+    if sku:
+        return _normalize_sku(sku)
+    return re.sub(r"\s+", " ", name.strip()).lower()
+
+
+def process_import_file(import_file: models.ImportFile) -> None:
+    if not import_file.file:
+        raise RuntimeError("Import file is missing.")
+
+    mapping = import_file.mapping
+    if not mapping:
+        raise RuntimeError("Mapping is missing.")
+
+    if import_file.file_kind != models.FileKind.PRICE:
+        import_file.status = models.ImportStatus.PROCESSED
+        import_file.processed_at = timezone.now()
+        import_file.save(update_fields=["status", "processed_at"])
+        return
+
+    path = Path(import_file.file.path)
+    extension = path.suffix.lower()
+    start_row = 1
+    column_map = mapping.column_map or {}
+    sku_col = int(column_map.get("sku", 0))
+    name_value = column_map.get("name", 0)
+    if isinstance(name_value, list):
+        name_cols = [int(value) for value in name_value if value]
+    else:
+        name_cols = [int(name_value)] if name_value else []
+    price_col = int(column_map.get("price", 0))
+    if not name_cols or not price_col:
+        raise RuntimeError("Mapping must include name and price columns.")
+
+    if extension in {".csv"}:
+        rows = _iter_rows_csv(path, start_row)
+        parsed_rows = list(
+            _parse_rows(rows, sku_col, name_cols, price_col, skip_until_valid=True)
+        )
+    elif extension in {".xlsx"}:
+        parsed_rows = []
+        sheet_names = [
+            name.strip()
+            for name in (mapping.sheet_names or "").split(",")
+            if name.strip()
+        ]
+        sheet_indexes = [
+            int(index.strip())
+            for index in (mapping.sheet_indexes or "").split(",")
+            if index.strip().isdigit()
+        ]
+        if sheet_names or sheet_indexes:
+            for name in sheet_names:
+                rows = _iter_rows_xlsx(path, name, None, start_row)
+                parsed_rows.extend(
+                    _parse_rows(rows, sku_col, name_cols, price_col, skip_until_valid=True)
+                )
+            for index in sheet_indexes:
+                rows = _iter_rows_xlsx(path, "", index, start_row)
+                parsed_rows.extend(
+                    _parse_rows(rows, sku_col, name_cols, price_col, skip_until_valid=True)
+                )
+        else:
+            rows = _iter_rows_xlsx(path, mapping.sheet_name, mapping.sheet_index, start_row)
+            parsed_rows = list(
+                _parse_rows(rows, sku_col, name_cols, price_col, skip_until_valid=True)
+            )
+    elif extension in {".xls"}:
+        parsed_rows = []
+        sheet_names = [
+            name.strip()
+            for name in (mapping.sheet_names or "").split(",")
+            if name.strip()
+        ]
+        sheet_indexes = [
+            int(index.strip())
+            for index in (mapping.sheet_indexes or "").split(",")
+            if index.strip().isdigit()
+        ]
+        if sheet_names or sheet_indexes:
+            for name in sheet_names:
+                rows = _iter_rows_xls_path(path, name, None, start_row)
+                parsed_rows.extend(
+                    _parse_rows(rows, sku_col, name_cols, price_col, skip_until_valid=True)
+                )
+            for index in sheet_indexes:
+                rows = _iter_rows_xls_path(path, "", index, start_row)
+                parsed_rows.extend(
+                    _parse_rows(rows, sku_col, name_cols, price_col, skip_until_valid=True)
+                )
+        else:
+            rows = _iter_rows_xls_path(path, mapping.sheet_name, mapping.sheet_index, start_row)
+            parsed_rows = list(
+                _parse_rows(rows, sku_col, name_cols, price_col, skip_until_valid=True)
+            )
+    else:
+        raise RuntimeError(f"Unsupported file type: {extension}")
+
+    currency = import_file.import_batch.supplier.default_currency
+    received_at = import_file.import_batch.received_at
+    if received_at and timezone.is_naive(received_at):
+        received_at = timezone.make_aware(received_at)
+    now = received_at or timezone.now()
+
+    if not parsed_rows:
+        raise RuntimeError(
+            "No data rows parsed. Check header row and column numbers."
+        )
+    unique_rows = {}
+    for parsed in parsed_rows:
+        key = _identity_key(parsed.sku, parsed.name)
+        if not key:
+            continue
+        unique_rows[key] = parsed
+    if len(unique_rows) < 100:
+        raise RuntimeError(
+            f"Too few products ({len(unique_rows)}). Expected at least 100."
+        )
+
+    supplier = import_file.import_batch.supplier
+    batch_received = import_file.import_batch.received_at
+    batch_created = import_file.import_batch.created_at
+    batch_time = batch_received or batch_created or timezone.now()
+    supplier_latest_batch = None
+    for received_at, created_at in models.ImportBatch.objects.filter(
+        supplier=supplier,
+        importfile__status=models.ImportStatus.PROCESSED,
+        importfile__file_kind=models.FileKind.PRICE,
+    ).values_list("received_at", "created_at"):
+        candidate = received_at or created_at
+        if candidate and (supplier_latest_batch is None or candidate > supplier_latest_batch):
+            supplier_latest_batch = candidate
+    identity_keys = list(unique_rows.keys())
+    existing_products = models.SupplierProduct.objects.filter(
+        supplier=supplier, identity_key__in=identity_keys
+    )
+    existing_map = {}
+    for product in existing_products:
+        key = product.identity_key or _identity_key(product.supplier_sku, product.name)
+        if key:
+            existing_map[key] = product
+        for variant in _legacy_sku_variants(product.supplier_sku):
+            existing_map.setdefault(variant, product)
+
+    to_create = []
+    to_update = []
+    is_latest_batch = not supplier_latest_batch or batch_time >= supplier_latest_batch
+    for identity_key, parsed in unique_rows.items():
+        existing = existing_map.get(identity_key)
+        if existing is None:
+            is_current = is_latest_batch
+            to_create.append(
+                models.SupplierProduct(
+                    supplier=supplier,
+                    supplier_sku=parsed.sku,
+                    identity_key=identity_key,
+                    name=parsed.name,
+                    currency=currency,
+                    current_price=parsed.price,
+                    last_imported_at=now,
+                    last_import_batch=import_file.import_batch,
+                    created_import_batch=import_file.import_batch,
+                    is_active=is_current,
+                )
+            )
+        else:
+            existing_batch_time = None
+            if existing.last_import_batch_id:
+                existing_batch_time = (
+                    existing.last_import_batch.received_at
+                    or existing.last_import_batch.created_at
+                )
+            if not existing_batch_time:
+                existing_batch_time = existing.last_imported_at
+            changed = (
+                existing.name != parsed.name
+                or existing.current_price != parsed.price
+                or existing.currency != currency
+                or existing.last_import_batch_id != import_file.import_batch_id
+                or not existing.is_active
+            )
+            if changed or is_latest_batch:
+                if not existing_batch_time or batch_time >= existing_batch_time:
+                    if existing.supplier_sku != parsed.sku:
+                        sku_taken = models.SupplierProduct.objects.filter(
+                            supplier=supplier, supplier_sku=parsed.sku
+                        ).exclude(id=existing.id).exists()
+                        if parsed.sku and not sku_taken:
+                            existing.supplier_sku = parsed.sku
+                    if changed:
+                        existing.name = parsed.name
+                        existing.current_price = parsed.price
+                        existing.currency = currency
+                    existing.last_imported_at = now
+                    existing.last_import_batch = import_file.import_batch
+                    if is_latest_batch:
+                        existing.is_active = True
+                    existing.identity_key = identity_key
+                    to_update.append(existing)
+
+    if to_create:
+        models.SupplierProduct.objects.bulk_create(to_create, batch_size=500)
+    if to_update:
+        models.SupplierProduct.objects.bulk_update(
+            to_update,
+            [
+                "supplier_sku",
+                "identity_key",
+                "name",
+                "current_price",
+                "currency",
+                "last_imported_at",
+                "last_import_batch",
+                "is_active",
+            ],
+            batch_size=500,
+        )
+
+    product_map = {
+        product.identity_key: product
+        for product in models.SupplierProduct.objects.filter(
+            supplier=supplier, identity_key__in=identity_keys
+        )
+    }
+    snapshots = []
+    for identity_key, parsed in unique_rows.items():
+        product = product_map.get(identity_key)
+        if product:
+            snapshots.append(
+                models.PriceSnapshot(
+                    supplier_product=product,
+                    import_batch=import_file.import_batch,
+                    price=parsed.price,
+                    currency=currency,
+                    recorded_at=now,
+                )
+            )
+    if snapshots:
+        models.PriceSnapshot.objects.bulk_create(snapshots, batch_size=500)
+
+    if is_latest_batch:
+        models.SupplierProduct.objects.filter(supplier=supplier).exclude(
+            identity_key__in=identity_keys
+        ).update(is_active=False)
+
+    import_file.status = models.ImportStatus.PROCESSED
+    import_file.processed_at = timezone.now()
+    import_file.save(update_fields=["status", "processed_at"])
+
+
+def delete_import_batch(import_batch: models.ImportBatch) -> None:
+    products = models.SupplierProduct.objects.filter(
+        created_import_batch=import_batch
+    )
+    legacy_products = models.SupplierProduct.objects.filter(
+        created_import_batch__isnull=True, last_import_batch=import_batch
+    )
+    models.PriceSnapshot.objects.filter(import_batch=import_batch).delete()
+    models.StockSnapshot.objects.filter(import_batch=import_batch).delete()
+
+    for import_file in import_batch.importfile_set.all():
+        if import_file.file:
+            import_file.file.delete(save=False)
+    import_batch.importfile_set.all().delete()
+    products.delete()
+    legacy_products.delete()
+    import_batch.delete()
+
+
+def preview_mapping_file(file_obj, sheet_index: int | None = None) -> dict:
+    file_obj.seek(0)
+    filename = getattr(file_obj, "name", "")
+    extension = Path(filename).suffix.lower()
+    rows = []
+    max_cols = 0
+    sheet_names = []
+    start_row = 1
+
+    if extension == ".csv":
+        for row in _iter_rows_csv_file(file_obj, start_row):
+            rows.append([str(cell) if cell is not None else "" for cell in row])
+            max_cols = max(max_cols, len(row))
+            if len(rows) >= 50:
+                break
+    elif extension == ".xlsx":
+        try:
+            import openpyxl
+        except ImportError as exc:
+            raise RuntimeError("openpyxl is required to read .xlsx files") from exc
+        file_obj.seek(0)
+        workbook = openpyxl.load_workbook(file_obj, data_only=True, read_only=True)
+        try:
+            sheet_names = workbook.sheetnames
+            if sheet_index is not None and 0 <= sheet_index < len(workbook.worksheets):
+                sheet = workbook.worksheets[sheet_index]
+            else:
+                sheet = workbook.active
+            max_cols = sheet.max_column or 0
+            for row in sheet.iter_rows(min_row=start_row, values_only=True):
+                row_values = list(row)
+                if max_cols and len(row_values) < max_cols:
+                    row_values.extend([""] * (max_cols - len(row_values)))
+                rows.append([str(cell) if cell is not None else "" for cell in row_values])
+                if len(rows) >= 50:
+                    break
+        finally:
+            workbook.close()
+    elif extension == ".xls":
+        file_obj.seek(0)
+        try:
+            import xlrd
+        except ImportError as exc:
+            raise RuntimeError("xlrd is required to read .xls files") from exc
+        workbook = xlrd.open_workbook(file_contents=file_obj.read())
+        sheet_names = workbook.sheet_names()
+        if sheet_index is not None and 0 <= sheet_index < len(sheet_names):
+            sheet = workbook.sheet_by_index(sheet_index)
+        else:
+            sheet = workbook.sheet_by_index(0)
+        max_cols = sheet.ncols
+        for row_idx in range(start_row - 1, sheet.nrows):
+            row = sheet.row_values(row_idx)
+            if max_cols and len(row) < max_cols:
+                row.extend([""] * (max_cols - len(row)))
+            rows.append([str(cell) if cell is not None else "" for cell in row])
+            if len(rows) >= 50:
+                break
+    else:
+        raise RuntimeError("Unsupported file type for preview.")
+
+    col_offset = 0
+    if rows and max_cols:
+        for col_index in range(max_cols):
+            if all((row[col_index] or "").strip() == "" for row in rows):
+                col_offset += 1
+            else:
+                break
+
+    return {
+        "rows": rows,
+        "max_cols": max_cols,
+        "sheet_names": sheet_names,
+        "col_offset": col_offset,
+    }

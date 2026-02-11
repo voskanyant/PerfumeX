@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <title>{% block title %}PerfumeX Prices{% endblock %}</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <style>
+            @import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap");
+            :root {
+                color-scheme: light;
+                --bg: #f6f6f6;
+                --text: #111827;
+                --muted: #6b7280;
+                --card: #ffffff;
+                --border: #e5e7eb;
+                --primary: #111827;
+                --primary-dark: #000000;
+                --sidebar: #0f172a;
+                --sidebar-text: #f9fafb;
+                --sidebar-muted: #9ca3af;
+                --success: #16a34a;
+                --danger: #dc2626;
+            }
+            body {
+                font-family: "IBM Plex Sans", "Segoe UI", Tahoma, Arial, sans-serif;
+                margin: 0;
+                background: var(--bg);
+                color: var(--text);
+            }
+            .layout {
+                display: flex;
+                min-height: 100vh;
+            }
+            .sidebar {
+                width: 240px;
+                background: var(--sidebar);
+                color: var(--sidebar-text);
+                padding: 24px 18px;
+                box-sizing: border-box;
+                position: sticky;
+                top: 0;
+                height: 100vh;
+            }
+            .sidebar h1 {
+                font-size: 20px;
+                margin: 0 0 22px;
+            }
+            .sidebar a {
+                color: var(--sidebar-text);
+                text-decoration: none;
+                display: block;
+                padding: 10px 12px;
+                border-radius: 10px;
+                font-size: 14px;
+                font-weight: 500;
+            }
+            .sidebar a:hover {
+                background: rgba(255, 255, 255, 0.08);
+            }
+            .sidebar .section-title {
+                margin: 18px 10px 8px;
+                font-size: 12px;
+                text-transform: uppercase;
+                letter-spacing: 0.08em;
+                color: var(--sidebar-muted);
+            }
+            .content {
+                flex: 1;
+            }
+            main {
+                padding: 28px;
+                max-width: 1240px;
+                margin: 0 auto;
+            }
+            table {
+                width: 100%;
+                border-collapse: collapse;
+                background: var(--card);
+                border-radius: 12px;
+                overflow: hidden;
+            }
+            th,
+            td {
+                padding: 8px 12px;
+                border-bottom: 1px solid var(--border);
+                text-align: left;
+                vertical-align: top;
+            }
+            th[data-field="current_price"],
+            td[data-field="current_price"] {
+                width: 96px;
+                white-space: nowrap;
+            }
+            th[data-field="last_imported_at"],
+            td[data-field="last_imported_at"] {
+                width: 140px;
+                white-space: nowrap;
+            }
+            th[data-field="name"],
+            td[data-field="name"] {
+                min-width: 240px;
+            }
+            th {
+                background: #f8f8f8;
+                font-weight: 600;
+                position: sticky;
+                top: 0;
+                z-index: 1;
+            }
+            .actions a {
+                margin-right: 8px;
+            }
+            .actions {
+                white-space: nowrap;
+            }
+            .actions form {
+                display: inline-flex;
+                margin: 0;
+            }
+            .action-group {
+                display: inline-flex;
+                align-items: center;
+                gap: 8px;
+            }
+            .card {
+                background: var(--card);
+                padding: 18px 20px;
+                border-radius: 14px;
+                box-shadow: none;
+                margin-bottom: 18px;
+                border: 1px solid var(--border);
+            }
+            .button {
+                display: inline-block;
+                padding: 6px 10px;
+                border-radius: 10px;
+                background: var(--primary);
+                color: #fff;
+                text-decoration: none;
+                border: 0;
+                font-weight: 600;
+                cursor: pointer;
+                line-height: 1.2;
+            }
+            .button:hover {
+                background: var(--primary-dark);
+            }
+            .button.secondary {
+                background: #f3f4f6;
+                color: #111827;
+            }
+            .button.secondary:hover {
+                background: #e5e7eb;
+            }
+            .button.danger {
+                background: #fee2e2;
+                color: #b91c1c;
+                border: 1px solid #fecaca;
+            }
+            .button.danger:hover {
+                background: #fecaca;
+            }
+            .button.icon {
+                padding: 6px;
+                width: 28px;
+                height: 28px;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+            }
+            .button .icon {
+                width: 16px;
+                height: 16px;
+                display: inline-block;
+                margin-right: 6px;
+            }
+            .button.icon .icon {
+                margin-right: 0;
+            }
+            .button.ghost {
+                background: transparent;
+                color: var(--primary);
+                border: 1px solid rgba(31, 77, 217, 0.3);
+            }
+            .sidebar .button.ghost {
+                color: var(--sidebar-text);
+                border-color: rgba(148, 163, 184, 0.4);
+            }
+            .sidebar .button.ghost:hover {
+                background: rgba(255, 255, 255, 0.08);
+            }
+            .muted {
+                color: var(--muted);
+            }
+            .status-dot {
+                display: inline-block;
+                width: 8px;
+                height: 8px;
+                border-radius: 50%;
+                margin-right: 6px;
+                vertical-align: middle;
+            }
+            .status-dot.active {
+                background: var(--success);
+            }
+            .status-dot.inactive {
+                background: var(--danger);
+            }
+            form .actions {
+                margin-top: 12px;
+            }
+            input,
+            select,
+            textarea {
+                max-width: 520px;
+                width: 100%;
+                padding: 8px 10px;
+                border: 1px solid var(--border);
+                border-radius: 10px;
+                box-sizing: border-box;
+                background: #fff;
+                font-family: inherit;
+                line-height: 1.2;
+            }
+            .helptext {
+                display: inline-flex;
+                align-items: center;
+                gap: 6px;
+                font-size: 12px;
+                color: var(--muted);
+                position: relative;
+                cursor: help;
+            }
+            .helptext::before {
+                content: "i";
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                width: 16px;
+                height: 16px;
+                border-radius: 50%;
+                background: #e5e7eb;
+                color: #111827;
+                font-size: 11px;
+                font-weight: 600;
+            }
+            .helptext::after {
+                content: attr(data-tip);
+                position: absolute;
+                left: 22px;
+                top: 50%;
+                transform: translateY(-50%);
+                background: #111827;
+                color: #fff;
+                padding: 6px 8px;
+                border-radius: 8px;
+                font-size: 12px;
+                white-space: nowrap;
+                opacity: 0;
+                pointer-events: none;
+                transition: opacity 0.12s ease;
+            }
+            .helptext:hover::after {
+                opacity: 1;
+            }
+            input:focus,
+            select:focus,
+            textarea:focus {
+                outline: 2px solid rgba(31, 77, 217, 0.15);
+                border-color: rgba(31, 77, 217, 0.45);
+            }
+            .page-title {
+                font-size: 24px;
+                margin: 0;
+            }
+            .page-subtitle {
+                margin-top: 6px;
+            }
+            .page-header {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 12px;
+                flex-wrap: wrap;
+            }
+            .filters {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+                gap: 12px;
+                margin-top: 12px;
+            }
+            .filters p {
+                margin: 0;
+            }
+            .table-wrap {
+                overflow: auto;
+                border-radius: 12px;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="layout">
+            <aside class="sidebar">
+                <h1>PerfumeX Prices</h1>
+                {% if user.is_authenticated %}
+                    <nav>
+                        <a href="{% url 'prices:dashboard' %}">Dashboard</a>
+                        <div class="section-title">Supplies</div>
+                        <a href="{% url 'prices:supplier_list' %}">Suppliers</a>
+                        <a href="{% url 'prices:supplier_overview' %}">Import Prices</a>
+                        <div class="section-title">Warehouse</div>
+                        <a href="{% url 'prices:our_product_list' %}">Our Products</a>
+                        <a href="{% url 'prices:product_list' %}">Suppliers Products</a>
+                        <a href="{% url 'prices:product_linking' %}">Product Linking</a>
+                        <div class="section-title">Settings</div>
+                        <a href="{% url 'prices:currency_rates' %}">Currencies</a>
+                        <a href="{% url 'prices:mailbox_list' %}">Mailboxes</a>
+                        <form action="{% url 'logout' %}" method="post" style="margin-top: 12px;">
+                            {% csrf_token %}
+                            <button type="submit" class="button ghost" style="width: 100%; text-align: left;">
+                                Logout
+                            </button>
+                        </form>
+                    </nav>
+                {% endif %}
+            </aside>
+            <div class="content">
+                <main>
+                    {% if messages %}
+                        <div class="card">
+                            {% for message in messages %}
+                                <p class="muted">{{ message }}</p>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                    {% block content %}{% endblock %}
+                </main>
+            </div>
+        </div>
+        <script>
+            (function () {
+                document.querySelectorAll(".helptext").forEach(function (el) {
+                    var text = el.textContent.trim();
+                    if (!text) return;
+                    el.setAttribute("data-tip", text);
+                    el.textContent = "";
+                });
+            })();
+        </script>
+    </body>
+</html>

@@ -1,0 +1,385 @@
+{% extends "prices/base.html" %}
+{% load prices_extras %}
+
+{% block title %}{{ list_title }}{% endblock %}
+
+{% block content %}
+    <div class="card">
+        <div class="page-header">
+            <div>
+                <h1 class="page-title">{{ list_title }}</h1>
+                <p class="muted page-subtitle">Total: {{ total_count }}</p>
+            </div>
+            <div>
+                {% if show_create and create_url_name %}
+                    <a class="button" href="{% url create_url_name %}">Add new</a>
+                {% endif %}
+                {% if show_cleanup %}
+                    <form action="{% url 'prices:product_cleanup' %}" method="post" style="display: inline;">
+                        {% csrf_token %}
+                        <button class="button secondary" type="submit">
+                            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="M3 6h18"/>
+                                <path d="M8 6V4h8v2"/>
+                                <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+                                <path d="M10 11v6"/>
+                                <path d="M14 11v6"/>
+                            </svg>
+                            Delete orphan products
+                        </button>
+                    </form>
+                    <form action="{% url 'prices:product_cleanup_inactive' %}" method="post" style="display: inline;">
+                        {% csrf_token %}
+                        {% if supplier_filter %}
+                            <input type="hidden" name="supplier" value="{{ supplier_filter }}">
+                        {% endif %}
+                        <button class="button secondary" type="submit">
+                            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="M3 6h18"/>
+                                <path d="M8 6V4h8v2"/>
+                                <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+                                <path d="M10 11v6"/>
+                                <path d="M14 11v6"/>
+                            </svg>
+                            Delete inactive products
+                        </button>
+                    </form>
+                {% endif %}
+                {% if show_bulk_delete %}
+                    <button class="button danger" type="button" id="bulk-delete-btn">
+                        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M3 6h18"/>
+                            <path d="M8 6V4h8v2"/>
+                            <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+                            <path d="M10 11v6"/>
+                            <path d="M14 11v6"/>
+                        </svg>
+                        Delete selected
+                    </button>
+                {% endif %}
+            </div>
+        </div>
+        <div class="filters">
+            {% if show_search %}
+                <p>
+                    <label for="live-search">Search</label>
+                    <input id="live-search" type="text" placeholder="Search products..." data-sort="{{ current_sort|default:'current_price' }}" data-dir="{{ current_dir|default:'asc' }}"{% if link_detail %} data-detail-base="/products/"{% endif %}{% if show_bulk_delete %} data-bulk="1"{% endif %}>
+                    <span id="search-count" class="muted" style="margin-left: 8px;"></span>
+                </p>
+            {% endif %}
+            {% if show_currency_filter %}
+                <p>
+                    <label for="currency-filter">Currency</label>
+                    <select id="currency-filter">
+                        <option value="">Original</option>
+                        {% for code in currency_options %}
+                            <option value="{{ code }}"{% if currency_filter == code %} selected{% endif %}>{{ code }}</option>
+                        {% endfor %}
+                    </select>
+                </p>
+            {% endif %}
+            {% if supplier_options %}
+                <p>
+                    <label for="supplier-filter">Supplier</label>
+                    <select id="supplier-filter">
+                        <option value="">All</option>
+                        {% for supplier in supplier_options %}
+                            <option value="{{ supplier.id }}"{% if supplier_filter == supplier.id|stringformat:"s" %} selected{% endif %}>
+                                {{ supplier.name }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </p>
+            {% endif %}
+            {% if status_options %}
+                <p>
+                    <label for="status-filter">Status</label>
+                    <select id="status-filter">
+                        <option value="">All</option>
+                        {% for value, label in status_options %}
+                            <option value="{{ value }}"{% if status_filter == value %} selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </p>
+            {% endif %}
+        </div>
+    </div>
+    <div class="card">
+        {% if object_list %}
+            <div class="table-wrap">
+                <table>
+                <thead>
+                    <tr>
+                        {% if show_bulk_delete %}
+                            <th><input type="checkbox" id="product-select-all"></th>
+                        {% endif %}
+                        {% for field in list_display %}
+                            <th data-field="{{ field }}">
+                                {% if current_sort == field %}
+                                    {% if current_dir == "asc" %}
+                                        <a href="?sort={{ field }}&dir=desc{% if current_q %}&q={{ current_q }}{% endif %}{% if currency_filter %}&currency={{ currency_filter }}{% endif %}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}">
+                                            {% if field == "current_price" %}
+                                                Price ({{ currency_filter|default:"Original" }}) ▲
+                                            {% else %}
+                                                {{ field|capfirst }} ▲
+                                            {% endif %}
+                                        </a>
+                                    {% else %}
+                                        <a href="?sort={{ field }}&dir=asc{% if current_q %}&q={{ current_q }}{% endif %}{% if currency_filter %}&currency={{ currency_filter }}{% endif %}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}">
+                                            {% if field == "current_price" %}
+                                                Price ({{ currency_filter|default:"Original" }}) ▼
+                                            {% else %}
+                                                {{ field|capfirst }} ▼
+                                            {% endif %}
+                                        </a>
+                                    {% endif %}
+                                {% else %}
+                                    <a href="?sort={{ field }}&dir=asc{% if current_q %}&q={{ current_q }}{% endif %}{% if currency_filter %}&currency={{ currency_filter }}{% endif %}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}">
+                                        {% if field == "current_price" %}
+                                            Price ({{ currency_filter|default:"Original" }})
+                                        {% else %}
+                                            {{ field|capfirst }}
+                                        {% endif %}
+                                    </a>
+                                {% endif %}
+                            </th>
+                        {% endfor %}
+                        {% if show_actions %}
+                            <th>Actions</th>
+                        {% endif %}
+                    </tr>
+                </thead>
+                <tbody>
+                        {% for obj in object_list %}
+                            <tr>
+                                {% if show_bulk_delete %}
+                                    <td><input type="checkbox" name="product_ids" value="{{ obj.pk }}"></td>
+                                {% endif %}
+                                {% for field in list_display %}
+                                    {% if field == "last_imported_at" %}
+                                        <td data-field="{{ field }}">{{ obj.last_imported_at|date:"d/m/Y H:i" }}</td>
+                                {% elif field == "current_price" and obj.display_price %}
+                                    <td data-field="{{ field }}">{{ obj.display_price|floatformat:2 }} {{ obj.display_currency }}</td>
+                                {% else %}
+                                    <td data-field="{{ field }}">
+                                        {% if field == "name" and show_status %}
+                                            <span class="status-dot {% if obj.is_active %}active{% else %}inactive{% endif %}"></span>
+                                        {% endif %}
+                                        {% if link_detail and detail_url_name and field == "name" %}
+                                            <a href="{% url detail_url_name obj.pk %}">{{ obj|get_attr:field }}</a>
+                                        {% else %}
+                                            {{ obj|get_attr:field }}
+                                        {% endif %}
+                                    </td>
+                                {% endif %}
+                            {% endfor %}
+                            {% if show_actions %}
+                                <td class="actions">
+                                    <div class="action-group">
+                                    {% if update_url_name %}
+                                        <a class="button secondary icon" href="{% url update_url_name obj.pk %}" title="Edit" aria-label="Edit">
+                                            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                                <path d="M12 20h9"/>
+                                                <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/>
+                                            </svg>
+                                        </a>
+                                    {% endif %}
+                                    {% if delete_url_name %}
+                                        <form method="post" action="{% url delete_url_name obj.pk %}" style="display: inline;">
+                                            {% csrf_token %}
+                                            <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                            <button class="button danger icon" type="submit" title="Delete" aria-label="Delete">
+                                                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                                    <path d="M3 6h18"/>
+                                                    <path d="M8 6V4h8v2"/>
+                                                    <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+                                                    <path d="M10 11v6"/>
+                                                    <path d="M14 11v6"/>
+                                                </svg>
+                                            </button>
+                                        </form>
+                                    {% endif %}
+                                    </div>
+                                </td>
+                            {% endif %}
+                        </tr>
+                    {% endfor %}
+                </tbody>
+                </table>
+            </div>
+            {% if show_bulk_delete %}
+                <form id="bulk-delete-form" method="post" action="{% url 'prices:product_bulk_delete' %}" style="display: none;">
+                    {% csrf_token %}
+                    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                </form>
+            {% endif %}
+            {% if is_paginated %}
+                <div id="pagination-controls" style="margin-top: 12px;">
+                    {% if page_obj.has_previous %}
+                        <a class="button" href="?page={{ page_obj.previous_page_number }}{% if current_sort %}&sort={{ current_sort }}{% endif %}{% if current_dir %}&dir={{ current_dir }}{% endif %}{% if current_q %}&q={{ current_q }}{% endif %}{% if currency_filter %}&currency={{ currency_filter }}{% endif %}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}">Previous</a>
+                    {% endif %}
+                    {% for page_num in page_obj.paginator.page_range %}
+                        {% if page_num == page_obj.number %}
+                            <span class="button" style="background: #1d4ed8;">{{ page_num }}</span>
+                        {% elif page_num > page_obj.number|add:-3 and page_num < page_obj.number|add:3 %}
+                            <a class="button" href="?page={{ page_num }}{% if current_sort %}&sort={{ current_sort }}{% endif %}{% if current_dir %}&dir={{ current_dir }}{% endif %}{% if current_q %}&q={{ current_q }}{% endif %}{% if currency_filter %}&currency={{ currency_filter }}{% endif %}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}">{{ page_num }}</a>
+                        {% endif %}
+                    {% endfor %}
+                    <span class="muted" style="margin: 0 8px;">
+                        Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+                    </span>
+                    {% if page_obj.has_next %}
+                        <a class="button" href="?page={{ page_obj.next_page_number }}{% if current_sort %}&sort={{ current_sort }}{% endif %}{% if current_dir %}&dir={{ current_dir }}{% endif %}{% if current_q %}&q={{ current_q }}{% endif %}{% if currency_filter %}&currency={{ currency_filter }}{% endif %}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}">Next</a>
+                    {% endif %}
+                </div>
+            {% endif %}
+        {% else %}
+            <p class="muted">No records yet.</p>
+        {% endif %}
+    </div>
+    {% if show_search %}
+        <script>
+            (function () {
+                var input = document.getElementById("live-search");
+                var countEl = document.getElementById("search-count");
+                var currencyFilter = document.getElementById("currency-filter");
+                var supplierFilter = document.getElementById("supplier-filter");
+                var statusFilter = document.getElementById("status-filter");
+                if (!input) return;
+                var tbody = document.querySelector("table tbody");
+                var originalRows = tbody ? tbody.innerHTML : "";
+                var pagination = document.getElementById("pagination-controls");
+                var originalPagination = pagination ? pagination.innerHTML : "";
+                var timer = null;
+                input.addEventListener("input", function () {
+                    clearTimeout(timer);
+                    timer = setTimeout(function () {
+                        var query = input.value.trim();
+                        if (!tbody) return;
+                        if (!query) {
+                            tbody.innerHTML = originalRows;
+                            if (pagination) {
+                                pagination.innerHTML = originalPagination;
+                                pagination.style.display = "";
+                            }
+                            if (countEl) countEl.textContent = "";
+                            return;
+                        }
+                        if (pagination) {
+                            pagination.style.display = "none";
+                        }
+                        var url = "/products/search/?q=" + encodeURIComponent(query);
+                        var sort = input.getAttribute("data-sort");
+                        var dir = input.getAttribute("data-dir");
+                        if (sort) url += "&sort=" + encodeURIComponent(sort);
+                        if (dir) url += "&dir=" + encodeURIComponent(dir);
+                        if (currencyFilter && currencyFilter.value) {
+                            url += "&currency=" + encodeURIComponent(currencyFilter.value);
+                        }
+                        if (supplierFilter && supplierFilter.value) {
+                            url += "&supplier=" + encodeURIComponent(supplierFilter.value);
+                        }
+                        if (statusFilter && statusFilter.value) {
+                            url += "&status=" + encodeURIComponent(statusFilter.value);
+                        }
+                        fetch(url, { headers: { "X-Requested-With": "XMLHttpRequest" } })
+                            .then(function (response) { return response.json(); })
+                            .then(function (data) {
+                                var detailBase = input.getAttribute("data-detail-base") || "";
+                                var bulkEnabled = input.getAttribute("data-bulk") === "1";
+                                var rows = data.items.map(function (item) {
+                                    var nameValue = item.name;
+                                    if (detailBase && item.id) {
+                                        nameValue = "<a href='" + detailBase + item.id + "/'>" + nameValue + "</a>";
+                                    }
+                                    if (item.is_active !== undefined) {
+                                        var dotClass = item.is_active ? "active" : "inactive";
+                                        nameValue = "<span class='status-dot " + dotClass + "'></span>" + nameValue;
+                                    }
+                                    var checkboxCell = bulkEnabled ? "<td><input type='checkbox' name='product_ids' value='" + item.id + "'></td>" : "";
+                                    return "<tr>" +
+                                        checkboxCell +
+                                        "<td>" + item.supplier + "</td>" +
+                                        "<td>" + item.supplier_sku + "</td>" +
+                                        "<td>" + nameValue + "</td>" +
+                                        "<td>" + item.current_price + "</td>" +
+                                        "<td>" + item.last_imported_at + "</td>" +
+                                    "</tr>";
+                                }).join("");
+                                var emptyColspan = bulkEnabled ? 6 : 5;
+                                tbody.innerHTML = rows || "<tr><td colspan='" + emptyColspan + "' class='muted'>No records yet.</td></tr>";
+                                if (countEl) countEl.textContent = "Found: " + data.count;
+                            });
+                    }, 300);
+                });
+                if (currencyFilter) {
+                    currencyFilter.addEventListener("change", function () {
+                        var url = new URL(window.location.href);
+                        if (currencyFilter.value) {
+                            url.searchParams.set("currency", currencyFilter.value);
+                        } else {
+                            url.searchParams.delete("currency");
+                        }
+                        window.location.href = url.toString();
+                    });
+                }
+                if (supplierFilter) {
+                    supplierFilter.addEventListener("change", function () {
+                        var url = new URL(window.location.href);
+                        if (supplierFilter.value) {
+                            url.searchParams.set("supplier", supplierFilter.value);
+                        } else {
+                            url.searchParams.delete("supplier");
+                        }
+                        window.location.href = url.toString();
+                    });
+                }
+                if (statusFilter) {
+                    statusFilter.addEventListener("change", function () {
+                        var url = new URL(window.location.href);
+                        if (statusFilter.value) {
+                            url.searchParams.set("status", statusFilter.value);
+                        } else {
+                            url.searchParams.delete("status");
+                        }
+                        window.location.href = url.toString();
+                    });
+                }
+            })();
+        </script>
+    {% endif %}
+    {% if show_bulk_delete %}
+        <script>
+            (function () {
+                var selectAll = document.getElementById("product-select-all");
+                var bulkButton = document.getElementById("bulk-delete-btn");
+                var bulkForm = document.getElementById("bulk-delete-form");
+                if (selectAll) {
+                    selectAll.addEventListener("change", function () {
+                        var checked = selectAll.checked;
+                        document.querySelectorAll("input[name='product_ids']").forEach(function (box) {
+                            box.checked = checked;
+                        });
+                    });
+                }
+                if (bulkButton && bulkForm) {
+                    bulkButton.addEventListener("click", function () {
+                        bulkForm.querySelectorAll("input[name='product_ids']").forEach(function (el) {
+                            el.remove();
+                        });
+                        var selected = Array.from(document.querySelectorAll("input[name='product_ids']:checked"));
+                        if (!selected.length) return;
+                        selected.forEach(function (box) {
+                            var input = document.createElement("input");
+                            input.type = "hidden";
+                            input.name = "product_ids";
+                            input.value = box.value;
+                            bulkForm.appendChild(input);
+                        });
+                        bulkForm.submit();
+                    });
+                }
+            })();
+        </script>
+    {% endif %}
+{% endblock %}

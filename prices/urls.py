@@ -1,0 +1,70 @@
+from django.urls import path
+
+from . import views
+
+
+app_name = "prices"
+
+urlpatterns = [
+    path("", views.DashboardView.as_view(), name="dashboard"),
+    path("suppliers/", views.SupplierListView.as_view(), name="supplier_list"),
+    path(
+        "suppliers/overview/",
+        views.SupplierOverviewView.as_view(),
+        name="supplier_overview",
+    ),
+    path("imports/new/", views.ImportWizardView.as_view(), name="import_wizard"),
+    path("imports/<int:pk>/delete/", views.ImportDeleteView.as_view(), name="import_delete"),
+    path("imports/delete/", views.ImportDeleteBulkView.as_view(), name="import_delete_bulk"),
+    path("products/cleanup/", views.SupplierProductCleanupView.as_view(), name="product_cleanup"),
+    path("products/cleanup-inactive/", views.SupplierProductInactiveCleanupView.as_view(), name="product_cleanup_inactive"),
+    path("products/bulk-delete/", views.SupplierProductBulkDeleteView.as_view(), name="product_bulk_delete"),
+    path("products/search/", views.SupplierProductSearchView.as_view(), name="product_search"),
+    path("settings/currencies/", views.CurrencyRateView.as_view(), name="currency_rates"),
+    path("settings/currencies/<int:pk>/edit/", views.CurrencyRateUpdateView.as_view(), name="currency_rate_update"),
+    path("settings/currencies/<int:pk>/delete/", views.CurrencyRateDeleteView.as_view(), name="currency_rate_delete"),
+    path("settings/mailboxes/", views.MailboxListView.as_view(), name="mailbox_list"),
+    path("settings/mailboxes/new/", views.MailboxCreateView.as_view(), name="mailbox_create"),
+    path("settings/mailboxes/<int:pk>/edit/", views.MailboxUpdateView.as_view(), name="mailbox_update"),
+    path("settings/mailboxes/<int:pk>/delete/", views.MailboxDeleteView.as_view(), name="mailbox_delete"),
+    path("suppliers/new/", views.SupplierCreateView.as_view(), name="supplier_create"),
+    path(
+        "suppliers/<int:pk>/",
+        views.SupplierDetailView.as_view(),
+        name="supplier_detail",
+    ),
+    path("suppliers/<int:pk>/edit/", views.SupplierUpdateView.as_view(), name="supplier_update"),
+    path("suppliers/<int:pk>/delete/", views.SupplierDeleteView.as_view(), name="supplier_delete"),
+    path("suppliers/<int:pk>/import/", views.SupplierImportView.as_view(), name="supplier_import"),
+    path("suppliers/<int:pk>/import-email/", views.SupplierEmailImportView.as_view(), name="supplier_import_email"),
+    path("suppliers/<int:pk>/import-email/backfill/", views.SupplierEmailBackfillView.as_view(), name="supplier_import_email_backfill"),
+    path("suppliers/import-email/backfill/", views.SupplierEmailBackfillBulkView.as_view(), name="supplier_import_email_backfill_bulk"),
+    path("suppliers/import-email/", views.SupplierEmailImportAllView.as_view(), name="supplier_import_email_all"),
+    path("suppliers/<int:pk>/import-email/cancel/", views.SupplierEmailImportCancelView.as_view(), name="supplier_import_email_cancel"),
+    path("suppliers/<int:pk>/import-email/status/", views.SupplierEmailImportStatusView.as_view(), name="supplier_import_email_status"),
+    path("suppliers/import-email/status/", views.SupplierEmailImportStatusAllView.as_view(), name="supplier_import_email_status_all"),
+    path(
+        "suppliers/<int:pk>/mapping-preview/",
+        views.SupplierMappingPreviewView.as_view(),
+        name="supplier_mapping_preview",
+    ),
+    path(
+        "suppliers/mapping-preview/",
+        views.SupplierMappingPreviewView.as_view(),
+        name="supplier_mapping_preview_new",
+    ),
+    path("products/", views.SupplierProductListView.as_view(), name="product_list"),
+    path("products/<int:pk>/", views.SupplierProductDetailView.as_view(), name="product_detail"),
+    path("products/<int:pk>/link/", views.SupplierProductLinkView.as_view(), name="product_link"),
+    path("products/new/", views.SupplierProductCreateView.as_view(), name="product_create"),
+    path("products/<int:pk>/edit/", views.SupplierProductUpdateView.as_view(), name="product_update"),
+    path("products/<int:pk>/delete/", views.SupplierProductDeleteView.as_view(), name="product_delete"),
+    path("our-products/", views.OurProductListView.as_view(), name="our_product_list"),
+    path("our-products/new/", views.OurProductCreateView.as_view(), name="our_product_create"),
+    path("our-products/<int:pk>/", views.OurProductDetailView.as_view(), name="our_product_detail"),
+    path("our-products/<int:pk>/edit/", views.OurProductUpdateView.as_view(), name="our_product_update"),
+    path("our-products/<int:pk>/delete/", views.OurProductDeleteView.as_view(), name="our_product_delete"),
+    path("linking/", views.ProductLinkingView.as_view(), name="product_linking"),
+    path("linking/search/", views.ProductLinkingSearchView.as_view(), name="product_linking_search"),
+    path("linking/apply/", views.ProductLinkingApplyView.as_view(), name="product_linking_apply"),
+]

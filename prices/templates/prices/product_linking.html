@@ -1,0 +1,288 @@
+{% extends "prices/base.html" %}
+
+{% block title %}Link Products{% endblock %}
+
+{% block content %}
+    <div class="card">
+        <div class="page-header">
+            <div>
+                <h1 class="page-title">Link Products</h1>
+                <p class="muted page-subtitle">Pick a supplier product, refine keywords, and link to your catalog.</p>
+            </div>
+        </div>
+        <div class="filters">
+            <p>
+                <label for="link-supplier-filter">Supplier</label>
+                <select id="link-supplier-filter">
+                    <option value="">All</option>
+                    {% for supplier in supplier_options %}
+                        <option value="{{ supplier.id }}"{% if supplier_filter == supplier.id|stringformat:"s" %} selected{% endif %}>
+                            {{ supplier.name }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </p>
+            <p>
+                <label for="link-search">Search</label>
+                <input id="link-search" type="text" value="{{ search_query }}" placeholder="Search supplier products">
+            </p>
+            <p>
+                <label>&nbsp;</label>
+                <button class="button secondary" type="button" id="link-filter-apply">Apply</button>
+            </p>
+        </div>
+    </div>
+    <div class="card">
+        <div style="display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px;">
+            <div>
+                <h2 class="page-title">Supplier products</h2>
+                <p class="muted page-subtitle">Click a row to select.</p>
+                <div class="table-wrap" style="max-height: 420px;">
+                    <table id="supplier-products-table">
+                        <thead>
+                            <tr>
+                                <th>Supplier</th>
+                                <th>SKU</th>
+                                <th>Name</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for product in supplier_products %}
+                                <tr data-id="{{ product.id }}" data-name="{{ product.name }}" style="cursor: pointer;">
+                                    <td>{{ product.supplier.name }}</td>
+                                    <td>{{ product.supplier_sku }}</td>
+                                    <td>{{ product.name }}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% if supplier_products.paginator.num_pages > 1 %}
+                    <div style="margin-top: 12px;">
+                        {% if supplier_products.has_previous %}
+                            <a class="button secondary" href="?sp_page={{ supplier_products.previous_page_number }}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if search_query %}&q={{ search_query }}{% endif %}">Previous</a>
+                        {% endif %}
+                        <span class="muted" style="margin: 0 8px;">
+                            Page {{ supplier_products.number }} of {{ supplier_products.paginator.num_pages }}
+                        </span>
+                        {% if supplier_products.has_next %}
+                            <a class="button secondary" href="?sp_page={{ supplier_products.next_page_number }}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if search_query %}&q={{ search_query }}{% endif %}">Next</a>
+                        {% endif %}
+                    </div>
+                {% endif %}
+            </div>
+            <div>
+                <h2 class="page-title">Keywords</h2>
+                <p class="muted page-subtitle">Toggle words to refine matches.</p>
+                <div id="keyword-panel" class="filters"></div>
+            </div>
+        </div>
+    </div>
+    <div class="card">
+        <div style="display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px;">
+            <div>
+                <h2 class="page-title">Matches</h2>
+                <p class="muted page-subtitle">Select a target to link.</p>
+                <div class="table-wrap" style="max-height: 420px;">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th></th>
+                                <th>Our products</th>
+                            </tr>
+                        </thead>
+                        <tbody id="our-product-results">
+                            <tr><td colspan="2" class="muted">No matches yet.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="table-wrap" style="max-height: 420px; margin-top: 12px;">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th></th>
+                                <th>Other supplier products</th>
+                            </tr>
+                        </thead>
+                        <tbody id="supplier-product-results">
+                            <tr><td colspan="2" class="muted">No matches yet.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div>
+                <h2 class="page-title">Link action</h2>
+                <p class="muted page-subtitle">Confirm the link for the selected supplier product.</p>
+                <form method="post" action="{% url 'prices:product_linking_apply' %}">
+                    {% csrf_token %}
+                    <input type="hidden" name="source_id" id="link-source-id">
+                    <input type="hidden" name="target_our" id="link-target-our">
+                    <input type="hidden" name="target_supplier" id="link-target-supplier">
+                    <p class="muted" id="link-selection">No product selected.</p>
+                    <button class="button" type="submit">Link product</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    <script>
+        (function () {
+            var selectedRow = null;
+            var sourceInput = document.getElementById("link-source-id");
+            var linkSelection = document.getElementById("link-selection");
+            var keywordPanel = document.getElementById("keyword-panel");
+            var ourResults = document.getElementById("our-product-results");
+            var supplierResults = document.getElementById("supplier-product-results");
+            var targetOur = document.getElementById("link-target-our");
+            var targetSupplier = document.getElementById("link-target-supplier");
+
+            function setTarget(type, id) {
+                targetOur.value = "";
+                targetSupplier.value = "";
+                if (type === "our") {
+                    targetOur.value = id;
+                } else {
+                    targetSupplier.value = id;
+                }
+                document.querySelectorAll("[data-target-select]").forEach(function (el) {
+                    el.checked = false;
+                });
+                var current = document.querySelector("[data-target-select='" + type + ":" + id + "']");
+                if (current) current.checked = true;
+            }
+
+            function tokenize(text) {
+                if (!text) return [];
+                if (window.Intl && Intl.Segmenter) {
+                    var segmenter = new Intl.Segmenter("en", { granularity: "word" });
+                    return Array.from(segmenter.segment(text))
+                        .filter(function (part) { return part.isWordLike; })
+                        .map(function (part) { return part.segment; });
+                }
+                try {
+                    var unicodeTokens = text.match(/[\p{L}\p{N}]+/gu);
+                    if (unicodeTokens) return unicodeTokens;
+                } catch (err) {
+                    // Ignore and fall back.
+                }
+                return text
+                    .replace(/[^A-Za-z0-9\u0400-\u04FF]+/g, " ")
+                    .trim()
+                    .split(/\s+/)
+                    .filter(Boolean);
+            }
+
+            function renderKeywords(name) {
+                keywordPanel.innerHTML = "";
+                if (!name) return;
+                var tokens = tokenize(name);
+                var seen = new Set();
+                tokens.filter(function (token) {
+                    var key = token.toLowerCase();
+                    if (seen.has(key)) return false;
+                    seen.add(key);
+                    return true;
+                }).slice(0, 18).forEach(function (token) {
+                    var id = "kw-" + token.replace(/[^a-z0-9]/gi, "").toLowerCase();
+                    var wrapper = document.createElement("div");
+                    var label = document.createElement("label");
+                    label.style.display = "flex";
+                    label.style.alignItems = "center";
+                    label.style.gap = "8px";
+                    var input = document.createElement("input");
+                    input.type = "checkbox";
+                    input.value = token;
+                    input.checked = true;
+                    input.id = id;
+                    input.addEventListener("change", searchMatches);
+                    label.appendChild(input);
+                    label.appendChild(document.createTextNode(token));
+                    wrapper.appendChild(label);
+                    keywordPanel.appendChild(wrapper);
+                });
+                searchMatches();
+            }
+
+            function searchMatches() {
+                if (!sourceInput.value) return;
+                var terms = Array.from(keywordPanel.querySelectorAll("input:checked")).map(function (el) { return el.value; });
+                if (!terms.length) {
+                    ourResults.innerHTML = "<tr><td colspan='2' class='muted'>No keywords selected.</td></tr>";
+                    supplierResults.innerHTML = "<tr><td colspan='2' class='muted'>No keywords selected.</td></tr>";
+                    return;
+                }
+                fetch("/linking/search/?supplier_product=" + sourceInput.value + "&terms=" + encodeURIComponent(terms.join(" ")))
+                    .then(function (res) { return res.json(); })
+                    .then(function (data) {
+                        if (data.error) {
+                            ourResults.innerHTML = "<tr><td colspan='2' class='muted'>" + data.error + "</td></tr>";
+                            supplierResults.innerHTML = "<tr><td colspan='2' class='muted'>" + data.error + "</td></tr>";
+                            return;
+                        }
+                        if (data.our_products.length) {
+                            ourResults.innerHTML = data.our_products.map(function (item) {
+                                var label = [item.brand, item.name, item.size].filter(Boolean).join(" ");
+                                return "<tr>" +
+                                    "<td><input type='checkbox' data-target-select='our:" + item.id + "'></td>" +
+                                    "<td>" + label + "</td>" +
+                                "</tr>";
+                            }).join("");
+                        } else {
+                            ourResults.innerHTML = "<tr><td colspan='2' class='muted'>No our products.</td></tr>";
+                        }
+                        if (data.supplier_products.length) {
+                            supplierResults.innerHTML = data.supplier_products.map(function (item) {
+                                var label = item.supplier + " · " + item.name + " (" + item.sku + ")";
+                                return "<tr>" +
+                                    "<td><input type='checkbox' data-target-select='supplier:" + item.id + "'></td>" +
+                                    "<td>" + label + "</td>" +
+                                "</tr>";
+                            }).join("");
+                        } else {
+                            supplierResults.innerHTML = "<tr><td colspan='2' class='muted'>No supplier products.</td></tr>";
+                        }
+                        document.querySelectorAll("[data-target-select]").forEach(function (el) {
+                            el.addEventListener("change", function () {
+                                var value = el.getAttribute("data-target-select");
+                                if (!value) return;
+                                var parts = value.split(":");
+                                setTarget(parts[0], parts[1]);
+                            });
+                        });
+                    });
+            }
+
+            document.querySelectorAll("#supplier-products-table tbody tr").forEach(function (row) {
+                row.addEventListener("click", function () {
+                    if (selectedRow) {
+                        selectedRow.style.background = "";
+                    }
+                    selectedRow = row;
+                    row.style.background = "#f3f4f6";
+                    var id = row.getAttribute("data-id");
+                    var name = row.getAttribute("data-name");
+                    sourceInput.value = id;
+                    linkSelection.textContent = "Selected: " + name;
+                    renderKeywords(name);
+                });
+            });
+
+            document.getElementById("link-filter-apply").addEventListener("click", function () {
+                var supplier = document.getElementById("link-supplier-filter").value;
+                var query = document.getElementById("link-search").value;
+                var url = new URL(window.location.href);
+                if (supplier) {
+                    url.searchParams.set("supplier", supplier);
+                } else {
+                    url.searchParams.delete("supplier");
+                }
+                if (query) {
+                    url.searchParams.set("q", query);
+                } else {
+                    url.searchParams.delete("q");
+                }
+                url.searchParams.delete("sp_page");
+                window.location.href = url.toString();
+            });
+        })();
+    </script>
+{% endblock %}

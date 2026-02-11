@@ -1,0 +1,33 @@
+{% extends "prices/base.html" %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+    <div class="card">
+        <div class="page-header">
+            <div>
+                <h1 class="page-title">Dashboard</h1>
+                <p class="muted page-subtitle">Quick access to imports and product data.</p>
+            </div>
+        </div>
+    </div>
+    <div class="card">
+        <div class="filters">
+            <div>
+                <h3 style="margin: 0 0 6px;">Import Prices</h3>
+                <p class="muted" style="margin: 0 0 10px;">Check supplier status and update from email.</p>
+                <a class="button" href="{% url 'prices:supplier_overview' %}">Open Import Center</a>
+            </div>
+            <div>
+                <h3 style="margin: 0 0 6px;">Suppliers</h3>
+                <p class="muted" style="margin: 0 0 10px;">Manage mappings and email rules.</p>
+                <a class="button secondary" href="{% url 'prices:supplier_list' %}">Manage Suppliers</a>
+            </div>
+            <div>
+                <h3 style="margin: 0 0 6px;">Our Products</h3>
+                <p class="muted" style="margin: 0 0 10px;">Manage your catalog and supplier offers.</p>
+                <a class="button secondary" href="{% url 'prices:our_product_list' %}">View Our Products</a>
+            </div>
+        </div>
+    </div>
+{% endblock %}

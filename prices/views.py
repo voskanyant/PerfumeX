@@ -1,0 +1,1515 @@
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.urls import reverse_lazy
+from collections import defaultdict
+import hashlib
+
+from django.utils import timezone
+from django.views.generic import (
+    CreateView,
+    DeleteView,
+    DetailView,
+    ListView,
+    FormView,
+    View,
+    TemplateView,
+    UpdateView,
+)
+from django.http import JsonResponse
+from django.core.paginator import Paginator
+from django.utils.http import url_has_allowed_host_and_scheme
+from django.views.decorators.http import require_POST
+from django.views.decorators.csrf import csrf_exempt
+from django.utils.decorators import method_decorator
+from datetime import datetime, time
+
+from decimal import Decimal
+import threading
+import re
+
+from django.db.models import Q
+
+from . import forms, models
+from django.shortcuts import get_object_or_404, redirect
+
+from .services.importer import delete_import_batch, process_import_file
+from django.contrib import messages
+from django.db import close_old_connections
+
+from .services.email_importer import run_import
+from .services.importer import preview_mapping_file
+
+
+def _get_supplier_latest_batch_time(supplier: models.Supplier):
+    latest = None
+    batches = models.ImportBatch.objects.filter(
+        supplier=supplier,
+        importfile__status=models.ImportStatus.PROCESSED,
+        importfile__file_kind=models.FileKind.PRICE,
+    ).values_list("received_at", "created_at")
+    for received_at, created_at in batches:
+        candidate = received_at or created_at
+        if candidate and (latest is None or candidate > latest):
+            latest = candidate
+    return latest
+
+
+class DashboardView(LoginRequiredMixin, TemplateView):
+    template_name = "prices/dashboard.html"
+
+
+class BaseListView(LoginRequiredMixin, ListView):
+    template_name = "prices/list.html"
+    paginate_by = 50
+    ordering = ("-id",)
+    list_display: tuple[str, ...] = ()
+    create_url_name = ""
+    update_url_name = ""
+    delete_url_name = ""
+    detail_url_name = ""
+    show_create = True
+    show_actions = True
+
+    def get_ordering(self):
+        sort_field = self.request.GET.get("sort")
+        sort_dir = self.request.GET.get("dir", "asc")
+        if sort_field in self.list_display:
+            prefix = "-" if sort_dir == "desc" else ""
+            return (f"{prefix}{sort_field}",)
+        return super().get_ordering()
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["list_display"] = self.list_display
+        context["list_title"] = getattr(
+            self, "list_title", self.model._meta.verbose_name_plural.title()
+        )
+        context["total_count"] = self.get_queryset().count()
+        context["current_sort"] = self.request.GET.get("sort", "")
+        context["current_dir"] = self.request.GET.get("dir", "asc")
+        context["current_q"] = self.request.GET.get("q", "")
+        context["create_url_name"] = self.create_url_name
+        context["update_url_name"] = self.update_url_name
+        context["delete_url_name"] = self.delete_url_name
+        context["detail_url_name"] = self.detail_url_name
+        context["show_create"] = self.show_create
+        context["show_actions"] = self.show_actions
+        return context
+
+
+class BaseCreateView(LoginRequiredMixin, CreateView):
+    template_name = "prices/form.html"
+    success_url_name = ""
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["object_name"] = self.model._meta.verbose_name.title()
+        return context
+
+    def get_success_url(self):
+        return reverse_lazy(self.success_url_name)
+
+
+class BaseUpdateView(LoginRequiredMixin, UpdateView):
+    template_name = "prices/form.html"
+    success_url_name = ""
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["object_name"] = self.model._meta.verbose_name.title()
+        return context
+
+    def get_success_url(self):
+        return reverse_lazy(self.success_url_name)
+
+
+class BaseDeleteView(LoginRequiredMixin, DeleteView):
+    template_name = "prices/confirm_delete.html"
+    success_url_name = ""
+
+    def get_success_url(self):
+        next_url = self.request.POST.get("next") or self.request.GET.get("next")
+        if next_url and url_has_allowed_host_and_scheme(
+            next_url, allowed_hosts={self.request.get_host()}
+        ):
+            return next_url
+        return reverse_lazy(self.success_url_name)
+
+
+class SupplierListView(BaseListView):
+    model = models.Supplier
+    list_display = (
+        "name",
+        "code",
+        "default_currency",
+        "is_active",
+        "created_at",
+    )
+    detail_url_name = "prices:supplier_detail"
+    create_url_name = "prices:supplier_create"
+    update_url_name = "prices:supplier_update"
+    delete_url_name = "prices:supplier_delete"
+
+
+class SupplierCreateView(BaseCreateView):
+    model = models.Supplier
+    form_class = forms.SupplierForm
+    success_url_name = "prices:supplier_list"
+
+
+
+class SupplierUpdateView(BaseUpdateView):
+    model = models.Supplier
+    form_class = forms.SupplierForm
+    success_url_name = "prices:supplier_list"
+
+
+
+class SupplierDeleteView(BaseDeleteView):
+    model = models.Supplier
+    success_url_name = "prices:supplier_list"
+
+
+class SupplierDetailView(LoginRequiredMixin, DetailView):
+    model = models.Supplier
+    template_name = "prices/supplier_detail.html"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["mappings"] = models.SupplierFileMapping.objects.filter(
+            supplier=self.object
+        ).order_by("-id")
+        return context
+
+
+class SupplierOverviewView(LoginRequiredMixin, TemplateView):
+    template_name = "prices/supplier_overview.html"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        suppliers = list(models.Supplier.objects.order_by("name"))
+        latest_imports = {}
+        latest_runs = {}
+        batches = (
+            models.ImportBatch.objects.select_related("supplier")
+            .order_by("-created_at")
+        )
+        for batch in batches:
+            if batch.supplier_id not in latest_imports:
+                latest_imports[batch.supplier_id] = batch
+        runs = (
+            models.EmailImportRun.objects.select_related("supplier")
+            .order_by("-started_at")
+        )
+        for run in runs:
+            if run.supplier_id not in latest_runs:
+                latest_runs[run.supplier_id] = run
+        rows = []
+        import_batches = models.ImportBatch.objects.select_related(
+            "supplier", "mailbox"
+        ).prefetch_related("importfile_set")
+        supplier_filter = self.request.GET.get("supplier", "").strip()
+        status_filter = self.request.GET.get("status", "").strip()
+        if supplier_filter:
+            import_batches = import_batches.filter(supplier_id=supplier_filter)
+        if status_filter:
+            import_batches = import_batches.filter(status=status_filter)
+        import_batches = import_batches.order_by("-created_at")
+        log_paginator = Paginator(import_batches, 25)
+        log_page_number = self.request.GET.get("log_page", "1")
+        log_page = log_paginator.get_page(log_page_number)
+        for supplier in suppliers:
+            run = latest_runs.get(supplier.id)
+            progress = None
+            if run and run.total_messages:
+                progress = int((run.processed_messages / run.total_messages) * 100)
+            rows.append(
+                {
+                    "supplier": supplier,
+                    "latest_import": latest_imports.get(supplier.id),
+                    "latest_run": run,
+                    "latest_run_progress": progress,
+                    "is_running": run and run.status == models.EmailImportStatus.RUNNING,
+                }
+            )
+        context["rows"] = rows
+        context["import_batches"] = log_page
+        context["import_log_page"] = log_page
+        context["any_running"] = models.EmailImportRun.objects.filter(
+            status=models.EmailImportStatus.RUNNING
+        ).exists()
+        context["supplier_filter"] = supplier_filter
+        context["status_filter"] = status_filter
+        context["supplier_options"] = suppliers
+        context["status_options"] = models.ImportStatus.choices
+        return context
+
+
+class ImportWizardView(LoginRequiredMixin, FormView):
+    template_name = "prices/import_wizard.html"
+    form_class = forms.ImportWizardForm
+    success_url = reverse_lazy("prices:supplier_overview")
+
+    def get_initial(self):
+        initial = super().get_initial()
+        supplier_id = self.request.GET.get("supplier")
+        file_kind = self.request.GET.get("file_kind")
+        if supplier_id:
+            initial["supplier"] = supplier_id
+        if file_kind:
+            initial["file_kind"] = file_kind
+        return initial
+
+    def form_valid(self, form):
+        supplier = form.cleaned_data["supplier"]
+        file_kind = form.cleaned_data["file_kind"]
+        upload = form.cleaned_data["file"]
+
+        mapping = (
+            models.SupplierFileMapping.objects.filter(
+                supplier=supplier, file_kind=file_kind, is_active=True
+            )
+            .order_by("-id")
+            .first()
+        )
+
+        import_batch = models.ImportBatch.objects.create(
+            supplier=supplier,
+            status=models.ImportStatus.PENDING,
+            received_at=timezone.now(),
+        )
+
+        content_hash = ""
+        if upload:
+            hasher = hashlib.sha256()
+            for chunk in upload.chunks():
+                hasher.update(chunk)
+            content_hash = hasher.hexdigest()
+
+        import_file = models.ImportFile.objects.create(
+            import_batch=import_batch,
+            mapping=mapping,
+            file_kind=file_kind,
+            filename=upload.name if upload else "",
+            file=upload,
+            content_hash=content_hash,
+            status=models.ImportStatus.PENDING,
+        )
+        try:
+            process_import_file(import_file)
+            import_batch.status = models.ImportStatus.PROCESSED
+            import_batch.save(update_fields=["status"])
+        except Exception as exc:
+            import_file.status = models.ImportStatus.FAILED
+            import_file.error_message = str(exc)
+            import_file.save(update_fields=["status", "error_message"])
+            import_batch.status = models.ImportStatus.FAILED
+            import_batch.error_message = str(exc)
+            import_batch.save(update_fields=["status", "error_message"])
+        return super().form_valid(form)
+
+
+class ImportDeleteView(LoginRequiredMixin, View):
+    def post(self, request, pk):
+        import_batch = get_object_or_404(models.ImportBatch, pk=pk)
+        delete_import_batch(import_batch)
+        return redirect("prices:supplier_overview")
+
+
+class ImportDeleteBulkView(LoginRequiredMixin, View):
+    def post(self, request):
+        ids = request.POST.getlist("import_ids")
+        if ids:
+            batches = models.ImportBatch.objects.filter(id__in=ids)
+            for batch in batches:
+                delete_import_batch(batch)
+        return redirect("prices:supplier_overview")
+
+
+class SupplierProductCleanupView(LoginRequiredMixin, View):
+    def post(self, request):
+        models.SupplierProduct.objects.filter(
+            created_import_batch__isnull=True, last_import_batch__isnull=True
+        ).delete()
+        return redirect("prices:product_list")
+
+
+class SupplierProductInactiveCleanupView(LoginRequiredMixin, View):
+    def post(self, request):
+        supplier_id = request.POST.get("supplier", "").strip()
+        queryset = models.SupplierProduct.objects.filter(is_active=False)
+        if supplier_id:
+            queryset = queryset.filter(supplier_id=supplier_id)
+        queryset.delete()
+        return redirect("prices:product_list")
+
+
+class SupplierProductBulkDeleteView(LoginRequiredMixin, View):
+    def post(self, request):
+        ids = request.POST.getlist("product_ids")
+        if ids:
+            models.SupplierProduct.objects.filter(id__in=ids).delete()
+        next_url = request.POST.get("next")
+        if next_url and url_has_allowed_host_and_scheme(
+            next_url, allowed_hosts={self.request.get_host()}
+        ):
+            return redirect(next_url)
+        return redirect("prices:product_list")
+
+
+class SupplierProductSearchView(LoginRequiredMixin, View):
+    def get(self, request):
+        query = request.GET.get("q", "").strip()
+        currency = request.GET.get("currency", "").strip()
+        supplier_filter = request.GET.get("supplier", "").strip()
+        status_filter = request.GET.get("status", "").strip()
+        sort_field = request.GET.get("sort") or "current_price"
+        sort_dir = request.GET.get("dir", "asc")
+        allowed_sorts = {"supplier", "supplier_sku", "name", "current_price", "last_imported_at"}
+        if sort_field not in allowed_sorts:
+            sort_field = "current_price"
+        prefix = "-" if sort_dir == "desc" else ""
+        ordering = f"{prefix}{sort_field}"
+
+        queryset = models.SupplierProduct.objects.select_related("supplier")
+        if query:
+            tokens = [token for token in re.split(r"\s+", query) if token]
+            for token in tokens:
+                queryset = queryset.filter(
+                    Q(supplier_sku__icontains=token)
+                    | Q(name__icontains=token)
+                    | Q(supplier__name__icontains=token)
+                )
+        if supplier_filter:
+            queryset = queryset.filter(supplier_id=supplier_filter)
+        if status_filter == "active":
+            queryset = queryset.filter(is_active=True)
+        elif status_filter == "inactive":
+            queryset = queryset.filter(is_active=False)
+        queryset = queryset.order_by(ordering)
+
+        total_count = queryset.count()
+        items = []
+        rates = _get_latest_rates()
+        for product in queryset:
+            imported_at = ""
+            if product.last_imported_at:
+                imported_at = timezone.localtime(product.last_imported_at).strftime(
+                    "%d/%m/%Y %H:%M"
+                )
+            display_price = product.current_price
+            display_currency = product.currency
+            if currency:
+                display_currency = currency
+                display_price = _convert_price(
+                    product.current_price, product.currency, currency, rates
+                )
+            items.append(
+                {
+                    "id": product.id,
+                    "supplier": product.supplier.name,
+                    "supplier_sku": product.supplier_sku,
+                    "name": product.name,
+                    "current_price": _format_price(display_price, display_currency),
+                    "last_imported_at": imported_at,
+                    "is_active": product.is_active,
+                }
+            )
+
+        return JsonResponse({"count": total_count, "items": items})
+
+
+class SupplierImportView(LoginRequiredMixin, FormView):
+    template_name = "prices/supplier_import.html"
+    form_class = forms.SupplierImportForm
+
+    def get_success_url(self):
+        return reverse_lazy("prices:supplier_overview")
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        supplier = get_object_or_404(models.Supplier, pk=self.kwargs["pk"])
+        context["supplier"] = supplier
+        return context
+
+    def get_initial(self):
+        initial = super().get_initial()
+        supplier = get_object_or_404(models.Supplier, pk=self.kwargs["pk"])
+        mapping = (
+            models.SupplierFileMapping.objects.filter(
+                supplier=supplier, file_kind=models.FileKind.PRICE, is_active=True
+            )
+            .order_by("-id")
+            .first()
+        )
+        if mapping:
+            name_value = mapping.column_map.get("name")
+            name_columns = []
+            if isinstance(name_value, list):
+                name_columns = [str(value) for value in name_value if value]
+            elif name_value:
+                name_columns = [str(name_value)]
+            sheet_selector_parts = []
+            if mapping.sheet_names:
+                sheet_selector_parts.extend(
+                    [name.strip() for name in mapping.sheet_names.split(",") if name.strip()]
+                )
+            if mapping.sheet_indexes:
+                sheet_selector_parts.extend(
+                    [idx.strip() for idx in mapping.sheet_indexes.split(",") if idx.strip()]
+                )
+            initial.update(
+                {
+                    "sheet_selector": ", ".join(sheet_selector_parts),
+                    "header_row": mapping.header_row,
+                    "sku_column": mapping.column_map.get("sku"),
+                    "name_columns": ",".join(name_columns),
+                    "price_column": mapping.column_map.get("price"),
+                }
+            )
+        return initial
+
+    def form_valid(self, form):
+        supplier = get_object_or_404(models.Supplier, pk=self.kwargs["pk"])
+        mapping = _save_supplier_mapping_from_import_form(form, supplier)
+        upload = form.cleaned_data["file"]
+        import_batch = models.ImportBatch.objects.create(
+            supplier=supplier,
+            status=models.ImportStatus.PENDING,
+            received_at=timezone.now(),
+        )
+        content_hash = ""
+        if upload:
+            hasher = hashlib.sha256()
+            for chunk in upload.chunks():
+                hasher.update(chunk)
+            content_hash = hasher.hexdigest()
+        import_file = models.ImportFile.objects.create(
+            import_batch=import_batch,
+            mapping=mapping,
+            file_kind=models.FileKind.PRICE,
+            filename=upload.name if upload else "",
+            file=upload,
+            content_hash=content_hash,
+            status=models.ImportStatus.PENDING,
+        )
+        try:
+            process_import_file(import_file)
+            import_batch.status = models.ImportStatus.PROCESSED
+            import_batch.save(update_fields=["status"])
+        except Exception as exc:
+            import_file.status = models.ImportStatus.FAILED
+            import_file.error_message = str(exc)
+            import_file.save(update_fields=["status", "error_message"])
+            import_batch.status = models.ImportStatus.FAILED
+            import_batch.error_message = str(exc)
+            import_batch.save(update_fields=["status", "error_message"])
+        return super().form_valid(form)
+
+
+class SupplierEmailImportView(LoginRequiredMixin, View):
+    def post(self, request, pk):
+        supplier = get_object_or_404(models.Supplier, pk=pk)
+        if not supplier.from_address_pattern:
+            messages.info(
+                request,
+                "Supplier has no sender email configured. Set From address pattern first.",
+            )
+            return redirect("prices:supplier_overview")
+        if models.EmailImportRun.objects.filter(
+            supplier=supplier, status=models.EmailImportStatus.RUNNING
+        ).exists():
+            messages.info(request, "Email import already running for this supplier.")
+            return redirect("prices:supplier_overview")
+        run = models.EmailImportRun.objects.create(
+            supplier=supplier, status=models.EmailImportStatus.RUNNING
+        )
+        def _run():
+            close_old_connections()
+            mailboxes = models.Mailbox.objects.filter(is_active=True)
+            latest_batch = _get_supplier_latest_batch_time(supplier)
+            if latest_batch and timezone.is_naive(latest_batch):
+                latest_batch = timezone.make_aware(latest_batch)
+            if latest_batch:
+                since_date = timezone.localtime(latest_batch) - timezone.timedelta(days=5)
+            else:
+                since_date = timezone.now() - timezone.timedelta(days=supplier.email_search_days)
+            run_import(
+                mailboxes=mailboxes,
+                supplier_id=supplier.id,
+                mark_seen=True,
+                limit=0,
+                max_bytes=20_000_000,
+                logger=None,
+                run_id=run.id,
+                search_criteria="ALL",
+                since_date=since_date,
+                from_filter=supplier.from_address_pattern or None,
+                subject_filter=supplier.price_subject_pattern or None,
+                dedupe_same_day_only=False,
+            )
+
+        thread = threading.Thread(target=_run, daemon=True)
+        thread.start()
+        return redirect("prices:supplier_overview")
+
+
+class SupplierEmailBackfillView(LoginRequiredMixin, View):
+    def post(self, request, pk):
+        supplier = get_object_or_404(models.Supplier, pk=pk)
+        if not supplier.from_address_pattern:
+            messages.info(
+                request,
+                "Supplier has no sender email configured. Set From address pattern first.",
+            )
+            return redirect("prices:supplier_import", pk=pk)
+        if models.EmailImportRun.objects.filter(
+            supplier=supplier, status=models.EmailImportStatus.RUNNING
+        ).exists():
+            messages.info(request, "Email import already running for this supplier.")
+            return redirect("prices:supplier_import", pk=pk)
+
+        start_raw = request.POST.get("start_date", "").strip()
+        end_raw = request.POST.get("end_date", "").strip()
+        if not start_raw:
+            messages.info(request, "Start date is required for backfill.")
+            return redirect("prices:supplier_import", pk=pk)
+
+        try:
+            start_date = datetime.fromisoformat(start_raw).date()
+        except ValueError:
+            messages.info(request, "Start date is invalid.")
+            return redirect("prices:supplier_import", pk=pk)
+
+        end_date = None
+        if end_raw:
+            try:
+                end_date = datetime.fromisoformat(end_raw).date()
+            except ValueError:
+                messages.info(request, "End date is invalid.")
+                return redirect("prices:supplier_import", pk=pk)
+
+        run = models.EmailImportRun.objects.create(
+            supplier=supplier,
+            status=models.EmailImportStatus.RUNNING,
+            last_message=f"Backfill {start_date.isoformat()} to {end_date or 'today'}",
+        )
+
+        def _run():
+            close_old_connections()
+            mailboxes = models.Mailbox.objects.filter(is_active=True)
+            since_date = timezone.make_aware(datetime.combine(start_date, time(0, 0)))
+            before_date = None
+            if end_date:
+                before_date = timezone.make_aware(
+                    datetime.combine(end_date + timezone.timedelta(days=1), time(0, 0))
+                )
+            run_import(
+                mailboxes=mailboxes,
+                supplier_id=supplier.id,
+                mark_seen=False,
+                limit=0,
+                max_bytes=20_000_000,
+                logger=None,
+                run_id=run.id,
+                search_criteria="ALL",
+                since_date=since_date,
+                before_date=before_date,
+                from_filter=supplier.from_address_pattern or None,
+                subject_filter=supplier.price_subject_pattern or None,
+                dedupe_same_day_only=False,
+            )
+
+        thread = threading.Thread(target=_run, daemon=True)
+        thread.start()
+        return redirect("prices:supplier_import", pk=pk)
+
+
+class SupplierEmailBackfillBulkView(LoginRequiredMixin, View):
+    def post(self, request):
+        supplier_ids = request.POST.getlist("supplier_ids")
+        start_raw = request.POST.get("start_date", "").strip()
+        end_raw = request.POST.get("end_date", "").strip()
+        if not supplier_ids:
+            messages.info(request, "Select at least one supplier for backfill.")
+            return redirect("prices:supplier_overview")
+        if not start_raw:
+            messages.info(request, "Start date is required for bulk backfill.")
+            return redirect("prices:supplier_overview")
+
+        try:
+            start_date = datetime.fromisoformat(start_raw).date()
+        except ValueError:
+            messages.info(request, "Start date is invalid.")
+            return redirect("prices:supplier_overview")
+
+        end_date = None
+        if end_raw:
+            try:
+                end_date = datetime.fromisoformat(end_raw).date()
+            except ValueError:
+                messages.info(request, "End date is invalid.")
+                return redirect("prices:supplier_overview")
+
+        suppliers = list(
+            models.Supplier.objects.filter(id__in=supplier_ids, is_active=True)
+        )
+        if not suppliers:
+            messages.info(request, "No valid suppliers selected.")
+            return redirect("prices:supplier_overview")
+
+        def _run_bulk():
+            close_old_connections()
+            mailboxes = list(models.Mailbox.objects.filter(is_active=True))
+            since_date = timezone.make_aware(datetime.combine(start_date, time(0, 0)))
+            before_date = None
+            if end_date:
+                before_date = timezone.make_aware(
+                    datetime.combine(end_date + timezone.timedelta(days=1), time(0, 0))
+                )
+            for supplier in suppliers:
+                if not supplier.from_address_pattern:
+                    continue
+                if models.EmailImportRun.objects.filter(
+                    supplier=supplier, status=models.EmailImportStatus.RUNNING
+                ).exists():
+                    continue
+                run = models.EmailImportRun.objects.create(
+                    supplier=supplier,
+                    status=models.EmailImportStatus.RUNNING,
+                    last_message=f"Bulk backfill {start_date.isoformat()} to {end_date or 'today'}",
+                )
+                try:
+                    run_import(
+                        mailboxes=mailboxes,
+                        supplier_id=supplier.id,
+                        mark_seen=False,
+                        limit=0,
+                        max_bytes=20_000_000,
+                        logger=None,
+                        run_id=run.id,
+                        search_criteria="ALL",
+                        since_date=since_date,
+                        before_date=before_date,
+                        from_filter=supplier.from_address_pattern or None,
+                        subject_filter=supplier.price_subject_pattern or None,
+                        dedupe_same_day_only=False,
+                    )
+                except Exception as exc:
+                    models.EmailImportRun.objects.filter(id=run.id).update(
+                        status=models.EmailImportStatus.FAILED,
+                        finished_at=timezone.now(),
+                        errors=1,
+                        last_message=str(exc),
+                    )
+
+        thread = threading.Thread(target=_run_bulk, daemon=True)
+        thread.start()
+        return redirect("prices:supplier_overview")
+
+
+class SupplierEmailImportAllView(LoginRequiredMixin, View):
+    def post(self, request):
+        if models.EmailImportRun.objects.filter(
+            status=models.EmailImportStatus.RUNNING
+        ).exists():
+            messages.info(request, "Email import already running.")
+            return redirect("prices:supplier_overview")
+        suppliers = list(
+            models.Supplier.objects.filter(
+                is_active=True, from_address_pattern__gt=""
+            ).order_by("name")
+        )
+        if not suppliers:
+            messages.info(
+                request, "No active suppliers with sender email configured."
+            )
+            return redirect("prices:supplier_overview")
+
+        def _run_all():
+            close_old_connections()
+            mailboxes = list(models.Mailbox.objects.filter(is_active=True))
+            for supplier in suppliers:
+                run = models.EmailImportRun.objects.create(
+                    supplier=supplier, status=models.EmailImportStatus.RUNNING
+                )
+                since_date = timezone.now() - timezone.timedelta(
+                    days=supplier.email_search_days
+                )
+                try:
+                    latest_batch = _get_supplier_latest_batch_time(supplier)
+                    if latest_batch and timezone.is_naive(latest_batch):
+                        latest_batch = timezone.make_aware(latest_batch)
+                    if latest_batch:
+                        since_date = timezone.localtime(latest_batch) - timezone.timedelta(days=5)
+                    else:
+                        since_date = timezone.now() - timezone.timedelta(days=supplier.email_search_days)
+                    run_import(
+                        mailboxes=mailboxes,
+                        supplier_id=supplier.id,
+                        mark_seen=True,
+                        limit=0,
+                        max_bytes=20_000_000,
+                        logger=None,
+                        run_id=run.id,
+                        search_criteria="ALL",
+                        since_date=since_date,
+                        from_filter=supplier.from_address_pattern or None,
+                        subject_filter=supplier.price_subject_pattern or None,
+                        dedupe_same_day_only=False,
+                    )
+                except Exception as exc:
+                    models.EmailImportRun.objects.filter(id=run.id).update(
+                        status=models.EmailImportStatus.FAILED,
+                        finished_at=timezone.now(),
+                        errors=1,
+                        last_message=str(exc),
+                    )
+
+        thread = threading.Thread(target=_run_all, daemon=True)
+        thread.start()
+        return redirect("prices:supplier_overview")
+
+
+class SupplierEmailImportStatusView(LoginRequiredMixin, View):
+    def get(self, request, pk):
+        run = (
+            models.EmailImportRun.objects.filter(supplier_id=pk)
+            .order_by("-started_at")
+            .first()
+        )
+        if not run:
+            return JsonResponse({"status": "idle"})
+        progress = None
+        if run.total_messages:
+            progress = int((run.processed_messages / run.total_messages) * 100)
+        return JsonResponse(
+            {
+                "status": run.status,
+                "progress": progress,
+                "processed_files": run.processed_files,
+                "errors": run.errors,
+                "last_message": run.last_message,
+            }
+        )
+
+
+class SupplierEmailImportStatusAllView(LoginRequiredMixin, View):
+    def get(self, request):
+        runs = (
+            models.EmailImportRun.objects.select_related("supplier")
+            .order_by("-started_at")
+        )
+        latest = {}
+        for run in runs:
+            if run.supplier_id not in latest:
+                progress = None
+                if run.total_messages:
+                    progress = int((run.processed_messages / run.total_messages) * 100)
+                latest[run.supplier_id] = {
+                    "status": run.status,
+                    "progress": progress,
+                    "processed_files": run.processed_files,
+                    "errors": run.errors,
+                    "last_message": run.last_message,
+                }
+        return JsonResponse({"runs": latest})
+
+
+class SupplierEmailImportCancelView(LoginRequiredMixin, View):
+    def post(self, request, pk):
+        supplier = get_object_or_404(models.Supplier, pk=pk)
+        updated = models.EmailImportRun.objects.filter(
+            supplier=supplier, status=models.EmailImportStatus.RUNNING
+        ).update(
+            status=models.EmailImportStatus.CANCELED,
+            finished_at=timezone.now(),
+            last_message="Canceled by user.",
+        )
+        if updated:
+            messages.info(request, "Email import marked as canceled.")
+        else:
+            messages.info(request, "No running import to cancel.")
+        return redirect("prices:supplier_overview")
+
+
+@method_decorator(csrf_exempt, name="dispatch")
+@method_decorator(require_POST, name="dispatch")
+class SupplierMappingPreviewView(LoginRequiredMixin, View):
+    def post(self, request, pk):
+        if "file" not in request.FILES:
+            return JsonResponse({"error": "No file uploaded."}, status=400)
+        upload = request.FILES["file"]
+        sheet_index = request.POST.get("sheet_index")
+        sheet_index_value = None
+        if sheet_index and sheet_index.isdigit():
+            sheet_index_value = int(sheet_index)
+        preview = preview_mapping_file(upload, sheet_index_value)
+        return JsonResponse(preview)
+
+
+class CurrencyRateView(LoginRequiredMixin, TemplateView):
+    template_name = "prices/currencies.html"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["form"] = forms.ExchangeRateForm()
+        context["rates"] = models.ExchangeRate.objects.order_by("-rate_date", "-id")
+        return context
+
+    def post(self, request, *args, **kwargs):
+        form = forms.ExchangeRateForm(request.POST)
+        if form.is_valid():
+            form.save()
+            return redirect("prices:currency_rates")
+        context = self.get_context_data()
+        context["form"] = form
+        return self.render_to_response(context)
+
+
+class CurrencyRateUpdateView(LoginRequiredMixin, View):
+    def post(self, request, pk):
+        rate = get_object_or_404(models.ExchangeRate, pk=pk)
+        form = forms.ExchangeRateForm(request.POST, instance=rate)
+        if form.is_valid():
+            form.save()
+        return redirect("prices:currency_rates")
+
+
+class CurrencyRateDeleteView(LoginRequiredMixin, View):
+    def post(self, request, pk):
+        rate = get_object_or_404(models.ExchangeRate, pk=pk)
+        rate.delete()
+        return redirect("prices:currency_rates")
+
+
+def _get_latest_rates() -> dict[tuple[str, str], Decimal]:
+    rates = {}
+    for rate in models.ExchangeRate.objects.order_by("-rate_date", "-id"):
+        key = (rate.from_currency, rate.to_currency)
+        if key not in rates:
+            rates[key] = rate.rate
+    return rates
+
+
+def _convert_price(
+    price: Decimal | None,
+    from_currency: str,
+    to_currency: str,
+    rates: dict[tuple[str, str], Decimal],
+) -> Decimal | None:
+    if price is None or not from_currency or not to_currency:
+        return price
+    if from_currency == to_currency:
+        return price
+    direct = rates.get((from_currency, to_currency))
+    if direct:
+        return price * direct
+    inverse = rates.get((to_currency, from_currency))
+    if inverse and inverse != 0:
+        return price / inverse
+    return price
+
+
+def _format_price(price: Decimal | None, currency: str) -> str:
+    if price is None:
+        return "-"
+    return f"{price:.2f} {currency}"
+
+
+def _save_supplier_mapping_from_import_form(form, supplier):
+    sheet_selector = (form.cleaned_data.get("sheet_selector") or "").strip()
+    sheet_names = []
+    sheet_indexes = []
+    if sheet_selector:
+        for part in [value.strip() for value in sheet_selector.split(",")]:
+            if not part:
+                continue
+            if part.isdigit():
+                sheet_indexes.append(part)
+            else:
+                sheet_names.append(part)
+    name_columns = [
+        int(value.strip())
+        for value in (form.cleaned_data.get("name_columns") or "").split(",")
+        if value.strip().isdigit()
+    ]
+    sku_column = form.cleaned_data.get("sku_column")
+    price_column = form.cleaned_data.get("price_column")
+    if not name_columns or not price_column:
+        raise RuntimeError("Mapping must include name and price columns.")
+    mapping, _ = models.SupplierFileMapping.objects.update_or_create(
+        supplier=supplier,
+        file_kind=models.FileKind.PRICE,
+        is_active=True,
+        defaults={
+            "mapping_mode": models.MappingMode.INDEX,
+            "sheet_names": ", ".join(sheet_names),
+            "sheet_indexes": ", ".join(sheet_indexes),
+            "header_row": form.cleaned_data.get("header_row") or 1,
+            "column_map": {
+                "sku": sku_column or 0,
+                "name": name_columns,
+                "price": price_column,
+            },
+        },
+    )
+    return mapping
+
+
+class MailboxListView(BaseListView):
+    model = models.Mailbox
+    list_display = ("name", "protocol", "host", "username", "is_active")
+    create_url_name = "prices:mailbox_create"
+    update_url_name = "prices:mailbox_update"
+    delete_url_name = "prices:mailbox_delete"
+
+
+class MailboxCreateView(BaseCreateView):
+    model = models.Mailbox
+    form_class = forms.MailboxForm
+    success_url_name = "prices:mailbox_list"
+
+
+class MailboxUpdateView(BaseUpdateView):
+    model = models.Mailbox
+    form_class = forms.MailboxForm
+    success_url_name = "prices:mailbox_list"
+
+
+class MailboxDeleteView(BaseDeleteView):
+    model = models.Mailbox
+    success_url_name = "prices:mailbox_list"
+
+
+class SupplierMailboxRuleListView(BaseListView):
+    model = models.SupplierMailboxRule
+    list_display = (
+        "supplier",
+        "mailbox",
+        "from_pattern",
+        "subject_pattern",
+        "filename_pattern",
+        "match_price_files",
+        "match_stock_files",
+        "is_active",
+    )
+    create_url_name = "prices:mailbox_rule_create"
+    update_url_name = "prices:mailbox_rule_update"
+    delete_url_name = "prices:mailbox_rule_delete"
+
+
+class SupplierMailboxRuleCreateView(BaseCreateView):
+    model = models.SupplierMailboxRule
+    form_class = forms.SupplierMailboxRuleForm
+    success_url_name = "prices:mailbox_rule_list"
+
+
+class SupplierMailboxRuleUpdateView(BaseUpdateView):
+    model = models.SupplierMailboxRule
+    form_class = forms.SupplierMailboxRuleForm
+    success_url_name = "prices:mailbox_rule_list"
+
+
+class SupplierMailboxRuleDeleteView(BaseDeleteView):
+    model = models.SupplierMailboxRule
+    success_url_name = "prices:mailbox_rule_list"
+
+
+class SupplierFileMappingListView(BaseListView):
+    model = models.SupplierFileMapping
+    list_display = (
+        "supplier",
+        "file_kind",
+        "mapping_mode",
+        "sheet_name",
+        "sheet_index",
+        "is_active",
+    )
+    create_url_name = "prices:mapping_create"
+    update_url_name = "prices:mapping_update"
+    delete_url_name = "prices:mapping_delete"
+
+
+class SupplierFileMappingCreateView(BaseCreateView):
+    model = models.SupplierFileMapping
+    form_class = forms.SupplierFileMappingForm
+    success_url_name = "prices:mapping_list"
+
+    def get_initial(self):
+        initial = super().get_initial()
+        supplier_id = self.request.GET.get("supplier")
+        if supplier_id:
+            initial["supplier"] = supplier_id
+        return initial
+
+
+class SupplierFileMappingUpdateView(BaseUpdateView):
+    model = models.SupplierFileMapping
+    form_class = forms.SupplierFileMappingForm
+    success_url_name = "prices:mapping_list"
+
+
+class SupplierFileMappingDeleteView(BaseDeleteView):
+    model = models.SupplierFileMapping
+    success_url_name = "prices:mapping_list"
+
+
+class SupplierProductListView(BaseListView):
+    model = models.SupplierProduct
+    list_display = (
+        "supplier",
+        "supplier_sku",
+        "name",
+        "current_price",
+        "last_imported_at",
+    )
+    list_title = "Suppliers Products"
+    show_create = False
+    show_actions = False
+    ordering = ("current_price",)
+    show_search = True
+    show_currency_filter = True
+    detail_url_name = "prices:product_detail"
+    create_url_name = "prices:product_create"
+    update_url_name = "prices:product_update"
+    delete_url_name = "prices:product_delete"
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        query = self.request.GET.get("q", "").strip()
+        supplier_filter = self.request.GET.get("supplier", "").strip()
+        status_filter = self.request.GET.get("status", "").strip()
+        if query:
+            tokens = [token for token in re.split(r"\s+", query) if token]
+            for token in tokens:
+                queryset = queryset.filter(
+                    Q(supplier_sku__icontains=token)
+                    | Q(name__icontains=token)
+                    | Q(supplier__name__icontains=token)
+                )
+        if supplier_filter:
+            queryset = queryset.filter(supplier_id=supplier_filter)
+        if status_filter == "active":
+            queryset = queryset.filter(is_active=True)
+        elif status_filter == "inactive":
+            queryset = queryset.filter(is_active=False)
+        return queryset
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        currency = self.request.GET.get("currency", "").strip()
+        supplier_filter = self.request.GET.get("supplier", "").strip()
+        status_filter = self.request.GET.get("status", "").strip()
+        currency_options = [choice[0] for choice in models.Currency.choices]
+        context["currency_filter"] = currency
+        context["currency_options"] = currency_options
+        context["supplier_filter"] = supplier_filter
+        context["supplier_options"] = models.Supplier.objects.order_by("name")
+        context["status_filter"] = status_filter
+        context["status_options"] = [("active", "Active"), ("inactive", "Inactive")]
+        context["show_currency_filter"] = self.show_currency_filter
+        context["show_cleanup"] = True
+        context["show_search"] = getattr(self, "show_search", False)
+        context["link_detail"] = True
+        context["show_status"] = True
+        context["show_actions"] = True
+        context["show_bulk_delete"] = True
+        if currency:
+            rates = _get_latest_rates()
+            for product in context["object_list"]:
+                product.display_currency = currency
+                product.display_price = _convert_price(
+                    product.current_price, product.currency, currency, rates
+                )
+        return context
+
+
+class SupplierProductDetailView(LoginRequiredMixin, DetailView):
+    model = models.SupplierProduct
+    template_name = "prices/product_detail.html"
+
+    def _parse_datetime(self, value: str):
+        if not value:
+            return None
+        try:
+            if len(value) == 10:
+                date_value = datetime.fromisoformat(value).date()
+                return timezone.make_aware(datetime.combine(date_value, time(0, 0)))
+            dt_value = datetime.fromisoformat(value)
+            if timezone.is_naive(dt_value):
+                return timezone.make_aware(dt_value)
+            return dt_value
+        except ValueError:
+            return None
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        start_value = self.request.GET.get("start", "").strip()
+        end_value = self.request.GET.get("end", "").strip()
+        context["link_form"] = forms.SupplierProductLinkForm(instance=self.object)
+        context["our_product"] = self.object.our_product
+        start_dt = self._parse_datetime(start_value)
+        end_dt = self._parse_datetime(end_value)
+        snapshots = models.PriceSnapshot.objects.filter(
+            supplier_product=self.object
+        ).order_by("-recorded_at")
+        if start_dt:
+            snapshots = snapshots.filter(recorded_at__gte=start_dt)
+        if end_dt:
+            if len(end_value) == 10:
+                end_dt = timezone.make_aware(
+                    datetime.combine(end_dt.date(), time(23, 59, 59))
+                )
+            snapshots = snapshots.filter(recorded_at__lte=end_dt)
+        latest_by_day = []
+        seen_days = set()
+        for snapshot in snapshots:
+            day_key = timezone.localtime(snapshot.recorded_at).date()
+            if day_key in seen_days:
+                continue
+            seen_days.add(day_key)
+            latest_by_day.append(snapshot)
+        context["snapshots"] = latest_by_day
+        chart_labels = []
+        chart_values = []
+        for snapshot in reversed(latest_by_day):
+            chart_labels.append(
+                timezone.localtime(snapshot.recorded_at).strftime("%d/%m/%Y")
+            )
+            chart_values.append(float(snapshot.price))
+        context["chart_labels"] = chart_labels
+        context["chart_values"] = chart_values
+        context["start_value"] = start_value
+        context["end_value"] = end_value
+        return context
+
+
+class SupplierProductLinkView(LoginRequiredMixin, View):
+    def post(self, request, pk):
+        product = get_object_or_404(models.SupplierProduct, pk=pk)
+        form = forms.SupplierProductLinkForm(request.POST, instance=product)
+        if form.is_valid():
+            form.save()
+        return redirect("prices:product_detail", pk=pk)
+
+
+class SupplierProductCreateView(BaseCreateView):
+    model = models.SupplierProduct
+    form_class = forms.SupplierProductForm
+    success_url_name = "prices:product_list"
+
+
+class SupplierProductUpdateView(BaseUpdateView):
+    model = models.SupplierProduct
+    form_class = forms.SupplierProductForm
+    success_url_name = "prices:product_list"
+
+
+class SupplierProductDeleteView(BaseDeleteView):
+    model = models.SupplierProduct
+    success_url_name = "prices:product_list"
+
+
+class OurProductListView(BaseListView):
+    model = models.OurProduct
+    list_display = ("name", "brand", "size", "is_active", "created_at")
+    list_title = "Our Products"
+    detail_url_name = "prices:our_product_detail"
+    create_url_name = "prices:our_product_create"
+    update_url_name = "prices:our_product_update"
+    delete_url_name = "prices:our_product_delete"
+
+
+class OurProductCreateView(BaseCreateView):
+    model = models.OurProduct
+    form_class = forms.OurProductForm
+    success_url_name = "prices:our_product_list"
+
+
+class OurProductUpdateView(BaseUpdateView):
+    model = models.OurProduct
+    form_class = forms.OurProductForm
+    success_url_name = "prices:our_product_list"
+
+
+class OurProductDeleteView(BaseDeleteView):
+    model = models.OurProduct
+    success_url_name = "prices:our_product_list"
+
+
+class OurProductDetailView(LoginRequiredMixin, DetailView):
+    model = models.OurProduct
+    template_name = "prices/our_product_detail.html"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        offers = models.SupplierProduct.objects.select_related("supplier").filter(
+            our_product=self.object
+        )
+        context["offers"] = offers
+        return context
+
+
+class ProductLinkingView(LoginRequiredMixin, TemplateView):
+    template_name = "prices/product_linking.html"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        supplier_filter = self.request.GET.get("supplier", "").strip()
+        search_query = self.request.GET.get("q", "").strip()
+        supplier_products = models.SupplierProduct.objects.select_related("supplier")
+        if supplier_filter:
+            supplier_products = supplier_products.filter(supplier_id=supplier_filter)
+        if search_query:
+            supplier_products = supplier_products.filter(
+                Q(name__icontains=search_query)
+                | Q(supplier_sku__icontains=search_query)
+            )
+        supplier_products = supplier_products.order_by("name")
+        paginator = Paginator(supplier_products, 50)
+        page_number = self.request.GET.get("sp_page", "1")
+        page = paginator.get_page(page_number)
+        context["supplier_products"] = page
+        context["supplier_filter"] = supplier_filter
+        context["search_query"] = search_query
+        context["supplier_options"] = models.Supplier.objects.order_by("name")
+        return context
+
+
+class ProductLinkingSearchView(LoginRequiredMixin, View):
+    def get(self, request):
+        supplier_product_id = request.GET.get("supplier_product", "").strip()
+        terms = request.GET.get("terms", "").strip()
+        try:
+            supplier_product_id = int(supplier_product_id)
+        except ValueError:
+            return JsonResponse({"error": "Invalid supplier product."}, status=400)
+        supplier_product = models.SupplierProduct.objects.select_related("supplier").filter(
+            id=supplier_product_id
+        ).first()
+        if not supplier_product:
+            return JsonResponse({"error": "Supplier product not found."}, status=404)
+        tokens = [token for token in re.split(r"[\\s,]+", terms) if token]
+        our_products = models.OurProduct.objects.all()
+        other_supplier_products = models.SupplierProduct.objects.select_related("supplier").exclude(
+            supplier_id=supplier_product.supplier_id
+        )
+        for token in tokens:
+            our_products = our_products.filter(
+                Q(name__icontains=token)
+                | Q(brand__icontains=token)
+                | Q(size__icontains=token)
+            )
+            other_supplier_products = other_supplier_products.filter(
+                Q(name__icontains=token) | Q(supplier_sku__icontains=token)
+            )
+        our_items = [
+            {
+                "id": item.id,
+                "name": item.name,
+                "brand": item.brand,
+                "size": item.size,
+            }
+            for item in our_products.order_by("name")[:50]
+        ]
+        supplier_items = [
+            {
+                "id": item.id,
+                "name": item.name,
+                "supplier": item.supplier.name,
+                "sku": item.supplier_sku,
+                "our_product_id": item.our_product_id,
+            }
+            for item in other_supplier_products.order_by("name")[:50]
+        ]
+        return JsonResponse(
+            {
+                "our_products": our_items,
+                "supplier_products": supplier_items,
+            }
+        )
+
+
+class ProductLinkingApplyView(LoginRequiredMixin, View):
+    def post(self, request):
+        source_id = request.POST.get("source_id", "").strip()
+        target_our = request.POST.get("target_our", "").strip()
+        target_supplier = request.POST.get("target_supplier", "").strip()
+        try:
+            source_id = int(source_id)
+        except ValueError:
+            return redirect("prices:product_linking")
+        source = get_object_or_404(models.SupplierProduct, id=source_id)
+        if target_our:
+            try:
+                target_our_id = int(target_our)
+            except ValueError:
+                return redirect("prices:product_linking")
+            our_product = get_object_or_404(models.OurProduct, id=target_our_id)
+            source.our_product = our_product
+            source.save(update_fields=["our_product"])
+        elif target_supplier:
+            try:
+                target_supplier_id = int(target_supplier)
+            except ValueError:
+                return redirect("prices:product_linking")
+            target = get_object_or_404(models.SupplierProduct, id=target_supplier_id)
+            if target.our_product:
+                source.our_product = target.our_product
+                source.save(update_fields=["our_product"])
+            else:
+                new_our = models.OurProduct.objects.create(
+                    name=target.name,
+                    brand=target.brand,
+                    size=target.size,
+                )
+                target.our_product = new_our
+                source.our_product = new_our
+                target.save(update_fields=["our_product"])
+                source.save(update_fields=["our_product"])
+        return redirect("prices:product_linking")
+
+
+class ImportBatchListView(BaseListView):
+    model = models.ImportBatch
+    list_display = (
+        "supplier",
+        "mailbox",
+        "message_id",
+        "received_at",
+        "status",
+        "created_at",
+    )
+    create_url_name = "prices:import_batch_create"
+    update_url_name = "prices:import_batch_update"
+    delete_url_name = "prices:import_batch_delete"
+
+
+class ImportBatchCreateView(BaseCreateView):
+    model = models.ImportBatch
+    form_class = forms.ImportBatchForm
+    success_url_name = "prices:import_batch_list"
+
+
+class ImportBatchUpdateView(BaseUpdateView):
+    model = models.ImportBatch
+    form_class = forms.ImportBatchForm
+    success_url_name = "prices:import_batch_list"
+
+
+class ImportBatchDeleteView(BaseDeleteView):
+    model = models.ImportBatch
+    success_url_name = "prices:import_batch_list"
+
+
+class ImportFileListView(BaseListView):
+    model = models.ImportFile
+    list_display = (
+        "import_batch",
+        "mapping",
+        "file_kind",
+        "filename",
+        "status",
+        "processed_at",
+    )
+    create_url_name = "prices:import_file_create"
+    update_url_name = "prices:import_file_update"
+    delete_url_name = "prices:import_file_delete"
+
+
+class ImportFileCreateView(BaseCreateView):
+    model = models.ImportFile
+    form_class = forms.ImportFileForm
+    success_url_name = "prices:import_file_list"
+
+
+class ImportFileUpdateView(BaseUpdateView):
+    model = models.ImportFile
+    form_class = forms.ImportFileForm
+    success_url_name = "prices:import_file_list"
+
+
+class ImportFileDeleteView(BaseDeleteView):
+    model = models.ImportFile
+    success_url_name = "prices:import_file_list"
+
+
+class PriceSnapshotListView(BaseListView):
+    model = models.PriceSnapshot
+    list_display = ("supplier_product", "price", "currency", "recorded_at")
+    create_url_name = "prices:price_snapshot_create"
+    update_url_name = "prices:price_snapshot_update"
+    delete_url_name = "prices:price_snapshot_delete"
+
+
+class PriceSnapshotCreateView(BaseCreateView):
+    model = models.PriceSnapshot
+    form_class = forms.PriceSnapshotForm
+    success_url_name = "prices:price_snapshot_list"
+
+
+class PriceSnapshotUpdateView(BaseUpdateView):
+    model = models.PriceSnapshot
+    form_class = forms.PriceSnapshotForm
+    success_url_name = "prices:price_snapshot_list"
+
+
+class PriceSnapshotDeleteView(BaseDeleteView):
+    model = models.PriceSnapshot
+    success_url_name = "prices:price_snapshot_list"
+
+
+class StockSnapshotListView(BaseListView):
+    model = models.StockSnapshot
+    list_display = ("supplier_product", "quantity", "recorded_at")
+    create_url_name = "prices:stock_snapshot_create"
+    update_url_name = "prices:stock_snapshot_update"
+    delete_url_name = "prices:stock_snapshot_delete"
+
+
+class StockSnapshotCreateView(BaseCreateView):
+    model = models.StockSnapshot
+    form_class = forms.StockSnapshotForm
+    success_url_name = "prices:stock_snapshot_list"
+
+
+class StockSnapshotUpdateView(BaseUpdateView):
+    model = models.StockSnapshot
+    form_class = forms.StockSnapshotForm
+    success_url_name = "prices:stock_snapshot_list"
+
+
+class StockSnapshotDeleteView(BaseDeleteView):
+    model = models.StockSnapshot
+    success_url_name = "prices:stock_snapshot_list"
+
+
+class ExchangeRateListView(BaseListView):
+    model = models.ExchangeRate
+    list_display = (
+        "rate_date",
+        "from_currency",
+        "to_currency",
+        "rate",
+        "source",
+    )
+    create_url_name = "prices:exchange_rate_create"
+    update_url_name = "prices:exchange_rate_update"
+    delete_url_name = "prices:exchange_rate_delete"
+
+
+class ExchangeRateCreateView(BaseCreateView):
+    model = models.ExchangeRate
+    form_class = forms.ExchangeRateForm
+    success_url_name = "prices:exchange_rate_list"
+
+
+class ExchangeRateUpdateView(BaseUpdateView):
+    model = models.ExchangeRate
+    form_class = forms.ExchangeRateForm
+    success_url_name = "prices:exchange_rate_list"
+
+
+class ExchangeRateDeleteView(BaseDeleteView):
+    model = models.ExchangeRate
+    success_url_name = "prices:exchange_rate_list"

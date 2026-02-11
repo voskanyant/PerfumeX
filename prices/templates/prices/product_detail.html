@@ -1,0 +1,205 @@
+{% extends "prices/base.html" %}
+
+{% block title %}{{ object.name }}{% endblock %}
+
+{% block content %}
+    <div class="card">
+        <div class="page-header">
+            <div>
+                <h1 class="page-title">{{ object.name }}</h1>
+                <p class="muted page-subtitle">{{ object.supplier.name }} · {{ object.supplier_sku }}</p>
+            </div>
+            <a class="button ghost" href="{% url 'prices:product_list' %}">Back to products</a>
+        </div>
+        <div class="filters" style="margin-top: 16px;">
+            <div>
+                <p class="muted" style="margin: 0 0 6px;">Current price</p>
+                <strong style="font-size: 20px;">{{ object.current_price|default:"-" }} {{ object.currency }}</strong>
+            </div>
+            <div>
+                <p class="muted" style="margin: 0 0 6px;">Last imported at</p>
+                <strong style="font-size: 16px;">{{ object.last_imported_at|date:"d/m/Y H:i" }}</strong>
+            </div>
+        </div>
+        <form method="post" action="{% url 'prices:product_link' object.pk %}" style="margin-top: 16px;">
+            {% csrf_token %}
+            <div class="filters" style="align-items: end;">
+                <p>
+                    <label for="id_our_product">Our product</label>
+                    {{ link_form.our_product }}
+                </p>
+                <p>
+                    <label>&nbsp;</label>
+                    <button class="button secondary" type="submit">Link</button>
+                </p>
+                {% if our_product %}
+                    <p>
+                        <label>&nbsp;</label>
+                        <a class="button ghost" href="{% url 'prices:our_product_detail' our_product.pk %}">Open Our Product</a>
+                    </p>
+                {% endif %}
+            </div>
+        </form>
+    </div>
+    <div class="card">
+        <div class="page-header">
+            <div>
+                <h2 class="page-title">Price history</h2>
+                <p class="muted page-subtitle">Latest daily price snapshots.</p>
+            </div>
+        </div>
+        <div style="margin: 12px 0 18px;">
+            <canvas id="price-chart" height="120"></canvas>
+        </div>
+        <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px;">
+            <button class="button secondary" type="button" data-range="6m">6m</button>
+            <button class="button secondary" type="button" data-range="1y">1y</button>
+            <button class="button secondary" type="button" data-range="2y">2y</button>
+        </div>
+        <form method="get" style="display: flex; gap: 12px; flex-wrap: wrap; align-items: end;">
+            <div>
+                <label for="start">Start</label>
+                <input id="start" name="start" type="datetime-local" value="{{ start_value }}">
+            </div>
+            <div>
+                <label for="end">End</label>
+                <input id="end" name="end" type="datetime-local" value="{{ end_value }}">
+            </div>
+            <button class="button" type="submit">Filter</button>
+        </form>
+        {% if snapshots %}
+            <table style="margin-top: 16px;">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Price</th>
+                        <th>Currency</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for snapshot in snapshots %}
+                        <tr>
+                            <td>{{ snapshot.recorded_at|date:"d/m/Y H:i" }}</td>
+                            <td>{{ snapshot.price|floatformat:2 }}</td>
+                            <td>{{ snapshot.currency }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p class="muted" style="margin-top: 12px;">No price history in this range.</p>
+        {% endif %}
+    </div>
+    {{ chart_labels|json_script:"chart-labels" }}
+    {{ chart_values|json_script:"chart-values" }}
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script>
+        (function () {
+            var labels = JSON.parse(document.getElementById("chart-labels").textContent || "[]");
+            var values = JSON.parse(document.getElementById("chart-values").textContent || "[]");
+            var ctx = document.getElementById("price-chart");
+            if (!ctx || !labels.length) return;
+            document.querySelectorAll("button[data-range]").forEach(function (button) {
+                button.addEventListener("click", function () {
+                    var range = button.getAttribute("data-range");
+                    var end = new Date();
+                    var start = new Date(end.getTime());
+                    if (range === "6m") {
+                        start.setMonth(start.getMonth() - 6);
+                    } else if (range === "1y") {
+                        start.setFullYear(start.getFullYear() - 1);
+                    } else if (range === "2y") {
+                        start.setFullYear(start.getFullYear() - 2);
+                    }
+                    var startInput = document.getElementById("start");
+                    var endInput = document.getElementById("end");
+                    if (startInput) {
+                        startInput.value = start.toISOString().slice(0, 16);
+                    }
+                    if (endInput) {
+                        endInput.value = end.toISOString().slice(0, 16);
+                    }
+                    startInput.form.submit();
+                });
+            });
+            var crosshair = {
+                id: "crosshair",
+                afterEvent: function(chart, args) {
+                    var event = args.event;
+                    chart._crosshair = event && event.x !== null ? { x: event.x, y: event.y } : null;
+                },
+                afterDraw: function(chart) {
+                    if (!chart._crosshair) return;
+                    var ctx = chart.ctx;
+                    var x = chart._crosshair.x;
+                    var yScale = chart.scales.y;
+                    var xScale = chart.scales.x;
+                    if (!xScale || !yScale) return;
+                    ctx.save();
+                    ctx.strokeStyle = "rgba(37,99,235,0.4)";
+                    ctx.lineWidth = 1;
+                    ctx.setLineDash([4, 4]);
+                    ctx.beginPath();
+                    ctx.moveTo(x, yScale.top);
+                    ctx.lineTo(x, yScale.bottom);
+                    ctx.stroke();
+                    ctx.beginPath();
+                    ctx.moveTo(xScale.left, chart._crosshair.y);
+                    ctx.lineTo(xScale.right, chart._crosshair.y);
+                    ctx.stroke();
+                    ctx.restore();
+                }
+            };
+            new Chart(ctx, {
+                type: "line",
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: "Price",
+                        data: values,
+                        borderColor: "#111827",
+                        backgroundColor: "rgba(17,24,39,0.04)",
+                        pointRadius: 0,
+                        pointHoverRadius: 4,
+                        tension: 0.2,
+                        borderWidth: 2,
+                        fill: false
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            mode: "index",
+                            intersect: false,
+                            callbacks: {
+                                label: function (ctx) {
+                                    return "Price: " + ctx.parsed.y;
+                                }
+                            }
+                        }
+                    },
+                    interaction: {
+                        mode: "index",
+                        intersect: false
+                    },
+                    scales: {
+                        x: {
+                            ticks: { maxTicksLimit: 8 },
+                            grid: { color: "rgba(17,24,39,0.06)" }
+                        },
+                        y: {
+                            beginAtZero: false,
+                            grid: { color: "rgba(17,24,39,0.06)" },
+                            ticks: {
+                                callback: function (value) { return value; }
+                            }
+                        }
+                    }
+                },
+                plugins: [crosshair]
+            });
+        })();
+    </script>
+{% endblock %}

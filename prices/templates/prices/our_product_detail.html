@@ -1,0 +1,57 @@
+{% extends "prices/base.html" %}
+
+{% block title %}{{ object.name }}{% endblock %}
+
+{% block content %}
+    <div class="card">
+        <div class="page-header">
+            <div>
+                <h1 class="page-title">{{ object.name }}</h1>
+                <p class="muted page-subtitle">{{ object.brand }} {{ object.size }}</p>
+            </div>
+            <div>
+                <a class="button ghost" href="{% url 'prices:our_product_list' %}">Back to our products</a>
+                <a class="button secondary icon" href="{% url 'prices:our_product_update' object.pk %}" title="Edit" aria-label="Edit">
+                    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M12 20h9"/>
+                        <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/>
+                    </svg>
+                </a>
+            </div>
+        </div>
+        {% if object.notes %}
+            <p class="muted">{{ object.notes }}</p>
+        {% endif %}
+    </div>
+    <div class="card">
+        <h2 class="page-title">Supplier offers</h2>
+        {% if offers %}
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Supplier</th>
+                            <th>Supplier SKU</th>
+                            <th>Name</th>
+                            <th>Price</th>
+                            <th>Last imported at</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for offer in offers %}
+                            <tr>
+                                <td>{{ offer.supplier.name }}</td>
+                                <td>{{ offer.supplier_sku }}</td>
+                                <td><a href="{% url 'prices:product_detail' offer.pk %}">{{ offer.name }}</a></td>
+                                <td>{{ offer.current_price|default:"-" }} {{ offer.currency }}</td>
+                                <td>{{ offer.last_imported_at|date:"d/m/Y H:i" }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <p class="muted">No supplier offers linked yet.</p>
+        {% endif %}
+    </div>
+{% endblock %}
