@@ -15,9 +15,14 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
           port: ${{ secrets.SERVER_PORT }}
+          debug: true
+          command_timeout: 30m
           script: |
             set -e
+            echo "User: $(whoami)"
+            echo "Host: $(hostname)"
             cd /opt/perfumex/PerfumeX
+            pwd
             git pull origin main
             /opt/perfumex/PerfumeX/.venv/bin/pip install -r requirements.txt
             set -a
