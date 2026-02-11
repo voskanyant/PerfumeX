@@ -1,0 +1,30 @@
+name: Deploy
+
+on:
+  push:
+    branches: ["main"]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to server via SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.77.233.213.208 }}
+          username: ${{ secrets.root }}
+          key: ${{ secrets.ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOv282Img7fItwT7E/3SoZetDH+sI8dLY80lc3TdEt49 }}
+          port: ${{ secrets.22 }}
+          script: |
+            set -e
+            cd /opt/perfumex/PerfumeX
+            git pull origin main
+            source .venv/bin/activate
+            pip install -r requirements.txt
+            set -a
+            source .env
+            set +a
+            python manage.py migrate
+            python manage.py collectstatic --noinput
+            systemctl restart perfumex
+            systemctl restart nginx
