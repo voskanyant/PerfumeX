@@ -19,12 +19,11 @@ jobs:
             set -e
             cd /opt/perfumex/PerfumeX
             git pull origin main
-            source .venv/bin/activate
-            pip install -r requirements.txt
+            /opt/perfumex/PerfumeX/.venv/bin/pip install -r requirements.txt
             set -a
-            source .env
+            . /opt/perfumex/PerfumeX/.env
             set +a
-            python manage.py migrate
-            python manage.py collectstatic --noinput
+            /opt/perfumex/PerfumeX/.venv/bin/python manage.py migrate
+            /opt/perfumex/PerfumeX/.venv/bin/python manage.py collectstatic --noinput
             systemctl restart perfumex
             systemctl restart nginx
