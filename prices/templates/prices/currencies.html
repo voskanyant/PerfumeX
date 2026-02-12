@@ -3,20 +3,21 @@
 {% block title %}Currencies{% endblock %}
 
 {% block content %}
-    <div class="card">
-        <div class="page-header">
+    <div class="card mb-3">
+        <div class="d-flex flex-wrap align-items-start justify-content-between gap-3">
             <div>
                 <h1 class="page-title">Currencies</h1>
-                <p class="muted page-subtitle">Set exchange rates used for product price conversion.</p>
+                <p class="page-subtitle">Set exchange rates used for product price conversion.</p>
             </div>
         </div>
     </div>
-    <div class="card">
+    <div class="card mb-3">
         <h2 class="page-title">Add rate</h2>
-        <form method="post">
+        <p class="muted mt-1">You can enter one direction only (e.g. USD→RUB). The app will automatically convert the other way.</p>
+        <form method="post" class="mt-2">
             {% csrf_token %}
             {{ form.as_p }}
-            <div class="actions">
+            <div class="d-flex flex-wrap gap-2">
                 <button class="button" type="submit">Save rate</button>
             </div>
         </form>
@@ -24,8 +25,8 @@
     <div class="card">
         <h2 class="page-title">Rates</h2>
         {% if rates %}
-            <div class="table-wrap">
-                <table>
+            <div class="table-wrap table-responsive mt-2">
+                <table class="table table-sm table-hover align-middle mb-0 table-mobile">
                 <thead>
                     <tr>
                         <th>Date</th>
@@ -42,35 +43,37 @@
                             <form id="rate-form-{{ rate.pk }}" method="post" action="{% url 'prices:currency_rate_update' rate.pk %}">
                                 {% csrf_token %}
                             </form>
-                            <td><input type="date" name="rate_date" value="{{ rate.rate_date|date:'Y-m-d' }}" form="rate-form-{{ rate.pk }}"></td>
-                            <td>
+                            <td data-label="Date"><input type="date" name="rate_date" value="{{ rate.rate_date|date:'Y-m-d' }}" form="rate-form-{{ rate.pk }}"></td>
+                            <td data-label="From">
                                 <select name="from_currency" form="rate-form-{{ rate.pk }}">
                                     <option value="RUB"{% if rate.from_currency == "RUB" %} selected{% endif %}>RUB</option>
                                     <option value="USD"{% if rate.from_currency == "USD" %} selected{% endif %}>USD</option>
                                 </select>
                             </td>
-                            <td>
+                            <td data-label="To">
                                 <select name="to_currency" form="rate-form-{{ rate.pk }}">
                                     <option value="RUB"{% if rate.to_currency == "RUB" %} selected{% endif %}>RUB</option>
                                     <option value="USD"{% if rate.to_currency == "USD" %} selected{% endif %}>USD</option>
                                 </select>
                             </td>
-                            <td><input type="text" name="rate" value="{{ rate.rate }}" form="rate-form-{{ rate.pk }}"></td>
-                            <td><input type="text" name="source" value="{{ rate.source }}" form="rate-form-{{ rate.pk }}"></td>
-                            <td class="actions">
-                                <button class="button secondary" type="submit" form="rate-form-{{ rate.pk }}">Save</button>
-                                <form method="post" action="{% url 'prices:currency_rate_delete' rate.pk %}" style="display: inline;">
-                                    {% csrf_token %}
-                                    <button class="button danger icon" type="submit" title="Delete" aria-label="Delete">
-                                        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                                            <path d="M3 6h18"/>
-                                            <path d="M8 6V4h8v2"/>
-                                            <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
-                                            <path d="M10 11v6"/>
-                                            <path d="M14 11v6"/>
-                                        </svg>
-                                    </button>
-                                </form>
+                            <td data-label="Rate"><input type="text" name="rate" value="{{ rate.rate }}" form="rate-form-{{ rate.pk }}"></td>
+                            <td data-label="Source"><input type="text" name="source" value="{{ rate.source }}" form="rate-form-{{ rate.pk }}"></td>
+                            <td class="actions" data-label="Actions">
+                                <div class="d-inline-flex gap-2">
+                                    <button class="button secondary" type="submit" form="rate-form-{{ rate.pk }}">Save</button>
+                                    <form method="post" action="{% url 'prices:currency_rate_delete' rate.pk %}">
+                                        {% csrf_token %}
+                                        <button class="button danger icon" type="submit" title="Delete" aria-label="Delete">
+                                            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                                <path d="M3 6h18"/>
+                                                <path d="M8 6V4h8v2"/>
+                                                <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+                                                <path d="M10 11v6"/>
+                                                <path d="M14 11v6"/>
+                                            </svg>
+                                        </button>
+                                    </form>
+                                </div>
                             </td>
                         </tr>
                     {% endfor %}
@@ -78,7 +81,7 @@
                 </table>
             </div>
         {% else %}
-            <p class="muted">No rates yet.</p>
+            <p class="muted mt-2">No rates yet.</p>
         {% endif %}
     </div>
 {% endblock %}

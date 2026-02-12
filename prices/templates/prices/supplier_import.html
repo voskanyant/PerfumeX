@@ -3,53 +3,57 @@
 {% block title %}Import Prices{% endblock %}
 
 {% block content %}
-    <div class="card">
-        <div class="page-header">
+    <div class="card mb-3">
+        <div class="d-flex flex-wrap align-items-start justify-content-between gap-3">
             <div>
                 <h1 class="page-title">Import Prices - {{ supplier.name }}</h1>
-                <p class="muted page-subtitle">Upload price list and set mapping for this supplier.</p>
+                <p class="page-subtitle">Upload price list and set mapping for this supplier.</p>
             </div>
             <a class="button ghost" href="{% url 'prices:supplier_overview' %}">Back</a>
         </div>
-        <form method="post" enctype="multipart/form-data">
+        <form method="post" enctype="multipart/form-data" class="mt-3">
             {% csrf_token %}
             {{ form.as_p }}
-            <div class="actions">
+            <div class="d-flex flex-wrap gap-2">
                 <button class="button" type="submit">Upload and import</button>
             </div>
         </form>
     </div>
-    <div class="card">
+
+    <div class="card mb-3">
         <h2 class="page-title">Email backfill</h2>
-        <p class="muted page-subtitle">Import historical emails for this supplier and build price history.</p>
-        <form method="post" action="{% url 'prices:supplier_import_email_backfill' supplier.pk %}">
+        <p class="page-subtitle">Import historical emails for this supplier and build price history.</p>
+        <form method="post" action="{% url 'prices:supplier_import_email_backfill' supplier.pk %}" class="row g-3 align-items-end">
             {% csrf_token %}
-            <p>
-                <label for="backfill-start">Start date</label>
+            <div class="col-12 col-md-6">
+                <label for="backfill-start" class="form-label">Start date</label>
                 <input id="backfill-start" name="start_date" type="date" required>
-            </p>
-            <p>
-                <label for="backfill-end">End date</label>
+            </div>
+            <div class="col-12 col-md-6">
+                <label for="backfill-end" class="form-label">End date</label>
                 <input id="backfill-end" name="end_date" type="date">
-            </p>
-            <button class="button" type="submit">Run backfill</button>
+            </div>
+            <div class="col-12">
+                <button class="button" type="submit">Run backfill</button>
+            </div>
         </form>
     </div>
+
     <div class="card">
         <h2 class="page-title">Mapping Preview</h2>
-        <p class="muted page-subtitle">Upload a price file to preview the first 50 rows and pick columns.</p>
-        <div id="sheet-row" style="margin-top: 8px; display: none;">
-            <label for="sheet-select">Sheet:</label>
+        <p class="page-subtitle">Upload a price file to preview the first 50 rows and pick columns.</p>
+        <div id="sheet-row" class="mt-2" style="display: none;">
+            <label for="sheet-select" class="form-label">Sheet</label>
             <select id="sheet-select"></select>
         </div>
-        <div style="margin-top: 8px;">
-            <button type="button" class="button" id="mode-sku">Set SKU</button>
-            <button type="button" class="button" id="mode-name">Set Name</button>
-            <button type="button" class="button" id="mode-name-add">Add Name</button>
-            <button type="button" class="button" id="mode-price">Set Price</button>
-            <span id="mode-status" class="muted" style="margin-left: 8px;">Mode: SKU</span>
+        <div class="d-flex flex-wrap gap-2 mt-2">
+            <button type="button" class="button secondary" id="mode-sku">Set SKU</button>
+            <button type="button" class="button secondary" id="mode-name">Set Name</button>
+            <button type="button" class="button secondary" id="mode-name-add">Add Name</button>
+            <button type="button" class="button secondary" id="mode-price">Set Price</button>
+            <span id="mode-status" class="muted ms-2">Mode: SKU</span>
         </div>
-        <div id="preview-table" style="margin-top: 12px; overflow: auto;"></div>
+        <div id="preview-table" class="table-wrap table-responsive mt-3"></div>
     </div>
     <script>
         (function () {
@@ -105,7 +109,7 @@
                     }
                     return "<tr>" + cells + "</tr>";
                 }).join("");
-                preview.innerHTML = "<table>" + header + body + "</table>";
+                preview.innerHTML = "<table class='table table-sm table-hover align-middle mb-0'>" + header + body + "</table>";
                 preview.querySelectorAll("th[data-col]").forEach(function (th) {
                     th.addEventListener("click", function () {
                         var col = th.getAttribute("data-col");

@@ -3,42 +3,45 @@
 {% block title %}Import Prices{% endblock %}
 
 {% block content %}
-    <div class="card">
-        <div class="page-header">
+    <div class="card mb-3">
+        <div class="d-flex flex-wrap align-items-start justify-content-between gap-3">
             <div>
                 <h1 class="page-title">Import Prices</h1>
-                <p class="muted page-subtitle">Manage imports per supplier.</p>
+                <p class="page-subtitle">Manage imports per supplier.</p>
             </div>
-            <form action="{% url 'prices:supplier_import_email_all' %}" method="post">
-                {% csrf_token %}
-                <button class="button" type="submit" data-email-update-all{% if any_running %} disabled{% endif %}>
-                    Update all from email
-                </button>
-            </form>
+            <div class="d-flex flex-wrap gap-2">
+                <a class="button secondary" href="{% url 'prices:import_settings' %}">Import settings</a>
+                <form action="{% url 'prices:supplier_import_email_all' %}" method="post">
+                    {% csrf_token %}
+                    <button class="button" type="submit" data-email-update-all{% if any_running %} disabled{% endif %}>
+                        Update all from email
+                    </button>
+                </form>
+            </div>
         </div>
     </div>
-    <div class="card">
-        <div class="page-header">
+
+    <div class="card mb-3">
+        <div class="d-flex flex-wrap align-items-start justify-content-between gap-3">
             <div>
                 <h2 class="page-title">Bulk backfill</h2>
-                <p class="muted page-subtitle">Run history import for selected suppliers.</p>
+                <p class="page-subtitle">Run history import for selected suppliers.</p>
             </div>
         </div>
-        <form id="bulk-backfill-form" method="post" action="{% url 'prices:supplier_import_email_backfill_bulk' %}">
+        <form id="bulk-backfill-form" method="post" action="{% url 'prices:supplier_import_email_backfill_bulk' %}" class="mt-3">
             {% csrf_token %}
-            <div class="filters">
-                <p>
-                    <label for="bulk-backfill-start">Start date</label>
+            <div class="row g-3 align-items-end">
+                <div class="col-12 col-md-4">
+                    <label for="bulk-backfill-start" class="form-label">Start date</label>
                     <input id="bulk-backfill-start" name="start_date" type="date" required>
-                </p>
-                <p>
-                    <label for="bulk-backfill-end">End date</label>
+                </div>
+                <div class="col-12 col-md-4">
+                    <label for="bulk-backfill-end" class="form-label">End date</label>
                     <input id="bulk-backfill-end" name="end_date" type="date">
-                </p>
-                <p>
-                    <label>&nbsp;</label>
-                    <button class="button" type="submit">Run backfill for selected</button>
-                </p>
+                </div>
+                <div class="col-12 col-md-4">
+                    <button class="button w-100" type="submit">Run backfill for selected</button>
+                </div>
             </div>
             <div id="bulk-backfill-selected"></div>
         </form>
@@ -106,10 +109,11 @@
             updateAll();
         })();
     </script>
-    <div class="card">
+
+    <div class="card mb-3">
         {% if rows %}
-            <div class="table-wrap">
-                <table>
+            <div class="table-wrap table-responsive">
+                <table class="table table-sm table-hover align-middle mb-0 table-mobile">
                 <thead>
                     <tr>
                         <th><input type="checkbox" id="supplier-select-all"></th>
@@ -122,53 +126,55 @@
                 <tbody>
                     {% for row in rows %}
                         <tr data-supplier-id="{{ row.supplier.pk }}" data-email-running="{% if row.is_running %}1{% else %}0{% endif %}">
-                            <td><input type="checkbox" class="supplier-select" value="{{ row.supplier.pk }}"></td>
-                            <td>{{ row.supplier.name }}</td>
-                            <td>
+                            <td data-label="Select"><input type="checkbox" class="supplier-select" value="{{ row.supplier.pk }}"></td>
+                            <td data-label="Supplier">{{ row.supplier.name }}</td>
+                            <td data-label="Last import">
                                 {% if row.latest_import %}
                                     {{ row.latest_import.received_at|default:row.latest_import.created_at|date:"d/m/Y H:i" }}
                                 {% else %}
                                     -
                                 {% endif %}
                             </td>
-                            <td>
+                            <td data-label="Email import">
                                 {% if row.latest_run %}
                                     <span data-email-status>{{ row.latest_run.status }}</span>
                                     {% if row.latest_run.status == "running" %}
                                         {% if row.latest_run_progress is not None %}
-                                            <div style="background:#e5e7eb; height:6px; border-radius:4px; margin-top:4px;">
-                                                <div data-email-progress style="background:#2563eb; height:6px; border-radius:4px; width: {{ row.latest_run_progress }}%;"></div>
+                                            <div class="progress mt-2" style="height:6px;">
+                                                <div class="progress-bar" data-email-progress role="progressbar" style="width: {{ row.latest_run_progress }}%;"></div>
                                             </div>
-                                            <div class="muted">{{ row.latest_run_progress }}%</div>
+                                            <div class="muted small">{{ row.latest_run_progress }}%</div>
                                         {% endif %}
                                     {% else %}
-                                        <div class="muted">
+                                        <div class="muted small">
                                             {{ row.latest_run.processed_files }} files, {{ row.latest_run.errors }} errors
                                         </div>
                                     {% endif %}
                                     {% if row.latest_run.last_message %}
-                                        <div class="muted" data-email-message>{{ row.latest_run.last_message }}</div>
+                                        <div class="muted small" data-email-message>{{ row.latest_run.last_message }}</div>
                                     {% endif %}
                                 {% else %}
                                     <span data-email-status>-</span>
                                 {% endif %}
                             </td>
-                            <td class="actions">
-                                <a class="button secondary icon" href="{% url 'prices:supplier_import' row.supplier.pk %}" title="Edit mapping" aria-label="Edit mapping">
-                                    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                                        <path d="M12 20h9"/>
-                                        <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/>
-                                    </svg>
-                                </a>
-                                <a class="button" href="{% url 'prices:supplier_import' row.supplier.pk %}">Quick upload</a>
-                                <form action="{% url 'prices:supplier_import_email' row.supplier.pk %}" method="post" style="display: inline;">
-                                    {% csrf_token %}
-                                    <button class="button" type="submit" data-email-update{% if row.is_running %} disabled{% endif %}>Update from email</button>
-                                </form>
-                                <form action="{% url 'prices:supplier_import_email_cancel' row.supplier.pk %}" method="post" style="display: inline;{% if not row.is_running %} display:none;{% endif %}">
-                                    {% csrf_token %}
-                                    <button class="button" type="submit" data-email-cancel>Cancel</button>
-                                </form>
+                            <td class="actions" data-label="Actions">
+                                <div class="d-inline-flex flex-wrap gap-2">
+                                    <a class="button secondary icon" href="{% url 'prices:supplier_import' row.supplier.pk %}" title="Edit mapping" aria-label="Edit mapping">
+                                        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                            <path d="M12 20h9"/>
+                                            <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/>
+                                        </svg>
+                                    </a>
+                                    <a class="button" href="{% url 'prices:supplier_import' row.supplier.pk %}">Quick upload</a>
+                                    <form action="{% url 'prices:supplier_import_email' row.supplier.pk %}" method="post">
+                                        {% csrf_token %}
+                                        <button class="button" type="submit" data-email-update{% if row.is_running %} disabled{% endif %}>Update from email</button>
+                                    </form>
+                                    <form action="{% url 'prices:supplier_import_email_cancel' row.supplier.pk %}" method="post" style="{% if not row.is_running %} display:none;{% endif %}">
+                                        {% csrf_token %}
+                                        <button class="button secondary" type="submit" data-email-cancel>Cancel</button>
+                                    </form>
+                                </div>
                             </td>
                         </tr>
                     {% endfor %}
@@ -179,16 +185,17 @@
             <p class="muted">No suppliers yet.</p>
         {% endif %}
     </div>
+
     <div class="card">
-        <div class="page-header">
+        <div class="d-flex flex-wrap align-items-start justify-content-between gap-3">
             <div>
                 <h2 class="page-title">Import Log</h2>
-                <p class="muted page-subtitle">Trace each file and batch status.</p>
+                <p class="page-subtitle">Trace each file and batch status.</p>
             </div>
         </div>
-        <form method="get" class="filters" style="margin-bottom: 12px;">
-            <p>
-                <label for="import-supplier-filter">Supplier</label>
+        <form method="get" class="row g-3 align-items-end mt-2">
+            <div class="col-12 col-md-4">
+                <label for="import-supplier-filter" class="form-label">Supplier</label>
                 <select id="import-supplier-filter" name="supplier">
                     <option value="">All</option>
                     {% for supplier in supplier_options %}
@@ -197,25 +204,24 @@
                         </option>
                     {% endfor %}
                 </select>
-            </p>
-            <p>
-                <label for="import-status-filter">Status</label>
+            </div>
+            <div class="col-12 col-md-4">
+                <label for="import-status-filter" class="form-label">Status</label>
                 <select id="import-status-filter" name="status">
                     <option value="">All</option>
                     {% for value, label in status_options %}
                         <option value="{{ value }}"{% if status_filter == value %} selected{% endif %}>{{ label }}</option>
                     {% endfor %}
                 </select>
-            </p>
-            <p>
-                <label>&nbsp;</label>
-                <button class="button secondary" type="submit">Filter</button>
-            </p>
+            </div>
+            <div class="col-12 col-md-4">
+                <button class="button secondary w-100" type="submit">Filter</button>
+            </div>
         </form>
         {% if import_batches %}
-            <form method="post" action="{% url 'prices:import_delete_bulk' %}">
+            <form method="post" action="{% url 'prices:import_delete_bulk' %}" class="mt-3">
                 {% csrf_token %}
-                <div style="margin-bottom: 8px;">
+                <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
                     <button class="button danger" type="submit">
                         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                             <path d="M3 6h18"/>
@@ -227,8 +233,8 @@
                         Delete selected
                     </button>
                 </div>
-                <div class="table-wrap">
-                    <table>
+                <div class="table-wrap table-responsive">
+                    <table class="table table-sm table-hover align-middle mb-0 table-mobile">
                     <thead>
                         <tr>
                             <th><input type="checkbox" id="import-select-all"></th>
@@ -244,13 +250,13 @@
                     <tbody>
                         {% for batch in import_batches %}
                             <tr>
-                                <td><input type="checkbox" name="import_ids" value="{{ batch.pk }}"></td>
-                                <td>{{ batch.received_at|default:batch.created_at|date:"d/m/Y H:i" }}</td>
-                                <td>{{ batch.supplier.name }}</td>
-                                <td>{{ batch.status }}</td>
-                                <td>{{ batch.mailbox|default:"-" }}</td>
-                                <td>{{ batch.message_id|default:"-" }}</td>
-                                <td>
+                                <td data-label="Select"><input type="checkbox" name="import_ids" value="{{ batch.pk }}"></td>
+                                <td data-label="Date">{{ batch.received_at|default:batch.created_at|date:"d/m/Y H:i" }}</td>
+                                <td data-label="Supplier">{{ batch.supplier.name }}</td>
+                                <td data-label="Status">{{ batch.status }}</td>
+                                <td data-label="Mailbox">{{ batch.mailbox|default:"-" }}</td>
+                                <td data-label="Message ID">{{ batch.message_id|default:"-" }}</td>
+                                <td data-label="Files">
                                     {% if batch.importfile_set.all %}
                                         {% for file in batch.importfile_set.all %}
                                             {{ file.file_kind }}: {{ file.filename }} ({{ file.status }})
@@ -263,7 +269,7 @@
                                         -
                                     {% endif %}
                                 </td>
-                                <td class="actions">
+                                <td class="actions" data-label="Actions">
                                     <button class="button danger icon" type="submit" formaction="{% url 'prices:import_delete' batch.pk %}" formmethod="post" title="Delete" aria-label="Delete">
                                         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                                             <path d="M3 6h18"/>
@@ -280,68 +286,8 @@
                     </table>
                 </div>
             </form>
-            {% if import_log_page and import_log_page.paginator.num_pages > 1 %}
-                <div style="margin-top: 12px;">
-                    {% if import_log_page.has_previous %}
-                        <a class="button" href="?log_page={{ import_log_page.previous_page_number }}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}">Previous</a>
-                    {% endif %}
-                    {% for page_num in import_log_page.paginator.page_range %}
-                        {% if page_num == import_log_page.number %}
-                            <span class="button" style="background: #1d4ed8;">{{ page_num }}</span>
-                        {% elif page_num > import_log_page.number|add:-3 and page_num < import_log_page.number|add:3 %}
-                            <a class="button" href="?log_page={{ page_num }}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}">{{ page_num }}</a>
-                        {% endif %}
-                    {% endfor %}
-                    <span class="muted" style="margin: 0 8px;">
-                        Page {{ import_log_page.number }} of {{ import_log_page.paginator.num_pages }}
-                    </span>
-                    {% if import_log_page.has_next %}
-                        <a class="button" href="?log_page={{ import_log_page.next_page_number }}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}">Next</a>
-                    {% endif %}
-                </div>
-            {% endif %}
         {% else %}
-            <p class="muted">No imports yet.</p>
+            <p class="muted mt-3">No imports yet.</p>
         {% endif %}
     </div>
-    <script>
-        (function () {
-            var selectAll = document.getElementById("import-select-all");
-            if (!selectAll) return;
-            selectAll.addEventListener("change", function () {
-                var checked = selectAll.checked;
-                document.querySelectorAll("input[name='import_ids']").forEach(function (box) {
-                    box.checked = checked;
-                });
-            });
-        })();
-    </script>
-    <script>
-        (function () {
-            var selectAll = document.getElementById("supplier-select-all");
-            var selectedContainer = document.getElementById("bulk-backfill-selected");
-            var form = document.getElementById("bulk-backfill-form");
-            if (selectAll) {
-                selectAll.addEventListener("change", function () {
-                    var checked = selectAll.checked;
-                    document.querySelectorAll(".supplier-select").forEach(function (box) {
-                        box.checked = checked;
-                    });
-                });
-            }
-            if (form) {
-                form.addEventListener("submit", function () {
-                    if (!selectedContainer) return;
-                    selectedContainer.innerHTML = "";
-                    document.querySelectorAll(".supplier-select:checked").forEach(function (box) {
-                        var input = document.createElement("input");
-                        input.type = "hidden";
-                        input.name = "supplier_ids";
-                        input.value = box.value;
-                        selectedContainer.appendChild(input);
-                    });
-                });
-            }
-        })();
-    </script>
 {% endblock %}

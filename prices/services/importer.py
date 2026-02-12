@@ -229,6 +229,7 @@ def _parse_rows(
     name_indexes = [value - 1 for value in name_cols if value]
     price_idx = price_col - 1
     found_data = not skip_until_valid
+    skip_terms = ("итого", "итог", "доставка")
     for row in rows:
         max_index = max([price_idx, *name_indexes, sku_idx if sku_idx is not None else 0])
         if len(row) <= max_index:
@@ -240,10 +241,16 @@ def _parse_rows(
         for index in name_indexes:
             value = row[index] if index < len(row) else None
             text = str(value).strip() if value is not None else ""
-            text = _fix_mojibake(text)
+            text = _fix_mojibake(text).strip()
             if text and not re.match(r"^-?\d+(?:[.,]\d+)?$", text):
                 name_parts.append(text)
         name = " ".join(name_parts).strip()
+        if name:
+            lowered = name.lower()
+            if any(term in lowered for term in skip_terms):
+                if not found_data:
+                    continue
+                continue
         price = _parse_decimal(row[price_idx])
         if not name or price is None or price == 0:
             if not found_data:
@@ -531,9 +538,17 @@ def preview_mapping_file(file_obj, sheet_index: int | None = None) -> dict:
     sheet_names = []
     start_row = 1
 
+    def _clean_preview_cell(value) -> str:
+        if value is None:
+            return ""
+        text = str(value)
+        if not text:
+            return ""
+        return _fix_mojibake(text)
+
     if extension == ".csv":
         for row in _iter_rows_csv_file(file_obj, start_row):
-            rows.append([str(cell) if cell is not None else "" for cell in row])
+            rows.append([_clean_preview_cell(cell) for cell in row])
             max_cols = max(max_cols, len(row))
             if len(rows) >= 50:
                 break
@@ -555,7 +570,7 @@ def preview_mapping_file(file_obj, sheet_index: int | None = None) -> dict:
                 row_values = list(row)
                 if max_cols and len(row_values) < max_cols:
                     row_values.extend([""] * (max_cols - len(row_values)))
-                rows.append([str(cell) if cell is not None else "" for cell in row_values])
+                rows.append([_clean_preview_cell(cell) for cell in row_values])
                 if len(rows) >= 50:
                     break
         finally:
@@ -577,7 +592,7 @@ def preview_mapping_file(file_obj, sheet_index: int | None = None) -> dict:
             row = sheet.row_values(row_idx)
             if max_cols and len(row) < max_cols:
                 row.extend([""] * (max_cols - len(row)))
-            rows.append([str(cell) if cell is not None else "" for cell in row])
+            rows.append([_clean_preview_cell(cell) for cell in row])
             if len(rows) >= 50:
                 break
     else:

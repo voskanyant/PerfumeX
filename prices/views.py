@@ -244,6 +244,33 @@ class SupplierOverviewView(LoginRequiredMixin, TemplateView):
         return context
 
 
+class ImportSettingsView(LoginRequiredMixin, TemplateView):
+    template_name = "prices/import_settings.html"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        settings_obj = models.ImportSettings.get_solo()
+        context["form"] = forms.ImportSettingsForm(instance=settings_obj)
+        context["settings_obj"] = settings_obj
+        if settings_obj.last_run_at:
+            context["next_run_at"] = settings_obj.last_run_at + timezone.timedelta(
+                minutes=settings_obj.interval_minutes
+            )
+        else:
+            context["next_run_at"] = None
+        return context
+
+    def post(self, request, *args, **kwargs):
+        settings_obj = models.ImportSettings.get_solo()
+        form = forms.ImportSettingsForm(request.POST, instance=settings_obj)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Import settings updated.")
+        else:
+            messages.error(request, "Please fix the errors and try again.")
+        return redirect("prices:import_settings")
+
+
 class ImportWizardView(LoginRequiredMixin, FormView):
     template_name = "prices/import_wizard.html"
     form_class = forms.ImportWizardForm

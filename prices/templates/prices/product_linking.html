@@ -1,18 +1,19 @@
-{% extends "prices/base.html" %}
+﻿{% extends "prices/base.html" %}
+{% load prices_extras %}
 
 {% block title %}Link Products{% endblock %}
 
 {% block content %}
-    <div class="card">
-        <div class="page-header">
+    <div class="card mb-3">
+        <div class="d-flex flex-wrap align-items-start justify-content-between gap-3">
             <div>
                 <h1 class="page-title">Link Products</h1>
-                <p class="muted page-subtitle">Pick a supplier product, refine keywords, and link to your catalog.</p>
+                <p class="page-subtitle">Pick a supplier product, refine keywords, and link to your catalog.</p>
             </div>
         </div>
-        <div class="filters">
-            <p>
-                <label for="link-supplier-filter">Supplier</label>
+        <div class="row g-3 mt-2">
+            <div class="col-12 col-md-4">
+                <label for="link-supplier-filter" class="form-label">Supplier</label>
                 <select id="link-supplier-filter">
                     <option value="">All</option>
                     {% for supplier in supplier_options %}
@@ -21,24 +22,24 @@
                         </option>
                     {% endfor %}
                 </select>
-            </p>
-            <p>
-                <label for="link-search">Search</label>
+            </div>
+            <div class="col-12 col-md-5">
+                <label for="link-search" class="form-label">Search</label>
                 <input id="link-search" type="text" value="{{ search_query }}" placeholder="Search supplier products">
-            </p>
-            <p>
-                <label>&nbsp;</label>
+            </div>
+            <div class="col-12 col-md-3 d-grid">
                 <button class="button secondary" type="button" id="link-filter-apply">Apply</button>
-            </p>
+            </div>
         </div>
     </div>
-    <div class="card">
-        <div style="display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px;">
-            <div>
+
+    <div class="row g-3">
+        <div class="col-12 col-lg-6">
+            <div class="card h-100">
                 <h2 class="page-title">Supplier products</h2>
-                <p class="muted page-subtitle">Click a row to select.</p>
-                <div class="table-wrap" style="max-height: 420px;">
-                    <table id="supplier-products-table">
+                <p class="page-subtitle">Click a row to select.</p>
+                <div class="table-wrap table-responsive" style="max-height: 420px;">
+                    <table id="supplier-products-table" class="table table-sm table-hover align-middle mb-0">
                         <thead>
                             <tr>
                                 <th>Supplier</th>
@@ -48,43 +49,44 @@
                         </thead>
                         <tbody>
                             {% for product in supplier_products %}
-                                <tr data-id="{{ product.id }}" data-name="{{ product.name }}" style="cursor: pointer;">
-                                    <td>{{ product.supplier.name }}</td>
-                                    <td>{{ product.supplier_sku }}</td>
-                                    <td>{{ product.name }}</td>
+                                <tr data-id="{{ product.id }}" data-name="{{ product.name|fix_text }}" style="cursor: pointer;">
+                                    <td>{{ product.supplier.name|fix_text }}</td>
+                                    <td>{{ product.supplier_sku|fix_text }}</td>
+                                    <td>{{ product.name|fix_text }}</td>
                                 </tr>
                             {% endfor %}
                         </tbody>
                     </table>
                 </div>
                 {% if supplier_products.paginator.num_pages > 1 %}
-                    <div style="margin-top: 12px;">
+                    <div class="d-flex flex-wrap align-items-center gap-2 mt-3">
                         {% if supplier_products.has_previous %}
                             <a class="button secondary" href="?sp_page={{ supplier_products.previous_page_number }}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if search_query %}&q={{ search_query }}{% endif %}">Previous</a>
                         {% endif %}
-                        <span class="muted" style="margin: 0 8px;">
-                            Page {{ supplier_products.number }} of {{ supplier_products.paginator.num_pages }}
-                        </span>
+                        <span class="muted">Page {{ supplier_products.number }} of {{ supplier_products.paginator.num_pages }}</span>
                         {% if supplier_products.has_next %}
                             <a class="button secondary" href="?sp_page={{ supplier_products.next_page_number }}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if search_query %}&q={{ search_query }}{% endif %}">Next</a>
                         {% endif %}
                     </div>
                 {% endif %}
             </div>
-            <div>
+        </div>
+        <div class="col-12 col-lg-6">
+            <div class="card h-100">
                 <h2 class="page-title">Keywords</h2>
-                <p class="muted page-subtitle">Toggle words to refine matches.</p>
-                <div id="keyword-panel" class="filters"></div>
+                <p class="page-subtitle">Toggle words to refine matches.</p>
+                <div id="keyword-panel" class="row g-2"></div>
             </div>
         </div>
     </div>
-    <div class="card">
-        <div style="display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px;">
-            <div>
+
+    <div class="row g-3 mt-1">
+        <div class="col-12 col-lg-7">
+            <div class="card h-100">
                 <h2 class="page-title">Matches</h2>
-                <p class="muted page-subtitle">Select a target to link.</p>
-                <div class="table-wrap" style="max-height: 420px;">
-                    <table>
+                <p class="page-subtitle">Select a target to link.</p>
+                <div class="table-wrap table-responsive" style="max-height: 360px;">
+                    <table class="table table-sm table-hover align-middle mb-0">
                         <thead>
                             <tr>
                                 <th></th>
@@ -96,8 +98,8 @@
                         </tbody>
                     </table>
                 </div>
-                <div class="table-wrap" style="max-height: 420px; margin-top: 12px;">
-                    <table>
+                <div class="table-wrap table-responsive mt-3" style="max-height: 360px;">
+                    <table class="table table-sm table-hover align-middle mb-0">
                         <thead>
                             <tr>
                                 <th></th>
@@ -110,16 +112,18 @@
                     </table>
                 </div>
             </div>
-            <div>
+        </div>
+        <div class="col-12 col-lg-5">
+            <div class="card h-100">
                 <h2 class="page-title">Link action</h2>
-                <p class="muted page-subtitle">Confirm the link for the selected supplier product.</p>
+                <p class="page-subtitle">Confirm the link for the selected supplier product.</p>
                 <form method="post" action="{% url 'prices:product_linking_apply' %}">
                     {% csrf_token %}
                     <input type="hidden" name="source_id" id="link-source-id">
                     <input type="hidden" name="target_our" id="link-target-our">
                     <input type="hidden" name="target_supplier" id="link-target-supplier">
                     <p class="muted" id="link-selection">No product selected.</p>
-                    <button class="button" type="submit">Link product</button>
+                    <button class="button w-100" type="submit">Link product</button>
                 </form>
             </div>
         </div>
@@ -184,10 +188,9 @@
                 }).slice(0, 18).forEach(function (token) {
                     var id = "kw-" + token.replace(/[^a-z0-9]/gi, "").toLowerCase();
                     var wrapper = document.createElement("div");
+                    wrapper.className = "col-6";
                     var label = document.createElement("label");
-                    label.style.display = "flex";
-                    label.style.alignItems = "center";
-                    label.style.gap = "8px";
+                    label.className = "d-flex align-items-center gap-2";
                     var input = document.createElement("input");
                     input.type = "checkbox";
                     input.value = token;
@@ -199,90 +202,74 @@
                     wrapper.appendChild(label);
                     keywordPanel.appendChild(wrapper);
                 });
-                searchMatches();
+            }
+
+            function buildQuery() {
+                return Array.from(keywordPanel.querySelectorAll("input[type=checkbox]"))
+                    .filter(function (input) { return input.checked; })
+                    .map(function (input) { return input.value; })
+                    .join(" ");
             }
 
             function searchMatches() {
-                if (!sourceInput.value) return;
-                var terms = Array.from(keywordPanel.querySelectorAll("input:checked")).map(function (el) { return el.value; });
-                if (!terms.length) {
-                    ourResults.innerHTML = "<tr><td colspan='2' class='muted'>No keywords selected.</td></tr>";
-                    supplierResults.innerHTML = "<tr><td colspan='2' class='muted'>No keywords selected.</td></tr>";
-                    return;
-                }
-                fetch("/linking/search/?supplier_product=" + sourceInput.value + "&terms=" + encodeURIComponent(terms.join(" ")))
+                var query = buildQuery();
+                if (!query) return;
+                fetch("/products/linking/search/?q=" + encodeURIComponent(query))
                     .then(function (res) { return res.json(); })
                     .then(function (data) {
-                        if (data.error) {
-                            ourResults.innerHTML = "<tr><td colspan='2' class='muted'>" + data.error + "</td></tr>";
-                            supplierResults.innerHTML = "<tr><td colspan='2' class='muted'>" + data.error + "</td></tr>";
-                            return;
-                        }
-                        if (data.our_products.length) {
-                            ourResults.innerHTML = data.our_products.map(function (item) {
-                                var label = [item.brand, item.name, item.size].filter(Boolean).join(" ");
-                                return "<tr>" +
-                                    "<td><input type='checkbox' data-target-select='our:" + item.id + "'></td>" +
-                                    "<td>" + label + "</td>" +
-                                "</tr>";
-                            }).join("");
+                        ourResults.innerHTML = "";
+                        supplierResults.innerHTML = "";
+                        if (!data.our_products.length) {
+                            ourResults.innerHTML = "<tr><td colspan='2' class='muted'>No matches yet.</td></tr>";
                         } else {
-                            ourResults.innerHTML = "<tr><td colspan='2' class='muted'>No our products.</td></tr>";
-                        }
-                        if (data.supplier_products.length) {
-                            supplierResults.innerHTML = data.supplier_products.map(function (item) {
-                                var label = item.supplier + " · " + item.name + " (" + item.sku + ")";
-                                return "<tr>" +
-                                    "<td><input type='checkbox' data-target-select='supplier:" + item.id + "'></td>" +
-                                    "<td>" + label + "</td>" +
-                                "</tr>";
-                            }).join("");
-                        } else {
-                            supplierResults.innerHTML = "<tr><td colspan='2' class='muted'>No supplier products.</td></tr>";
-                        }
-                        document.querySelectorAll("[data-target-select]").forEach(function (el) {
-                            el.addEventListener("change", function () {
-                                var value = el.getAttribute("data-target-select");
-                                if (!value) return;
-                                var parts = value.split(":");
-                                setTarget(parts[0], parts[1]);
+                            data.our_products.forEach(function (item) {
+                                var row = document.createElement("tr");
+                                row.innerHTML = "<td><input type='checkbox' data-target-select='our:" + item.id + "'></td><td>" + item.name + "</td>";
+                                row.querySelector("input").addEventListener("change", function () {
+                                    setTarget("our", item.id);
+                                });
+                                ourResults.appendChild(row);
                             });
-                        });
+                        }
+                        if (!data.supplier_products.length) {
+                            supplierResults.innerHTML = "<tr><td colspan='2' class='muted'>No matches yet.</td></tr>";
+                        } else {
+                            data.supplier_products.forEach(function (item) {
+                                var row = document.createElement("tr");
+                                row.innerHTML = "<td><input type='checkbox' data-target-select='supplier:" + item.id + "'></td><td>" + item.name + "</td>";
+                                row.querySelector("input").addEventListener("change", function () {
+                                    setTarget("supplier", item.id);
+                                });
+                                supplierResults.appendChild(row);
+                            });
+                        }
                     });
             }
 
             document.querySelectorAll("#supplier-products-table tbody tr").forEach(function (row) {
                 row.addEventListener("click", function () {
-                    if (selectedRow) {
-                        selectedRow.style.background = "";
-                    }
+                    if (selectedRow) selectedRow.classList.remove("table-active");
                     selectedRow = row;
-                    row.style.background = "#f3f4f6";
+                    row.classList.add("table-active");
                     var id = row.getAttribute("data-id");
                     var name = row.getAttribute("data-name");
                     sourceInput.value = id;
                     linkSelection.textContent = "Selected: " + name;
                     renderKeywords(name);
+                    searchMatches();
                 });
             });
 
             document.getElementById("link-filter-apply").addEventListener("click", function () {
                 var supplier = document.getElementById("link-supplier-filter").value;
-                var query = document.getElementById("link-search").value;
-                var url = new URL(window.location.href);
-                if (supplier) {
-                    url.searchParams.set("supplier", supplier);
-                } else {
-                    url.searchParams.delete("supplier");
-                }
-                if (query) {
-                    url.searchParams.set("q", query);
-                } else {
-                    url.searchParams.delete("q");
-                }
-                url.searchParams.delete("sp_page");
-                window.location.href = url.toString();
+                var q = document.getElementById("link-search").value;
+                var url = "?";
+                if (supplier) url += "supplier=" + supplier + "&";
+                if (q) url += "q=" + encodeURIComponent(q);
+                window.location.href = url;
             });
         })();
     </script>
 {% endblock %}
+
+

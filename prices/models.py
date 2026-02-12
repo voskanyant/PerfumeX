@@ -255,3 +255,17 @@ class EmailImportRun(models.Model):
 
     def __str__(self) -> str:
         return f"{self.supplier} {self.started_at:%Y-%m-%d %H:%M}"
+
+
+class ImportSettings(models.Model):
+    enabled = models.BooleanField(default=True)
+    interval_minutes = models.PositiveIntegerField(default=120)
+    last_run_at = models.DateTimeField(null=True, blank=True)
+
+    def __str__(self) -> str:
+        return "Import settings"
+
+    @classmethod
+    def get_solo(cls) -> "ImportSettings":
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj

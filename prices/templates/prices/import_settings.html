@@ -1,0 +1,48 @@
+{% extends "prices/base.html" %}
+
+{% block title %}Import Settings{% endblock %}
+
+{% block content %}
+    <div class="card mb-3">
+        <div class="d-flex flex-wrap align-items-start justify-content-between gap-3">
+            <div>
+                <h1 class="page-title">Import Settings</h1>
+                <p class="page-subtitle">Control how often the system checks email for new price lists.</p>
+            </div>
+        </div>
+    </div>
+    <div class="card">
+        <form method="post" class="row g-3 align-items-end">
+            {% csrf_token %}
+            <div class="col-12 col-md-6">
+                <div class="form-check">
+                    {{ form.enabled }}
+                    <label class="form-check-label" for="id_enabled">Enable auto email checks</label>
+                </div>
+            </div>
+            <div class="col-12 col-md-6">
+                <label class="form-label" for="id_interval_minutes">Check interval (minutes)</label>
+                {{ form.interval_minutes }}
+                <div class="form-text">How often to check all mailboxes for new price lists.</div>
+            </div>
+            <div class="col-12">
+                <button class="button" type="submit">Save settings</button>
+            </div>
+        </form>
+        <div class="mt-3 muted">
+            {% if settings_obj.last_run_at %}
+                Last auto run: {{ settings_obj.last_run_at|date:"d/m/Y H:i" }}
+            {% else %}
+                Last auto run: -
+            {% endif %}
+            <br>
+            {% if next_run_at %}
+                Next run target: {{ next_run_at|date:"d/m/Y H:i" }}
+            {% endif %}
+        </div>
+        <div class="alert alert-light border mt-3">
+            Server task required: set a cron job to run `python manage.py import_emails` every 5-10 minutes.
+            The command will respect the interval above and skip if it ran too recently.
+        </div>
+    </div>
+{% endblock %}

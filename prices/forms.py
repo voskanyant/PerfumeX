@@ -134,3 +134,19 @@ class SupplierImportForm(forms.Form):
         help_text="Comma-separated columns to concatenate, e.g. 3 or 3,4."
     )
     price_column = forms.IntegerField(min_value=1)
+
+
+class ImportSettingsForm(forms.ModelForm):
+    class Meta:
+        model = models.ImportSettings
+        fields = ("enabled", "interval_minutes")
+        labels = {
+            "enabled": "Enable auto email checks",
+            "interval_minutes": "Check interval (minutes)",
+        }
+        help_texts = {
+            "interval_minutes": "How often to check all mailboxes for new price lists.",
+        }
+        widgets = {
+            "interval_minutes": forms.NumberInput(attrs={"min": 5, "step": 5}),
+        }

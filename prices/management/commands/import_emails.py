@@ -1,4 +1,5 @@
 from django.core.management.base import BaseCommand
+from django.utils import timezone
 
 from prices import models
 from prices.services.email_importer import run_import
@@ -22,8 +23,24 @@ class Command(BaseCommand):
             default=20_000_000,
             help="Skip emails larger than this size (bytes).",
         )
+        parser.add_argument(
+            "--force",
+            action="store_true",
+            help="Run immediately, ignoring Import Settings interval/disabled flag.",
+        )
 
     def handle(self, *args, **options):
+        settings_obj = models.ImportSettings.get_solo()
+        if not options["force"]:
+            if not settings_obj.enabled:
+                self.stdout.write("Import settings disabled. Use --force to run.")
+                return
+            if settings_obj.last_run_at:
+                elapsed = timezone.now() - settings_obj.last_run_at
+                if elapsed.total_seconds() < settings_obj.interval_minutes * 60:
+                    self.stdout.write("Skipped. Last run too recent.")
+                    return
+
         mailboxes = models.Mailbox.objects.filter(is_active=True)
         if options["mailbox"]:
             mailboxes = mailboxes.filter(name=options["mailbox"])
@@ -37,3 +54,6 @@ class Command(BaseCommand):
             logger=self.stdout.write,
             dedupe_same_day_only=False,
         )
+
+        settings_obj.last_run_at = timezone.now()
+        settings_obj.save(update_fields=["last_run_at"])

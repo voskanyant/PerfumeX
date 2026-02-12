@@ -23,6 +23,7 @@ urlpatterns = [
     path("settings/currencies/", views.CurrencyRateView.as_view(), name="currency_rates"),
     path("settings/currencies/<int:pk>/edit/", views.CurrencyRateUpdateView.as_view(), name="currency_rate_update"),
     path("settings/currencies/<int:pk>/delete/", views.CurrencyRateDeleteView.as_view(), name="currency_rate_delete"),
+    path("settings/imports/", views.ImportSettingsView.as_view(), name="import_settings"),
     path("settings/mailboxes/", views.MailboxListView.as_view(), name="mailbox_list"),
     path("settings/mailboxes/new/", views.MailboxCreateView.as_view(), name="mailbox_create"),
     path("settings/mailboxes/<int:pk>/edit/", views.MailboxUpdateView.as_view(), name="mailbox_update"),
