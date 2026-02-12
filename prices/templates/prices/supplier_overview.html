@@ -291,3 +291,53 @@
         {% endif %}
     </div>
 {% endblock %}
+{% block extra_scripts %}
+    <script>
+        (function () {
+            var supplierSelectAll = document.getElementById("supplier-select-all");
+            var supplierBoxes = Array.from(document.querySelectorAll(".supplier-select"));
+            var bulkForm = document.getElementById("bulk-backfill-form");
+            var bulkSelected = document.getElementById("bulk-backfill-selected");
+
+            function syncBulkHidden() {
+                if (!bulkSelected) return;
+                bulkSelected.innerHTML = "";
+                supplierBoxes.filter(function (box) { return box.checked; }).forEach(function (box) {
+                    var input = document.createElement("input");
+                    input.type = "hidden";
+                    input.name = "supplier_ids";
+                    input.value = box.value;
+                    bulkSelected.appendChild(input);
+                });
+            }
+
+            if (supplierSelectAll) {
+                supplierSelectAll.addEventListener("change", function () {
+                    var checked = supplierSelectAll.checked;
+                    supplierBoxes.forEach(function (box) { box.checked = checked; });
+                    syncBulkHidden();
+                });
+            }
+            supplierBoxes.forEach(function (box) {
+                box.addEventListener("change", function () {
+                    syncBulkHidden();
+                });
+            });
+            if (bulkForm) {
+                bulkForm.addEventListener("submit", function () {
+                    syncBulkHidden();
+                });
+            }
+
+            var importSelectAll = document.getElementById("import-select-all");
+            if (importSelectAll) {
+                importSelectAll.addEventListener("change", function () {
+                    var checked = importSelectAll.checked;
+                    document.querySelectorAll("input[name='import_ids']").forEach(function (box) {
+                        box.checked = checked;
+                    });
+                });
+            }
+        })();
+    </script>
+{% endblock %}
