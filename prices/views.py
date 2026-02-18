@@ -30,6 +30,7 @@ import re
 import unicodedata
 
 from django.db.models import Max, Q
+from django.db.models.functions import Coalesce
 
 from . import forms, models
 from django.shortcuts import get_object_or_404, redirect
@@ -215,7 +216,7 @@ class SupplierOverviewView(LoginRequiredMixin, TemplateView):
         import_batches = models.ImportBatch.objects.select_related(
             "supplier", "mailbox"
         ).prefetch_related("importfile_set").annotate(
-            updated_at=Max("importfile__processed_at")
+            updated_at=Coalesce(Max("importfile__processed_at"), "created_at")
         )
         supplier_filter = self.request.GET.get("supplier", "").strip()
         status_filter = self.request.GET.get("status", "").strip()
