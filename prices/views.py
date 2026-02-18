@@ -29,7 +29,7 @@ import threading
 import re
 import unicodedata
 
-from django.db.models import Q
+from django.db.models import Max, Q
 
 from . import forms, models
 from django.shortcuts import get_object_or_404, redirect
@@ -214,14 +214,46 @@ class SupplierOverviewView(LoginRequiredMixin, TemplateView):
         rows = []
         import_batches = models.ImportBatch.objects.select_related(
             "supplier", "mailbox"
-        ).prefetch_related("importfile_set")
+        ).prefetch_related("importfile_set").annotate(
+            updated_at=Max("importfile__processed_at")
+        )
         supplier_filter = self.request.GET.get("supplier", "").strip()
         status_filter = self.request.GET.get("status", "").strip()
+        log_sort = self.request.GET.get("log_sort", "date").strip()
+        log_dir = self.request.GET.get("log_dir", "desc").strip().lower()
+        if log_dir not in {"asc", "desc"}:
+            log_dir = "desc"
         if supplier_filter:
             import_batches = import_batches.filter(supplier_id=supplier_filter)
         if status_filter:
             import_batches = import_batches.filter(status=status_filter)
-        import_batches = import_batches.order_by("-created_at")
+        if log_sort == "supplier":
+            ordering = "supplier__name"
+        elif log_sort == "status":
+            ordering = "status"
+        elif log_sort == "mailbox":
+            ordering = "mailbox__name"
+        elif log_sort == "updated":
+            ordering = "updated_at"
+        else:
+            log_sort = "date"
+            ordering = "received_at"
+
+        if log_sort == "date":
+            if log_dir == "asc":
+                import_batches = import_batches.order_by("received_at", "created_at")
+            else:
+                import_batches = import_batches.order_by("-received_at", "-created_at")
+        elif log_sort == "updated":
+            if log_dir == "asc":
+                import_batches = import_batches.order_by("updated_at", "created_at")
+            else:
+                import_batches = import_batches.order_by("-updated_at", "-created_at")
+        else:
+            if log_dir == "asc":
+                import_batches = import_batches.order_by(ordering, "-created_at")
+            else:
+                import_batches = import_batches.order_by(f"-{ordering}", "-created_at")
         log_paginator = Paginator(import_batches, 25)
         log_page_number = self.request.GET.get("log_page", "1")
         log_page = log_paginator.get_page(log_page_number)
@@ -247,6 +279,8 @@ class SupplierOverviewView(LoginRequiredMixin, TemplateView):
         ).exists()
         context["supplier_filter"] = supplier_filter
         context["status_filter"] = status_filter
+        context["log_sort"] = log_sort
+        context["log_dir"] = log_dir
         context["supplier_options"] = suppliers
         context["status_options"] = models.ImportStatus.choices
         return context
