@@ -45,6 +45,32 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
+        # Recover rows left in pending when previous cron run was killed
+        # (for example by external timeout) so they can be retried safely.
+        stale_cutoff = timezone.now() - timezone.timedelta(minutes=15)
+        stale_files_qs = models.ImportFile.objects.filter(
+            status=models.ImportStatus.PENDING,
+            import_batch__created_at__lt=stale_cutoff,
+        )
+        stale_file_ids = list(stale_files_qs.values_list("id", flat=True))
+        if stale_file_ids:
+            stale_files_qs.update(
+                status=models.ImportStatus.FAILED,
+                error_message="Auto-failed stale pending file. Previous run was likely interrupted.",
+            )
+            models.ImportBatch.objects.filter(
+                id__in=models.ImportFile.objects.filter(id__in=stale_file_ids).values_list(
+                    "import_batch_id", flat=True
+                ),
+                status=models.ImportStatus.PENDING,
+            ).update(
+                status=models.ImportStatus.FAILED,
+                error_message="Auto-failed stale pending batch. Previous run was likely interrupted.",
+            )
+            self.stdout.write(
+                f"Recovered stale pending imports: {len(stale_file_ids)} file(s)."
+            )
+
         settings_obj = models.ImportSettings.get_solo()
         if not options["force"]:
             if not settings_obj.enabled:
