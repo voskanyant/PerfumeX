@@ -4,6 +4,7 @@ from django.utils import timezone
 from prices import models
 from prices.services.email_importer import run_import
 from prices.services.cbr_rates import upsert_cbr_markup_rates
+from prices.services.importer import process_import_file
 
 
 def _get_supplier_latest_batch_time(supplier: models.Supplier):
@@ -70,6 +71,49 @@ class Command(BaseCommand):
             self.stdout.write(
                 f"Recovered stale pending imports: {len(stale_file_ids)} file(s)."
             )
+
+        # Retry auto-failed stale files directly from saved file payload
+        # so we don't depend on IMAP fetching the same message again.
+        retry_qs = (
+            models.ImportFile.objects.select_related("import_batch", "import_batch__supplier")
+            .filter(
+                status=models.ImportStatus.FAILED,
+                error_message__startswith="Auto-failed stale pending file.",
+                file__isnull=False,
+            )
+            .order_by("id")[:100]
+        )
+        retried = 0
+        for import_file in retry_qs:
+            supplier = import_file.import_batch.supplier
+            if import_file.content_hash and models.ImportFile.objects.filter(
+                import_batch__supplier=supplier,
+                content_hash=import_file.content_hash,
+                status=models.ImportStatus.PROCESSED,
+            ).exists():
+                continue
+            import_file.status = models.ImportStatus.PENDING
+            import_file.error_message = ""
+            import_file.save(update_fields=["status", "error_message"])
+            try:
+                process_import_file(import_file)
+                import_file.status = models.ImportStatus.PROCESSED
+                import_file.save(update_fields=["status"])
+                models.ImportBatch.objects.filter(id=import_file.import_batch_id).update(
+                    status=models.ImportStatus.PROCESSED,
+                    error_message="",
+                )
+                retried += 1
+            except Exception as exc:
+                import_file.status = models.ImportStatus.FAILED
+                import_file.error_message = str(exc)
+                import_file.save(update_fields=["status", "error_message"])
+                models.ImportBatch.objects.filter(id=import_file.import_batch_id).update(
+                    status=models.ImportStatus.FAILED,
+                    error_message=str(exc),
+                )
+        if retried:
+            self.stdout.write(f"Retried stale failed files: {retried}.")
 
         settings_obj = models.ImportSettings.get_solo()
         if not options["force"]:
