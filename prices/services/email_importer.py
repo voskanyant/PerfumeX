@@ -1,9 +1,11 @@
 import email
 import hashlib
 import imaplib
+import re
 import socket
 import ssl
 import time
+from datetime import datetime
 from email.header import decode_header
 from email.utils import parsedate_to_datetime, parseaddr
 
@@ -113,6 +115,24 @@ def _imap_fetch(client, mailbox, msg_id, query, logger):
     return "NO", [], client
 
 
+def _extract_internaldate(meta):
+    if not meta:
+        return None
+    pattern = re.compile(r'INTERNALDATE "([^"]+)"')
+    for item in meta:
+        if isinstance(item, tuple) and item and item[0]:
+            text = item[0].decode(errors="ignore")
+            match = pattern.search(text)
+            if not match:
+                continue
+            raw = match.group(1)
+            try:
+                return datetime.strptime(raw, "%d-%b-%Y %H:%M:%S %z")
+            except ValueError:
+                return None
+    return None
+
+
 def run_import(
     mailboxes,
     supplier_id=None,
@@ -186,7 +206,12 @@ def run_import(
         except Exception:
             pass
         if limit:
-            message_ids = message_ids[:limit]
+            # In incremental mode, taking the oldest N can permanently starve
+            # new messages in busy mailboxes; take the newest chunk instead.
+            if min_received_at:
+                message_ids = message_ids[-limit:]
+            else:
+                message_ids = message_ids[:limit]
         if run_id:
             models.EmailImportRun.objects.filter(id=run_id).update(
                 total_messages=len(message_ids),
@@ -211,7 +236,7 @@ def run_import(
                 client,
                 mailbox,
                 msg_id,
-                "(BODY.PEEK[HEADER.FIELDS (SUBJECT FROM DATE MESSAGE-ID)] RFC822.SIZE)",
+                "(BODY.PEEK[HEADER.FIELDS (SUBJECT FROM DATE MESSAGE-ID)] RFC822.SIZE INTERNALDATE)",
                 logger,
             )
             if not client:
@@ -245,15 +270,22 @@ def run_import(
             message = email.message_from_bytes(raw_email)
             subject = _decode_header(message.get("Subject", ""))
             from_addr = parseaddr(message.get("From", ""))[1]
-            message_id = message.get("Message-ID", "")
-            received_at = None
+            message_id = (message.get("Message-ID") or "").strip()
+            received_at = _extract_internaldate(meta)
+            if received_at and timezone.is_naive(received_at):
+                received_at = timezone.make_aware(received_at)
+            if received_at and timezone.is_aware(received_at):
+                received_at = received_at.astimezone(timezone.get_current_timezone())
+            header_received_at = None
             if message.get("Date"):
                 try:
-                    received_at = parsedate_to_datetime(message.get("Date"))
-                    if received_at and timezone.is_naive(received_at):
-                        received_at = timezone.make_aware(received_at)
+                    header_received_at = parsedate_to_datetime(message.get("Date"))
+                    if header_received_at and timezone.is_naive(header_received_at):
+                        header_received_at = timezone.make_aware(header_received_at)
                 except Exception:
-                    received_at = None
+                    header_received_at = None
+            if not received_at:
+                received_at = header_received_at
             if (
                 min_received_at
                 and received_at
@@ -346,15 +378,36 @@ def run_import(
 
                 batch = batch_by_supplier.get(supplier.id)
                 if not batch:
-                    batch, _ = models.ImportBatch.objects.get_or_create(
-                        supplier=supplier,
-                        message_id=message_id,
-                        defaults={
-                            "mailbox": mailbox,
-                            "received_at": received_at,
-                            "status": models.ImportStatus.PENDING,
-                        },
-                    )
+                    if message_id:
+                        batch, _ = models.ImportBatch.objects.get_or_create(
+                            supplier=supplier,
+                            message_id=message_id,
+                            defaults={
+                                "mailbox": mailbox,
+                                "received_at": received_at,
+                                "status": models.ImportStatus.PENDING,
+                            },
+                        )
+                        # Backfill critical metadata on previously created batches.
+                        update_fields = []
+                        if batch.mailbox_id is None:
+                            batch.mailbox = mailbox
+                            update_fields.append("mailbox")
+                        if batch.received_at is None and received_at is not None:
+                            batch.received_at = received_at
+                            update_fields.append("received_at")
+                        if update_fields:
+                            batch.save(update_fields=update_fields)
+                    else:
+                        # Some providers omit Message-ID; never collapse such
+                        # emails into old batches with blank IDs.
+                        batch = models.ImportBatch.objects.create(
+                            supplier=supplier,
+                            mailbox=mailbox,
+                            message_id="",
+                            received_at=received_at,
+                            status=models.ImportStatus.PENDING,
+                        )
                     batch_by_supplier[supplier.id] = batch
 
                 import_file = models.ImportFile.objects.create(
