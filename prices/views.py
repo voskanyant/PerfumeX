@@ -216,7 +216,8 @@ class SupplierOverviewView(LoginRequiredMixin, TemplateView):
         import_batches = models.ImportBatch.objects.select_related(
             "supplier", "mailbox"
         ).prefetch_related("importfile_set").annotate(
-            updated_at=Coalesce(Max("importfile__processed_at"), "created_at")
+            updated_at=Coalesce(Max("importfile__processed_at"), "created_at"),
+            date_at=Coalesce("received_at", "created_at"),
         )
         supplier_filter = self.request.GET.get("supplier", "").strip()
         status_filter = self.request.GET.get("status", "").strip()
@@ -242,14 +243,22 @@ class SupplierOverviewView(LoginRequiredMixin, TemplateView):
 
         if log_sort == "date":
             if log_dir == "asc":
-                import_batches = import_batches.order_by("received_at", "created_at")
+                import_batches = import_batches.order_by(
+                    "date_at", "updated_at", "created_at", "id"
+                )
             else:
-                import_batches = import_batches.order_by("-received_at", "-created_at")
+                import_batches = import_batches.order_by(
+                    "-date_at", "-updated_at", "-created_at", "-id"
+                )
         elif log_sort == "updated":
             if log_dir == "asc":
-                import_batches = import_batches.order_by("updated_at", "created_at")
+                import_batches = import_batches.order_by(
+                    "updated_at", "date_at", "created_at", "id"
+                )
             else:
-                import_batches = import_batches.order_by("-updated_at", "-created_at")
+                import_batches = import_batches.order_by(
+                    "-updated_at", "-date_at", "-created_at", "-id"
+                )
         else:
             if log_dir == "asc":
                 import_batches = import_batches.order_by(ordering, "-created_at")
