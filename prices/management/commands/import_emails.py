@@ -6,6 +6,20 @@ from prices.services.email_importer import run_import
 from prices.services.cbr_rates import upsert_cbr_markup_rates
 
 
+def _get_supplier_latest_batch_time(supplier: models.Supplier):
+    latest = None
+    batches = models.ImportBatch.objects.filter(
+        supplier=supplier,
+        importfile__status=models.ImportStatus.PROCESSED,
+        importfile__file_kind=models.FileKind.PRICE,
+    ).values_list("received_at", "created_at")
+    for received_at, created_at in batches:
+        candidate = received_at or created_at
+        if candidate and (latest is None or candidate > latest):
+            latest = candidate
+    return latest
+
+
 class Command(BaseCommand):
     help = "Import supplier price lists from email attachments."
 
@@ -46,6 +60,8 @@ class Command(BaseCommand):
         if options["mailbox"]:
             mailboxes = mailboxes.filter(name=options["mailbox"])
 
+        limit = options["limit"] if options["limit"] else settings_obj.max_messages_per_run
+
         today = timezone.localdate()
         cbr_rate_exists_today = models.ExchangeRate.objects.filter(
             rate_date=today,
@@ -65,15 +81,35 @@ class Command(BaseCommand):
             except Exception as exc:
                 self.stdout.write(f"CBR rate sync skipped: {exc}")
 
-        run_import(
-            mailboxes=mailboxes,
-            supplier_id=None,
-            mark_seen=options["mark_seen"],
-            limit=options["limit"],
-            max_bytes=options["max_bytes"],
-            logger=self.stdout.write,
-            dedupe_same_day_only=False,
+        suppliers = (
+            models.Supplier.objects.filter(is_active=True, from_address_pattern__gt="")
+            .order_by("name")
         )
+        for supplier in suppliers:
+            latest_batch = _get_supplier_latest_batch_time(supplier)
+            if latest_batch and timezone.is_naive(latest_batch):
+                latest_batch = timezone.make_aware(latest_batch)
+            if latest_batch:
+                since_date = timezone.localtime(latest_batch) - timezone.timedelta(days=1)
+            else:
+                since_date = timezone.now() - timezone.timedelta(days=supplier.email_search_days)
+            self.stdout.write(
+                f"Checking supplier: {supplier.name} (since {since_date:%Y-%m-%d %H:%M})"
+            )
+            run_import(
+                mailboxes=mailboxes,
+                supplier_id=supplier.id,
+                mark_seen=False,
+                limit=limit,
+                max_bytes=options["max_bytes"],
+                logger=self.stdout.write,
+                search_criteria="ALL",
+                since_date=since_date,
+                min_received_at=latest_batch,
+                from_filter=supplier.from_address_pattern or None,
+                subject_filter=supplier.price_subject_pattern or None,
+                dedupe_same_day_only=False,
+            )
 
         settings_obj.last_run_at = timezone.now()
         settings_obj.save(update_fields=["last_run_at"])

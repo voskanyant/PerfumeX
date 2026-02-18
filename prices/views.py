@@ -269,6 +269,16 @@ class ImportSettingsView(LoginRequiredMixin, TemplateView):
         return context
 
     def post(self, request, *args, **kwargs):
+        if request.POST.get("action") == "run_now":
+            def _run_now():
+                close_old_connections()
+                call_command("import_emails", force=True)
+
+            thread = threading.Thread(target=_run_now, daemon=True)
+            thread.start()
+            messages.success(request, "Email import started.")
+            return redirect("prices:import_settings")
+
         settings_obj = models.ImportSettings.get_solo()
         form = forms.ImportSettingsForm(request.POST, instance=settings_obj)
         if form.is_valid():
@@ -418,7 +428,9 @@ class SupplierProductSearchView(LoginRequiredMixin, View):
         query = request.GET.get("q", "").strip()
         currency = request.GET.get("currency", "").strip() or models.Currency.USD
         supplier_filter = request.GET.get("supplier", "").strip()
-        status_filter = request.GET.get("status", "").strip() or "active"
+        status_filter = request.GET.get("status", "").strip().lower() or "active"
+        if status_filter not in {"active", "inactive", "all"}:
+            status_filter = "active"
         sort_field = request.GET.get("sort") or "current_price"
         sort_dir = request.GET.get("dir", "asc")
         allowed_sorts = {"supplier", "supplier_sku", "name", "current_price", "last_imported_at"}
@@ -1412,7 +1424,9 @@ class SupplierProductListView(BaseListView):
         queryset = super().get_queryset()
         query = self.request.GET.get("q", "").strip()
         supplier_filter = self.request.GET.get("supplier", "").strip()
-        status_filter = self.request.GET.get("status", "").strip() or "active"
+        status_filter = self.request.GET.get("status", "").strip().lower() or "active"
+        if status_filter not in {"active", "inactive", "all"}:
+            status_filter = "active"
         if query:
             tokens = [token for token in re.split(r"\s+", query) if token]
             for token in tokens:
@@ -1432,14 +1446,16 @@ class SupplierProductListView(BaseListView):
         context = super().get_context_data(**kwargs)
         currency = self.request.GET.get("currency", "").strip() or models.Currency.USD
         supplier_filter = self.request.GET.get("supplier", "").strip()
-        status_filter = self.request.GET.get("status", "").strip() or "active"
+        status_filter = self.request.GET.get("status", "").strip().lower() or "active"
+        if status_filter not in {"active", "inactive", "all"}:
+            status_filter = "active"
         currency_options = [choice[0] for choice in models.Currency.choices]
         context["currency_filter"] = currency
         context["currency_options"] = currency_options
         context["supplier_filter"] = supplier_filter
         context["supplier_options"] = models.Supplier.objects.order_by("name")
         context["status_filter"] = status_filter
-        context["status_options"] = [("active", "Active"), ("inactive", "Inactive")]
+        context["status_options"] = [("all", "All"), ("active", "Active"), ("inactive", "Inactive")]
         context["show_currency_filter"] = self.show_currency_filter
         context["show_cleanup"] = True
         context["show_search"] = getattr(self, "show_search", False)

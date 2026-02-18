@@ -262,6 +262,8 @@ class EmailImportRun(models.Model):
 class ImportSettings(models.Model):
     enabled = models.BooleanField(default=True)
     interval_minutes = models.PositiveIntegerField(default=120)
+    auto_mark_seen = models.BooleanField(default=True)
+    max_messages_per_run = models.PositiveIntegerField(default=200)
     cbr_markup_percent = models.DecimalField(max_digits=6, decimal_places=3, default=3.0)
     filename_blacklist_terms = models.TextField(
         blank=True,

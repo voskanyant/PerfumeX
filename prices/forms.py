@@ -144,20 +144,32 @@ class SupplierImportForm(forms.Form):
 class ImportSettingsForm(forms.ModelForm):
     class Meta:
         model = models.ImportSettings
-        fields = ("enabled", "interval_minutes", "cbr_markup_percent", "filename_blacklist_terms")
+        fields = (
+            "enabled",
+            "interval_minutes",
+            "auto_mark_seen",
+            "max_messages_per_run",
+            "cbr_markup_percent",
+            "filename_blacklist_terms",
+        )
         labels = {
             "enabled": "Enable auto email checks",
             "interval_minutes": "Check interval (minutes)",
+            "auto_mark_seen": "Mark imported emails as seen",
+            "max_messages_per_run": "Max messages per run",
             "cbr_markup_percent": "CBR markup (%)",
             "filename_blacklist_terms": "Filename blacklist terms",
         }
         help_texts = {
             "interval_minutes": "How often to check all mailboxes for new price lists.",
+            "auto_mark_seen": "Recommended on. Prevents re-reading the same unseen emails every run.",
+            "max_messages_per_run": "Safety limit for one run to avoid long/stuck IMAP sessions.",
             "cbr_markup_percent": "Applied to daily USD->RUB CBR rate (e.g. 3.0).",
             "filename_blacklist_terms": "If filename contains any term, the file is skipped. One term per line (or comma-separated).",
         }
         widgets = {
             "interval_minutes": forms.NumberInput(attrs={"min": 5, "step": 5}),
+            "max_messages_per_run": forms.NumberInput(attrs={"min": 1, "step": 1}),
             "cbr_markup_percent": forms.NumberInput(attrs={"min": 0, "step": 0.001}),
             "filename_blacklist_terms": forms.Textarea(attrs={"rows": 6}),
         }

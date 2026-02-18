@@ -179,7 +179,6 @@
                                 <div class="filter-item">
                                     <label for="status-filter">Status</label>
                                     <select id="status-filter">
-                                        <option value="">All</option>
                                         {% for value, label in status_options %}
                                             <option value="{{ value }}"{% if status_filter == value %} selected{% endif %}>{{ label }}</option>
                                         {% endfor %}
@@ -242,7 +241,6 @@
                     <div class="filter-item">
                         <label for="status-filter">Status</label>
                         <select id="status-filter">
-                            <option value="">All</option>
                             {% for value, label in status_options %}
                                 <option value="{{ value }}"{% if status_filter == value %} selected{% endif %}>{{ label }}</option>
                             {% endfor %}
@@ -767,11 +765,7 @@
                 if (statusFilter) {
                     statusFilter.addEventListener("change", function () {
                         var url = new URL(window.location.href);
-                        if (statusFilter.value) {
-                            url.searchParams.set("status", statusFilter.value);
-                        } else {
-                            url.searchParams.delete("status");
-                        }
+                        url.searchParams.set("status", statusFilter.value || "all");
                         url.searchParams.delete("page");
                         window.location.href = url.toString();
                     });

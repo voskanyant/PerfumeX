@@ -95,7 +95,7 @@
                                 <td data-label="USD">{% if snapshot.price_usd|default_if_none:'' != '' %}{{ snapshot.price_usd|floatformat:2 }} ${% else %}-{% endif %}</td>
                                 <td data-label="Import">
                                     {% if snapshot.import_batch_id %}
-                                        <a href="{% url 'prices:import_detail' snapshot.import_batch_id %}?next={{ request.get_full_path|urlencode }}">
+                                        <a href="{% url 'prices:import_detail' snapshot.import_batch_id %}?next={{ back_url|urlencode }}">
                                             Open
                                         </a>
                                     {% else %}
