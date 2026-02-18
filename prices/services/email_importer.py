@@ -361,12 +361,15 @@ def run_import(
                     message_day = timezone.localtime(received_at).date()
                     exists = models.ImportFile.objects.filter(
                         content_hash=content_hash,
+                        status=models.ImportStatus.PROCESSED,
                         import_batch__supplier=supplier,
                         import_batch__received_at__date=message_day,
                     ).exists()
                 else:
                     exists = models.ImportFile.objects.filter(
-                        content_hash=content_hash, import_batch__supplier=supplier
+                        content_hash=content_hash,
+                        status=models.ImportStatus.PROCESSED,
+                        import_batch__supplier=supplier,
                     ).exists()
                 if exists:
                     summary["skipped_duplicates"] += 1
