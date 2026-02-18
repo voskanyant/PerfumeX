@@ -127,11 +127,14 @@ def run_import(
     from_filter=None,
     subject_filter=None,
     dedupe_same_day_only=False,
+    min_received_at=None,
 ):
     socket.setdefaulttimeout(20)
     supplier = None
     if supplier_id:
         supplier = models.Supplier.objects.filter(id=supplier_id).first()
+    settings_obj = models.ImportSettings.get_solo()
+    blacklist_terms = settings_obj.get_filename_blacklist()
     summary = {
         "processed_files": 0,
         "skipped_duplicates": 0,
@@ -177,6 +180,11 @@ def run_import(
             continue
 
         message_ids = data[0].split()
+        # Process oldest first so history is built chronologically.
+        try:
+            message_ids = sorted(message_ids, key=lambda x: int(x))
+        except Exception:
+            pass
         if limit:
             message_ids = message_ids[:limit]
         if run_id:
@@ -246,6 +254,19 @@ def run_import(
                         received_at = timezone.make_aware(received_at)
                 except Exception:
                     received_at = None
+            if (
+                min_received_at
+                and received_at
+                and received_at <= min_received_at
+            ):
+                if run_id:
+                    models.EmailImportRun.objects.filter(id=run_id).update(
+                        last_message=(
+                            "Skipped old email at "
+                            f"{timezone.localtime(received_at).strftime('%d/%m/%Y %H:%M')}"
+                        )
+                    )
+                continue
 
             batch_by_supplier = {}
             processed_any = False
@@ -258,6 +279,13 @@ def run_import(
                 if not filename:
                     continue
                 filename = _decode_header(filename)
+                lowered_filename = filename.lower()
+                if blacklist_terms and any(term in lowered_filename for term in blacklist_terms):
+                    if run_id:
+                        models.EmailImportRun.objects.filter(id=run_id).update(
+                            last_message=f"Skipped by filename blacklist: {filename}"
+                        )
+                    continue
                 payload = part.get_payload(decode=True)
                 if not payload:
                     continue

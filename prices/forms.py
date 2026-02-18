@@ -1,4 +1,4 @@
-from django import forms
+﻿from django import forms
 from django.utils import timezone
 
 from . import models
@@ -134,19 +134,93 @@ class SupplierImportForm(forms.Form):
         help_text="Comma-separated columns to concatenate, e.g. 3 or 3,4."
     )
     price_column = forms.IntegerField(min_value=1)
+    currency_column = forms.IntegerField(
+        required=False,
+        min_value=1,
+        help_text="Optional currency column (RUB/USD/₽). If empty, currency is detected from price cell or supplier default.",
+    )
 
 
 class ImportSettingsForm(forms.ModelForm):
     class Meta:
         model = models.ImportSettings
-        fields = ("enabled", "interval_minutes")
+        fields = ("enabled", "interval_minutes", "cbr_markup_percent", "filename_blacklist_terms")
         labels = {
             "enabled": "Enable auto email checks",
             "interval_minutes": "Check interval (minutes)",
+            "cbr_markup_percent": "CBR markup (%)",
+            "filename_blacklist_terms": "Filename blacklist terms",
         }
         help_texts = {
             "interval_minutes": "How often to check all mailboxes for new price lists.",
+            "cbr_markup_percent": "Applied to daily USD->RUB CBR rate (e.g. 3.0).",
+            "filename_blacklist_terms": "If filename contains any term, the file is skipped. One term per line (or comma-separated).",
         }
         widgets = {
             "interval_minutes": forms.NumberInput(attrs={"min": 5, "step": 5}),
+            "cbr_markup_percent": forms.NumberInput(attrs={"min": 0, "step": 0.001}),
+            "filename_blacklist_terms": forms.Textarea(attrs={"rows": 6}),
         }
+
+
+class CBRMarkupForm(forms.Form):
+    cbr_markup_percent = forms.DecimalField(
+        min_value=0,
+        max_digits=6,
+        decimal_places=3,
+        initial=3.0,
+        widget=forms.NumberInput(attrs={"min": 0, "step": 0.001}),
+        label="CBR markup (%)",
+    )
+
+
+class CBRSyncRangeForm(forms.Form):
+    start_date = forms.DateField(
+        required=True,
+        widget=forms.DateInput(attrs={"type": "date"}),
+        label="Start date",
+    )
+    end_date = forms.DateField(
+        required=False,
+        widget=forms.DateInput(attrs={"type": "date"}),
+        label="End date",
+    )
+
+    def clean(self):
+        cleaned_data = super().clean()
+        start_date = cleaned_data.get("start_date")
+        end_date = cleaned_data.get("end_date")
+        if start_date and end_date and end_date < start_date:
+            self.add_error("end_date", "End date must be on or after start date.")
+        return cleaned_data
+
+
+class MixedCurrencyBackfillForm(forms.Form):
+    start_date = forms.DateField(required=True, widget=forms.DateInput(attrs={"type": "date"}))
+    end_date = forms.DateField(required=False, widget=forms.DateInput(attrs={"type": "date"}))
+    target_currency = forms.ChoiceField(
+        choices=models.Currency.choices,
+        initial=models.Currency.RUB,
+    )
+    fallback_currency = forms.ChoiceField(
+        choices=models.Currency.choices,
+        initial=models.Currency.RUB,
+    )
+    usd_markup_percent = forms.DecimalField(
+        required=True,
+        initial=3.0,
+        min_value=0,
+        decimal_places=2,
+        max_digits=6,
+    )
+    replace_range = forms.BooleanField(required=False, initial=False)
+    dry_run = forms.BooleanField(required=False, initial=False)
+
+    def clean(self):
+        cleaned = super().clean()
+        start_date = cleaned.get("start_date")
+        end_date = cleaned.get("end_date")
+        if start_date and end_date and start_date > end_date:
+            self.add_error("end_date", "End date must be greater than or equal to start date.")
+        return cleaned
+

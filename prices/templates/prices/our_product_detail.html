@@ -44,7 +44,7 @@
                                 <td data-label="Supplier">{{ offer.supplier.name|fix_text }}</td>
                                 <td data-label="Supplier SKU">{{ offer.supplier_sku }}</td>
                                 <td data-label="Name"><a href="{% url 'prices:product_detail' offer.pk %}">{{ offer.name|fix_text }}</a></td>
-                                <td data-label="Price">{{ offer.current_price|default:"-" }} {{ offer.currency }}</td>
+                                <td data-label="Price">{{ offer.current_price|default:"-" }} {{ offer.currency|currency_symbol }}</td>
                                 <td data-label="Last imported">{{ offer.last_imported_at|date:"d/m/Y H:i" }}</td>
                             </tr>
                         {% endfor %}

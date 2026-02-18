@@ -46,6 +46,32 @@
             <div id="bulk-backfill-selected"></div>
         </form>
     </div>
+
+    <div class="card mb-3">
+        <div class="d-flex flex-wrap align-items-start justify-content-between gap-3">
+            <div>
+                <h2 class="page-title">Recalculate rates from imports</h2>
+                <p class="page-subtitle">Fill USD/RUB CBR rates for dates that exist in processed imports.</p>
+            </div>
+        </div>
+        <form id="bulk-rates-form" method="post" action="{% url 'prices:supplier_rates_recalculate' %}" class="mt-3">
+            {% csrf_token %}
+            <div class="row g-3 align-items-end">
+                <div class="col-12 col-md-4">
+                    <label for="bulk-rates-start" class="form-label">Start date (optional)</label>
+                    <input id="bulk-rates-start" name="start_date" type="date">
+                </div>
+                <div class="col-12 col-md-4">
+                    <label for="bulk-rates-end" class="form-label">End date (optional)</label>
+                    <input id="bulk-rates-end" name="end_date" type="date">
+                </div>
+                <div class="col-12 col-md-4">
+                    <button class="button secondary w-100" type="submit">Recalculate rates for selected</button>
+                </div>
+            </div>
+            <div id="bulk-rates-selected"></div>
+        </form>
+    </div>
     <script>
         (function () {
             function updateAll() {
@@ -242,7 +268,6 @@
                             <th>Supplier</th>
                             <th>Status</th>
                             <th>Mailbox</th>
-                            <th>Message ID</th>
                             <th>Files</th>
                             <th>Actions</th>
                         </tr>
@@ -255,7 +280,6 @@
                                 <td data-label="Supplier">{{ batch.supplier.name }}</td>
                                 <td data-label="Status">{{ batch.status }}</td>
                                 <td data-label="Mailbox">{{ batch.mailbox|default:"-" }}</td>
-                                <td data-label="Message ID">{{ batch.message_id|default:"-" }}</td>
                                 <td data-label="Files">
                                     {% if batch.importfile_set.all %}
                                         {% for file in batch.importfile_set.all %}
@@ -270,21 +294,49 @@
                                     {% endif %}
                                 </td>
                                 <td class="actions" data-label="Actions">
-                                    <button class="button danger icon" type="submit" formaction="{% url 'prices:import_delete' batch.pk %}" formmethod="post" title="Delete" aria-label="Delete">
-                                        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                                            <path d="M3 6h18"/>
-                                            <path d="M8 6V4h8v2"/>
-                                            <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
-                                            <path d="M10 11v6"/>
-                                            <path d="M14 11v6"/>
-                                        </svg>
-                                    </button>
+                                    <details class="actions-menu-desktop">
+                                        <summary aria-label="More actions">...</summary>
+                                        <div class="actions-menu-pop d-flex flex-column gap-2">
+                                            <a class="button secondary" href="{% url 'prices:import_detail' batch.pk %}?next={{ request.get_full_path|urlencode }}">
+                                                Details
+                                            </a>
+                                            <button class="button danger" type="submit" formaction="{% url 'prices:import_delete' batch.pk %}" formmethod="post">
+                                                Delete
+                                            </button>
+                                        </div>
+                                    </details>
                                 </td>
                             </tr>
                         {% endfor %}
                     </tbody>
                     </table>
                 </div>
+                {% if import_log_page and import_log_page.paginator.num_pages > 1 %}
+                    <nav class="mt-3" aria-label="Import log pagination">
+                        <ul class="pagination flex-wrap mb-0">
+                            {% if import_log_page.has_previous %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?log_page={{ import_log_page.previous_page_number }}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}">Previous</a>
+                                </li>
+                            {% endif %}
+                            {% for page_num in import_log_page.paginator.page_range %}
+                                {% if page_num == import_log_page.number %}
+                                    <li class="page-item active"><span class="page-link">{{ page_num }}</span></li>
+                                {% elif page_num > import_log_page.number|add:-3 and page_num < import_log_page.number|add:3 %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="?log_page={{ page_num }}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}">{{ page_num }}</a>
+                                    </li>
+                                {% endif %}
+                            {% endfor %}
+                            {% if import_log_page.has_next %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?log_page={{ import_log_page.next_page_number }}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}">Next</a>
+                                </li>
+                            {% endif %}
+                        </ul>
+                        <div class="muted mt-2">Page {{ import_log_page.number }} of {{ import_log_page.paginator.num_pages }}</div>
+                    </nav>
+                {% endif %}
             </form>
         {% else %}
             <p class="muted mt-3">No imports yet.</p>
@@ -298,16 +350,28 @@
             var supplierBoxes = Array.from(document.querySelectorAll(".supplier-select"));
             var bulkForm = document.getElementById("bulk-backfill-form");
             var bulkSelected = document.getElementById("bulk-backfill-selected");
+            var bulkRatesForm = document.getElementById("bulk-rates-form");
+            var bulkRatesSelected = document.getElementById("bulk-rates-selected");
 
             function syncBulkHidden() {
                 if (!bulkSelected) return;
                 bulkSelected.innerHTML = "";
+                if (bulkRatesSelected) {
+                    bulkRatesSelected.innerHTML = "";
+                }
                 supplierBoxes.filter(function (box) { return box.checked; }).forEach(function (box) {
                     var input = document.createElement("input");
                     input.type = "hidden";
                     input.name = "supplier_ids";
                     input.value = box.value;
                     bulkSelected.appendChild(input);
+                    if (bulkRatesSelected) {
+                        var input2 = document.createElement("input");
+                        input2.type = "hidden";
+                        input2.name = "supplier_ids";
+                        input2.value = box.value;
+                        bulkRatesSelected.appendChild(input2);
+                    }
                 });
             }
 
@@ -325,6 +389,11 @@
             });
             if (bulkForm) {
                 bulkForm.addEventListener("submit", function () {
+                    syncBulkHidden();
+                });
+            }
+            if (bulkRatesForm) {
+                bulkRatesForm.addEventListener("submit", function () {
                     syncBulkHidden();
                 });
             }

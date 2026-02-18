@@ -25,6 +25,16 @@
                 {{ form.interval_minutes }}
                 <div class="form-text">How often to check all mailboxes for new price lists.</div>
             </div>
+            <div class="col-12 col-md-6">
+                <label class="form-label" for="id_cbr_markup_percent">CBR markup (%)</label>
+                {{ form.cbr_markup_percent }}
+                <div class="form-text">Used for daily USD/RUB auto rates from CBR.</div>
+            </div>
+            <div class="col-12 col-md-6">
+                <label class="form-label" for="id_filename_blacklist_terms">Filename blacklist terms</label>
+                {{ form.filename_blacklist_terms }}
+                <div class="form-text">Skip files if filename contains any term. One term per line (or comma-separated).</div>
+            </div>
             <div class="col-12">
                 <button class="button" type="submit">Save settings</button>
             </div>

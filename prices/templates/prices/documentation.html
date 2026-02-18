@@ -1,0 +1,83 @@
+{% extends "prices/base.html" %}
+
+{% block title %}Documentation{% endblock %}
+
+{% block content %}
+    <div class="card p-3 p-md-4 mb-3">
+        <h1 class="page-title">Documentation</h1>
+        <p class="page-subtitle">How PerfumeX Prices currently works.</p>
+    </div>
+
+    <div class="card p-3 p-md-4 mb-3">
+        <h2 class="h4 mb-3">Products Page</h2>
+        <ul class="mb-0">
+            <li>Default filter: <strong>Status = Active</strong>.</li>
+            <li>Default currency view: <strong>USD</strong>.</li>
+            <li>Search matches by <strong>product name only</strong> (not SKU).</li>
+            <li>When opening a product and going back, search/filter state is kept.</li>
+            <li>Last opened product row/card is softly highlighted.</li>
+        </ul>
+    </div>
+
+    <div class="card p-3 p-md-4 mb-3">
+        <h2 class="h4 mb-3">Manual Import (Supplier Import)</h2>
+        <ul class="mb-0">
+            <li>File types: <code>.xlsx</code>, <code>.xls</code>, <code>.csv</code> (if parser supports supplier format).</li>
+            <li>Mapping uses column indexes (1-based in UI).</li>
+            <li>Name can be mapped from multiple columns (comma-separated) and gets concatenated with spaces.</li>
+            <li>Optional currency column can be provided per row.</li>
+            <li>Rows are skipped when price is empty/invalid/zero or when name is clearly invalid.</li>
+            <li>Products missing from the latest import are marked inactive (not deleted).</li>
+        </ul>
+    </div>
+
+    <div class="card p-3 p-md-4 mb-3">
+        <h2 class="h4 mb-3">Email Import</h2>
+        <ul class="mb-0">
+            <li>Import can run per supplier or for all suppliers.</li>
+            <li>System checks mailbox and applies supplier matching rules.</li>
+            <li>Duplicate detection is hash-based for attachments.</li>
+            <li>Status/progress is shown in Import Prices page.</li>
+            <li>You can cancel a running supplier email import.</li>
+        </ul>
+    </div>
+
+    <div class="card p-3 p-md-4 mb-3">
+        <h2 class="h4 mb-3">History Rules</h2>
+        <ul class="mb-0">
+            <li>Price history is stored in snapshots with import timestamp.</li>
+            <li>For charts/tables, latest snapshot per day is used as daily history point.</li>
+            <li>If same day has multiple files, newer snapshots update that day’s latest state.</li>
+            <li>Product page “Last imported at” shows last successful product update timestamp.</li>
+        </ul>
+    </div>
+
+    <div class="card p-3 p-md-4 mb-3">
+        <h2 class="h4 mb-3">Currencies</h2>
+        <ul class="mb-0">
+            <li>Rates are managed in Settings → Currencies.</li>
+            <li>CBR autofill can create/update rates using CBR value plus markup percent.</li>
+            <li>Products list conversion uses the <strong>latest available rate</strong> for display.</li>
+            <li>Historical snapshots can keep RUB and USD values based on historical date rate logic.</li>
+        </ul>
+    </div>
+
+    <div class="card p-3 p-md-4 mb-3">
+        <h2 class="h4 mb-3">Backfill Types</h2>
+        <ul class="mb-0">
+            <li><strong>Email backfill:</strong> imports historical supplier files from a date range.</li>
+            <li><strong>Mixed currency backfill:</strong> one-time helper for ranges where older files are USD and newer are RUB.</li>
+            <li>Use “replace existing snapshots” carefully; it rewrites existing range data.</li>
+        </ul>
+    </div>
+
+    <div class="card p-3 p-md-4">
+        <h2 class="h4 mb-3">Known Practical Notes</h2>
+        <ul class="mb-0">
+            <li>After template/JS/CSS updates, use hard refresh (<code>Ctrl+F5</code>).</li>
+            <li>If new DB fields are added and page fails with <code>no such column/table</code>, run migrations.</li>
+            <li>For server deploy, GitHub Actions + SSH workflow applies code, migrations, static, and service restart.</li>
+        </ul>
+    </div>
+{% endblock %}
+

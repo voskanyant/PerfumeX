@@ -99,7 +99,55 @@
                     border-radius: 999px;
                     margin-right: 6px;
                     vertical-align: middle;
+                    flex: 0 0 8px;
                 }
+            .actions-mobile {
+                display: none;
+            }
+            .actions-menu-desktop {
+                position: relative;
+            }
+            .actions-menu-desktop summary {
+                list-style: none;
+                cursor: pointer;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                width: 34px;
+                height: 34px;
+                border: 1px solid var(--app-border);
+                border-radius: 10px;
+                color: #4b5563;
+                background: #fff;
+                font-weight: 700;
+                line-height: 1;
+            }
+            .actions-menu-desktop summary::-webkit-details-marker {
+                display: none;
+            }
+            .actions-menu-pop {
+                position: absolute;
+                right: 0;
+                top: 38px;
+                z-index: 40;
+                background: #fff;
+                border: 1px solid var(--app-border);
+                border-radius: 10px;
+                box-shadow: var(--app-shadow);
+                padding: 8px;
+                min-width: 132px;
+            }
+            .actions-menu-pop form {
+                margin: 0;
+            }
+            .actions-menu-pop .button {
+                width: 100%;
+                display: inline-flex;
+                justify-content: center;
+            }
+            .actions-menu-pop form .button {
+                width: 100%;
+            }
             .status-dot.active {
                 background: #16a34a;
             }
@@ -124,8 +172,12 @@
                 grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
                 gap: 12px;
             }
-            .filters p {
+            .filters .filter-item {
                 margin: 0;
+            }
+            .filters .filter-item > label {
+                display: block;
+                margin-bottom: 6px;
             }
             .table-wrap {
                 border-radius: 16px;
@@ -145,9 +197,32 @@
             td[data-field="name"] {
                 min-width: 240px;
             }
+            .products-mobile td[data-field="name"] a {
+                color: #111827;
+                text-decoration: none;
+                font-weight: 600;
+            }
+            .products-mobile td[data-field="name"] a:hover,
+            .products-mobile td[data-field="name"] a:focus {
+                color: #0f172a;
+                text-decoration: none;
+            }
+            .products-mobile td[data-field="supplier"],
+            .products-mobile td[data-field="current_price"] {
+                font-weight: 600;
+                color: #111827;
+            }
+            @media (min-width: 992px) {
+                .products-mobile th,
+                .products-mobile td {
+                    padding-left: 16px;
+                    padding-right: 16px;
+                }
+            }
             form p > label {
                 font-weight: 600;
                 margin-bottom: 6px;
+                display: block;
             }
             form p {
                 margin-bottom: 12px;
@@ -247,9 +322,13 @@
                     display: grid;
                     grid-template-columns: 1fr 1fr;
                     gap: 6px 12px;
+                    position: relative;
+                    -webkit-tap-highlight-color: transparent;
                 }
                 .products-mobile td {
                     padding: 4px 0;
+                    background: transparent !important;
+                    box-shadow: none !important;
                 }
                 .products-mobile td::before {
                     display: none;
@@ -258,13 +337,15 @@
                     grid-column: 1 / -1;
                     font-weight: 600;
                     display: flex;
-                    align-items: center;
+                    align-items: flex-start;
                     gap: 4px;
                     padding-bottom: 2px;
                     justify-content: flex-start;
+                    padding-right: 24px;
                 }
                 .products-mobile td[data-field="name"] .status-dot {
                     margin-right: 0;
+                    margin-top: 0.42em;
                 }
                 .products-mobile td[data-field="supplier"] {
                     order: 2;
@@ -280,11 +361,81 @@
                     order: 5;
                     text-align: right;
                 }
-                .products-mobile td.actions {
-                    grid-column: 1 / -1;
-                    justify-content: flex-end;
-                    order: 6;
+                .products-mobile td[data-field="supplier"],
+                .products-mobile td[data-field="current_price"],
+                .products-mobile td[data-field="supplier_sku"],
+                .products-mobile td[data-field="last_imported_at"] {
+                    user-select: none;
+                    -webkit-user-select: none;
                 }
+                .products-mobile td.actions {
+                    position: absolute;
+                    right: 10px;
+                    top: 8px;
+                    margin: 0;
+                    padding: 0;
+                    width: auto;
+                    z-index: 12;
+                }
+                .products-mobile td.actions::before {
+                    display: none;
+                }
+                .products-mobile td.actions .actions-desktop {
+                    display: none !important;
+                }
+                .products-mobile td.actions .actions-mobile {
+                    display: block;
+                }
+                .mobile-actions-menu {
+                    position: relative;
+                }
+                .mobile-actions-menu summary {
+                    list-style: none;
+                    cursor: pointer;
+                    display: inline-flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 15px;
+                    font-weight: 700;
+                    line-height: 1;
+                    color: #4b5563;
+                    border: 0;
+                    background: transparent;
+                    width: auto;
+                    height: auto;
+                    padding: 0;
+                }
+                .mobile-actions-menu summary::-webkit-details-marker {
+                    display: none;
+                }
+                .mobile-actions-pop {
+                    position: absolute;
+                    right: 0;
+                    top: 36px;
+                    background: #ffffff;
+                    border: 1px solid var(--app-border);
+                    border-radius: 10px;
+                    box-shadow: var(--app-shadow);
+                    padding: 8px;
+                    min-width: 132px;
+                    z-index: 20;
+                }
+                .mobile-actions-pop .button {
+                    width: 100%;
+                    justify-content: flex-start;
+                }
+                .mobile-actions-pop form {
+                    margin: 0;
+                }
+            }
+            .products-mobile tr.last-viewed {
+                background: #f5f7fb !important;
+                box-shadow: 0 0 0 1px #e3e8f2 inset !important;
+                transition: background-color 0.2s ease, box-shadow 0.2s ease;
+            }
+            .products-mobile tr.last-viewed td {
+                background: transparent !important;
+                box-shadow: none !important;
             }
         </style>
     </head>
@@ -317,6 +468,7 @@
                             <a class="nav-link" href="{% url 'prices:import_settings' %}">Import Settings</a>
                             <a class="nav-link" href="{% url 'prices:currency_rates' %}">Currencies</a>
                             <a class="nav-link" href="{% url 'prices:mailbox_list' %}">Mailboxes</a>
+                            <a class="nav-link" href="{% url 'prices:documentation' %}">Documentation</a>
                             <form action="{% url 'logout' %}" method="post" class="mt-3">
                                 {% csrf_token %}
                                 <button type="submit" class="btn btn-outline-secondary w-100 text-start">Logout</button>
@@ -342,6 +494,7 @@
                                 <a class="nav-link" href="{% url 'prices:import_settings' %}">Import Settings</a>
                                 <a class="nav-link" href="{% url 'prices:currency_rates' %}">Currencies</a>
                                 <a class="nav-link" href="{% url 'prices:mailbox_list' %}">Mailboxes</a>
+                                <a class="nav-link" href="{% url 'prices:documentation' %}">Documentation</a>
                                 <form action="{% url 'logout' %}" method="post" class="mt-3">
                                     {% csrf_token %}
                                     <button type="submit" class="btn btn-outline-secondary w-100 text-start">Logout</button>

@@ -3,6 +3,7 @@ from django.utils import timezone
 
 from prices import models
 from prices.services.email_importer import run_import
+from prices.services.cbr_rates import upsert_cbr_markup_rates
 
 
 class Command(BaseCommand):
@@ -44,6 +45,25 @@ class Command(BaseCommand):
         mailboxes = models.Mailbox.objects.filter(is_active=True)
         if options["mailbox"]:
             mailboxes = mailboxes.filter(name=options["mailbox"])
+
+        today = timezone.localdate()
+        cbr_rate_exists_today = models.ExchangeRate.objects.filter(
+            rate_date=today,
+            from_currency=models.Currency.USD,
+            to_currency=models.Currency.RUB,
+            source__startswith="CBR + ",
+        ).exists()
+        if cbr_rate_exists_today:
+            self.stdout.write("CBR daily rate already synced for today.")
+        else:
+            try:
+                upsert_cbr_markup_rates(
+                    today,
+                    settings_obj.cbr_markup_percent,
+                )
+                self.stdout.write("CBR daily USD->RUB rate synced.")
+            except Exception as exc:
+                self.stdout.write(f"CBR rate sync skipped: {exc}")
 
         run_import(
             mailboxes=mailboxes,

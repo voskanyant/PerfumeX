@@ -16,15 +16,18 @@ from django.views.generic import (
 )
 from django.http import JsonResponse
 from django.core.paginator import Paginator
+from django.core.management import call_command
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_POST
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 from datetime import datetime, time
+import io
 
 from decimal import Decimal
 import threading
 import re
+import unicodedata
 
 from django.db.models import Q
 
@@ -37,6 +40,7 @@ from django.db import close_old_connections
 
 from .services.email_importer import run_import
 from .services.importer import preview_mapping_file
+from .services.cbr_rates import upsert_cbr_markup_rates, upsert_cbr_markup_rates_range
 
 
 def _get_supplier_latest_batch_time(supplier: models.Supplier):
@@ -55,6 +59,10 @@ def _get_supplier_latest_batch_time(supplier: models.Supplier):
 
 class DashboardView(LoginRequiredMixin, TemplateView):
     template_name = "prices/dashboard.html"
+
+
+class DocumentationView(LoginRequiredMixin, TemplateView):
+    template_name = "prices/documentation.html"
 
 
 class BaseListView(LoginRequiredMixin, ListView):
@@ -338,7 +346,12 @@ class ImportWizardView(LoginRequiredMixin, FormView):
 class ImportDeleteView(LoginRequiredMixin, View):
     def post(self, request, pk):
         import_batch = get_object_or_404(models.ImportBatch, pk=pk)
+        next_url = request.POST.get("next", "").strip()
         delete_import_batch(import_batch)
+        if next_url and url_has_allowed_host_and_scheme(
+            next_url, allowed_hosts={self.request.get_host()}
+        ):
+            return redirect(next_url)
         return redirect("prices:supplier_overview")
 
 
@@ -350,6 +363,23 @@ class ImportDeleteBulkView(LoginRequiredMixin, View):
             for batch in batches:
                 delete_import_batch(batch)
         return redirect("prices:supplier_overview")
+
+
+class ImportDetailView(LoginRequiredMixin, DetailView):
+    model = models.ImportBatch
+    template_name = "prices/import_detail.html"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["import_files"] = self.object.importfile_set.all().order_by("id")
+        back_url = self.request.GET.get("next", "").strip()
+        if back_url and url_has_allowed_host_and_scheme(
+            back_url, allowed_hosts={self.request.get_host()}
+        ):
+            context["back_url"] = back_url
+        else:
+            context["back_url"] = reverse_lazy("prices:supplier_overview")
+        return context
 
 
 class SupplierProductCleanupView(LoginRequiredMixin, View):
@@ -386,9 +416,9 @@ class SupplierProductBulkDeleteView(LoginRequiredMixin, View):
 class SupplierProductSearchView(LoginRequiredMixin, View):
     def get(self, request):
         query = request.GET.get("q", "").strip()
-        currency = request.GET.get("currency", "").strip()
+        currency = request.GET.get("currency", "").strip() or models.Currency.USD
         supplier_filter = request.GET.get("supplier", "").strip()
-        status_filter = request.GET.get("status", "").strip()
+        status_filter = request.GET.get("status", "").strip() or "active"
         sort_field = request.GET.get("sort") or "current_price"
         sort_dir = request.GET.get("dir", "asc")
         allowed_sorts = {"supplier", "supplier_sku", "name", "current_price", "last_imported_at"}
@@ -402,8 +432,7 @@ class SupplierProductSearchView(LoginRequiredMixin, View):
             tokens = [token for token in re.split(r"\s+", query) if token]
             for token in tokens:
                 queryset = queryset.filter(
-                    Q(supplier_sku__icontains=token)
-                    | Q(name__icontains=token)
+                    Q(name__icontains=token)
                     | Q(supplier__name__icontains=token)
                 )
         if supplier_filter:
@@ -456,6 +485,7 @@ class SupplierImportView(LoginRequiredMixin, FormView):
         context = super().get_context_data(**kwargs)
         supplier = get_object_or_404(models.Supplier, pk=self.kwargs["pk"])
         context["supplier"] = supplier
+        context["mixed_backfill_form"] = forms.MixedCurrencyBackfillForm()
         return context
 
     def get_initial(self):
@@ -491,6 +521,7 @@ class SupplierImportView(LoginRequiredMixin, FormView):
                     "sku_column": mapping.column_map.get("sku"),
                     "name_columns": ",".join(name_columns),
                     "price_column": mapping.column_map.get("price"),
+                    "currency_column": mapping.column_map.get("currency"),
                 }
             )
         return initial
@@ -557,7 +588,7 @@ class SupplierEmailImportView(LoginRequiredMixin, View):
             if latest_batch and timezone.is_naive(latest_batch):
                 latest_batch = timezone.make_aware(latest_batch)
             if latest_batch:
-                since_date = timezone.localtime(latest_batch) - timezone.timedelta(days=5)
+                since_date = timezone.localtime(latest_batch) - timezone.timedelta(days=1)
             else:
                 since_date = timezone.now() - timezone.timedelta(days=supplier.email_search_days)
             run_import(
@@ -570,6 +601,7 @@ class SupplierEmailImportView(LoginRequiredMixin, View):
                 run_id=run.id,
                 search_criteria="ALL",
                 since_date=since_date,
+                min_received_at=latest_batch,
                 from_filter=supplier.from_address_pattern or None,
                 subject_filter=supplier.price_subject_pattern or None,
                 dedupe_same_day_only=False,
@@ -648,6 +680,108 @@ class SupplierEmailBackfillView(LoginRequiredMixin, View):
 
         thread = threading.Thread(target=_run, daemon=True)
         thread.start()
+        return redirect("prices:supplier_import", pk=pk)
+
+
+class SupplierMixedCurrencyBackfillView(LoginRequiredMixin, View):
+    def post(self, request, pk):
+        supplier = get_object_or_404(models.Supplier, pk=pk)
+        form = forms.MixedCurrencyBackfillForm(request.POST)
+        if not form.is_valid():
+            messages.error(request, "Invalid mixed-currency backfill parameters.")
+            return redirect("prices:supplier_import", pk=pk)
+
+        if models.EmailImportRun.objects.filter(
+            supplier=supplier, status=models.EmailImportStatus.RUNNING
+        ).exists():
+            messages.info(request, "Another background task is already running for this supplier.")
+            return redirect("prices:supplier_import", pk=pk)
+
+        cleaned = form.cleaned_data
+        start_date = cleaned["start_date"].isoformat()
+        end_date = cleaned["end_date"].isoformat() if cleaned.get("end_date") else ""
+        target_currency = cleaned["target_currency"]
+        fallback_currency = cleaned["fallback_currency"]
+        usd_markup_percent = cleaned["usd_markup_percent"]
+        replace_range = bool(cleaned.get("replace_range"))
+        dry_run = bool(cleaned.get("dry_run"))
+
+        run = models.EmailImportRun.objects.create(
+            supplier=supplier,
+            status=models.EmailImportStatus.RUNNING,
+            last_message=(
+                f"Mixed backfill started: {start_date}"
+                + (f" to {end_date}" if end_date else " to today")
+            ),
+        )
+
+        def _run():
+            close_old_connections()
+            output = io.StringIO()
+            try:
+                kwargs = {
+                    "supplier_id": supplier.id,
+                    "start_date": start_date,
+                    "target_currency": target_currency,
+                    "fallback_currency": fallback_currency,
+                    "usd_markup_percent": usd_markup_percent,
+                    "stdout": output,
+                }
+                if end_date:
+                    kwargs["end_date"] = end_date
+                if replace_range:
+                    kwargs["replace_range"] = True
+                if dry_run:
+                    kwargs["dry_run"] = True
+
+                call_command("backfill_mixed_currency_history", **kwargs)
+                lines = [line.strip() for line in output.getvalue().splitlines() if line.strip()]
+                summary = lines[-1] if lines else "Mixed currency backfill finished."
+                processed_files = 0
+                errors = 0
+                sample_error = ""
+                for line in lines:
+                    if line.startswith("- conversion_error_sample:") and not sample_error:
+                        sample_error = line.replace("- conversion_error_sample:", "").strip()
+                    if line.startswith("SUMMARY "):
+                        summary = line
+                        parts = line.replace("SUMMARY ", "").split()
+                        data = {}
+                        for part in parts:
+                            if "=" in part:
+                                key, value = part.split("=", 1)
+                                data[key] = value
+                        try:
+                            processed_files = int(data.get("files_total", "0"))
+                        except ValueError:
+                            processed_files = 0
+                        try:
+                            errors = int(data.get("rows_failed_conversion", "0")) + int(
+                                data.get("files_failed_parse", "0")
+                            )
+                        except ValueError:
+                            errors = 0
+                        break
+                if sample_error:
+                    summary = f"{summary} sample_error={sample_error[:150]}"
+                models.EmailImportRun.objects.filter(id=run.id).update(
+                    status=models.EmailImportStatus.FINISHED,
+                    finished_at=timezone.now(),
+                    processed_files=processed_files,
+                    errors=errors,
+                    last_message=summary,
+                )
+            except Exception as exc:
+                models.EmailImportRun.objects.filter(id=run.id).update(
+                    status=models.EmailImportStatus.FAILED,
+                    finished_at=timezone.now(),
+                    errors=1,
+                    last_message=str(exc),
+                )
+
+        thread = threading.Thread(target=_run, daemon=True)
+        thread.start()
+        messages.success(request, "Mixed-currency backfill started in background.")
         return redirect("prices:supplier_import", pk=pk)
 
 
@@ -734,6 +868,81 @@ class SupplierEmailBackfillBulkView(LoginRequiredMixin, View):
         return redirect("prices:supplier_overview")
 
 
+class SupplierRatesRecalculateView(LoginRequiredMixin, View):
+    def post(self, request):
+        supplier_ids = request.POST.getlist("supplier_ids")
+        start_raw = request.POST.get("start_date", "").strip()
+        end_raw = request.POST.get("end_date", "").strip()
+
+        start_date = None
+        if start_raw:
+            try:
+                start_date = datetime.fromisoformat(start_raw).date()
+            except ValueError:
+                messages.info(request, "Start date is invalid.")
+                return redirect("prices:supplier_overview")
+
+        end_date = None
+        if end_raw:
+            try:
+                end_date = datetime.fromisoformat(end_raw).date()
+            except ValueError:
+                messages.info(request, "End date is invalid.")
+                return redirect("prices:supplier_overview")
+
+        if start_date and end_date and end_date < start_date:
+            messages.info(request, "End date must be on or after start date.")
+            return redirect("prices:supplier_overview")
+
+        batches = models.ImportBatch.objects.filter(
+            importfile__file_kind=models.FileKind.PRICE,
+            importfile__status=models.ImportStatus.PROCESSED,
+        ).distinct()
+        if supplier_ids:
+            batches = batches.filter(supplier_id__in=supplier_ids)
+
+        import_dates = set()
+        for batch in batches.only("received_at", "created_at"):
+            dt = batch.received_at or batch.created_at
+            if not dt:
+                continue
+            if timezone.is_aware(dt):
+                local_date = timezone.localtime(dt).date()
+            else:
+                local_date = dt.date()
+            if start_date and local_date < start_date:
+                continue
+            if end_date and local_date > end_date:
+                continue
+            import_dates.add(local_date)
+
+        if not import_dates:
+            messages.info(request, "No import dates found for selected filters.")
+            return redirect("prices:supplier_overview")
+
+        settings_obj = models.ImportSettings.get_solo()
+        synced = 0
+        failed = 0
+        for rate_date in sorted(import_dates):
+            try:
+                upsert_cbr_markup_rates(rate_date, settings_obj.cbr_markup_percent)
+                synced += 1
+            except Exception:
+                failed += 1
+
+        if failed:
+            messages.warning(
+                request,
+                f"Rate recalculation finished: {synced} day(s) synced, {failed} failed.",
+            )
+        else:
+            messages.success(
+                request,
+                f"Rate recalculation finished: {synced} day(s) synced.",
+            )
+        return redirect("prices:supplier_overview")
+
+
 class SupplierEmailImportAllView(LoginRequiredMixin, View):
     def post(self, request):
         if models.EmailImportRun.objects.filter(
@@ -767,7 +976,7 @@ class SupplierEmailImportAllView(LoginRequiredMixin, View):
                     if latest_batch and timezone.is_naive(latest_batch):
                         latest_batch = timezone.make_aware(latest_batch)
                     if latest_batch:
-                        since_date = timezone.localtime(latest_batch) - timezone.timedelta(days=5)
+                        since_date = timezone.localtime(latest_batch) - timezone.timedelta(days=1)
                     else:
                         since_date = timezone.now() - timezone.timedelta(days=supplier.email_search_days)
                     run_import(
@@ -780,6 +989,7 @@ class SupplierEmailImportAllView(LoginRequiredMixin, View):
                         run_id=run.id,
                         search_criteria="ALL",
                         since_date=since_date,
+                        min_received_at=latest_batch,
                         from_filter=supplier.from_address_pattern or None,
                         subject_filter=supplier.price_subject_pattern or None,
                         dedupe_same_day_only=False,
@@ -876,14 +1086,83 @@ class SupplierMappingPreviewView(LoginRequiredMixin, View):
 
 class CurrencyRateView(LoginRequiredMixin, TemplateView):
     template_name = "prices/currencies.html"
+    paginate_by = 30
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["form"] = forms.ExchangeRateForm()
-        context["rates"] = models.ExchangeRate.objects.order_by("-rate_date", "-id")
+        rates_qs = models.ExchangeRate.objects.filter(
+            from_currency=models.Currency.USD,
+            to_currency=models.Currency.RUB,
+        ).order_by("-rate_date", "-id")
+        paginator = Paginator(rates_qs, self.paginate_by)
+        page_number = self.request.GET.get("page", "1")
+        rates_page = paginator.get_page(page_number)
+        context["rates_page"] = rates_page
+        context["rates"] = rates_page.object_list
+        settings_obj = models.ImportSettings.get_solo()
+        context["cbr_markup_form"] = forms.CBRMarkupForm(
+            initial={"cbr_markup_percent": settings_obj.cbr_markup_percent}
+        )
+        context["cbr_range_form"] = forms.CBRSyncRangeForm(
+            initial={"start_date": timezone.localdate(), "end_date": timezone.localdate()}
+        )
+        context["settings_obj"] = settings_obj
         return context
 
     def post(self, request, *args, **kwargs):
+        action = request.POST.get("action", "").strip()
+        if action in {"save_cbr_markup", "sync_cbr_today"}:
+            settings_obj = models.ImportSettings.get_solo()
+            markup_form = forms.CBRMarkupForm(request.POST)
+            if not markup_form.is_valid():
+                context = self.get_context_data()
+                context["cbr_markup_form"] = markup_form
+                return self.render_to_response(context)
+            settings_obj.cbr_markup_percent = markup_form.cleaned_data["cbr_markup_percent"]
+            settings_obj.save(update_fields=["cbr_markup_percent"])
+            if action == "sync_cbr_today":
+                try:
+                    usd_rub = upsert_cbr_markup_rates(
+                        timezone.localdate(),
+                        settings_obj.cbr_markup_percent,
+                    )
+                    messages.success(
+                        request,
+                        f"CBR rate synced for today. USD->RUB: {usd_rub}.",
+                    )
+                except Exception as exc:
+                    messages.error(request, f"Failed to sync CBR rate: {exc}")
+            else:
+                messages.success(request, "CBR markup saved.")
+            return redirect("prices:currency_rates")
+        if action == "sync_cbr_range":
+            settings_obj = models.ImportSettings.get_solo()
+            range_form = forms.CBRSyncRangeForm(request.POST)
+            if not range_form.is_valid():
+                context = self.get_context_data()
+                context["cbr_range_form"] = range_form
+                return self.render_to_response(context)
+            start_date = range_form.cleaned_data["start_date"]
+            end_date = range_form.cleaned_data.get("end_date") or start_date
+            result = upsert_cbr_markup_rates_range(
+                start_date=start_date,
+                end_date=end_date,
+                markup_percent=settings_obj.cbr_markup_percent,
+            )
+            if result["errors"]:
+                messages.warning(
+                    request,
+                    f"Range sync finished with warnings: {result['synced_days']}/{result['total_days']} days synced.",
+                )
+                messages.warning(request, " | ".join(result["errors"][:5]))
+            else:
+                messages.success(
+                    request,
+                    f"CBR range synced: {result['synced_days']} day(s).",
+                )
+            return redirect("prices:currency_rates")
+
         form = forms.ExchangeRateForm(request.POST)
         if form.is_valid():
             form.save()
@@ -899,6 +1178,9 @@ class CurrencyRateUpdateView(LoginRequiredMixin, View):
         form = forms.ExchangeRateForm(request.POST, instance=rate)
         if form.is_valid():
             form.save()
+        page = request.POST.get("page", "").strip()
+        if page.isdigit():
+            return redirect(f"{reverse_lazy('prices:currency_rates')}?page={page}")
         return redirect("prices:currency_rates")
 
 
@@ -906,11 +1188,33 @@ class CurrencyRateDeleteView(LoginRequiredMixin, View):
     def post(self, request, pk):
         rate = get_object_or_404(models.ExchangeRate, pk=pk)
         rate.delete()
+        page = request.POST.get("page", "").strip()
+        if page.isdigit():
+            return redirect(f"{reverse_lazy('prices:currency_rates')}?page={page}")
+        return redirect("prices:currency_rates")
+
+
+class CurrencyRateBulkDeleteView(LoginRequiredMixin, View):
+    def post(self, request):
+        ids = request.POST.getlist("rate_ids")
+        if ids:
+            models.ExchangeRate.objects.filter(id__in=ids).delete()
+        page = request.POST.get("page", "").strip()
+        if page.isdigit():
+            return redirect(f"{reverse_lazy('prices:currency_rates')}?page={page}")
         return redirect("prices:currency_rates")
 
 
 def _get_latest_rates() -> dict[tuple[str, str], Decimal]:
+    today = timezone.localdate()
     rates = {}
+    today_rates = models.ExchangeRate.objects.filter(rate_date=today).order_by("-id")
+    for rate in today_rates:
+        key = (rate.from_currency, rate.to_currency)
+        if key not in rates:
+            rates[key] = rate.rate
+    if rates:
+        return rates
     for rate in models.ExchangeRate.objects.order_by("-rate_date", "-id"):
         key = (rate.from_currency, rate.to_currency)
         if key not in rates:
@@ -940,7 +1244,8 @@ def _convert_price(
 def _format_price(price: Decimal | None, currency: str) -> str:
     if price is None:
         return "-"
-    return f"{price:.2f} {currency}"
+    symbol = {"USD": "$", "RUB": "₽"}.get((currency or "").upper(), currency)
+    return f"{price:.2f} {symbol}"
 
 
 def _save_supplier_mapping_from_import_form(form, supplier):
@@ -962,6 +1267,7 @@ def _save_supplier_mapping_from_import_form(form, supplier):
     ]
     sku_column = form.cleaned_data.get("sku_column")
     price_column = form.cleaned_data.get("price_column")
+    currency_column = form.cleaned_data.get("currency_column")
     if not name_columns or not price_column:
         raise RuntimeError("Mapping must include name and price columns.")
     mapping, _ = models.SupplierFileMapping.objects.update_or_create(
@@ -977,6 +1283,7 @@ def _save_supplier_mapping_from_import_form(form, supplier):
                 "sku": sku_column or 0,
                 "name": name_columns,
                 "price": price_column,
+                "currency": currency_column or 0,
             },
         },
     )
@@ -1084,10 +1391,10 @@ class SupplierFileMappingDeleteView(BaseDeleteView):
 class SupplierProductListView(BaseListView):
     model = models.SupplierProduct
     list_display = (
-        "supplier",
         "supplier_sku",
         "name",
         "current_price",
+        "supplier",
         "last_imported_at",
     )
     list_title = "Suppliers Products"
@@ -1105,13 +1412,12 @@ class SupplierProductListView(BaseListView):
         queryset = super().get_queryset()
         query = self.request.GET.get("q", "").strip()
         supplier_filter = self.request.GET.get("supplier", "").strip()
-        status_filter = self.request.GET.get("status", "").strip()
+        status_filter = self.request.GET.get("status", "").strip() or "active"
         if query:
             tokens = [token for token in re.split(r"\s+", query) if token]
             for token in tokens:
                 queryset = queryset.filter(
-                    Q(supplier_sku__icontains=token)
-                    | Q(name__icontains=token)
+                    Q(name__icontains=token)
                     | Q(supplier__name__icontains=token)
                 )
         if supplier_filter:
@@ -1124,9 +1430,9 @@ class SupplierProductListView(BaseListView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        currency = self.request.GET.get("currency", "").strip()
+        currency = self.request.GET.get("currency", "").strip() or models.Currency.USD
         supplier_filter = self.request.GET.get("supplier", "").strip()
-        status_filter = self.request.GET.get("status", "").strip()
+        status_filter = self.request.GET.get("status", "").strip() or "active"
         currency_options = [choice[0] for choice in models.Currency.choices]
         context["currency_filter"] = currency
         context["currency_options"] = currency_options
@@ -1171,15 +1477,24 @@ class SupplierProductDetailView(LoginRequiredMixin, DetailView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        next_url = self.request.GET.get("next", "").strip()
+        if next_url and url_has_allowed_host_and_scheme(
+            next_url, allowed_hosts={self.request.get_host()}
+        ):
+            context["back_url"] = next_url
+        else:
+            context["back_url"] = reverse_lazy("prices:product_list")
         start_value = self.request.GET.get("start", "").strip()
         end_value = self.request.GET.get("end", "").strip()
         context["link_form"] = forms.SupplierProductLinkForm(instance=self.object)
         context["our_product"] = self.object.our_product
         start_dt = self._parse_datetime(start_value)
         end_dt = self._parse_datetime(end_value)
-        snapshots = models.PriceSnapshot.objects.filter(
-            supplier_product=self.object
-        ).order_by("-recorded_at")
+        snapshots = (
+            models.PriceSnapshot.objects.filter(supplier_product=self.object)
+            .select_related("import_batch", "import_batch__supplier")
+            .order_by("-recorded_at")
+        )
         if start_dt:
             snapshots = snapshots.filter(recorded_at__gte=start_dt)
         if end_dt:
@@ -1304,9 +1619,82 @@ class ProductLinkingView(LoginRequiredMixin, TemplateView):
 
 
 class ProductLinkingSearchView(LoginRequiredMixin, View):
+    @staticmethod
+    def _norm_text(value: str) -> str:
+        value = unicodedata.normalize("NFKC", (value or "")).lower()
+        value = re.sub(r"[^\w\s]+", " ", value, flags=re.UNICODE)
+        value = re.sub(r"\s+", " ", value).strip()
+        return value
+
+    @classmethod
+    def _tokens(cls, value: str) -> list[str]:
+        txt = cls._norm_text(value)
+        if not txt:
+            return []
+        tokens = [t for t in txt.split(" ") if t]
+        return [t for t in tokens if len(t) >= 2]
+
+    @staticmethod
+    def _extract_size(value: str) -> str:
+        txt = (value or "").lower()
+        match = re.search(r"(\d+(?:[.,]\d+)?)\s*(ml|мл)", txt)
+        if not match:
+            return ""
+        num = match.group(1).replace(",", ".")
+        unit = match.group(2)
+        return f"{num}{unit}"
+
+    @classmethod
+    def _score_candidate(
+        cls,
+        source_name: str,
+        source_brand: str,
+        source_size: str,
+        cand_name: str,
+        cand_brand: str,
+        cand_size: str,
+    ) -> tuple[float, str]:
+        src_tokens = set(cls._tokens(source_name))
+        cand_tokens = set(cls._tokens(cand_name))
+        if not src_tokens or not cand_tokens:
+            return 0.0, "no tokens"
+
+        overlap = len(src_tokens.intersection(cand_tokens))
+        union = len(src_tokens.union(cand_tokens)) or 1
+        token_score = overlap / union
+
+        reasons = []
+        score = token_score * 0.72
+        reasons.append(f"tokens {overlap}/{union}")
+
+        src_brand_n = cls._norm_text(source_brand)
+        cand_brand_n = cls._norm_text(cand_brand)
+        if src_brand_n and cand_brand_n:
+            if src_brand_n == cand_brand_n:
+                score += 0.20
+                reasons.append("brand exact")
+            elif src_brand_n in cand_brand_n or cand_brand_n in src_brand_n:
+                score += 0.10
+                reasons.append("brand partial")
+
+        src_size_n = cls._extract_size(source_size) or cls._extract_size(source_name)
+        cand_size_n = cls._extract_size(cand_size) or cls._extract_size(cand_name)
+        if src_size_n and cand_size_n:
+            if src_size_n == cand_size_n:
+                score += 0.08
+                reasons.append("size exact")
+            elif src_size_n.split("ml")[0] == cand_size_n.split("ml")[0]:
+                score += 0.04
+                reasons.append("size near")
+
+        if score > 1:
+            score = 1.0
+        return float(score), ", ".join(reasons)
+
     def get(self, request):
         supplier_product_id = request.GET.get("supplier_product", "").strip()
-        terms = request.GET.get("terms", "").strip()
+        terms = (request.GET.get("terms", "") or request.GET.get("q", "")).strip()
+        auto = request.GET.get("auto", "").strip() == "1"
         try:
             supplier_product_id = int(supplier_product_id)
         except ValueError:
@@ -1316,6 +1704,8 @@ class ProductLinkingSearchView(LoginRequiredMixin, View):
         ).first()
         if not supplier_product:
             return JsonResponse({"error": "Supplier product not found."}, status=404)
+        if auto and not terms:
+            terms = supplier_product.name or ""
         tokens = [token for token in re.split(r"[\\s,]+", terms) if token]
         our_products = models.OurProduct.objects.all()
         other_supplier_products = models.SupplierProduct.objects.select_related("supplier").exclude(
@@ -1330,29 +1720,66 @@ class ProductLinkingSearchView(LoginRequiredMixin, View):
             other_supplier_products = other_supplier_products.filter(
                 Q(name__icontains=token) | Q(supplier_sku__icontains=token)
             )
-        our_items = [
-            {
-                "id": item.id,
-                "name": item.name,
-                "brand": item.brand,
-                "size": item.size,
-            }
-            for item in our_products.order_by("name")[:50]
-        ]
-        supplier_items = [
-            {
-                "id": item.id,
-                "name": item.name,
-                "supplier": item.supplier.name,
-                "sku": item.supplier_sku,
-                "our_product_id": item.our_product_id,
-            }
-            for item in other_supplier_products.order_by("name")[:50]
-        ]
+        scored_our = []
+        for item in our_products.order_by("name")[:250]:
+            score, reason = self._score_candidate(
+                supplier_product.name,
+                supplier_product.brand,
+                supplier_product.size,
+                item.name,
+                item.brand,
+                item.size,
+            )
+            if score <= 0:
+                continue
+            scored_our.append(
+                {
+                    "id": item.id,
+                    "name": item.name,
+                    "brand": item.brand,
+                    "size": item.size,
+                    "score": round(score * 100, 1),
+                    "reason": reason,
+                }
+            )
+        scored_our.sort(key=lambda x: x["score"], reverse=True)
+        our_items = scored_our[:50]
+
+        scored_supplier = []
+        for item in other_supplier_products.order_by("name")[:250]:
+            score, reason = self._score_candidate(
+                supplier_product.name,
+                supplier_product.brand,
+                supplier_product.size,
+                item.name,
+                item.brand,
+                item.size,
+            )
+            if score <= 0:
+                continue
+            scored_supplier.append(
+                {
+                    "id": item.id,
+                    "name": item.name,
+                    "supplier": item.supplier.name,
+                    "sku": item.supplier_sku,
+                    "our_product_id": item.our_product_id,
+                    "score": round(score * 100, 1),
+                    "reason": reason,
+                }
+            )
+        scored_supplier.sort(key=lambda x: x["score"], reverse=True)
+        supplier_items = scored_supplier[:50]
         return JsonResponse(
             {
                 "our_products": our_items,
                 "supplier_products": supplier_items,
+                "source": {
+                    "id": supplier_product.id,
+                    "name": supplier_product.name,
+                    "brand": supplier_product.brand,
+                    "size": supplier_product.size,
+                },
             }
         )
 

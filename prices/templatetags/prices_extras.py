@@ -42,3 +42,12 @@ def fix_text(value):
     if isinstance(value, str):
         return _fix_mojibake(value)
     return value
+
+
+@register.filter
+def currency_symbol(value):
+    symbols = {
+        "USD": "$",
+        "RUB": "₽",
+    }
+    return symbols.get(str(value or "").upper(), value or "")

@@ -10,13 +10,13 @@
                 <h1 class="page-title">{{ object.name|fix_text }}</h1>
                 <p class="page-subtitle">{{ object.supplier.name|fix_text }} &middot; {{ object.supplier_sku|fix_text }}</p>
             </div>
-            <a class="button ghost" href="{% url 'prices:product_list' %}">Back to products</a>
+            <a class="button ghost" href="{{ back_url }}">Back to products</a>
         </div>
         <div class="row g-3 mt-2">
             <div class="col-12 col-md-6">
                 <div class="p-3 rounded-3 border bg-light">
                     <div class="small muted">Current price</div>
-                    <div class="fw-semibold fs-5">{{ object.current_price|default:"-" }} {{ object.currency }}</div>
+                    <div class="fw-semibold fs-5">{{ object.current_price|default:"-" }} {{ object.currency|currency_symbol }}</div>
                 </div>
             </div>
             <div class="col-12 col-md-6">
@@ -80,14 +80,28 @@
                             <th>Date</th>
                             <th>Price</th>
                             <th>Currency</th>
+                            <th>RUB</th>
+                            <th>USD</th>
+                            <th>Import</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for snapshot in snapshots %}
                             <tr>
                                 <td data-label="Date">{{ snapshot.recorded_at|date:"d/m/Y H:i" }}</td>
-                                <td data-label="Price">{{ snapshot.price|floatformat:2 }}</td>
+                                <td data-label="Price">{{ snapshot.price|floatformat:2 }} {{ snapshot.currency|currency_symbol }}</td>
                                 <td data-label="Currency">{{ snapshot.currency }}</td>
+                                <td data-label="RUB">{% if snapshot.price_rub|default_if_none:'' != '' %}{{ snapshot.price_rub|floatformat:2 }} ₽{% else %}-{% endif %}</td>
+                                <td data-label="USD">{% if snapshot.price_usd|default_if_none:'' != '' %}{{ snapshot.price_usd|floatformat:2 }} ${% else %}-{% endif %}</td>
+                                <td data-label="Import">
+                                    {% if snapshot.import_batch_id %}
+                                        <a href="{% url 'prices:import_detail' snapshot.import_batch_id %}?next={{ request.get_full_path|urlencode }}">
+                                            Open
+                                        </a>
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
                             </tr>
                         {% endfor %}
                     </tbody>

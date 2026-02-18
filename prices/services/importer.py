@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import csv
 from dataclasses import dataclass
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from pathlib import Path
 from typing import Iterable
 import re
@@ -18,6 +18,7 @@ class ParsedRow:
     sku: str
     name: str
     price: Decimal
+    currency: str
 
 
 def _parse_decimal(value) -> Decimal | None:
@@ -37,6 +38,20 @@ def _parse_decimal(value) -> Decimal | None:
         return Decimal(text)
     except InvalidOperation:
         return None
+
+
+def _detect_currency(cell_value) -> str | None:
+    if cell_value is None:
+        return None
+    text = _fix_mojibake(str(cell_value).strip())
+    if not text:
+        return None
+    upper = text.upper()
+    if "USD" in upper or "$" in upper:
+        return models.Currency.USD
+    if "RUB" in upper or "RUR" in upper or "РУБ" in upper or "₽" in upper:
+        return models.Currency.RUB
+    return None
 
 
 def _count_cyrillic(text: str) -> int:
@@ -223,11 +238,14 @@ def _parse_rows(
     sku_col: int,
     name_cols: list[int],
     price_col: int,
+    currency_col: int,
+    default_currency: str,
     skip_until_valid: bool = True,
 ) -> Iterable[ParsedRow]:
     sku_idx = sku_col - 1 if sku_col else None
     name_indexes = [value - 1 for value in name_cols if value]
     price_idx = price_col - 1
+    currency_idx = currency_col - 1 if currency_col else None
     found_data = not skip_until_valid
     skip_terms = ("итого", "итог", "доставка")
     for row in rows:
@@ -251,19 +269,75 @@ def _parse_rows(
                 if not found_data:
                     continue
                 continue
+            if _is_invalid_short_name(name):
+                if not found_data:
+                    continue
+                continue
         price = _parse_decimal(row[price_idx])
         if not name or price is None or price == 0:
             if not found_data:
                 continue
             continue
+        detected_currency = None
+        if currency_idx is not None and currency_idx < len(row):
+            detected_currency = _detect_currency(row[currency_idx])
+        if not detected_currency:
+            detected_currency = _detect_currency(row[price_idx])
+        detected_currency = detected_currency or default_currency
         found_data = True
-        yield ParsedRow(sku=sku, name=name, price=price)
+        yield ParsedRow(sku=sku, name=name, price=price, currency=detected_currency)
 
 
 def _identity_key(sku: str, name: str) -> str:
     if sku:
         return _normalize_sku(sku)
     return re.sub(r"\s+", " ", name.strip()).lower()
+
+
+def _is_invalid_short_name(name: str) -> bool:
+    normalized = re.sub(r"\s+", " ", (name or "").strip())
+    if len(normalized) < 3:
+        return True
+    words = [word for word in normalized.split(" ") if word]
+    if len(words) == 1 and len(words[0]) < 10:
+        return True
+    return False
+
+
+def _get_historical_usd_rub_rate(rate_date):
+    rate = (
+        models.ExchangeRate.objects.filter(
+            from_currency=models.Currency.USD,
+            to_currency=models.Currency.RUB,
+            rate_date__lte=rate_date,
+        )
+        .order_by("-rate_date", "-id")
+        .first()
+    )
+    if rate:
+        return rate.rate
+    return None
+
+
+def _compute_snapshot_prices(price: Decimal, currency: str, usd_rub_rate):
+    amount = Decimal(price)
+    if currency == models.Currency.USD:
+        usd_value = amount.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        rub_value = None
+        if usd_rub_rate:
+            rub_value = (amount * usd_rub_rate).quantize(
+                Decimal("0.01"), rounding=ROUND_HALF_UP
+            )
+        return rub_value, usd_value
+    if currency == models.Currency.RUB:
+        rub_value = amount.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        usd_value = None
+        if usd_rub_rate and usd_rub_rate != 0:
+            usd_value = (amount / usd_rub_rate).quantize(
+                Decimal("0.01"), rounding=ROUND_HALF_UP
+            )
+        return rub_value, usd_value
+    return None, None
 
 
 def process_import_file(import_file: models.ImportFile) -> None:
@@ -291,13 +365,22 @@ def process_import_file(import_file: models.ImportFile) -> None:
     else:
         name_cols = [int(name_value)] if name_value else []
     price_col = int(column_map.get("price", 0))
+    currency_col = int(column_map.get("currency", 0) or 0)
     if not name_cols or not price_col:
         raise RuntimeError("Mapping must include name and price columns.")
 
     if extension in {".csv"}:
         rows = _iter_rows_csv(path, start_row)
         parsed_rows = list(
-            _parse_rows(rows, sku_col, name_cols, price_col, skip_until_valid=True)
+            _parse_rows(
+                rows,
+                sku_col,
+                name_cols,
+                price_col,
+                currency_col,
+                import_file.import_batch.supplier.default_currency,
+                skip_until_valid=True,
+            )
         )
     elif extension in {".xlsx"}:
         parsed_rows = []
@@ -315,17 +398,41 @@ def process_import_file(import_file: models.ImportFile) -> None:
             for name in sheet_names:
                 rows = _iter_rows_xlsx(path, name, None, start_row)
                 parsed_rows.extend(
-                    _parse_rows(rows, sku_col, name_cols, price_col, skip_until_valid=True)
+                    _parse_rows(
+                        rows,
+                        sku_col,
+                        name_cols,
+                        price_col,
+                        currency_col,
+                        import_file.import_batch.supplier.default_currency,
+                        skip_until_valid=True,
+                    )
                 )
             for index in sheet_indexes:
                 rows = _iter_rows_xlsx(path, "", index, start_row)
                 parsed_rows.extend(
-                    _parse_rows(rows, sku_col, name_cols, price_col, skip_until_valid=True)
+                    _parse_rows(
+                        rows,
+                        sku_col,
+                        name_cols,
+                        price_col,
+                        currency_col,
+                        import_file.import_batch.supplier.default_currency,
+                        skip_until_valid=True,
+                    )
                 )
         else:
             rows = _iter_rows_xlsx(path, mapping.sheet_name, mapping.sheet_index, start_row)
             parsed_rows = list(
-                _parse_rows(rows, sku_col, name_cols, price_col, skip_until_valid=True)
+                _parse_rows(
+                    rows,
+                    sku_col,
+                    name_cols,
+                    price_col,
+                    currency_col,
+                    import_file.import_batch.supplier.default_currency,
+                    skip_until_valid=True,
+                )
             )
     elif extension in {".xls"}:
         parsed_rows = []
@@ -343,26 +450,51 @@ def process_import_file(import_file: models.ImportFile) -> None:
             for name in sheet_names:
                 rows = _iter_rows_xls_path(path, name, None, start_row)
                 parsed_rows.extend(
-                    _parse_rows(rows, sku_col, name_cols, price_col, skip_until_valid=True)
+                    _parse_rows(
+                        rows,
+                        sku_col,
+                        name_cols,
+                        price_col,
+                        currency_col,
+                        import_file.import_batch.supplier.default_currency,
+                        skip_until_valid=True,
+                    )
                 )
             for index in sheet_indexes:
                 rows = _iter_rows_xls_path(path, "", index, start_row)
                 parsed_rows.extend(
-                    _parse_rows(rows, sku_col, name_cols, price_col, skip_until_valid=True)
+                    _parse_rows(
+                        rows,
+                        sku_col,
+                        name_cols,
+                        price_col,
+                        currency_col,
+                        import_file.import_batch.supplier.default_currency,
+                        skip_until_valid=True,
+                    )
                 )
         else:
             rows = _iter_rows_xls_path(path, mapping.sheet_name, mapping.sheet_index, start_row)
             parsed_rows = list(
-                _parse_rows(rows, sku_col, name_cols, price_col, skip_until_valid=True)
+                _parse_rows(
+                    rows,
+                    sku_col,
+                    name_cols,
+                    price_col,
+                    currency_col,
+                    import_file.import_batch.supplier.default_currency,
+                    skip_until_valid=True,
+                )
             )
     else:
         raise RuntimeError(f"Unsupported file type: {extension}")
 
-    currency = import_file.import_batch.supplier.default_currency
     received_at = import_file.import_batch.received_at
     if received_at and timezone.is_naive(received_at):
         received_at = timezone.make_aware(received_at)
     now = received_at or timezone.now()
+    rate_lookup_date = timezone.localtime(now).date() if timezone.is_aware(now) else now.date()
+    usd_rub_rate = _get_historical_usd_rub_rate(rate_lookup_date)
 
     if not parsed_rows:
         raise RuntimeError(
@@ -417,7 +549,7 @@ def process_import_file(import_file: models.ImportFile) -> None:
                     supplier_sku=parsed.sku,
                     identity_key=identity_key,
                     name=parsed.name,
-                    currency=currency,
+                    currency=parsed.currency,
                     current_price=parsed.price,
                     last_imported_at=now,
                     last_import_batch=import_file.import_batch,
@@ -437,7 +569,7 @@ def process_import_file(import_file: models.ImportFile) -> None:
             changed = (
                 existing.name != parsed.name
                 or existing.current_price != parsed.price
-                or existing.currency != currency
+                or existing.currency != parsed.currency
                 or existing.last_import_batch_id != import_file.import_batch_id
                 or not existing.is_active
             )
@@ -452,7 +584,7 @@ def process_import_file(import_file: models.ImportFile) -> None:
                     if changed:
                         existing.name = parsed.name
                         existing.current_price = parsed.price
-                        existing.currency = currency
+                        existing.currency = parsed.currency
                     existing.last_imported_at = now
                     existing.last_import_batch = import_file.import_batch
                     if is_latest_batch:
@@ -488,12 +620,17 @@ def process_import_file(import_file: models.ImportFile) -> None:
     for identity_key, parsed in unique_rows.items():
         product = product_map.get(identity_key)
         if product:
+            price_rub, price_usd = _compute_snapshot_prices(
+                parsed.price, parsed.currency, usd_rub_rate
+            )
             snapshots.append(
                 models.PriceSnapshot(
                     supplier_product=product,
                     import_batch=import_file.import_batch,
                     price=parsed.price,
-                    currency=currency,
+                    currency=parsed.currency,
+                    price_rub=price_rub,
+                    price_usd=price_usd,
                     recorded_at=now,
                 )
             )

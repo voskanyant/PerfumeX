@@ -39,6 +39,58 @@
         </form>
     </div>
 
+    <div class="card mb-3">
+        <h2 class="page-title">Mixed Currency History Backfill</h2>
+        <p class="page-subtitle">
+            One-time backfill for files where old prices are in USD and newer in RUB.
+            USD rows are converted with CBR previous-day rate plus markup.
+        </p>
+        <form method="post" action="{% url 'prices:supplier_mixed_backfill' supplier.pk %}" class="row g-3 align-items-end">
+            {% csrf_token %}
+            <div class="col-12 col-md-6">
+                <label for="mixed-start" class="form-label">Start date</label>
+                <input id="mixed-start" name="start_date" type="date" required>
+            </div>
+            <div class="col-12 col-md-6">
+                <label for="mixed-end" class="form-label">End date</label>
+                <input id="mixed-end" name="end_date" type="date">
+            </div>
+            <div class="col-12 col-md-4">
+                <label for="mixed-target" class="form-label">Target currency</label>
+                <select id="mixed-target" name="target_currency">
+                    <option value="RUB" selected>RUB</option>
+                    <option value="USD">USD</option>
+                </select>
+            </div>
+            <div class="col-12 col-md-4">
+                <label for="mixed-fallback" class="form-label">Fallback currency</label>
+                <select id="mixed-fallback" name="fallback_currency">
+                    <option value="RUB" selected>RUB</option>
+                    <option value="USD">USD</option>
+                </select>
+            </div>
+            <div class="col-12 col-md-4">
+                <label for="mixed-markup" class="form-label">USD markup %</label>
+                <input id="mixed-markup" name="usd_markup_percent" type="number" min="0" step="0.01" value="2.70" required>
+            </div>
+            <div class="col-12 col-md-6">
+                <label class="form-check-label d-flex align-items-center gap-2">
+                    <input class="form-check-input" name="replace_range" type="checkbox">
+                    Replace existing snapshots in date range
+                </label>
+            </div>
+            <div class="col-12 col-md-6">
+                <label class="form-check-label d-flex align-items-center gap-2">
+                    <input class="form-check-input" name="dry_run" type="checkbox">
+                    Dry run (do not save data)
+                </label>
+            </div>
+            <div class="col-12">
+                <button class="button" type="submit">Run mixed backfill</button>
+            </div>
+        </form>
+    </div>
+
     <div class="card">
         <h2 class="page-title">Mapping Preview</h2>
         <p class="page-subtitle">Upload a price file to preview the first 50 rows and pick columns.</p>
@@ -51,6 +103,7 @@
             <button type="button" class="button secondary" id="mode-name">Set Name</button>
             <button type="button" class="button secondary" id="mode-name-add">Add Name</button>
             <button type="button" class="button secondary" id="mode-price">Set Price</button>
+            <button type="button" class="button secondary" id="mode-currency">Set Currency</button>
             <span id="mode-status" class="muted ms-2">Mode: SKU</span>
         </div>
         <div id="preview-table" class="table-wrap table-responsive mt-3"></div>
@@ -75,6 +128,7 @@
             document.getElementById("mode-name").addEventListener("click", function () { setMode("name"); });
             document.getElementById("mode-name-add").addEventListener("click", function () { setMode("name_add"); });
             document.getElementById("mode-price").addEventListener("click", function () { setMode("price"); });
+            document.getElementById("mode-currency").addEventListener("click", function () { setMode("currency"); });
 
             function updateField(fieldId, value, append) {
                 var input = document.getElementById(fieldId);
@@ -117,6 +171,7 @@
                         if (mode === "name") updateField("id_name_columns", col, false);
                         if (mode === "name_add") updateField("id_name_columns", col, true);
                         if (mode === "price") updateField("id_price_column", col, false);
+                        if (mode === "currency") updateField("id_currency_column", col, false);
                     });
                 });
             }

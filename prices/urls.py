@@ -7,6 +7,7 @@ app_name = "prices"
 
 urlpatterns = [
     path("", views.DashboardView.as_view(), name="dashboard"),
+    path("docs/", views.DocumentationView.as_view(), name="documentation"),
     path("suppliers/", views.SupplierListView.as_view(), name="supplier_list"),
     path(
         "suppliers/overview/",
@@ -14,6 +15,7 @@ urlpatterns = [
         name="supplier_overview",
     ),
     path("imports/new/", views.ImportWizardView.as_view(), name="import_wizard"),
+    path("imports/<int:pk>/", views.ImportDetailView.as_view(), name="import_detail"),
     path("imports/<int:pk>/delete/", views.ImportDeleteView.as_view(), name="import_delete"),
     path("imports/delete/", views.ImportDeleteBulkView.as_view(), name="import_delete_bulk"),
     path("products/cleanup/", views.SupplierProductCleanupView.as_view(), name="product_cleanup"),
@@ -23,6 +25,7 @@ urlpatterns = [
     path("settings/currencies/", views.CurrencyRateView.as_view(), name="currency_rates"),
     path("settings/currencies/<int:pk>/edit/", views.CurrencyRateUpdateView.as_view(), name="currency_rate_update"),
     path("settings/currencies/<int:pk>/delete/", views.CurrencyRateDeleteView.as_view(), name="currency_rate_delete"),
+    path("settings/currencies/delete/", views.CurrencyRateBulkDeleteView.as_view(), name="currency_rate_delete_bulk"),
     path("settings/imports/", views.ImportSettingsView.as_view(), name="import_settings"),
     path("settings/mailboxes/", views.MailboxListView.as_view(), name="mailbox_list"),
     path("settings/mailboxes/new/", views.MailboxCreateView.as_view(), name="mailbox_create"),
@@ -39,7 +42,13 @@ urlpatterns = [
     path("suppliers/<int:pk>/import/", views.SupplierImportView.as_view(), name="supplier_import"),
     path("suppliers/<int:pk>/import-email/", views.SupplierEmailImportView.as_view(), name="supplier_import_email"),
     path("suppliers/<int:pk>/import-email/backfill/", views.SupplierEmailBackfillView.as_view(), name="supplier_import_email_backfill"),
+    path(
+        "suppliers/<int:pk>/mixed-backfill/",
+        views.SupplierMixedCurrencyBackfillView.as_view(),
+        name="supplier_mixed_backfill",
+    ),
     path("suppliers/import-email/backfill/", views.SupplierEmailBackfillBulkView.as_view(), name="supplier_import_email_backfill_bulk"),
+    path("suppliers/rates/recalculate/", views.SupplierRatesRecalculateView.as_view(), name="supplier_rates_recalculate"),
     path("suppliers/import-email/", views.SupplierEmailImportAllView.as_view(), name="supplier_import_email_all"),
     path("suppliers/<int:pk>/import-email/cancel/", views.SupplierEmailImportCancelView.as_view(), name="supplier_import_email_cancel"),
     path("suppliers/<int:pk>/import-email/status/", views.SupplierEmailImportStatusView.as_view(), name="supplier_import_email_status"),

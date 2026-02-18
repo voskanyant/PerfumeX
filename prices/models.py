@@ -199,6 +199,8 @@ class PriceSnapshot(models.Model):
     )
     price = models.DecimalField(max_digits=12, decimal_places=2)
     currency = models.CharField(max_length=3, choices=Currency.choices)
+    price_rub = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    price_usd = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
     recorded_at = models.DateTimeField(default=timezone.now)
 
     def __str__(self) -> str:
@@ -260,6 +262,11 @@ class EmailImportRun(models.Model):
 class ImportSettings(models.Model):
     enabled = models.BooleanField(default=True)
     interval_minutes = models.PositiveIntegerField(default=120)
+    cbr_markup_percent = models.DecimalField(max_digits=6, decimal_places=3, default=3.0)
+    filename_blacklist_terms = models.TextField(
+        blank=True,
+        default="сверка\nнакладная\ninvoice\nакт\nreport\nнакл",
+    )
     last_run_at = models.DateTimeField(null=True, blank=True)
 
     def __str__(self) -> str:
@@ -269,3 +276,8 @@ class ImportSettings(models.Model):
     def get_solo(cls) -> "ImportSettings":
         obj, _ = cls.objects.get_or_create(pk=1)
         return obj
+
+    def get_filename_blacklist(self) -> list[str]:
+        raw = (self.filename_blacklist_terms or "").replace(";", "\n").replace(",", "\n")
+        terms = [term.strip().lower() for term in raw.splitlines() if term.strip()]
+        return terms
