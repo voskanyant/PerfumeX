@@ -176,7 +176,9 @@ class Command(BaseCommand):
                 logger=self.stdout.write,
                 search_criteria="ALL",
                 since_date=since_date,
-                min_received_at=latest_batch,
+                # Don't hard-skip by latest batch time; rely on lookback window
+                # + hash dedupe to avoid missing earlier same-day emails.
+                min_received_at=None,
                 from_filter=supplier.from_address_pattern or None,
                 subject_filter=supplier.price_subject_pattern or None,
                 dedupe_same_day_only=False,
