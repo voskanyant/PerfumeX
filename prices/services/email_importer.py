@@ -30,6 +30,32 @@ def _decode_header(value):
             parts.append(text)
     return "".join(parts)
 
+def _get_part_filename(part):
+    filename = part.get_filename()
+    if filename:
+        return _decode_header(filename)
+    name = part.get_param("name", header="content-type")
+    if name:
+        return _decode_header(name)
+    return ""
+
+
+def _infer_extension(content_type):
+    if not content_type:
+        return ""
+    content_type = content_type.lower()
+    if content_type in (
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    ):
+        return ".xlsx"
+    if content_type in ("application/vnd.ms-excel",):
+        return ".xls"
+    if content_type in ("text/csv", "application/csv"):
+        return ".csv"
+    if content_type in ("application/octet-stream",):
+        return ".xlsx"
+    return ""
+
 
 def _match_pattern(value, pattern):
     if not pattern:
@@ -383,21 +409,25 @@ def run_import(
                         run = models.EmailImportRun.objects.filter(id=run_id).first()
                         if run and run.status == models.EmailImportStatus.CANCELED:
                             break
-                    filename = part.get_filename()
-                    if not filename:
+                filename = _get_part_filename(part)
+                content_type = (part.get_content_type() or "").lower()
+                if not filename:
+                    ext = _infer_extension(content_type)
+                    if ext and part.get_content_maintype() != "text":
+                        filename = f"attachment_{timezone.now():%Y%m%d_%H%M%S}{ext}"
+                    else:
                         continue
-                    filename = _decode_header(filename)
-                    lowered_filename = filename.lower()
-                    if blacklist_terms and any(term in lowered_filename for term in blacklist_terms):
-                        if run_id:
-                            models.EmailImportRun.objects.filter(id=run_id).update(
-                                last_message=f"Skipped by filename blacklist: {filename}"
-                            )
-                        last_message = f"Skipped by filename blacklist: {filename}"
-                        continue
-                    payload = part.get_payload(decode=True)
-                    if not payload:
-                        continue
+                lowered_filename = filename.lower()
+                if blacklist_terms and any(term in lowered_filename for term in blacklist_terms):
+                    if run_id:
+                        models.EmailImportRun.objects.filter(id=run_id).update(
+                            last_message=f"Skipped by filename blacklist: {filename}"
+                        )
+                    last_message = f"Skipped by filename blacklist: {filename}"
+                    continue
+                payload = part.get_payload(decode=True)
+                if not payload:
+                    continue
 
                 rule = _pick_rule(mailbox, from_addr, subject, filename, supplier_id)
                 matched_supplier = None
