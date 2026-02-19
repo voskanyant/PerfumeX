@@ -671,6 +671,8 @@ class SupplierEmailImportView(LoginRequiredMixin, View):
         def _run():
             close_old_connections()
             mailboxes = models.Mailbox.objects.filter(is_active=True)
+            settings_obj = models.ImportSettings.get_solo()
+            timeout_seconds = max(60, settings_obj.supplier_timeout_minutes * 60)
             latest_batch = _get_supplier_latest_batch_time(supplier)
             if latest_batch and timezone.is_naive(latest_batch):
                 latest_batch = timezone.make_aware(latest_batch)
@@ -684,6 +686,7 @@ class SupplierEmailImportView(LoginRequiredMixin, View):
                 mark_seen=True,
                 limit=0,
                 max_bytes=20_000_000,
+                max_seconds=timeout_seconds,
                 logger=None,
                 run_id=run.id,
                 search_criteria="ALL",
@@ -743,6 +746,8 @@ class SupplierEmailBackfillView(LoginRequiredMixin, View):
         def _run():
             close_old_connections()
             mailboxes = models.Mailbox.objects.filter(is_active=True)
+            settings_obj = models.ImportSettings.get_solo()
+            timeout_seconds = max(60, settings_obj.supplier_timeout_minutes * 60)
             since_date = timezone.make_aware(datetime.combine(start_date, time(0, 0)))
             before_date = None
             if end_date:
@@ -755,6 +760,7 @@ class SupplierEmailBackfillView(LoginRequiredMixin, View):
                 mark_seen=False,
                 limit=0,
                 max_bytes=20_000_000,
+                max_seconds=timeout_seconds,
                 logger=None,
                 run_id=run.id,
                 search_criteria="ALL",
@@ -908,6 +914,8 @@ class SupplierEmailBackfillBulkView(LoginRequiredMixin, View):
         def _run_bulk():
             close_old_connections()
             mailboxes = list(models.Mailbox.objects.filter(is_active=True))
+            settings_obj = models.ImportSettings.get_solo()
+            timeout_seconds = max(60, settings_obj.supplier_timeout_minutes * 60)
             since_date = timezone.make_aware(datetime.combine(start_date, time(0, 0)))
             before_date = None
             if end_date:
@@ -933,6 +941,7 @@ class SupplierEmailBackfillBulkView(LoginRequiredMixin, View):
                         mark_seen=False,
                         limit=0,
                         max_bytes=20_000_000,
+                        max_seconds=timeout_seconds,
                         logger=None,
                         run_id=run.id,
                         search_criteria="ALL",
@@ -1051,6 +1060,8 @@ class SupplierEmailImportAllView(LoginRequiredMixin, View):
         def _run_all():
             close_old_connections()
             mailboxes = list(models.Mailbox.objects.filter(is_active=True))
+            settings_obj = models.ImportSettings.get_solo()
+            timeout_seconds = max(60, settings_obj.supplier_timeout_minutes * 60)
             for supplier in suppliers:
                 run = models.EmailImportRun.objects.create(
                     supplier=supplier, status=models.EmailImportStatus.RUNNING
@@ -1072,6 +1083,7 @@ class SupplierEmailImportAllView(LoginRequiredMixin, View):
                         mark_seen=True,
                         limit=0,
                         max_bytes=20_000_000,
+                        max_seconds=timeout_seconds,
                         logger=None,
                         run_id=run.id,
                         search_criteria="ALL",

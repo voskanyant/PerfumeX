@@ -42,6 +42,11 @@
                 <div class="form-text">How many suppliers are checked each run (round-robin).</div>
             </div>
             <div class="col-12 col-md-6">
+                <label class="form-label" for="id_supplier_timeout_minutes">Supplier timeout (minutes)</label>
+                {{ form.supplier_timeout_minutes }}
+                <div class="form-text">Stop a supplier import if it exceeds this time. It will retry later.</div>
+            </div>
+            <div class="col-12 col-md-6">
                 <label class="form-label" for="id_cbr_markup_percent">CBR markup (%)</label>
                 {{ form.cbr_markup_percent }}
                 <div class="form-text">Used for daily USD/RUB auto rates from CBR.</div>
