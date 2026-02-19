@@ -198,8 +198,23 @@ def run_import(
             if client:
                 client.logout()
             continue
-
         message_ids = data[0].split()
+        # Gmail sometimes hides messages from INBOX search (label-only mail).
+        # Fallback to All Mail if nothing found.
+        if (
+            not message_ids
+            and mailbox.host
+            and "gmail.com" in mailbox.host.lower()
+        ):
+            try:
+                client.select('"[Gmail]/All Mail"')
+                status, data, client = _imap_search(client, mailbox, criteria, logger)
+                if status == "OK":
+                    message_ids = data[0].split()
+                    if message_ids:
+                        _log(logger, f"Using Gmail All Mail for {mailbox.name}.")
+            except Exception as exc:
+                _log(logger, f"Failed Gmail All Mail fallback ({mailbox.name}): {exc}")
         # Process oldest first so history is built chronologically.
         try:
             message_ids = sorted(message_ids, key=lambda x: int(x))
