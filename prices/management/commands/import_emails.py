@@ -160,7 +160,8 @@ class Command(BaseCommand):
             if latest_batch and timezone.is_naive(latest_batch):
                 latest_batch = timezone.make_aware(latest_batch)
             if latest_batch:
-                since_date = timezone.localtime(latest_batch) - timezone.timedelta(days=1)
+                # Look back a few days to avoid missing same-day or late-arriving emails.
+                since_date = timezone.localtime(latest_batch) - timezone.timedelta(days=3)
             else:
                 since_date = timezone.now() - timezone.timedelta(days=supplier.email_search_days)
             self.stdout.write(
