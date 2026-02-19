@@ -155,6 +155,14 @@ def run_import(
         supplier = models.Supplier.objects.filter(id=supplier_id).first()
     settings_obj = models.ImportSettings.get_solo()
     blacklist_terms = settings_obj.get_filename_blacklist()
+    last_message = None
+
+    def note(msg):
+        nonlocal last_message
+        last_message = msg
+        if logger:
+            logger(msg)
+
     summary = {
         "processed_files": 0,
         "skipped_duplicates": 0,
@@ -194,7 +202,7 @@ def run_import(
             criteria.extend(["BEFORE", before_date.strftime("%d-%b-%Y")])
         status, data, client = _imap_search(client, mailbox, criteria, logger)
         if status != "OK":
-            _log(logger, f"Failed to search mailbox: {mailbox.name}")
+            note(f"Failed to search mailbox: {mailbox.name}")
             if client:
                 client.logout()
             continue
@@ -268,7 +276,7 @@ def run_import(
                         except (IndexError, ValueError):
                             size = None
             if size and size > max_bytes:
-                _log(logger, f"Skipping message {msg_id.decode()}: size {size} bytes.")
+                note(f"Skipping message {msg_id.decode()}: size {size} bytes.")
                 if run_id:
                     models.EmailImportRun.objects.filter(id=run_id).update(
                         last_message=f"Skipped large message {msg_id.decode()}"
@@ -313,6 +321,10 @@ def run_import(
                             f"{timezone.localtime(received_at).strftime('%d/%m/%Y %H:%M')}"
                         )
                     )
+                last_message = (
+                    "Skipped old email at "
+                    f"{timezone.localtime(received_at).strftime('%d/%m/%Y %H:%M')}"
+                )
                 continue
 
             batch_by_supplier = {}
@@ -332,6 +344,7 @@ def run_import(
                         models.EmailImportRun.objects.filter(id=run_id).update(
                             last_message=f"Skipped by filename blacklist: {filename}"
                         )
+                    last_message = f"Skipped by filename blacklist: {filename}"
                     continue
                 payload = part.get_payload(decode=True)
                 if not payload:
@@ -370,6 +383,7 @@ def run_import(
                             models.EmailImportRun.objects.filter(id=run_id).update(
                                 last_message=f"Skipped unsupported file: {filename}"
                             )
+                        last_message = f"Skipped unsupported file: {filename}"
                         continue
                 content_hash = hashlib.sha256(payload).hexdigest()
                 if dedupe_same_day_only and received_at:
@@ -392,6 +406,7 @@ def run_import(
                         models.EmailImportRun.objects.filter(id=run_id).update(
                             skipped_duplicates=F("skipped_duplicates") + 1
                         )
+                    last_message = f"Skipped duplicate file: {filename}"
                     continue
 
                 batch = batch_by_supplier.get(supplier.id)
@@ -464,6 +479,7 @@ def run_import(
                             errors=F("errors") + 1,
                             last_message=str(exc),
                         )
+                    last_message = str(exc)
 
             for batch in batch_by_supplier.values():
                 if batch.status != models.ImportStatus.FAILED:
@@ -493,6 +509,7 @@ def run_import(
                 skipped_duplicates=summary["skipped_duplicates"],
                 errors=summary["errors"],
             )
+    summary["last_message"] = last_message
     return summary
 
 

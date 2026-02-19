@@ -304,6 +304,37 @@ class ImportSettingsView(LoginRequiredMixin, TemplateView):
         settings_obj = models.ImportSettings.get_solo()
         context["form"] = forms.ImportSettingsForm(instance=settings_obj)
         context["settings_obj"] = settings_obj
+        suppliers = list(
+            models.Supplier.objects.filter(is_active=True, from_address_pattern__gt="").order_by("name")
+        )
+        batch_size = settings_obj.supplier_batch_size or len(suppliers) or 1
+        if suppliers:
+            if batch_size >= len(suppliers):
+                current_batch = suppliers
+                next_offset = 0
+            else:
+                offset = settings_obj.supplier_batch_offset % len(suppliers)
+                end = offset + batch_size
+                if end <= len(suppliers):
+                    current_batch = suppliers[offset:end]
+                else:
+                    current_batch = suppliers[offset:] + suppliers[: end - len(suppliers)]
+                next_offset = (offset + batch_size) % len(suppliers)
+            if batch_size >= len(suppliers):
+                next_batch = suppliers
+            else:
+                end = next_offset + batch_size
+                if end <= len(suppliers):
+                    next_batch = suppliers[next_offset:end]
+                else:
+                    next_batch = suppliers[next_offset:] + suppliers[: end - len(suppliers)]
+        else:
+            current_batch = []
+            next_batch = []
+
+        context["current_batch"] = current_batch
+        context["next_batch"] = next_batch
+        context["supplier_statuses"] = suppliers
         if settings_obj.last_run_at:
             context["next_run_at"] = settings_obj.last_run_at + timezone.timedelta(
                 minutes=settings_obj.interval_minutes

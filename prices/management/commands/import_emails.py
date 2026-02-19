@@ -173,7 +173,9 @@ class Command(BaseCommand):
                 supplier_batch = suppliers[offset:] + suppliers[: end - len(suppliers)]
             next_offset = (offset + batch_size) % len(suppliers)
 
+        mailbox_names = ", ".join(mailboxes.values_list("name", flat=True))
         for supplier in supplier_batch:
+            check_started = timezone.now()
             latest_batch = _get_supplier_latest_batch_time(supplier)
             if latest_batch and timezone.is_naive(latest_batch):
                 latest_batch = timezone.make_aware(latest_batch)
@@ -185,7 +187,7 @@ class Command(BaseCommand):
             self.stdout.write(
                 f"Checking supplier: {supplier.name} (since {since_date:%Y-%m-%d %H:%M})"
             )
-            run_import(
+            summary = run_import(
                 mailboxes=mailboxes,
                 supplier_id=supplier.id,
                 mark_seen=False,
@@ -200,6 +202,22 @@ class Command(BaseCommand):
                 from_filter=supplier.from_address_pattern or None,
                 subject_filter=supplier.price_subject_pattern or None,
                 dedupe_same_day_only=False,
+            )
+            supplier.last_email_check_at = check_started
+            supplier.last_email_matched = summary.get("matched_files", 0)
+            supplier.last_email_processed = summary.get("processed_files", 0)
+            supplier.last_email_errors = summary.get("errors", 0)
+            supplier.last_email_last_message = summary.get("last_message") or ""
+            supplier.last_email_mailboxes = mailbox_names
+            supplier.save(
+                update_fields=[
+                    "last_email_check_at",
+                    "last_email_matched",
+                    "last_email_processed",
+                    "last_email_errors",
+                    "last_email_last_message",
+                    "last_email_mailboxes",
+                ]
             )
 
         settings_obj.last_run_at = timezone.now()

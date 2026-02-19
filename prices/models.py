@@ -35,6 +35,12 @@ class Supplier(models.Model):
     price_filename_pattern = models.CharField(max_length=200, blank=True)
     email_search_days = models.PositiveIntegerField(default=7)
     notes = models.TextField(blank=True)
+    last_email_check_at = models.DateTimeField(null=True, blank=True)
+    last_email_matched = models.PositiveIntegerField(default=0)
+    last_email_processed = models.PositiveIntegerField(default=0)
+    last_email_errors = models.PositiveIntegerField(default=0)
+    last_email_last_message = models.TextField(blank=True)
+    last_email_mailboxes = models.CharField(max_length=300, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self) -> str:
