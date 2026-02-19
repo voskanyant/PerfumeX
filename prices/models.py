@@ -264,6 +264,8 @@ class ImportSettings(models.Model):
     interval_minutes = models.PositiveIntegerField(default=120)
     auto_mark_seen = models.BooleanField(default=True)
     max_messages_per_run = models.PositiveIntegerField(default=200)
+    supplier_batch_size = models.PositiveIntegerField(default=10)
+    supplier_batch_offset = models.PositiveIntegerField(default=0)
     cbr_markup_percent = models.DecimalField(max_digits=6, decimal_places=3, default=3.0)
     filename_blacklist_terms = models.TextField(
         blank=True,

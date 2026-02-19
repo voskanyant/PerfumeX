@@ -151,11 +151,29 @@ class Command(BaseCommand):
             except Exception as exc:
                 self.stdout.write(f"CBR rate sync skipped: {exc}")
 
-        suppliers = (
+        suppliers = list(
             models.Supplier.objects.filter(is_active=True, from_address_pattern__gt="")
             .order_by("name")
         )
-        for supplier in suppliers:
+        if not suppliers:
+            settings_obj.last_run_at = timezone.now()
+            settings_obj.save(update_fields=["last_run_at"])
+            return
+
+        batch_size = settings_obj.supplier_batch_size or len(suppliers)
+        if batch_size >= len(suppliers):
+            supplier_batch = suppliers
+            next_offset = 0
+        else:
+            offset = settings_obj.supplier_batch_offset % len(suppliers)
+            end = offset + batch_size
+            if end <= len(suppliers):
+                supplier_batch = suppliers[offset:end]
+            else:
+                supplier_batch = suppliers[offset:] + suppliers[: end - len(suppliers)]
+            next_offset = (offset + batch_size) % len(suppliers)
+
+        for supplier in supplier_batch:
             latest_batch = _get_supplier_latest_batch_time(supplier)
             if latest_batch and timezone.is_naive(latest_batch):
                 latest_batch = timezone.make_aware(latest_batch)
@@ -185,4 +203,5 @@ class Command(BaseCommand):
             )
 
         settings_obj.last_run_at = timezone.now()
-        settings_obj.save(update_fields=["last_run_at"])
+        settings_obj.supplier_batch_offset = next_offset
+        settings_obj.save(update_fields=["last_run_at", "supplier_batch_offset"])
