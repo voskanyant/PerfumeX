@@ -305,17 +305,38 @@
                                 <td data-label="Status">{{ batch.status }}</td>
                                 <td data-label="Mailbox">{{ batch.mailbox|default:"-" }}</td>
                                 <td data-label="Files">
-                                    {% if batch.importfile_set.all %}
-                                        {% for file in batch.importfile_set.all %}
-                                            {{ file.file_kind }}: {{ file.filename }} ({{ file.status }})
-                                            {% if file.error_message %}
-                                                - {{ file.error_message }}
-                                            {% endif %}
-                                            <br>
-                                        {% endfor %}
-                                    {% else %}
-                                        -
-                                    {% endif %}
+                                    {% with files=batch.importfile_set.all %}
+                                        {% if files %}
+                                            {% with first=files|first %}
+                                                <div class="files-summary">
+                                                    {{ first.file_kind }}: {{ first.filename|truncatechars:40 }} ({{ first.status }})
+                                                    {% if first.error_message %}
+                                                        — {{ first.error_message|truncatechars:80 }}
+                                                    {% endif %}
+                                                    {% if files|length > 1 %}
+                                                        <span class="muted">(+{{ files|length|add:"-1" }} more)</span>
+                                                    {% endif %}
+                                                </div>
+                                                {% if files|length > 1 or first.error_message %}
+                                                    <details class="files-details">
+                                                        <summary>Show details</summary>
+                                                        <div class="files-details-list">
+                                                            {% for file in files %}
+                                                                <div>
+                                                                    {{ file.file_kind }}: {{ file.filename }} ({{ file.status }})
+                                                                    {% if file.error_message %}
+                                                                        — {{ file.error_message }}
+                                                                    {% endif %}
+                                                                </div>
+                                                            {% endfor %}
+                                                        </div>
+                                                    </details>
+                                                {% endif %}
+                                            {% endwith %}
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    {% endwith %}
                                 </td>
                                 <td class="actions" data-label="Actions">
                                     <details class="actions-menu-desktop">
