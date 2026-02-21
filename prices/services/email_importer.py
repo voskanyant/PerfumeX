@@ -224,6 +224,29 @@ def _find_all_mail_folder(client):
     return None
 
 
+def _select_mailbox(client, folder_name):
+    if not folder_name:
+        return False
+    candidates = [folder_name]
+    trimmed = folder_name.strip()
+    if trimmed.startswith('"') and trimmed.endswith('"'):
+        candidates.append(trimmed[1:-1])
+    else:
+        candidates.append(f'"{trimmed}"')
+    seen = set()
+    for candidate in candidates:
+        if not candidate or candidate in seen:
+            continue
+        seen.add(candidate)
+        try:
+            status, _ = client.select(candidate)
+        except Exception:
+            continue
+        if status == "OK":
+            return True
+    return False
+
+
 def run_import(
     mailboxes,
     supplier_id=None,
@@ -362,8 +385,7 @@ def run_import(
                         if not folder or folder in seen:
                             continue
                         seen.add(folder)
-                        sel_status, _ = client.select(folder)
-                        if sel_status == "OK":
+                        if _select_mailbox(client, folder):
                             selected = True
                             break
                     if selected:
@@ -385,8 +407,7 @@ def run_import(
                     _log(logger, f"Failed Gmail All Mail fallback ({mailbox.name}): {exc}")
                 # Ensure we are back in SELECTED state for INBOX fetch loop.
                 try:
-                    sel_status, _ = client.select("INBOX")
-                    if sel_status != "OK":
+                    if not _select_mailbox(client, "INBOX"):
                         client = _connect_imap(mailbox, logger)
                         if not client:
                             summary["errors"] += 1
