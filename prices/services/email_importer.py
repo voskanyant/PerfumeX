@@ -113,14 +113,19 @@ def _find_supplier_fallback(suppliers, from_addr, subject, filename):
 
 
 def _connect_imap(mailbox, logger):
-    try:
-        client = imaplib.IMAP4_SSL(mailbox.host, mailbox.port)
-        client.login(mailbox.username, mailbox.password)
-        client.select("INBOX")
-        return client
-    except Exception as exc:
-        _log(logger, f"IMAP connection failed for {mailbox.name}: {exc}")
-        return None
+    for attempt in range(2):
+        try:
+            client = imaplib.IMAP4_SSL(mailbox.host, mailbox.port, timeout=45)
+            client.login(mailbox.username, mailbox.password)
+            client.select("INBOX")
+            return client
+        except Exception as exc:
+            _log(
+                logger,
+                f"IMAP connection failed for {mailbox.name} (attempt {attempt + 1}/2): {exc}",
+            )
+            time.sleep(1)
+    return None
 
 
 def _imap_search(client, mailbox, criteria, logger):
@@ -287,6 +292,13 @@ def run_import(
                 ).exists()
             client = _connect_imap(mailbox, logger)
             if not client:
+                summary["errors"] += 1
+                if run_id:
+                    models.EmailImportRun.objects.filter(id=run_id).update(
+                        errors=F("errors") + 1,
+                        last_message=f"IMAP connection failed: {mailbox.name}",
+                    )
+                note(f"Skipping mailbox due connection failure: {mailbox.name}")
                 continue
             criteria = [search_criteria]
             if from_filter:
