@@ -316,6 +316,7 @@ def run_import(
                     client.logout()
                 continue
             message_ids = data[0].split()
+            note(f"{mailbox.name}: found {len(message_ids)} message(s) in INBOX.")
             # Gmail sometimes hides messages from INBOX search (label-only mail).
             # Fallback to All Mail if nothing found.
             if (
@@ -334,6 +335,9 @@ def run_import(
                         status, data, client = _imap_search(client, mailbox, criteria, logger)
                         if status == "OK":
                             message_ids = data[0].split()
+                            note(
+                                f"{mailbox.name}: found {len(message_ids)} message(s) in Gmail All Mail."
+                            )
                             if message_ids:
                                 _log(logger, f"Using Gmail All Mail for {mailbox.name}.")
                     else:
@@ -349,6 +353,7 @@ def run_import(
                 # Always take newest messages in incremental runs to avoid
                 # starvation when mailbox volume is high.
                 message_ids = message_ids[-limit:]
+            note(f"{mailbox.name}: processing {len(message_ids)} message(s) after limit.")
             if run_id:
                 models.EmailImportRun.objects.filter(id=run_id).update(
                     total_messages=len(message_ids),
