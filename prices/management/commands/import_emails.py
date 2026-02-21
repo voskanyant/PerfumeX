@@ -174,15 +174,20 @@ class Command(BaseCommand):
             settings_obj.save(update_fields=["last_run_at"])
             return
 
+        min_received_at = None
         if settings_obj.last_run_at:
-            since_date = timezone.localtime(settings_obj.last_run_at) - timezone.timedelta(days=3)
+            lookback_minutes = max(settings_obj.interval_minutes * 3, 360)
+            since_date = timezone.localtime(settings_obj.last_run_at) - timezone.timedelta(
+                minutes=lookback_minutes
+            )
+            min_received_at = since_date
         else:
             max_days = max([s.email_search_days for s in suppliers] or [7])
             since_date = timezone.now() - timezone.timedelta(days=max_days)
         self.stdout.write(
             f"Checking mailboxes (since {since_date:%Y-%m-%d %H:%M})"
         )
-        run_import(
+        summary = run_import(
             mailboxes=mailboxes,
             supplier_id=None,
             mark_seen=False,
@@ -192,10 +197,18 @@ class Command(BaseCommand):
             logger=self.stdout.write,
             search_criteria="ALL",
             since_date=since_date,
-            min_received_at=None,
+            min_received_at=min_received_at,
             from_filter=None,
             subject_filter=None,
             dedupe_same_day_only=False,
+        )
+        self.stdout.write(
+            "Import summary: "
+            f"matched={summary.get('matched_files', 0)} "
+            f"processed={summary.get('processed_files', 0)} "
+            f"duplicates={summary.get('skipped_duplicates', 0)} "
+            f"errors={summary.get('errors', 0)} "
+            f"timed_out={summary.get('timed_out', False)}"
         )
 
         settings_obj.last_run_at = timezone.now()

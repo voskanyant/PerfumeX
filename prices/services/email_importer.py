@@ -173,6 +173,29 @@ def _extract_internaldate(meta):
     return None
 
 
+def _extract_header_date(meta):
+    if not meta:
+        return None
+    for item in meta:
+        if not isinstance(item, tuple) or len(item) < 2:
+            continue
+        raw_headers = item[1]
+        if not raw_headers:
+            continue
+        try:
+            headers = email.message_from_bytes(raw_headers)
+            raw_date = headers.get("Date")
+            if not raw_date:
+                continue
+            parsed = parsedate_to_datetime(raw_date)
+            if parsed and timezone.is_naive(parsed):
+                parsed = timezone.make_aware(parsed)
+            return parsed
+        except Exception:
+            continue
+    return None
+
+
 def run_import(
     mailboxes,
     supplier_id=None,
@@ -219,6 +242,7 @@ def run_import(
         "skipped_duplicates": 0,
         "matched_files": 0,
         "errors": 0,
+        "timed_out": False,
     }
     if run_id:
         models.EmailImportRun.objects.filter(id=run_id).update(
@@ -353,33 +377,13 @@ def run_import(
                             last_message=f"Skipped large message {msg_id.decode()}"
                         )
                     continue
-                status, msg_data, client = _imap_fetch(
-                    client, mailbox, msg_id, "(BODY.PEEK[])", logger
-                )
-                if not client:
-                    continue
-                if status != "OK" or not msg_data:
-                    continue
-                raw_email = msg_data[0][1]
-                message = email.message_from_bytes(raw_email)
-                subject = _decode_header(message.get("Subject", ""))
-                from_addr = parseaddr(message.get("From", ""))[1]
-                message_id = (message.get("Message-ID") or "").strip()
                 received_at = _extract_internaldate(meta)
                 if received_at and timezone.is_naive(received_at):
                     received_at = timezone.make_aware(received_at)
                 if received_at and timezone.is_aware(received_at):
                     received_at = received_at.astimezone(timezone.get_current_timezone())
-                header_received_at = None
-                if message.get("Date"):
-                    try:
-                        header_received_at = parsedate_to_datetime(message.get("Date"))
-                        if header_received_at and timezone.is_naive(header_received_at):
-                            header_received_at = timezone.make_aware(header_received_at)
-                    except Exception:
-                        header_received_at = None
                 if not received_at:
-                    received_at = header_received_at
+                    received_at = _extract_header_date(meta)
                 if (
                     min_received_at
                     and received_at
@@ -397,6 +401,25 @@ def run_import(
                         f"{timezone.localtime(received_at).strftime('%d/%m/%Y %H:%M')}"
                     )
                     continue
+                status, msg_data, client = _imap_fetch(
+                    client, mailbox, msg_id, "(BODY.PEEK[])", logger
+                )
+                if not client:
+                    continue
+                if status != "OK" or not msg_data:
+                    continue
+                raw_email = msg_data[0][1]
+                message = email.message_from_bytes(raw_email)
+                subject = _decode_header(message.get("Subject", ""))
+                from_addr = parseaddr(message.get("From", ""))[1]
+                message_id = (message.get("Message-ID") or "").strip()
+                if not received_at and message.get("Date"):
+                    try:
+                        received_at = parsedate_to_datetime(message.get("Date"))
+                        if received_at and timezone.is_naive(received_at):
+                            received_at = timezone.make_aware(received_at)
+                    except Exception:
+                        received_at = None
 
                 batch_by_supplier = {}
                 processed_any = False
@@ -406,183 +429,185 @@ def run_import(
                         run = models.EmailImportRun.objects.filter(id=run_id).first()
                         if run and run.status == models.EmailImportStatus.CANCELED:
                             break
-                filename = _get_part_filename(part)
-                content_type = (part.get_content_type() or "").lower()
-                if not filename:
-                    ext = _infer_extension(content_type)
-                    if ext and part.get_content_maintype() != "text":
-                        filename = f"attachment_{timezone.now():%Y%m%d_%H%M%S}{ext}"
-                    else:
+                    if part.get_content_maintype() == "multipart":
                         continue
-                lowered_filename = filename.lower()
-                if blacklist_terms and any(term in lowered_filename for term in blacklist_terms):
-                    if run_id:
-                        models.EmailImportRun.objects.filter(id=run_id).update(
-                            last_message=f"Skipped by filename blacklist: {filename}"
-                        )
-                    last_message = f"Skipped by filename blacklist: {filename}"
-                    continue
-                payload = part.get_payload(decode=True)
-                if not payload:
-                    continue
-
-                rule = _pick_rule(mailbox, from_addr, subject, filename, supplier_id)
-                matched_supplier = None
-                if rule:
-                    matched_supplier = rule.supplier
-                elif supplier:
-                    if not _match_supplier_fallback(
-                        supplier,
-                        from_addr,
-                        subject,
-                        filename,
-                        has_rules_for_mailbox,
-                    ):
-                        continue
-                    matched_supplier = supplier
-                else:
-                    matched_supplier = _find_supplier_fallback(
-                        fallback_suppliers or [],
-                        from_addr,
-                        subject,
-                        filename,
-                    )
-                    if not matched_supplier:
-                        continue
-                summary["matched_files"] += 1
-                if run_id:
-                    models.EmailImportRun.objects.filter(id=run_id).update(
-                        matched_files=F("matched_files") + 1
-                    )
-
-                if rule:
-                    file_kind = (
-                        models.FileKind.STOCK
-                        if rule.match_stock_files and not rule.match_price_files
-                        else models.FileKind.PRICE
-                    )
-                else:
-                    file_kind = models.FileKind.PRICE
-                supplier_id_for_stats = matched_supplier.id
-                stats = supplier_stats.setdefault(
-                    supplier_id_for_stats,
-                    {
-                        "matched": 0,
-                        "processed": 0,
-                        "errors": 0,
-                        "last_message": "",
-                    },
-                )
-                stats["matched"] = stats.get("matched", 0) + 1
-
-                if file_kind == models.FileKind.PRICE:
-                    lower_name = filename.lower()
-                    if not lower_name.endswith((".csv", ".xlsx", ".xls")):
+                    filename = _get_part_filename(part)
+                    content_type = (part.get_content_type() or "").lower()
+                    if not filename:
+                        ext = _infer_extension(content_type)
+                        if ext and part.get_content_maintype() != "text":
+                            filename = f"attachment_{timezone.now():%Y%m%d_%H%M%S}{ext}"
+                        else:
+                            continue
+                    lowered_filename = filename.lower()
+                    if blacklist_terms and any(term in lowered_filename for term in blacklist_terms):
                         if run_id:
                             models.EmailImportRun.objects.filter(id=run_id).update(
-                                last_message=f"Skipped unsupported file: {filename}"
+                                last_message=f"Skipped by filename blacklist: {filename}"
                             )
-                        last_message = f"Skipped unsupported file: {filename}"
+                        last_message = f"Skipped by filename blacklist: {filename}"
+                        continue
+                    payload = part.get_payload(decode=True)
+                    if not payload:
                         continue
 
-                content_hash = hashlib.sha256(payload).hexdigest()
-                if dedupe_same_day_only and received_at:
-                    message_day = timezone.localtime(received_at).date()
-                    exists = models.ImportFile.objects.filter(
-                        content_hash=content_hash,
-                        status=models.ImportStatus.PROCESSED,
-                        import_batch__supplier=matched_supplier,
-                        import_batch__received_at__date=message_day,
-                    ).exists()
-                else:
-                    exists = models.ImportFile.objects.filter(
-                        content_hash=content_hash,
-                        status=models.ImportStatus.PROCESSED,
-                        import_batch__supplier=matched_supplier,
-                    ).exists()
-                if exists:
-                    summary["skipped_duplicates"] += 1
-                    if run_id:
-                        models.EmailImportRun.objects.filter(id=run_id).update(
-                            skipped_duplicates=F("skipped_duplicates") + 1
-                        )
-                    last_message = f"Skipped duplicate file: {filename}"
-                    continue
-
-                batch = batch_by_supplier.get(matched_supplier.id)
-                if not batch:
-                    if message_id:
-                        batch, _ = models.ImportBatch.objects.get_or_create(
-                            supplier=matched_supplier,
-                            message_id=message_id,
-                            defaults={
-                                "mailbox": mailbox,
-                                "received_at": received_at,
-                                "status": models.ImportStatus.PENDING,
-                            },
-                        )
-                        # Backfill critical metadata on previously created batches.
-                        update_fields = []
-                        if batch.mailbox_id is None:
-                            batch.mailbox = mailbox
-                            update_fields.append("mailbox")
-                        if batch.received_at is None and received_at is not None:
-                            batch.received_at = received_at
-                            update_fields.append("received_at")
-                        if update_fields:
-                            batch.save(update_fields=update_fields)
+                    rule = _pick_rule(mailbox, from_addr, subject, filename, supplier_id)
+                    matched_supplier = None
+                    if rule:
+                        matched_supplier = rule.supplier
+                    elif supplier:
+                        if not _match_supplier_fallback(
+                            supplier,
+                            from_addr,
+                            subject,
+                            filename,
+                            has_rules_for_mailbox,
+                        ):
+                            continue
+                        matched_supplier = supplier
                     else:
-                        # Some providers omit Message-ID; never collapse such
-                        # emails into old batches with blank IDs.
-                        batch = models.ImportBatch.objects.create(
-                            supplier=matched_supplier,
-                            mailbox=mailbox,
-                            message_id="",
-                            received_at=received_at,
-                            status=models.ImportStatus.PENDING,
+                        matched_supplier = _find_supplier_fallback(
+                            fallback_suppliers or [],
+                            from_addr,
+                            subject,
+                            filename,
                         )
-                    batch_by_supplier[matched_supplier.id] = batch
+                        if not matched_supplier:
+                            continue
+                    summary["matched_files"] += 1
+                    if run_id:
+                        models.EmailImportRun.objects.filter(id=run_id).update(
+                            matched_files=F("matched_files") + 1
+                        )
 
-                import_file = models.ImportFile.objects.create(
-                    import_batch=batch,
-                    mapping=models.SupplierFileMapping.objects.filter(
-                        supplier=matched_supplier,
+                    if rule:
+                        file_kind = (
+                            models.FileKind.STOCK
+                            if rule.match_stock_files and not rule.match_price_files
+                            else models.FileKind.PRICE
+                        )
+                    else:
+                        file_kind = models.FileKind.PRICE
+                    supplier_id_for_stats = matched_supplier.id
+                    stats = supplier_stats.setdefault(
+                        supplier_id_for_stats,
+                        {
+                            "matched": 0,
+                            "processed": 0,
+                            "errors": 0,
+                            "last_message": "",
+                        },
+                    )
+                    stats["matched"] = stats.get("matched", 0) + 1
+
+                    if file_kind == models.FileKind.PRICE:
+                        lower_name = filename.lower()
+                        if not lower_name.endswith((".csv", ".xlsx", ".xls")):
+                            if run_id:
+                                models.EmailImportRun.objects.filter(id=run_id).update(
+                                    last_message=f"Skipped unsupported file: {filename}"
+                                )
+                            last_message = f"Skipped unsupported file: {filename}"
+                            continue
+
+                    content_hash = hashlib.sha256(payload).hexdigest()
+                    if dedupe_same_day_only and received_at:
+                        message_day = timezone.localtime(received_at).date()
+                        exists = models.ImportFile.objects.filter(
+                            content_hash=content_hash,
+                            status=models.ImportStatus.PROCESSED,
+                            import_batch__supplier=matched_supplier,
+                            import_batch__received_at__date=message_day,
+                        ).exists()
+                    else:
+                        exists = models.ImportFile.objects.filter(
+                            content_hash=content_hash,
+                            status=models.ImportStatus.PROCESSED,
+                            import_batch__supplier=matched_supplier,
+                        ).exists()
+                    if exists:
+                        summary["skipped_duplicates"] += 1
+                        if run_id:
+                            models.EmailImportRun.objects.filter(id=run_id).update(
+                                skipped_duplicates=F("skipped_duplicates") + 1
+                            )
+                        last_message = f"Skipped duplicate file: {filename}"
+                        continue
+
+                    batch = batch_by_supplier.get(matched_supplier.id)
+                    if not batch:
+                        if message_id:
+                            batch, _ = models.ImportBatch.objects.get_or_create(
+                                supplier=matched_supplier,
+                                message_id=message_id,
+                                defaults={
+                                    "mailbox": mailbox,
+                                    "received_at": received_at,
+                                    "status": models.ImportStatus.PENDING,
+                                },
+                            )
+                            # Backfill critical metadata on previously created batches.
+                            update_fields = []
+                            if batch.mailbox_id is None:
+                                batch.mailbox = mailbox
+                                update_fields.append("mailbox")
+                            if batch.received_at is None and received_at is not None:
+                                batch.received_at = received_at
+                                update_fields.append("received_at")
+                            if update_fields:
+                                batch.save(update_fields=update_fields)
+                        else:
+                            # Some providers omit Message-ID; never collapse such
+                            # emails into old batches with blank IDs.
+                            batch = models.ImportBatch.objects.create(
+                                supplier=matched_supplier,
+                                mailbox=mailbox,
+                                message_id="",
+                                received_at=received_at,
+                                status=models.ImportStatus.PENDING,
+                            )
+                        batch_by_supplier[matched_supplier.id] = batch
+
+                    import_file = models.ImportFile.objects.create(
+                        import_batch=batch,
+                        mapping=models.SupplierFileMapping.objects.filter(
+                            supplier=matched_supplier,
+                            file_kind=file_kind,
+                            is_active=True,
+                        ).order_by("-id").first(),
                         file_kind=file_kind,
-                        is_active=True,
-                    ).order_by("-id").first(),
-                    file_kind=file_kind,
-                    filename=filename,
-                    content_hash=content_hash,
-                    status=models.ImportStatus.PENDING,
-                )
-                import_file.file.save(filename, ContentFile(payload), save=True)
-                processed_any = True
-                try:
-                    process_import_file(import_file)
-                    import_file.status = models.ImportStatus.PROCESSED
-                    import_file.save(update_fields=["status"])
-                    summary["processed_files"] += 1
-                    stats["processed"] = stats.get("processed", 0) + 1
-                    if run_id:
-                        models.EmailImportRun.objects.filter(id=run_id).update(
-                            processed_files=F("processed_files") + 1
-                        )
-                except Exception as exc:
-                    import_file.status = models.ImportStatus.FAILED
-                    import_file.error_message = str(exc)
-                    import_file.save(update_fields=["status", "error_message"])
-                    batch.status = models.ImportStatus.FAILED
-                    batch.error_message = str(exc)
-                    batch.save(update_fields=["status", "error_message"])
-                    summary["errors"] += 1
-                    stats["errors"] = stats.get("errors", 0) + 1
-                    if run_id:
-                        models.EmailImportRun.objects.filter(id=run_id).update(
-                            errors=F("errors") + 1,
-                            last_message=str(exc),
-                        )
-                    last_message = str(exc)
-                    stats["last_message"] = str(exc)
+                        filename=filename,
+                        content_hash=content_hash,
+                        status=models.ImportStatus.PENDING,
+                    )
+                    import_file.file.save(filename, ContentFile(payload), save=True)
+                    processed_any = True
+                    try:
+                        process_import_file(import_file)
+                        import_file.status = models.ImportStatus.PROCESSED
+                        import_file.save(update_fields=["status"])
+                        summary["processed_files"] += 1
+                        stats["processed"] = stats.get("processed", 0) + 1
+                        if run_id:
+                            models.EmailImportRun.objects.filter(id=run_id).update(
+                                processed_files=F("processed_files") + 1
+                            )
+                    except Exception as exc:
+                        import_file.status = models.ImportStatus.FAILED
+                        import_file.error_message = str(exc)
+                        import_file.save(update_fields=["status", "error_message"])
+                        batch.status = models.ImportStatus.FAILED
+                        batch.error_message = str(exc)
+                        batch.save(update_fields=["status", "error_message"])
+                        summary["errors"] += 1
+                        stats["errors"] = stats.get("errors", 0) + 1
+                        if run_id:
+                            models.EmailImportRun.objects.filter(id=run_id).update(
+                                errors=F("errors") + 1,
+                                last_message=str(exc),
+                            )
+                        last_message = str(exc)
+                        stats["last_message"] = str(exc)
 
                 for batch in batch_by_supplier.values():
                     if batch.status != models.ImportStatus.FAILED:
@@ -600,6 +625,7 @@ def run_import(
                 client = None
     except TimeoutError:
         summary["errors"] += 1
+        summary["timed_out"] = True
     finally:
         if client:
             try:
