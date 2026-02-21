@@ -249,6 +249,11 @@ def run_import(
         "matched_files": 0,
         "errors": 0,
         "timed_out": False,
+        "attachments_seen": 0,
+        "skipped_no_filename": 0,
+        "skipped_no_payload": 0,
+        "skipped_blacklist": 0,
+        "skipped_unsupported_extension": 0,
     }
     if run_id:
         models.EmailImportRun.objects.filter(id=run_id).update(
@@ -464,9 +469,12 @@ def run_import(
                         if ext and part.get_content_maintype() != "text":
                             filename = f"attachment_{timezone.now():%Y%m%d_%H%M%S}{ext}"
                         else:
+                            summary["skipped_no_filename"] += 1
                             continue
+                    summary["attachments_seen"] += 1
                     lowered_filename = filename.lower()
                     if blacklist_terms and any(term in lowered_filename for term in blacklist_terms):
+                        summary["skipped_blacklist"] += 1
                         if run_id:
                             models.EmailImportRun.objects.filter(id=run_id).update(
                                 last_message=f"Skipped by filename blacklist: {filename}"
@@ -475,6 +483,7 @@ def run_import(
                         continue
                     payload = part.get_payload(decode=True)
                     if not payload:
+                        summary["skipped_no_payload"] += 1
                         continue
 
                     rule = _pick_rule(mailbox, from_addr, subject, filename, supplier_id)
@@ -539,6 +548,7 @@ def run_import(
                                 models.EmailImportRun.objects.filter(id=run_id).update(
                                     last_message=f"Skipped unsupported file: {filename}"
                                 )
+                            summary["skipped_unsupported_extension"] += 1
                             last_message = f"Skipped unsupported file: {filename}"
                             continue
 
@@ -716,6 +726,16 @@ def run_import(
                 logger,
                 f"- x{count} from='{from_addr}' subject='{subj}' file='{fname}'",
             )
+    if logger:
+        _log(
+            logger,
+            "Attachment diagnostics: "
+            f"seen={summary['attachments_seen']} "
+            f"no_filename={summary['skipped_no_filename']} "
+            f"no_payload={summary['skipped_no_payload']} "
+            f"blacklist={summary['skipped_blacklist']} "
+            f"unsupported_ext={summary['skipped_unsupported_extension']}",
+        )
     summary["last_message"] = last_message
     return summary
 
