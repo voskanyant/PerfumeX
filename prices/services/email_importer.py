@@ -201,6 +201,29 @@ def _extract_header_date(meta):
     return None
 
 
+def _find_all_mail_folder(client):
+    try:
+        status, data = client.list()
+    except Exception:
+        return None
+    if status != "OK" or not data:
+        return None
+    for row in data:
+        if not row:
+            continue
+        text = row.decode(errors="ignore")
+        if "\\All" not in text:
+            continue
+        # Common LIST row: (\HasNoChildren \All) "/" "[Gmail]/All Mail"
+        quoted = re.findall(r'"([^"]*)"', text)
+        if quoted:
+            return quoted[-1]
+        parts = text.rsplit(" ", 1)
+        if len(parts) == 2:
+            return parts[-1].strip('"')
+    return None
+
+
 def run_import(
     mailboxes,
     supplier_id=None,
@@ -329,7 +352,16 @@ def run_import(
             if mailbox.host and "gmail.com" in mailbox.host.lower():
                 try:
                     selected = False
-                    for folder in ('"[Gmail]/All Mail"', '"[Google Mail]/All Mail"'):
+                    detected_folder = _find_all_mail_folder(client)
+                    folder_candidates = []
+                    if detected_folder:
+                        folder_candidates.append(detected_folder)
+                    folder_candidates.extend(["[Gmail]/All Mail", "[Google Mail]/All Mail"])
+                    seen = set()
+                    for folder in folder_candidates:
+                        if not folder or folder in seen:
+                            continue
+                        seen.add(folder)
                         sel_status, _ = client.select(folder)
                         if sel_status == "OK":
                             selected = True
