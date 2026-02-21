@@ -146,6 +146,8 @@ def _imap_search(client, mailbox, criteria, logger, selected_folder="INBOX"):
 
 
 def _imap_fetch(client, mailbox, msg_id, query, logger, selected_folder="INBOX"):
+    if not client:
+        return "NO", [], None
     for attempt in range(2):
         try:
             status, data = client.fetch(msg_id, query)
@@ -273,6 +275,7 @@ def run_import(
     subject_filter=None,
     dedupe_same_day_only=False,
     min_received_at=None,
+    use_uid_cursor=False,
 ):
     socket.setdefaulttimeout(20)
     supplier = None
@@ -451,10 +454,29 @@ def run_import(
                 message_ids = sorted(message_ids, key=lambda x: int(x))
             except Exception:
                 pass
+            cursor_field = "last_inbox_uid"
+            if selected_folder != "INBOX":
+                cursor_field = "last_all_mail_uid"
+            if use_uid_cursor and not supplier and not from_filter and not subject_filter:
+                last_uid = getattr(mailbox, cursor_field, 0) or 0
+                filtered_ids = []
+                for _mid in message_ids:
+                    uid_int = _uid_to_int(_mid)
+                    if uid_int is None:
+                        continue
+                    if uid_int > last_uid:
+                        filtered_ids.append(_mid)
+                note(
+                    f"{mailbox.name}: new by UID cursor={len(filtered_ids)} (last={last_uid}, folder={selected_folder})."
+                )
+                message_ids = filtered_ids
             if limit:
-                # Always take newest messages in incremental runs to avoid
-                # starvation when mailbox volume is high.
-                message_ids = message_ids[-limit:]
+                if use_uid_cursor and not supplier and not from_filter and not subject_filter:
+                    # With UID cursor, process oldest new first to drain backlog safely.
+                    message_ids = message_ids[:limit]
+                else:
+                    # Without cursor, newest-first is safer for manual recovery runs.
+                    message_ids = message_ids[-limit:]
             note(f"{mailbox.name}: processing {len(message_ids)} message(s) after limit.")
             if run_id:
                 models.EmailImportRun.objects.filter(id=run_id).update(
@@ -467,6 +489,7 @@ def run_import(
                     last_message=f"No messages found in {mailbox.name}.",
                 )
 
+            max_processed_uid = 0
             for msg_id in message_ids:
                 check_timeout("processing messages")
                 if run_id:
@@ -489,6 +512,9 @@ def run_import(
                     continue
                 if status != "OK" or not meta:
                     continue
+                uid_int = _uid_to_int(msg_id)
+                if uid_int and uid_int > max_processed_uid:
+                    max_processed_uid = uid_int
                 size = None
                 for item in meta:
                     if isinstance(item, tuple):
@@ -766,6 +792,14 @@ def run_import(
                     except (imaplib.IMAP4.abort, socket.timeout, ssl.SSLError):
                         _log(logger, "Failed to mark message as seen.")
 
+            if use_uid_cursor and not supplier and not from_filter and not subject_filter:
+                if max_processed_uid:
+                    current_uid = getattr(mailbox, cursor_field, 0) or 0
+                    if max_processed_uid > current_uid:
+                        setattr(mailbox, cursor_field, max_processed_uid)
+                        mailbox.last_checked_at = timezone.now()
+                        mailbox.save(update_fields=[cursor_field, "last_checked_at"])
+
             if client:
                 client.logout()
                 client = None
@@ -847,3 +881,12 @@ def run_import(
 def _log(logger, message):
     if logger:
         logger(message)
+
+
+def _uid_to_int(uid):
+    if isinstance(uid, bytes):
+        uid = uid.decode(errors="ignore")
+    try:
+        return int(str(uid).strip())
+    except Exception:
+        return None

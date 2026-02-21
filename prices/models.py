@@ -62,6 +62,9 @@ class Mailbox(models.Model):
     password = models.CharField(max_length=200)
     use_ssl = models.BooleanField(default=True)
     is_active = models.BooleanField(default=True)
+    last_inbox_uid = models.BigIntegerField(default=0)
+    last_all_mail_uid = models.BigIntegerField(default=0)
+    last_checked_at = models.DateTimeField(null=True, blank=True)
 
     def __str__(self) -> str:
         return self.name

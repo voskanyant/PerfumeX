@@ -174,66 +174,31 @@ class Command(BaseCommand):
             settings_obj.save(update_fields=["last_run_at"])
             return
 
-        # Auto mode: process suppliers in round-robin batches to avoid
-        # starvation when mailbox volume is high.
-        batch_size = max(1, settings_obj.supplier_batch_size or 1)
-        supplier_count = len(suppliers)
-        if options["force"] or options["all"] or batch_size >= supplier_count:
-            batch_suppliers = suppliers
+        max_days = max([s.email_search_days for s in suppliers] or [7])
+        if options["force"]:
+            since_date = timezone.now() - timezone.timedelta(days=max(max_days, 7))
+        elif settings_obj.last_run_at:
+            since_date = timezone.localtime(settings_obj.last_run_at) - timezone.timedelta(days=3)
         else:
-            offset = settings_obj.supplier_batch_offset % supplier_count
-            end = offset + batch_size
-            if end <= supplier_count:
-                batch_suppliers = suppliers[offset:end]
-            else:
-                batch_suppliers = suppliers[offset:] + suppliers[: end - supplier_count]
-            settings_obj.supplier_batch_offset = end % supplier_count
-            settings_obj.save(update_fields=["supplier_batch_offset"])
+            since_date = timezone.now() - timezone.timedelta(days=max_days)
 
-        self.stdout.write(
-            "Checking suppliers batch: "
-            + ", ".join(s.name for s in batch_suppliers)
+        self.stdout.write(f"Checking mailboxes (since {since_date:%Y-%m-%d %H:%M})")
+        summary = run_import(
+            mailboxes=mailboxes,
+            supplier_id=None,
+            mark_seen=False,
+            limit=limit,
+            max_bytes=options["max_bytes"],
+            max_seconds=timeout_minutes * 60,
+            logger=self.stdout.write,
+            search_criteria="ALL",
+            since_date=since_date,
+            min_received_at=None,
+            from_filter=None,
+            subject_filter=None,
+            dedupe_same_day_only=False,
+            use_uid_cursor=not options["force"],
         )
-
-        summary = {
-            "matched_files": 0,
-            "processed_files": 0,
-            "skipped_duplicates": 0,
-            "errors": 0,
-            "timed_out": False,
-        }
-        for supplier in batch_suppliers:
-            max_days = max(supplier.email_search_days or 7, 3)
-            if options["force"]:
-                supplier_since = timezone.now() - timezone.timedelta(days=max(max_days, 7))
-            elif settings_obj.last_run_at:
-                supplier_since = timezone.localtime(settings_obj.last_run_at) - timezone.timedelta(days=3)
-            else:
-                supplier_since = timezone.now() - timezone.timedelta(days=max_days)
-
-            self.stdout.write(
-                f"- {supplier.name}: checking since {supplier_since:%Y-%m-%d %H:%M}"
-            )
-            supplier_summary = run_import(
-                mailboxes=mailboxes,
-                supplier_id=supplier.id,
-                mark_seen=False,
-                limit=limit,
-                max_bytes=options["max_bytes"],
-                max_seconds=timeout_minutes * 60,
-                logger=self.stdout.write,
-                search_criteria="ALL",
-                since_date=supplier_since,
-                min_received_at=None,
-                from_filter=supplier.from_address_pattern or None,
-                subject_filter=supplier.price_subject_pattern or None,
-                dedupe_same_day_only=False,
-            )
-            summary["matched_files"] += supplier_summary.get("matched_files", 0)
-            summary["processed_files"] += supplier_summary.get("processed_files", 0)
-            summary["skipped_duplicates"] += supplier_summary.get("skipped_duplicates", 0)
-            summary["errors"] += supplier_summary.get("errors", 0)
-            summary["timed_out"] = bool(summary["timed_out"] or supplier_summary.get("timed_out", False))
         self.stdout.write(
             "Import summary: "
             f"matched={summary.get('matched_files', 0)} "
