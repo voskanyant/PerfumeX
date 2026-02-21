@@ -302,12 +302,9 @@ def run_import(
             except Exception:
                 pass
             if limit:
-                # In incremental mode, taking the oldest N can permanently starve
-                # new messages in busy mailboxes; take the newest chunk instead.
-                if min_received_at:
-                    message_ids = message_ids[-limit:]
-                else:
-                    message_ids = message_ids[:limit]
+                # Always take newest messages in incremental runs to avoid
+                # starvation when mailbox volume is high.
+                message_ids = message_ids[-limit:]
             if run_id:
                 models.EmailImportRun.objects.filter(id=run_id).update(
                     total_messages=len(message_ids),
