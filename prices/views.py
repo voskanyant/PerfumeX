@@ -77,6 +77,7 @@ class BaseListView(LoginRequiredMixin, ListView):
     detail_url_name = ""
     show_create = True
     show_actions = True
+    show_action_menu = True
 
     def get_ordering(self):
         sort_field = self.request.GET.get("sort")
@@ -102,6 +103,7 @@ class BaseListView(LoginRequiredMixin, ListView):
         context["detail_url_name"] = self.detail_url_name
         context["show_create"] = self.show_create
         context["show_actions"] = self.show_actions
+        context["show_action_menu"] = self.show_action_menu
         return context
 
 
@@ -1395,6 +1397,7 @@ class MailboxListView(BaseListView):
     create_url_name = "prices:mailbox_create"
     update_url_name = "prices:mailbox_update"
     delete_url_name = "prices:mailbox_delete"
+    show_action_menu = False
 
 
 class MailboxCreateView(BaseCreateView):

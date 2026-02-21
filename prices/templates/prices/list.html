@@ -326,40 +326,55 @@
                                 {% endfor %}
                             {% if show_actions %}
                                 <td class="actions" data-label="Actions">
-                                    <div class="actions-desktop d-inline-flex align-items-center gap-2">
-                                        <details class="actions-menu-desktop">
-                                            <summary aria-label="More actions">...</summary>
-                                            <div class="actions-menu-pop d-flex flex-column gap-2">
-                                                {% if update_url_name %}
-                                                    <a class="button secondary" href="{% url update_url_name obj.pk %}">Edit</a>
-                                                {% endif %}
-                                                {% if delete_url_name %}
-                                                    <form method="post" action="{% url delete_url_name obj.pk %}">
-                                                        {% csrf_token %}
-                                                        <input type="hidden" name="next" value="{{ request.get_full_path }}">
-                                                        <button class="button danger" type="submit">Delete</button>
-                                                    </form>
-                                                {% endif %}
-                                            </div>
-                                        </details>
-                                    </div>
-                                    <div class="actions-mobile">
-                                        <details class="mobile-actions-menu">
-                                            <summary aria-label="Actions">...</summary>
-                                            <div class="mobile-actions-pop d-flex flex-column gap-2">
-                                                {% if update_url_name %}
-                                                    <a class="button secondary" href="{% url update_url_name obj.pk %}">Edit</a>
-                                                {% endif %}
-                                                {% if delete_url_name %}
-                                                    <form method="post" action="{% url delete_url_name obj.pk %}">
-                                                        {% csrf_token %}
-                                                        <input type="hidden" name="next" value="{{ request.get_full_path }}">
-                                                        <button class="button danger" type="submit">Delete</button>
-                                                    </form>
-                                                {% endif %}
-                                            </div>
-                                        </details>
-                                    </div>
+                                    {% if show_action_menu %}
+                                        <div class="actions-desktop d-inline-flex align-items-center gap-2">
+                                            <details class="actions-menu-desktop">
+                                                <summary aria-label="More actions">...</summary>
+                                                <div class="actions-menu-pop d-flex flex-column gap-2">
+                                                    {% if update_url_name %}
+                                                        <a class="button secondary" href="{% url update_url_name obj.pk %}">Edit</a>
+                                                    {% endif %}
+                                                    {% if delete_url_name %}
+                                                        <form method="post" action="{% url delete_url_name obj.pk %}">
+                                                            {% csrf_token %}
+                                                            <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                                            <button class="button danger" type="submit">Delete</button>
+                                                        </form>
+                                                    {% endif %}
+                                                </div>
+                                            </details>
+                                        </div>
+                                        <div class="actions-mobile">
+                                            <details class="mobile-actions-menu">
+                                                <summary aria-label="Actions">...</summary>
+                                                <div class="mobile-actions-pop d-flex flex-column gap-2">
+                                                    {% if update_url_name %}
+                                                        <a class="button secondary" href="{% url update_url_name obj.pk %}">Edit</a>
+                                                    {% endif %}
+                                                    {% if delete_url_name %}
+                                                        <form method="post" action="{% url delete_url_name obj.pk %}">
+                                                            {% csrf_token %}
+                                                            <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                                            <button class="button danger" type="submit">Delete</button>
+                                                        </form>
+                                                    {% endif %}
+                                                </div>
+                                            </details>
+                                        </div>
+                                    {% else %}
+                                        <div class="d-inline-flex align-items-center gap-2">
+                                            {% if update_url_name %}
+                                                <a class="button secondary" href="{% url update_url_name obj.pk %}">Edit</a>
+                                            {% endif %}
+                                            {% if delete_url_name %}
+                                                <form method="post" action="{% url delete_url_name obj.pk %}" class="m-0">
+                                                    {% csrf_token %}
+                                                    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                                    <button class="button danger" type="submit">Delete</button>
+                                                </form>
+                                            {% endif %}
+                                        </div>
+                                    {% endif %}
                                 </td>
                             {% endif %}
                         </tr>
