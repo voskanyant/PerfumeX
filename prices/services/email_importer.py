@@ -133,7 +133,7 @@ def _imap_search(client, mailbox, criteria, logger):
         try:
             status, data = client.search(None, *criteria)
             return status, data, client
-        except (imaplib.IMAP4.abort, socket.timeout, ssl.SSLError) as exc:
+        except (imaplib.IMAP4.abort, imaplib.IMAP4.error, socket.timeout, ssl.SSLError) as exc:
             _log(logger, f"IMAP search error ({mailbox.name}): {exc}")
             if attempt == 0:
                 client = _connect_imap(mailbox, logger)
@@ -149,7 +149,7 @@ def _imap_fetch(client, mailbox, msg_id, query, logger):
         try:
             status, data = client.fetch(msg_id, query)
             return status, data, client
-        except (imaplib.IMAP4.abort, socket.timeout, ssl.SSLError) as exc:
+        except (imaplib.IMAP4.abort, imaplib.IMAP4.error, socket.timeout, ssl.SSLError) as exc:
             _log(logger, f"IMAP fetch error ({mailbox.name}): {exc}")
             if attempt == 0:
                 client = _connect_imap(mailbox, logger)
@@ -351,6 +351,21 @@ def run_import(
                         _log(logger, f"Gmail All Mail folder not accessible for {mailbox.name}.")
                 except Exception as exc:
                     _log(logger, f"Failed Gmail All Mail fallback ({mailbox.name}): {exc}")
+                # Ensure we are back in SELECTED state for INBOX fetch loop.
+                try:
+                    sel_status, _ = client.select("INBOX")
+                    if sel_status != "OK":
+                        client = _connect_imap(mailbox, logger)
+                        if not client:
+                            summary["errors"] += 1
+                            note(f"Skipping mailbox due INBOX re-select failure: {mailbox.name}")
+                            continue
+                except Exception:
+                    client = _connect_imap(mailbox, logger)
+                    if not client:
+                        summary["errors"] += 1
+                        note(f"Skipping mailbox due INBOX re-select failure: {mailbox.name}")
+                        continue
             # Process oldest first so history is built chronologically.
             try:
                 message_ids = sorted(message_ids, key=lambda x: int(x))
