@@ -175,14 +175,16 @@ class Command(BaseCommand):
             return
 
         min_received_at = None
-        if settings_obj.last_run_at:
-            lookback_minutes = max(settings_obj.interval_minutes * 3, 360)
-            since_date = timezone.localtime(settings_obj.last_run_at) - timezone.timedelta(
-                minutes=lookback_minutes
-            )
-            min_received_at = since_date
+        max_days = max([s.email_search_days for s in suppliers] or [7])
+        if options["force"]:
+            # Force mode is used for recovery, so always use a wide supplier window.
+            # This prevents missing emails that were not imported in recent runs.
+            since_date = timezone.now() - timezone.timedelta(days=max(max_days, 7))
+        elif settings_obj.last_run_at:
+            # Keep a broad safety window so delayed/older emails are still caught.
+            # Dedupe by content hash prevents duplicate file imports.
+            since_date = timezone.localtime(settings_obj.last_run_at) - timezone.timedelta(days=3)
         else:
-            max_days = max([s.email_search_days for s in suppliers] or [7])
             since_date = timezone.now() - timezone.timedelta(days=max_days)
         self.stdout.write(
             f"Checking mailboxes (since {since_date:%Y-%m-%d %H:%M})"
