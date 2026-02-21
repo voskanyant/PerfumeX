@@ -235,6 +235,7 @@ def run_import(
     run_started = timezone.now()
     mailbox_names = ", ".join([mb.name for mb in mailboxes])
     supplier_stats: dict[int, dict[str, object]] = {}
+    unmatched_samples: dict[tuple[str, str, str], int] = {}
 
     def note(msg):
         nonlocal last_message
@@ -498,6 +499,12 @@ def run_import(
                             filename,
                         )
                         if not matched_supplier:
+                            key = (
+                                (from_addr or "").strip().lower(),
+                                (subject or "").strip()[:120],
+                                (filename or "").strip()[:120],
+                            )
+                            unmatched_samples[key] = unmatched_samples.get(key, 0) + 1
                             continue
                     summary["matched_files"] += 1
                     if run_id:
@@ -700,6 +707,14 @@ def run_import(
                 processed_files=summary["processed_files"],
                 skipped_duplicates=summary["skipped_duplicates"],
                 errors=summary["errors"],
+            )
+    if not summary["matched_files"] and unmatched_samples and logger:
+        _log(logger, "No supplier matches. Top unmatched sender/subject/file:")
+        top_items = sorted(unmatched_samples.items(), key=lambda item: item[1], reverse=True)[:10]
+        for (from_addr, subj, fname), count in top_items:
+            _log(
+                logger,
+                f"- x{count} from='{from_addr}' subject='{subj}' file='{fname}'",
             )
     summary["last_message"] = last_message
     return summary
