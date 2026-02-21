@@ -322,14 +322,11 @@ def run_import(
                     client.logout()
                 continue
             message_ids = data[0].split()
+            inbox_ids = set(message_ids)
             note(f"{mailbox.name}: found {len(message_ids)} message(s) in INBOX.")
-            # Gmail sometimes hides messages from INBOX search (label-only mail).
-            # Fallback to All Mail if nothing found.
-            if (
-                not message_ids
-                and mailbox.host
-                and "gmail.com" in mailbox.host.lower()
-            ):
+            # Gmail can have relevant messages outside INBOX (archived/labels).
+            # Always merge INBOX + All Mail for reliability.
+            if mailbox.host and "gmail.com" in mailbox.host.lower():
                 try:
                     selected = False
                     for folder in ('"[Gmail]/All Mail"', '"[Google Mail]/All Mail"'):
@@ -340,12 +337,16 @@ def run_import(
                     if selected:
                         status, data, client = _imap_search(client, mailbox, criteria, logger)
                         if status == "OK":
-                            message_ids = data[0].split()
+                            all_mail_ids = set(data[0].split())
                             note(
-                                f"{mailbox.name}: found {len(message_ids)} message(s) in Gmail All Mail."
+                                f"{mailbox.name}: found {len(all_mail_ids)} message(s) in Gmail All Mail."
                             )
-                            if message_ids:
+                            merged_ids = inbox_ids | all_mail_ids
+                            if merged_ids:
+                                message_ids = list(merged_ids)
                                 _log(logger, f"Using Gmail All Mail for {mailbox.name}.")
+                            else:
+                                message_ids = list(inbox_ids)
                     else:
                         _log(logger, f"Gmail All Mail folder not accessible for {mailbox.name}.")
                 except Exception as exc:
