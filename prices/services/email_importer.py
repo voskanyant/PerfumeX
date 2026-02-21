@@ -324,12 +324,20 @@ def run_import(
                 and "gmail.com" in mailbox.host.lower()
             ):
                 try:
-                    client.select('"[Gmail]/All Mail"')
-                    status, data, client = _imap_search(client, mailbox, criteria, logger)
-                    if status == "OK":
-                        message_ids = data[0].split()
-                        if message_ids:
-                            _log(logger, f"Using Gmail All Mail for {mailbox.name}.")
+                    selected = False
+                    for folder in ('"[Gmail]/All Mail"', '"[Google Mail]/All Mail"'):
+                        sel_status, _ = client.select(folder)
+                        if sel_status == "OK":
+                            selected = True
+                            break
+                    if selected:
+                        status, data, client = _imap_search(client, mailbox, criteria, logger)
+                        if status == "OK":
+                            message_ids = data[0].split()
+                            if message_ids:
+                                _log(logger, f"Using Gmail All Mail for {mailbox.name}.")
+                    else:
+                        _log(logger, f"Gmail All Mail folder not accessible for {mailbox.name}.")
                 except Exception as exc:
                     _log(logger, f"Failed Gmail All Mail fallback ({mailbox.name}): {exc}")
             # Process oldest first so history is built chronologically.
