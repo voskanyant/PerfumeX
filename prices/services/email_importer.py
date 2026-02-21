@@ -112,12 +112,13 @@ def _find_supplier_fallback(suppliers, from_addr, subject, filename):
     return None
 
 
-def _connect_imap(mailbox, logger):
+def _connect_imap(mailbox, logger, select_folder="INBOX"):
     for attempt in range(2):
         try:
             client = imaplib.IMAP4_SSL(mailbox.host, mailbox.port, timeout=45)
             client.login(mailbox.username, mailbox.password)
-            client.select("INBOX")
+            if not _select_mailbox(client, select_folder):
+                raise RuntimeError(f"Could not select mailbox: {select_folder}")
             return client
         except Exception as exc:
             _log(
@@ -128,7 +129,7 @@ def _connect_imap(mailbox, logger):
     return None
 
 
-def _imap_search(client, mailbox, criteria, logger):
+def _imap_search(client, mailbox, criteria, logger, selected_folder="INBOX"):
     for attempt in range(2):
         try:
             status, data = client.search(None, *criteria)
@@ -136,7 +137,7 @@ def _imap_search(client, mailbox, criteria, logger):
         except (imaplib.IMAP4.abort, imaplib.IMAP4.error, socket.timeout, ssl.SSLError) as exc:
             _log(logger, f"IMAP search error ({mailbox.name}): {exc}")
             if attempt == 0:
-                client = _connect_imap(mailbox, logger)
+                client = _connect_imap(mailbox, logger, select_folder=selected_folder)
                 if not client:
                     return "NO", [], None
                 continue
@@ -144,7 +145,7 @@ def _imap_search(client, mailbox, criteria, logger):
     return "NO", [], client
 
 
-def _imap_fetch(client, mailbox, msg_id, query, logger):
+def _imap_fetch(client, mailbox, msg_id, query, logger, selected_folder="INBOX"):
     for attempt in range(2):
         try:
             status, data = client.fetch(msg_id, query)
@@ -152,7 +153,7 @@ def _imap_fetch(client, mailbox, msg_id, query, logger):
         except (imaplib.IMAP4.abort, imaplib.IMAP4.error, socket.timeout, ssl.SSLError) as exc:
             _log(logger, f"IMAP fetch error ({mailbox.name}): {exc}")
             if attempt == 0:
-                client = _connect_imap(mailbox, logger)
+                client = _connect_imap(mailbox, logger, select_folder=selected_folder)
                 if not client:
                     return "NO", [], None
                 continue
@@ -198,6 +199,15 @@ def _extract_header_date(meta):
             return parsed
         except Exception:
             continue
+    return None
+
+
+def _extract_raw_email_from_fetch(msg_data):
+    if not msg_data:
+        return None
+    for item in msg_data:
+        if isinstance(item, tuple) and len(item) >= 2 and isinstance(item[1], (bytes, bytearray)):
+            return bytes(item[1])
     return None
 
 
@@ -342,7 +352,8 @@ def run_import(
                 has_rules_for_mailbox = models.SupplierMailboxRule.objects.filter(
                     supplier=supplier, mailbox=mailbox, is_active=True
                 ).exists()
-            client = _connect_imap(mailbox, logger)
+            selected_folder = "INBOX"
+            client = _connect_imap(mailbox, logger, select_folder=selected_folder)
             if not client:
                 summary["errors"] += 1
                 if run_id:
@@ -361,7 +372,9 @@ def run_import(
                 criteria.extend(["SINCE", since_date.strftime("%d-%b-%Y")])
             if before_date:
                 criteria.extend(["BEFORE", before_date.strftime("%d-%b-%Y")])
-            status, data, client = _imap_search(client, mailbox, criteria, logger)
+            status, data, client = _imap_search(
+                client, mailbox, criteria, logger, selected_folder=selected_folder
+            )
             if status != "OK":
                 note(f"Failed to search mailbox: {mailbox.name}")
                 if client:
@@ -387,37 +400,51 @@ def run_import(
                         seen.add(folder)
                         if _select_mailbox(client, folder):
                             selected = True
+                            selected_folder = folder
                             break
                     if selected:
-                        status, data, client = _imap_search(client, mailbox, criteria, logger)
+                        status, data, client = _imap_search(
+                            client, mailbox, criteria, logger, selected_folder=selected_folder
+                        )
                         if status == "OK":
                             all_mail_ids = set(data[0].split())
                             note(
                                 f"{mailbox.name}: found {len(all_mail_ids)} message(s) in Gmail All Mail."
                             )
-                            merged_ids = inbox_ids | all_mail_ids
-                            if merged_ids:
-                                message_ids = list(merged_ids)
+                            if all_mail_ids:
+                                message_ids = list(all_mail_ids)
                                 _log(logger, f"Using Gmail All Mail for {mailbox.name}.")
                             else:
                                 message_ids = list(inbox_ids)
+                                selected_folder = "INBOX"
                     else:
                         _log(logger, f"Gmail All Mail folder not accessible for {mailbox.name}.")
+                        selected_folder = "INBOX"
                 except Exception as exc:
                     _log(logger, f"Failed Gmail All Mail fallback ({mailbox.name}): {exc}")
+                    selected_folder = "INBOX"
                 # Ensure we are back in SELECTED state for INBOX fetch loop.
-                try:
-                    if not _select_mailbox(client, "INBOX"):
-                        client = _connect_imap(mailbox, logger)
+                if selected_folder == "INBOX":
+                    try:
+                        if not _select_mailbox(client, "INBOX"):
+                            client = _connect_imap(mailbox, logger, select_folder="INBOX")
+                            if not client:
+                                summary["errors"] += 1
+                                note(f"Skipping mailbox due INBOX re-select failure: {mailbox.name}")
+                                continue
+                    except Exception:
+                        client = _connect_imap(mailbox, logger, select_folder="INBOX")
                         if not client:
                             summary["errors"] += 1
                             note(f"Skipping mailbox due INBOX re-select failure: {mailbox.name}")
                             continue
-                except Exception:
-                    client = _connect_imap(mailbox, logger)
+                elif not _select_mailbox(client, selected_folder):
+                    client = _connect_imap(mailbox, logger, select_folder=selected_folder)
                     if not client:
                         summary["errors"] += 1
-                        note(f"Skipping mailbox due INBOX re-select failure: {mailbox.name}")
+                        note(
+                            f"Skipping mailbox due mailbox re-select failure: {mailbox.name} ({selected_folder})"
+                        )
                         continue
             # Process oldest first so history is built chronologically.
             try:
@@ -456,6 +483,7 @@ def run_import(
                     msg_id,
                     "(BODY.PEEK[HEADER.FIELDS (SUBJECT FROM DATE MESSAGE-ID)] RFC822.SIZE INTERNALDATE)",
                     logger,
+                    selected_folder=selected_folder,
                 )
                 if not client:
                     continue
@@ -502,13 +530,20 @@ def run_import(
                     )
                     continue
                 status, msg_data, client = _imap_fetch(
-                    client, mailbox, msg_id, "(BODY.PEEK[])", logger
+                    client,
+                    mailbox,
+                    msg_id,
+                    "(BODY.PEEK[])",
+                    logger,
+                    selected_folder=selected_folder,
                 )
                 if not client:
                     continue
                 if status != "OK" or not msg_data:
                     continue
-                raw_email = msg_data[0][1]
+                raw_email = _extract_raw_email_from_fetch(msg_data)
+                if not raw_email:
+                    continue
                 message = email.message_from_bytes(raw_email)
                 subject = _decode_header(message.get("Subject", ""))
                 from_addr = parseaddr(message.get("From", ""))[1]
