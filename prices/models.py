@@ -1,4 +1,5 @@
 import os
+import re
 
 from django.db import models
 from django.utils import timezone
@@ -186,13 +187,28 @@ class ImportBatch(models.Model):
         return f"{self.supplier} / {self.created_at:%Y-%m-%d %H:%M}"
 
 
+def _safe_file_part(value: str) -> str:
+    text = (value or "").strip().replace(" ", "_")
+    text = re.sub(r"[^\w\-.]+", "_", text, flags=re.UNICODE)
+    text = re.sub(r"_+", "_", text).strip("._-")
+    return text or "file"
+
+
 def build_import_file_path(import_file: "ImportFile", filename: str) -> str:
+    # Keep full storage path <= 100 chars for deployments where FileField DB column
+    # is still varchar(100).
+    max_path_len = 100
     raw_name = os.path.basename((filename or "").strip()) or "file"
+    stem, ext = os.path.splitext(raw_name)
+    safe_ext = ext[:12] if ext else ""
+
     supplier = getattr(getattr(import_file, "import_batch", None), "supplier", None)
     supplier_id = getattr(supplier, "id", None) or 0
     supplier_name = getattr(supplier, "name", "") or ""
-    supplier_slug = slugify(supplier_name) or "supplier"
-    supplier_folder = f"{supplier_id:04d}_{supplier_slug}"
+    supplier_slug_full = slugify(supplier_name) or "supplier"
+    supplier_slug_folder = supplier_slug_full[:24] or "supplier"
+    supplier_slug_file = supplier_slug_full[:16] or "supplier"
+    supplier_folder = f"{supplier_id:04d}_{supplier_slug_folder}"
 
     batch = getattr(import_file, "import_batch", None)
     received_at = getattr(batch, "received_at", None) or getattr(batch, "created_at", None)
@@ -200,7 +216,25 @@ def build_import_file_path(import_file: "ImportFile", filename: str) -> str:
         received_at = timezone.now()
     local_received = timezone.localtime(received_at)
     dt_prefix = local_received.strftime("%Y-%m-%d_%H-%M")
-    return f"imports/{supplier_folder}/{dt_prefix}__{raw_name}"
+
+    original_part = _safe_file_part(stem)
+    base_prefix = f"{dt_prefix}_{supplier_slug_file}_"
+
+    folder_prefix = f"imports/{supplier_folder}/"
+    reserved = len(folder_prefix) + len(base_prefix) + len(safe_ext)
+    available_for_original = max(8, max_path_len - reserved)
+    shortened_original = original_part[:available_for_original]
+    final_name = f"{base_prefix}{shortened_original}{safe_ext}"
+    path = f"{folder_prefix}{final_name}"
+
+    if len(path) > max_path_len:
+        fallback_name = f"{dt_prefix}_{supplier_id}_{getattr(import_file, 'id', 0) or 0}{safe_ext}"
+        path = f"{folder_prefix}{fallback_name}"
+    if len(path) > max_path_len:
+        overflow = len(path) - max_path_len
+        trimmed_folder = supplier_folder[:-overflow] if overflow < len(supplier_folder) else str(supplier_id)
+        path = f"imports/{trimmed_folder}/{dt_prefix}_{supplier_id}{safe_ext}"
+    return path[:max_path_len]
 
 
 def import_file_upload_to(import_file: "ImportFile", filename: str) -> str:

@@ -74,6 +74,20 @@ def _parse_exclude_terms(raw: str) -> list[str]:
     return [term.lower() for term in normalized.splitlines() if term.strip()]
 
 
+def _parse_search_query(raw: str) -> tuple[list[str], list[str]]:
+    include_tokens: list[str] = []
+    exclude_tokens: list[str] = []
+    for token in re.split(r"\s+", (raw or "").strip()):
+        cleaned = token.strip()
+        if not cleaned:
+            continue
+        if cleaned.startswith("-") and len(cleaned) > 1:
+            exclude_tokens.append(cleaned[1:])
+        else:
+            include_tokens.append(cleaned)
+    return include_tokens, exclude_tokens
+
+
 def _resolve_supplier_exclude_terms(request) -> str:
     raw_from_query = request.GET.get("exclude")
     if raw_from_query is None:
@@ -674,6 +688,7 @@ class SupplierProductSearchView(LoginRequiredMixin, View):
     def get(self, request):
         page_size = 100
         query = request.GET.get("q", "").strip()
+        include_tokens, inline_exclude_tokens = _parse_search_query(query)
         exclude_raw = _resolve_supplier_exclude_terms(request)
         exclude_terms = _parse_exclude_terms(exclude_raw)
         currency = request.GET.get("currency", "").strip() or models.Currency.USD
@@ -697,13 +712,14 @@ class SupplierProductSearchView(LoginRequiredMixin, View):
         ordering = f"{prefix}{sort_db_field}"
 
         queryset = models.SupplierProduct.objects.select_related("supplier")
-        if query:
-            tokens = [token for token in re.split(r"\s+", query) if token]
-            for token in tokens:
+        if include_tokens:
+            for token in include_tokens:
                 queryset = queryset.filter(
                     Q(name__icontains=token)
                     | Q(supplier__name__icontains=token)
                 )
+        for term in inline_exclude_tokens:
+            queryset = queryset.exclude(name__icontains=term)
         if supplier_filter:
             queryset = queryset.filter(supplier_id=supplier_filter)
         if status_filter == "active":
@@ -1770,6 +1786,7 @@ class SupplierProductListView(BaseListView):
     def get_queryset(self):
         queryset = super().get_queryset()
         query = self.request.GET.get("q", "").strip()
+        include_tokens, inline_exclude_tokens = _parse_search_query(query)
         exclude_raw = _resolve_supplier_exclude_terms(self.request)
         exclude_terms = _parse_exclude_terms(exclude_raw)
         self._exclude_terms_raw = exclude_raw
@@ -1777,13 +1794,14 @@ class SupplierProductListView(BaseListView):
         status_filter = self.request.GET.get("status", "").strip().lower() or "all"
         if status_filter not in {"active", "inactive", "all"}:
             status_filter = "all"
-        if query:
-            tokens = [token for token in re.split(r"\s+", query) if token]
-            for token in tokens:
+        if include_tokens:
+            for token in include_tokens:
                 queryset = queryset.filter(
                     Q(name__icontains=token)
                     | Q(supplier__name__icontains=token)
                 )
+        for term in inline_exclude_tokens:
+            queryset = queryset.exclude(name__icontains=term)
         if supplier_filter:
             queryset = queryset.filter(supplier_id=supplier_filter)
         if status_filter == "active":
