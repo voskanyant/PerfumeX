@@ -196,7 +196,7 @@ class Command(BaseCommand):
             min_received_at=None,
             from_filter=None,
             subject_filter=None,
-            dedupe_same_day_only=False,
+            dedupe_same_day_only=True,
             use_uid_cursor=not options["force"],
         )
         self.stdout.write(

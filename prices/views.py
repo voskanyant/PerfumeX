@@ -696,7 +696,7 @@ class SupplierEmailImportView(LoginRequiredMixin, View):
                 min_received_at=latest_batch,
                 from_filter=supplier.from_address_pattern or None,
                 subject_filter=supplier.price_subject_pattern or None,
-                dedupe_same_day_only=False,
+                dedupe_same_day_only=True,
             )
 
         thread = threading.Thread(target=_run, daemon=True)
@@ -770,7 +770,7 @@ class SupplierEmailBackfillView(LoginRequiredMixin, View):
                 before_date=before_date,
                 from_filter=supplier.from_address_pattern or None,
                 subject_filter=supplier.price_subject_pattern or None,
-                dedupe_same_day_only=False,
+                dedupe_same_day_only=True,
             )
 
         thread = threading.Thread(target=_run, daemon=True)
@@ -951,7 +951,7 @@ class SupplierEmailBackfillBulkView(LoginRequiredMixin, View):
                         before_date=before_date,
                         from_filter=supplier.from_address_pattern or None,
                         subject_filter=supplier.price_subject_pattern or None,
-                        dedupe_same_day_only=False,
+                        dedupe_same_day_only=True,
                     )
                 except Exception as exc:
                     models.EmailImportRun.objects.filter(id=run.id).update(
@@ -1093,7 +1093,7 @@ class SupplierEmailImportAllView(LoginRequiredMixin, View):
                         min_received_at=latest_batch,
                         from_filter=supplier.from_address_pattern or None,
                         subject_filter=supplier.price_subject_pattern or None,
-                        dedupe_same_day_only=False,
+                        dedupe_same_day_only=True,
                     )
                 except Exception as exc:
                     models.EmailImportRun.objects.filter(id=run.id).update(
