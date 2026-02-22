@@ -97,8 +97,8 @@
                                 <td data-label="Date">{{ snapshot.recorded_at|date:"d/m/Y H:i" }}</td>
                                 <td data-label="Price">{{ snapshot.price|floatformat:2 }} {{ snapshot.currency|currency_symbol }}</td>
                                 <td data-label="Currency">{{ snapshot.currency }}</td>
-                                <td data-label="RUB">{% if snapshot.price_rub|default_if_none:'' != '' %}{{ snapshot.price_rub|floatformat:2 }} ₽{% else %}-{% endif %}</td>
-                                <td data-label="USD">{% if snapshot.price_usd|default_if_none:'' != '' %}{{ snapshot.price_usd|floatformat:2 }} ${% else %}-{% endif %}</td>
+                                <td data-label="RUB">{% if snapshot.display_price_rub|default_if_none:'' != '' %}{{ snapshot.display_price_rub|floatformat:2 }} ₽{% else %}-{% endif %}</td>
+                                <td data-label="USD">{% if snapshot.display_price_usd|default_if_none:'' != '' %}{{ snapshot.display_price_usd|floatformat:2 }} ${% else %}-{% endif %}</td>
                                 <td data-label="Import">
                                     {% if snapshot.import_batch_id %}
                                         <a href="{% url 'prices:import_detail' snapshot.import_batch_id %}?next={{ back_url|urlencode }}">

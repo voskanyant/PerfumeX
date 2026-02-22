@@ -1733,7 +1733,7 @@ class SupplierProductDetailView(LoginRequiredMixin, DetailView):
         context["snapshots"] = latest_by_day
         chart_labels = []
         chart_values = []
-        rates = _get_latest_rates() if chart_currency in {"usd", "rub"} else {}
+        rates = _get_latest_rates()
         for snapshot in reversed(latest_by_day):
             chart_labels.append(
                 timezone.localtime(snapshot.recorded_at).strftime("%d/%m/%Y")
@@ -1754,6 +1754,19 @@ class SupplierProductDetailView(LoginRequiredMixin, DetailView):
             if chart_price is None:
                 chart_price = snapshot.price
             chart_values.append(float(chart_price))
+        for snapshot in latest_by_day:
+            display_rub = snapshot.price_rub
+            if display_rub is None:
+                display_rub = _convert_price(
+                    snapshot.price, snapshot.currency, models.Currency.RUB, rates
+                )
+            display_usd = snapshot.price_usd
+            if display_usd is None:
+                display_usd = _convert_price(
+                    snapshot.price, snapshot.currency, models.Currency.USD, rates
+                )
+            snapshot.display_price_rub = display_rub
+            snapshot.display_price_usd = display_usd
         context["chart_labels"] = chart_labels
         context["chart_values"] = chart_values
         context["chart_currency"] = chart_currency
@@ -2208,3 +2221,4 @@ class ExchangeRateUpdateView(BaseUpdateView):
 class ExchangeRateDeleteView(BaseDeleteView):
     model = models.ExchangeRate
     success_url_name = "prices:exchange_rate_list"
+
