@@ -512,9 +512,6 @@ def run_import(
                     continue
                 if status != "OK" or not meta:
                     continue
-                uid_int = _uid_to_int(msg_id)
-                if uid_int and uid_int > max_processed_uid:
-                    max_processed_uid = uid_int
                 size = None
                 for item in meta:
                     if isinstance(item, tuple):
@@ -570,6 +567,9 @@ def run_import(
                 raw_email = _extract_raw_email_from_fetch(msg_data)
                 if not raw_email:
                     continue
+                uid_int = _uid_to_int(msg_id)
+                if uid_int and uid_int > max_processed_uid:
+                    max_processed_uid = uid_int
                 message = email.message_from_bytes(raw_email)
                 subject = _decode_header(message.get("Subject", ""))
                 from_addr = parseaddr(message.get("From", ""))[1]
