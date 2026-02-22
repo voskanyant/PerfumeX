@@ -2,8 +2,13 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.urls import reverse_lazy
 from collections import defaultdict
 import hashlib
+import os
+import stat
+import subprocess
+from pathlib import Path
 
 from django.utils import timezone
+from django.conf import settings
 from django.views.generic import (
     CreateView,
     DeleteView,
@@ -42,6 +47,105 @@ from django.db import close_old_connections
 from .services.email_importer import run_import
 from .services.importer import preview_mapping_file
 from .services.cbr_rates import upsert_cbr_markup_rates, upsert_cbr_markup_rates_range
+
+
+CRON_MARKER = "PERFUMEX_IMPORT_CRON"
+
+
+def _runner_script_path() -> Path:
+    base_dir = Path(settings.BASE_DIR)
+    return base_dir.parent / "run_import_emails.sh"
+
+
+def _render_runner_script() -> str:
+    base_dir = Path(settings.BASE_DIR)
+    return "\n".join(
+        [
+            "#!/usr/bin/env bash",
+            "set -Eeuo pipefail",
+            "exec >>/var/log/perfumex_email_import.log 2>&1",
+            'echo "=== START $(date \'+%F %T\') ==="',
+            f"cd {base_dir}",
+            "source .venv/bin/activate",
+            "set -a",
+            f". {base_dir}/.env",
+            "set +a",
+            "python manage.py import_emails",
+            "rc=$?",
+            'echo "=== END $(date \'+%F %T\') rc=$rc ==="',
+            "exit $rc",
+            "",
+        ]
+    )
+
+
+def _ensure_runner_script() -> Path:
+    script_path = _runner_script_path()
+    content = _render_runner_script()
+    script_path.write_text(content, encoding="utf-8")
+    current_mode = script_path.stat().st_mode
+    script_path.chmod(current_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+    return script_path
+
+
+def _read_crontab_lines() -> list[str]:
+    result = subprocess.run(
+        ["crontab", "-l"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        stderr = (result.stderr or "").lower()
+        if "no crontab" in stderr:
+            return []
+        raise RuntimeError(result.stderr.strip() or "Failed to read crontab.")
+    text = result.stdout or ""
+    lines = [line.rstrip("\n") for line in text.splitlines()]
+    return lines
+
+
+def _write_crontab_lines(lines: list[str]) -> None:
+    payload = "\n".join(lines).strip("\n")
+    if payload:
+        payload = payload + "\n"
+    subprocess.run(
+        ["crontab", "-"],
+        input=payload,
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+
+
+def _build_cron_line(script_path: Path) -> str:
+    return (
+        "*/5 * * * * /usr/bin/flock -n /tmp/perfumex_import.lock "
+        f"/usr/bin/timeout 240s /bin/bash {script_path} # {CRON_MARKER}"
+    )
+
+
+def _get_cron_status() -> dict:
+    script_path = _runner_script_path()
+    try:
+        lines = _read_crontab_lines()
+        cron_line = next((line for line in lines if CRON_MARKER in line), "")
+        return {
+            "supported": True,
+            "installed": bool(cron_line),
+            "line": cron_line,
+            "script_path": str(script_path),
+            "script_exists": script_path.exists(),
+        }
+    except Exception as exc:
+        return {
+            "supported": False,
+            "installed": False,
+            "line": "",
+            "script_path": str(script_path),
+            "script_exists": script_path.exists(),
+            "error": str(exc),
+        }
 
 
 def _get_supplier_latest_batch_time(supplier: models.Supplier):
@@ -343,10 +447,32 @@ class ImportSettingsView(LoginRequiredMixin, TemplateView):
             )
         else:
             context["next_run_at"] = None
+        context["cron_status"] = _get_cron_status()
         return context
 
     def post(self, request, *args, **kwargs):
-        if request.POST.get("action") == "run_now":
+        action = request.POST.get("action")
+        if action == "install_cron":
+            try:
+                script_path = _ensure_runner_script()
+                lines = [line for line in _read_crontab_lines() if CRON_MARKER not in line]
+                lines.append(_build_cron_line(script_path))
+                _write_crontab_lines(lines)
+                messages.success(request, "Scheduler installed (cron + runner script).")
+            except Exception as exc:
+                messages.error(request, f"Failed to install scheduler: {exc}")
+            return redirect("prices:import_settings")
+
+        if action == "remove_cron":
+            try:
+                lines = [line for line in _read_crontab_lines() if CRON_MARKER not in line]
+                _write_crontab_lines(lines)
+                messages.success(request, "Scheduler cron entry removed.")
+            except Exception as exc:
+                messages.error(request, f"Failed to remove scheduler: {exc}")
+            return redirect("prices:import_settings")
+
+        if action == "run_now":
             def _run_now():
                 close_old_connections()
                 call_command("import_emails", force=True)

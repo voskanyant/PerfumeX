@@ -66,6 +66,16 @@
             <input type="hidden" name="action" value="run_now">
             <button class="button secondary" type="submit">Run now</button>
         </form>
+        <form method="post" class="mt-2 d-flex flex-wrap gap-2">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="install_cron">
+            <button class="button secondary" type="submit">Install scheduler</button>
+        </form>
+        <form method="post" class="mt-2 d-flex flex-wrap gap-2">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="remove_cron">
+            <button class="button danger" type="submit">Remove scheduler</button>
+        </form>
         <div class="mt-3 muted">
             {% if settings_obj.last_run_at %}
                 Last auto run: {{ settings_obj.last_run_at|timezone:"Europe/Moscow"|date:"d/m/Y H:i" }}
@@ -78,8 +88,20 @@
             {% endif %}
         </div>
         <div class="alert alert-light border mt-3">
-            Server task required: set a cron job to run `python manage.py import_emails` every 5-10 minutes.
-            The command will respect the interval above and skip if it ran too recently.
+            <div><strong>Scheduler status:</strong>
+                {% if cron_status.supported %}
+                    {% if cron_status.installed %}Installed{% else %}Not installed{% endif %}
+                {% else %}
+                    Unavailable
+                {% endif %}
+            </div>
+            <div class="mt-1"><strong>Runner script:</strong> <code>{{ cron_status.script_path }}</code> {% if cron_status.script_exists %}(exists){% else %}(missing){% endif %}</div>
+            {% if cron_status.line %}
+                <div class="mt-1"><strong>Cron line:</strong> <code>{{ cron_status.line }}</code></div>
+            {% endif %}
+            {% if cron_status.error %}
+                <div class="mt-1 text-danger"><strong>Error:</strong> {{ cron_status.error }}</div>
+            {% endif %}
         </div>
     </div>
 
