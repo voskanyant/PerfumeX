@@ -209,6 +209,18 @@
                 display: grid;
                 gap: 4px;
             }
+            .import-row-success {
+                background: rgba(22, 163, 74, 0.08);
+            }
+            .import-row-failed {
+                background: rgba(220, 38, 38, 0.10);
+            }
+            .import-row-removed {
+                background: rgba(234, 179, 8, 0.16);
+            }
+            .import-row-pending {
+                background: rgba(59, 130, 246, 0.08);
+            }
             th[data-field="current_price"],
             td[data-field="current_price"] {
                 width: 90px;
@@ -237,6 +249,27 @@
             .products-mobile td[data-field="current_price"] {
                 font-weight: 600;
                 color: #111827;
+            }
+            .products-mobile tr.inactive-product-row td {
+                background: #f3f4f6;
+                color: #6b7280;
+            }
+            .products-mobile tr.inactive-product-row td[data-field="name"] a {
+                color: #4b5563;
+            }
+            .products-mobile tr.inactive-product-row .status-dot.inactive {
+                background: #9ca3af;
+            }
+            .products-mobile tr.inactive-divider-row td {
+                background: #e5e7eb;
+                color: #4b5563;
+                font-size: 12px;
+                font-weight: 700;
+                letter-spacing: 0.04em;
+                text-transform: uppercase;
+                border-top: 2px solid #d1d5db;
+                padding-top: 10px;
+                padding-bottom: 10px;
             }
             @media (min-width: 992px) {
                 .products-mobile th,
@@ -493,7 +526,6 @@
                             <div class="nav-section-title">Settings</div>
                             <a class="nav-link" href="{% url 'prices:import_settings' %}">Import Settings</a>
                             <a class="nav-link" href="{% url 'prices:currency_rates' %}">Currencies</a>
-                            <a class="nav-link" href="{% url 'prices:mailbox_list' %}">Mailboxes</a>
                             <a class="nav-link" href="{% url 'prices:documentation' %}">Documentation</a>
                             <form action="{% url 'logout' %}" method="post" class="mt-3">
                                 {% csrf_token %}
@@ -519,7 +551,6 @@
                                 <div class="nav-section-title">Settings</div>
                                 <a class="nav-link" href="{% url 'prices:import_settings' %}">Import Settings</a>
                                 <a class="nav-link" href="{% url 'prices:currency_rates' %}">Currencies</a>
-                                <a class="nav-link" href="{% url 'prices:mailbox_list' %}">Mailboxes</a>
                                 <a class="nav-link" href="{% url 'prices:documentation' %}">Documentation</a>
                                 <form action="{% url 'logout' %}" method="post" class="mt-3">
                                     {% csrf_token %}

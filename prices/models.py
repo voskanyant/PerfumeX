@@ -1,5 +1,9 @@
+import os
+
 from django.db import models
 from django.utils import timezone
+from django.conf import settings
+from django.utils.text import slugify
 
 
 class Currency(models.TextChoices):
@@ -182,6 +186,27 @@ class ImportBatch(models.Model):
         return f"{self.supplier} / {self.created_at:%Y-%m-%d %H:%M}"
 
 
+def build_import_file_path(import_file: "ImportFile", filename: str) -> str:
+    raw_name = os.path.basename((filename or "").strip()) or "file"
+    supplier = getattr(getattr(import_file, "import_batch", None), "supplier", None)
+    supplier_id = getattr(supplier, "id", None) or 0
+    supplier_name = getattr(supplier, "name", "") or ""
+    supplier_slug = slugify(supplier_name) or "supplier"
+    supplier_folder = f"{supplier_id:04d}_{supplier_slug}"
+
+    batch = getattr(import_file, "import_batch", None)
+    received_at = getattr(batch, "received_at", None) or getattr(batch, "created_at", None)
+    if received_at is None:
+        received_at = timezone.now()
+    local_received = timezone.localtime(received_at)
+    dt_prefix = local_received.strftime("%Y-%m-%d_%H-%M")
+    return f"imports/{supplier_folder}/{dt_prefix}__{raw_name}"
+
+
+def import_file_upload_to(import_file: "ImportFile", filename: str) -> str:
+    return build_import_file_path(import_file, filename)
+
+
 class ImportFile(models.Model):
     import_batch = models.ForeignKey(ImportBatch, on_delete=models.CASCADE)
     mapping = models.ForeignKey(
@@ -189,7 +214,7 @@ class ImportFile(models.Model):
     )
     file_kind = models.CharField(max_length=10, choices=FileKind.choices)
     filename = models.CharField(max_length=255)
-    file = models.FileField(upload_to="imports/", null=True, blank=True)
+    file = models.FileField(upload_to=import_file_upload_to, null=True, blank=True)
     content_hash = models.CharField(max_length=64, blank=True)
     status = models.CharField(
         max_length=20, choices=ImportStatus.choices, default=ImportStatus.PENDING
@@ -263,6 +288,7 @@ class EmailImportRun(models.Model):
     skipped_duplicates = models.PositiveIntegerField(default=0)
     errors = models.PositiveIntegerField(default=0)
     last_message = models.TextField(blank=True)
+    detailed_log = models.TextField(blank=True)
 
     def __str__(self) -> str:
         return f"{self.supplier} {self.started_at:%Y-%m-%d %H:%M}"
@@ -276,6 +302,7 @@ class ImportSettings(models.Model):
     supplier_batch_size = models.PositiveIntegerField(default=10)
     supplier_batch_offset = models.PositiveIntegerField(default=0)
     supplier_timeout_minutes = models.PositiveIntegerField(default=5)
+    deactivate_products_after_days = models.PositiveIntegerField(default=0)
     cbr_markup_percent = models.DecimalField(max_digits=6, decimal_places=3, default=3.0)
     filename_blacklist_terms = models.TextField(
         blank=True,
@@ -295,3 +322,19 @@ class ImportSettings(models.Model):
         raw = (self.filename_blacklist_terms or "").replace(";", "\n").replace(",", "\n")
         terms = [term.strip().lower() for term in raw.splitlines() if term.strip()]
         return terms
+
+
+class UserPreference(models.Model):
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="price_prefs"
+    )
+    supplier_exclude_terms = models.TextField(blank=True, default="")
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self) -> str:
+        return f"Preferences: {self.user}"
+
+    @classmethod
+    def get_for_user(cls, user):
+        obj, _ = cls.objects.get_or_create(user=user)
+        return obj

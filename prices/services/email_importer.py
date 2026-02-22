@@ -5,7 +5,7 @@ import re
 import socket
 import ssl
 import time
-from datetime import datetime
+from datetime import datetime, timezone as dt_timezone
 from email.header import decode_header
 from email.utils import parsedate_to_datetime, parseaddr
 
@@ -55,6 +55,15 @@ def _infer_extension(content_type):
     if content_type in ("application/octet-stream",):
         return ".xlsx"
     return ""
+
+def _local_day_bounds(dt):
+    """Return UTC bounds for the local calendar day of dt."""
+    if not dt:
+        return None, None
+    local_dt = timezone.localtime(dt)
+    day_start_local = local_dt.replace(hour=0, minute=0, second=0, microsecond=0)
+    day_end_local = day_start_local + timezone.timedelta(days=1)
+    return day_start_local.astimezone(dt_timezone.utc), day_end_local.astimezone(dt_timezone.utc)
 
 
 def _match_pattern(value, pattern):
@@ -295,12 +304,25 @@ def run_import(
     mailbox_names = ", ".join([mb.name for mb in mailboxes])
     supplier_stats: dict[int, dict[str, object]] = {}
     unmatched_samples: dict[tuple[str, str, str], int] = {}
+    log_lines: list[str] = []
+    max_log_lines = 500
+
+    def _log_line(msg):
+        stamp = timezone.localtime(timezone.now()).strftime("%H:%M:%S")
+        log_lines.append(f"[{stamp}] {msg}")
+        if len(log_lines) > max_log_lines:
+            del log_lines[: len(log_lines) - max_log_lines]
+        if run_id and (len(log_lines) % 25 == 0):
+            models.EmailImportRun.objects.filter(id=run_id).update(
+                detailed_log="\n".join(log_lines)
+            )
+        if logger:
+            logger(msg)
 
     def note(msg):
         nonlocal last_message
         last_message = msg
-        if logger:
-            logger(msg)
+        _log_line(msg)
 
     summary = {
         "processed_files": 0,
@@ -335,6 +357,7 @@ def run_import(
                 finished_at=timezone.now(),
                 errors=F("errors") + 1,
                 last_message=msg,
+                detailed_log="\n".join(log_lines),
             )
         raise TimeoutError(msg)
 
@@ -347,7 +370,7 @@ def run_import(
                 if run and run.status == models.EmailImportStatus.CANCELED:
                     break
             if mailbox.protocol != models.Mailbox.IMAP:
-                _log(logger, f"Skipping {mailbox.name}: only IMAP supported.")
+                _log(_log_line, f"Skipping {mailbox.name}: only IMAP supported.")
                 continue
 
             has_rules_for_mailbox = False
@@ -356,7 +379,7 @@ def run_import(
                     supplier=supplier, mailbox=mailbox, is_active=True
                 ).exists()
             selected_folder = "INBOX"
-            client = _connect_imap(mailbox, logger, select_folder=selected_folder)
+            client = _connect_imap(mailbox, _log_line, select_folder=selected_folder)
             if not client:
                 summary["errors"] += 1
                 if run_id:
@@ -376,7 +399,7 @@ def run_import(
             if before_date:
                 criteria.extend(["BEFORE", before_date.strftime("%d-%b-%Y")])
             status, data, client = _imap_search(
-                client, mailbox, criteria, logger, selected_folder=selected_folder
+                client, mailbox, criteria, _log_line, selected_folder=selected_folder
             )
             if status != "OK":
                 note(f"Failed to search mailbox: {mailbox.name}")
@@ -407,7 +430,7 @@ def run_import(
                             break
                     if selected:
                         status, data, client = _imap_search(
-                            client, mailbox, criteria, logger, selected_folder=selected_folder
+                            client, mailbox, criteria, _log_line, selected_folder=selected_folder
                         )
                         if status == "OK":
                             all_mail_ids = set(data[0].split())
@@ -416,33 +439,33 @@ def run_import(
                             )
                             if all_mail_ids:
                                 message_ids = list(all_mail_ids)
-                                _log(logger, f"Using Gmail All Mail for {mailbox.name}.")
+                                _log(_log_line, f"Using Gmail All Mail for {mailbox.name}.")
                             else:
                                 message_ids = list(inbox_ids)
                                 selected_folder = "INBOX"
                     else:
-                        _log(logger, f"Gmail All Mail folder not accessible for {mailbox.name}.")
+                        _log(_log_line, f"Gmail All Mail folder not accessible for {mailbox.name}.")
                         selected_folder = "INBOX"
                 except Exception as exc:
-                    _log(logger, f"Failed Gmail All Mail fallback ({mailbox.name}): {exc}")
+                    _log(_log_line, f"Failed Gmail All Mail fallback ({mailbox.name}): {exc}")
                     selected_folder = "INBOX"
                 # Ensure we are back in SELECTED state for INBOX fetch loop.
                 if selected_folder == "INBOX":
                     try:
                         if not _select_mailbox(client, "INBOX"):
-                            client = _connect_imap(mailbox, logger, select_folder="INBOX")
+                            client = _connect_imap(mailbox, _log_line, select_folder="INBOX")
                             if not client:
                                 summary["errors"] += 1
                                 note(f"Skipping mailbox due INBOX re-select failure: {mailbox.name}")
                                 continue
                     except Exception:
-                        client = _connect_imap(mailbox, logger, select_folder="INBOX")
+                        client = _connect_imap(mailbox, _log_line, select_folder="INBOX")
                         if not client:
                             summary["errors"] += 1
                             note(f"Skipping mailbox due INBOX re-select failure: {mailbox.name}")
                             continue
                 elif not _select_mailbox(client, selected_folder):
-                    client = _connect_imap(mailbox, logger, select_folder=selected_folder)
+                    client = _connect_imap(mailbox, _log_line, select_folder=selected_folder)
                     if not client:
                         summary["errors"] += 1
                         note(
@@ -505,7 +528,7 @@ def run_import(
                     mailbox,
                     msg_id,
                     "(BODY.PEEK[HEADER.FIELDS (SUBJECT FROM DATE MESSAGE-ID)] RFC822.SIZE INTERNALDATE)",
-                    logger,
+                    _log_line,
                     selected_folder=selected_folder,
                 )
                 if not client:
@@ -557,7 +580,7 @@ def run_import(
                     mailbox,
                     msg_id,
                     "(BODY.PEEK[])",
-                    logger,
+                    _log_line,
                     selected_folder=selected_folder,
                 )
                 if not client:
@@ -684,12 +707,20 @@ def run_import(
 
                     content_hash = hashlib.sha256(payload).hexdigest()
                     if dedupe_same_day_only and received_at:
-                        message_day = timezone.localtime(received_at).date()
+                        day_start_utc, day_end_utc = _local_day_bounds(received_at)
+                        # Deduplicate within the same supplier + mailbox + local day.
+                        # Include pending files too so repeated attachments in the same run
+                        # are skipped immediately.
                         exists = models.ImportFile.objects.filter(
                             content_hash=content_hash,
-                            status=models.ImportStatus.PROCESSED,
                             import_batch__supplier=matched_supplier,
-                            import_batch__received_at__date=message_day,
+                            import_batch__mailbox=mailbox,
+                            import_batch__received_at__gte=day_start_utc,
+                            import_batch__received_at__lt=day_end_utc,
+                            status__in=[
+                                models.ImportStatus.PENDING,
+                                models.ImportStatus.PROCESSED,
+                            ],
                         ).exists()
                     else:
                         exists = models.ImportFile.objects.filter(
@@ -790,7 +821,7 @@ def run_import(
                     try:
                         client.store(msg_id, "+FLAGS", "\\Seen")
                     except (imaplib.IMAP4.abort, socket.timeout, ssl.SSLError):
-                        _log(logger, "Failed to mark message as seen.")
+                        _log(_log_line, "Failed to mark message as seen.")
 
             if use_uid_cursor and not supplier and not from_filter and not subject_filter:
                 if max_processed_uid:
@@ -845,7 +876,8 @@ def run_import(
         run = models.EmailImportRun.objects.filter(id=run_id).first()
         if run and run.status == models.EmailImportStatus.CANCELED:
             models.EmailImportRun.objects.filter(id=run_id).update(
-                finished_at=timezone.now()
+                finished_at=timezone.now(),
+                detailed_log="\n".join(log_lines),
             )
         elif not timed_out:
             models.EmailImportRun.objects.filter(id=run_id).update(
@@ -855,24 +887,29 @@ def run_import(
                 processed_files=summary["processed_files"],
                 skipped_duplicates=summary["skipped_duplicates"],
                 errors=summary["errors"],
+                detailed_log="\n".join(log_lines),
             )
     if not summary["matched_files"] and unmatched_samples and logger:
-        _log(logger, "No supplier matches. Top unmatched sender/subject/file:")
+        _log(_log_line, "No supplier matches. Top unmatched sender/subject/file:")
         top_items = sorted(unmatched_samples.items(), key=lambda item: item[1], reverse=True)[:10]
         for (from_addr, subj, fname), count in top_items:
             _log(
-                logger,
+                _log_line,
                 f"- x{count} from='{from_addr}' subject='{subj}' file='{fname}'",
             )
     if logger:
         _log(
-            logger,
+            _log_line,
             "Attachment diagnostics: "
             f"seen={summary['attachments_seen']} "
             f"no_filename={summary['skipped_no_filename']} "
             f"no_payload={summary['skipped_no_payload']} "
             f"blacklist={summary['skipped_blacklist']} "
             f"unsupported_ext={summary['skipped_unsupported_extension']}",
+        )
+    if run_id:
+        models.EmailImportRun.objects.filter(id=run_id).update(
+            detailed_log="\n".join(log_lines)
         )
     summary["last_message"] = last_message
     return summary

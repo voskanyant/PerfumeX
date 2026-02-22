@@ -1,6 +1,8 @@
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 from django.db.models import F
+from django.db.models import Q
+from django.db.models import Count
 
 from prices import models
 from prices.services.email_importer import run_import
@@ -24,6 +26,7 @@ def _get_supplier_latest_batch_time(supplier: models.Supplier):
 
 class Command(BaseCommand):
     help = "Import supplier price lists from email attachments."
+    PRODUCT_REMOVED_EVENT_PREFIX = "SYSTEM_DEACTIVATE:"
 
     def add_arguments(self, parser):
         parser.add_argument("--mailbox", help="Mailbox name to process.")
@@ -207,6 +210,44 @@ class Command(BaseCommand):
             f"errors={summary.get('errors', 0)} "
             f"timed_out={summary.get('timed_out', False)}"
         )
+
+        stale_days = int(settings_obj.deactivate_products_after_days or 0)
+        if stale_days > 0:
+            cutoff = timezone.now() - timezone.timedelta(days=stale_days)
+            stale_qs = models.SupplierProduct.objects.select_related("supplier").filter(
+                is_active=True,
+            ).filter(
+                Q(last_imported_at__lt=cutoff)
+                | Q(last_imported_at__isnull=True, created_at__lt=cutoff)
+            )
+            by_supplier = list(
+                stale_qs.values("supplier_id").annotate(total=Count("id"))
+            )
+            deactivated = stale_qs.update(is_active=False)
+            if deactivated:
+                now = timezone.now()
+                for row in by_supplier:
+                    supplier_id = row.get("supplier_id")
+                    total = row.get("total") or 0
+                    if not supplier_id or total <= 0:
+                        continue
+                    supplier = models.Supplier.objects.filter(pk=supplier_id).first()
+                    if not supplier:
+                        continue
+                    models.ImportBatch.objects.create(
+                        supplier=supplier,
+                        mailbox=None,
+                        message_id=f"{self.PRODUCT_REMOVED_EVENT_PREFIX}{now.isoformat()}:{supplier_id}",
+                        received_at=now,
+                        status=models.ImportStatus.PROCESSED,
+                        error_message=(
+                            f"No price received for {stale_days} day(s). "
+                            f"Deactivated {total} supplier product(s)."
+                        ),
+                    )
+            self.stdout.write(
+                f"Auto-deactivated stale supplier products: {deactivated} (older than {stale_days} days)."
+            )
 
         settings_obj.last_run_at = timezone.now()
         settings_obj.save(update_fields=["last_run_at"])

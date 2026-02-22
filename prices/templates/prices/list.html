@@ -70,7 +70,26 @@
         .product-filters-offcanvas .extra-filters-grid {
             grid-template-columns: 1fr;
         }
+        #supplier-bulk-root.bulk-mode-off .bulk-actions-inline {
+            display: none !important;
+        }
+        #supplier-bulk-root.bulk-mode-on .bulk-actions-inline {
+            display: inline-flex !important;
+        }
+        #supplier-bulk-root.bulk-mode-off th.bulk-col,
+        #supplier-bulk-root.bulk-mode-off td.bulk-col {
+            display: none !important;
+        }
+        #supplier-bulk-root .bulk-gear-btn {
+            width: 40px;
+            height: 40px;
+            padding: 0;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
     </style>
+    <div id="supplier-bulk-root"{% if list_title == 'Suppliers Products' or list_title == 'Supplier Products' %} class="bulk-mode-off"{% endif %}>
     <div class="card p-3 p-md-4 mb-3">
         <div class="d-flex flex-wrap align-items-start justify-content-between gap-3">
             <div>
@@ -123,6 +142,28 @@
                         </svg>
                         Delete selected
                     </button>
+                {% endif %}
+                {% if show_bulk_delete and list_title == 'Suppliers Products' or show_bulk_delete and list_title == 'Supplier Products' %}
+                    <button class="button secondary bulk-gear-btn" type="button" id="bulk-mode-toggle" title="Bulk tools" aria-label="Bulk tools">
+                        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <circle cx="12" cy="12" r="3"></circle>
+                            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33h0A1.65 1.65 0 0 0 10 3.09V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h0a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v0A1.65 1.65 0 0 0 20.91 10H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                        </svg>
+                    </button>
+                    <div class="bulk-actions-inline gap-2 align-items-center" id="bulk-actions-inline">
+                        <button class="button secondary" type="button" id="bulk-change-btn">Bulk change</button>
+                        <button class="button danger" type="button" id="bulk-delete-btn">
+                            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="M3 6h18"/>
+                                <path d="M8 6V4h8v2"/>
+                                <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+                                <path d="M10 11v6"/>
+                                <path d="M14 11v6"/>
+                            </svg>
+                            Delete selected
+                        </button>
+                        <button class="button ghost" type="button" id="bulk-mode-cancel">Cancel</button>
+                    </div>
                 {% endif %}
             </div>
         </div>
@@ -185,21 +226,11 @@
                                     </select>
                                 </div>
                             {% endif %}
-                            {% if show_bulk_delete %}
-                                <div class="filter-item">
-                                    <label>Bulk actions</label>
-                                    <button class="button danger w-100" type="button" id="bulk-delete-btn">
-                                        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                                            <path d="M3 6h18"/>
-                                            <path d="M8 6V4h8v2"/>
-                                            <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
-                                            <path d="M10 11v6"/>
-                                            <path d="M14 11v6"/>
-                                        </svg>
-                                        Delete selected
-                                    </button>
-                                </div>
-                            {% endif %}
+                            <div class="filter-item">
+                                <label for="exclude-filter">Exclude words in name</label>
+                                <textarea id="exclude-filter" rows="3" placeholder="One word per line (or comma-separated)">{{ exclude_terms|default:'' }}</textarea>
+                                <button class="button secondary w-100 mt-2" type="button" id="exclude-apply-btn">Apply exclusion</button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -207,7 +238,7 @@
                 {% if show_search %}
                     <div class="filter-item">
                         <label for="live-search">Search</label>
-                        <input id="live-search" type="text" value="{{ current_q|default:'' }}" placeholder="Search products..." data-sort="{{ current_sort|default:'current_price' }}" data-dir="{{ current_dir|default:'asc' }}"{% if link_detail %} data-detail-base="/products/"{% endif %}{% if show_bulk_delete %} data-bulk="1"{% endif %}{% if update_url_name %} data-edit-pattern="{% url update_url_name 0 %}"{% endif %}{% if delete_url_name %} data-delete-pattern="{% url delete_url_name 0 %}"{% endif %}>
+                        <input id="live-search" type="text" value="{{ current_q|default:'' }}" placeholder="Search products..." data-sort="{{ current_sort|default:'current_price' }}" data-dir="{{ current_dir|default:'asc' }}"{% if link_detail %} data-detail-base="/products/" data-server-search="1"{% endif %}{% if show_bulk_delete %} data-bulk="1"{% endif %}{% if update_url_name %} data-edit-pattern="{% url update_url_name 0 %}"{% endif %}{% if delete_url_name %} data-delete-pattern="{% url delete_url_name 0 %}"{% endif %}>
                         <span id="search-count" class="muted" style="margin-left: 8px;"></span>
                     </div>
                 {% endif %}
@@ -257,13 +288,13 @@
                 <thead>
                     <tr>
                         {% if show_bulk_delete %}
-                            <th class="select-col"><input type="checkbox" id="product-select-all"></th>
+                            <th class="select-col bulk-col"><input type="checkbox" id="product-select-all"></th>
                         {% endif %}
                         {% for field in list_display %}
                             <th data-field="{{ field }}">
                                 {% if current_sort == field %}
                                     {% if current_dir == "asc" %}
-                                        <a href="?sort={{ field }}&dir=desc{% if current_q %}&q={{ current_q }}{% endif %}{% if currency_filter %}&currency={{ currency_filter }}{% endif %}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}">
+                                        <a href="?sort={{ field }}&dir=desc{% if current_q %}&q={{ current_q }}{% endif %}{% if currency_filter %}&currency={{ currency_filter }}{% endif %}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if exclude_terms %}&exclude={{ exclude_terms|urlencode }}{% endif %}">
                                             {% if field == "current_price" %}
                                                 Price ({% if currency_filter %}{{ currency_filter|currency_symbol }}{% else %}Original{% endif %}) ▲
                                             {% else %}
@@ -271,7 +302,7 @@
                                             {% endif %}
                                         </a>
                                     {% else %}
-                                        <a href="?sort={{ field }}&dir=asc{% if current_q %}&q={{ current_q }}{% endif %}{% if currency_filter %}&currency={{ currency_filter }}{% endif %}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}">
+                                        <a href="?sort={{ field }}&dir=asc{% if current_q %}&q={{ current_q }}{% endif %}{% if currency_filter %}&currency={{ currency_filter }}{% endif %}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if exclude_terms %}&exclude={{ exclude_terms|urlencode }}{% endif %}">
                                             {% if field == "current_price" %}
                                                 Price ({% if currency_filter %}{{ currency_filter|currency_symbol }}{% else %}Original{% endif %}) ▼
                                             {% else %}
@@ -280,7 +311,7 @@
                                         </a>
                                     {% endif %}
                                 {% else %}
-                                    <a href="?sort={{ field }}&dir=asc{% if current_q %}&q={{ current_q }}{% endif %}{% if currency_filter %}&currency={{ currency_filter }}{% endif %}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}">
+                                    <a href="?sort={{ field }}&dir=asc{% if current_q %}&q={{ current_q }}{% endif %}{% if currency_filter %}&currency={{ currency_filter }}{% endif %}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if exclude_terms %}&exclude={{ exclude_terms|urlencode }}{% endif %}">
                                         {% if field == "current_price" %}
                                             Price ({% if currency_filter %}{{ currency_filter|currency_symbol }}{% else %}Original{% endif %})
                                         {% else %}
@@ -297,9 +328,18 @@
                 </thead>
                 <tbody>
                         {% for obj in object_list %}
-                            <tr data-product-id="{{ obj.pk }}">
+                            {% ifchanged obj.is_active %}
+                                {% if not obj.is_active and not forloop.first %}
+                                    <tr class="inactive-divider-row">
+                                        <td colspan="{% if show_bulk_delete %}{% if show_actions %}{{ list_display|length|add:'2' }}{% else %}{{ list_display|length|add:'1' }}{% endif %}{% else %}{% if show_actions %}{{ list_display|length|add:'1' }}{% else %}{{ list_display|length }}{% endif %}{% endif %}">
+                                            Inactive products
+                                        </td>
+                                    </tr>
+                                {% endif %}
+                            {% endifchanged %}
+                            <tr data-product-id="{{ obj.pk }}"{% if not obj.is_active %} class="inactive-product-row"{% endif %}>
                                 {% if show_bulk_delete %}
-                                    <td class="select-col"><input type="checkbox" name="product_ids" value="{{ obj.pk }}"></td>
+                                    <td class="select-col bulk-col"><input type="checkbox" name="product_ids" value="{{ obj.pk }}"></td>
                                 {% endif %}
                                 {% for field in list_display %}
                                     {% if field == "last_imported_at" %}
@@ -393,7 +433,7 @@
                     <ul class="pagination flex-wrap mb-0">
                         {% if page_obj.has_previous %}
                             <li class="page-item">
-                                <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if current_sort %}&sort={{ current_sort }}{% endif %}{% if current_dir %}&dir={{ current_dir }}{% endif %}{% if current_q %}&q={{ current_q }}{% endif %}{% if currency_filter %}&currency={{ currency_filter }}{% endif %}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}">Previous</a>
+                                <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if current_sort %}&sort={{ current_sort }}{% endif %}{% if current_dir %}&dir={{ current_dir }}{% endif %}{% if current_q %}&q={{ current_q }}{% endif %}{% if currency_filter %}&currency={{ currency_filter }}{% endif %}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if exclude_terms %}&exclude={{ exclude_terms|urlencode }}{% endif %}">Previous</a>
                             </li>
                         {% endif %}
                         {% for page_num in page_obj.paginator.page_range %}
@@ -401,13 +441,13 @@
                                 <li class="page-item active"><span class="page-link">{{ page_num }}</span></li>
                             {% elif page_num > page_obj.number|add:-3 and page_num < page_obj.number|add:3 %}
                                 <li class="page-item">
-                                    <a class="page-link" href="?page={{ page_num }}{% if current_sort %}&sort={{ current_sort }}{% endif %}{% if current_dir %}&dir={{ current_dir }}{% endif %}{% if current_q %}&q={{ current_q }}{% endif %}{% if currency_filter %}&currency={{ currency_filter }}{% endif %}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}">{{ page_num }}</a>
+                                    <a class="page-link" href="?page={{ page_num }}{% if current_sort %}&sort={{ current_sort }}{% endif %}{% if current_dir %}&dir={{ current_dir }}{% endif %}{% if current_q %}&q={{ current_q }}{% endif %}{% if currency_filter %}&currency={{ currency_filter }}{% endif %}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if exclude_terms %}&exclude={{ exclude_terms|urlencode }}{% endif %}">{{ page_num }}</a>
                                 </li>
                             {% endif %}
                         {% endfor %}
                         {% if page_obj.has_next %}
                             <li class="page-item">
-                                <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if current_sort %}&sort={{ current_sort }}{% endif %}{% if current_dir %}&dir={{ current_dir }}{% endif %}{% if current_q %}&q={{ current_q }}{% endif %}{% if currency_filter %}&currency={{ currency_filter }}{% endif %}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}">Next</a>
+                                <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if current_sort %}&sort={{ current_sort }}{% endif %}{% if current_dir %}&dir={{ current_dir }}{% endif %}{% if current_q %}&q={{ current_q }}{% endif %}{% if currency_filter %}&currency={{ currency_filter }}{% endif %}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if exclude_terms %}&exclude={{ exclude_terms|urlencode }}{% endif %}">Next</a>
                             </li>
                         {% endif %}
                     </ul>
@@ -417,6 +457,7 @@
         {% else %}
             <p class="muted">No records yet.</p>
         {% endif %}
+    </div>
     </div>
     {% if show_search %}
         <script>
@@ -429,6 +470,8 @@
                 var supplierSuggest = document.getElementById("supplier-suggest");
                 var supplierOptionSource = document.getElementById("supplier-option-source");
                 var statusFilter = document.getElementById("status-filter");
+                var excludeFilter = document.getElementById("exclude-filter");
+                var excludeApplyBtn = document.getElementById("exclude-apply-btn");
                 if (!input) return;
                 var table = document.querySelector("table");
                 var tbody = table ? table.querySelector("tbody") : null;
@@ -438,6 +481,8 @@
                 var timer = null;
                 var activeController = null;
                 var requestId = 0;
+                var lastRequestSignature = "";
+                var currentAjaxPage = 1;
                 var supplierOptions = supplierOptionSource
                     ? Array.from(supplierOptionSource.options).map(function (opt) {
                         return { id: String(opt.value || ""), name: String(opt.text || "") };
@@ -471,15 +516,56 @@
                     });
                 }
 
-                function updateSearchParamInUrl(query) {
+                function updateSearchParamInUrl(query, page) {
                     var url = new URL(window.location.href);
                     if (query) {
                         url.searchParams.set("q", query);
-                        url.searchParams.delete("page");
+                        if (page && Number(page) > 1) {
+                            url.searchParams.set("page", String(page));
+                        } else {
+                            url.searchParams.delete("page");
+                        }
                     } else {
                         url.searchParams.delete("q");
+                        url.searchParams.delete("page");
                     }
                     window.history.replaceState({}, "", url.toString());
+                }
+
+                function renderSearchPagination(data, query) {
+                    if (!pagination) return;
+                    var totalPages = Number(data.num_pages || 1);
+                    var page = Number(data.page || 1);
+                    if (totalPages <= 1) {
+                        pagination.style.display = "none";
+                        return;
+                    }
+                    var start = Math.max(1, page - 2);
+                    var end = Math.min(totalPages, page + 2);
+                    var html = "<nav class='mt-3' aria-label='Pagination'><ul class='pagination flex-wrap mb-0'>";
+                    if (data.has_previous) {
+                        html += "<li class='page-item'><a class='page-link' href='#' data-page='" + data.previous_page + "'>Previous</a></li>";
+                    }
+                    for (var p = start; p <= end; p += 1) {
+                        if (p === page) {
+                            html += "<li class='page-item active'><span class='page-link'>" + p + "</span></li>";
+                        } else {
+                            html += "<li class='page-item'><a class='page-link' href='#' data-page='" + p + "'>" + p + "</a></li>";
+                        }
+                    }
+                    if (data.has_next) {
+                        html += "<li class='page-item'><a class='page-link' href='#' data-page='" + data.next_page + "'>Next</a></li>";
+                    }
+                    html += "</ul><div class='muted mt-2'>Page " + page + " of " + totalPages + "</div></nav>";
+                    pagination.innerHTML = html;
+                    pagination.style.display = "";
+                    pagination.querySelectorAll("a[data-page]").forEach(function (link) {
+                        link.addEventListener("click", function (event) {
+                            event.preventDefault();
+                            var nextPage = Number(link.getAttribute("data-page") || "1");
+                            runAjaxSearch(query, nextPage, true);
+                        });
+                    });
                 }
 
                 function applyLastViewedHighlight() {
@@ -561,6 +647,9 @@
                     } else {
                         url.searchParams.delete("supplier");
                     }
+                    if (excludeFilter) {
+                        url.searchParams.set("exclude", excludeFilter.value.trim());
+                    }
                     url.searchParams.delete("page");
                     window.location.href = url.toString();
                 }
@@ -582,7 +671,9 @@
                     var csrfEl = document.querySelector("input[name='csrfmiddlewaretoken']");
                     var csrfValue = csrfEl ? csrfEl.value : "";
                     var nextValue = window.location.pathname + window.location.search;
-                    var rows = items.map(function (item) {
+                    var rows = "";
+                    var inactiveDividerInserted = false;
+                    items.forEach(function (item) {
                         var supplier = escapeHtml(item.supplier);
                         var sku = escapeHtml(item.supplier_sku);
                         var name = escapeHtml(item.name);
@@ -598,7 +689,7 @@
                         }
 
                         var checkboxCell = bulkEnabled
-                            ? "<td class='select-col'><input type='checkbox' name='product_ids' value='" + item.id + "'></td>"
+                            ? "<td class='select-col bulk-col'><input type='checkbox' name='product_ids' value='" + item.id + "'></td>"
                             : "";
 
                         var actionsCell = "";
@@ -635,7 +726,15 @@
                             actionsCell += "</div></details></div></td>";
                         }
 
-                        return "<tr data-product-id='" + item.id + "'>" +
+                        var hasActions = !!(editPattern || deletePattern);
+                        var colCount = bulkEnabled ? (hasActions ? 7 : 6) : (hasActions ? 6 : 5);
+                        var rowClass = item.is_active ? "" : " class='inactive-product-row'";
+                        if (item.is_active === false && !inactiveDividerInserted) {
+                            rows += "<tr class='inactive-divider-row'><td colspan='" + colCount + "'>Inactive products</td></tr>";
+                            inactiveDividerInserted = true;
+                        }
+
+                        rows += "<tr data-product-id='" + item.id + "'" + rowClass + ">" +
                             checkboxCell +
                             "<td data-field='supplier_sku' data-label='SKU'>" + sku + "</td>" +
                             "<td data-field='name' data-label='Name'>" + name + "</td>" +
@@ -644,7 +743,7 @@
                             "<td data-field='last_imported_at' data-label='Last imported'>" + imported + "</td>" +
                             actionsCell +
                         "</tr>";
-                    }).join("");
+                    });
 
                     if (!rows) {
                         var hasActions = !!(editPattern || deletePattern);
@@ -654,6 +753,74 @@
                     tbody.innerHTML = rows;
                     decorateButtons(tbody);
                     applyLastViewedHighlight();
+                }
+
+                function runAjaxSearch(query, page, force) {
+                    if (!tbody) return;
+                    var safePage = page && Number(page) > 0 ? Number(page) : 1;
+                    var requestSignature = [
+                        query,
+                        currencyFilter ? currencyFilter.value : "",
+                        supplierFilter ? supplierFilter.value : "",
+                        statusFilter ? statusFilter.value : "",
+                        excludeFilter ? excludeFilter.value.trim() : "",
+                        input.getAttribute("data-sort") || "",
+                        input.getAttribute("data-dir") || "",
+                        String(safePage)
+                    ].join("|");
+                    if (!force && requestSignature === lastRequestSignature) {
+                        return;
+                    }
+                    lastRequestSignature = requestSignature;
+                    currentAjaxPage = safePage;
+                    updateSearchParamInUrl(query, safePage);
+                    requestId += 1;
+                    var currentRequestId = requestId;
+
+                    if (activeController) {
+                        activeController.abort();
+                        activeController = null;
+                    }
+                    var url = "/products/search/?q=" + encodeURIComponent(query);
+                    var sort = input.getAttribute("data-sort");
+                    var dir = input.getAttribute("data-dir");
+                    if (sort) url += "&sort=" + encodeURIComponent(sort);
+                    if (dir) url += "&dir=" + encodeURIComponent(dir);
+                    if (currencyFilter && currencyFilter.value) {
+                        url += "&currency=" + encodeURIComponent(currencyFilter.value);
+                    }
+                    if (supplierFilter && supplierFilter.value) {
+                        url += "&supplier=" + encodeURIComponent(supplierFilter.value);
+                    }
+                    if (statusFilter && statusFilter.value) {
+                        url += "&status=" + encodeURIComponent(statusFilter.value);
+                    }
+                    if (excludeFilter && excludeFilter.value.trim()) {
+                        url += "&exclude=" + encodeURIComponent(excludeFilter.value.trim());
+                    }
+                    url += "&page=" + encodeURIComponent(String(safePage));
+                    activeController = new AbortController();
+                    fetch(url, {
+                        headers: { "X-Requested-With": "XMLHttpRequest" },
+                        signal: activeController.signal
+                    })
+                        .then(function (response) { return response.json(); })
+                        .then(function (data) {
+                            if (currentRequestId !== requestId) return;
+                            renderRows(data.items || []);
+                            renderSearchPagination(data, query);
+                            if (countEl) {
+                                countEl.textContent = "Found: " + data.count;
+                            }
+                        })
+                        .catch(function (error) {
+                            if (error && error.name === "AbortError") return;
+                        })
+                        .finally(function () {
+                            if (currentRequestId === requestId) {
+                                activeController = null;
+                            }
+                        });
                 }
 
                 input.addEventListener("keydown", function (event) {
@@ -666,16 +833,23 @@
                     clearTimeout(timer);
                     timer = setTimeout(function () {
                         var query = input.value.trim();
-                        updateSearchParamInUrl(query);
-                        if (!tbody) return;
-                        requestId += 1;
-                        var currentRequestId = requestId;
-
-                        if (activeController) {
-                            activeController.abort();
-                            activeController = null;
+                        var useServerSearch = input.getAttribute("data-server-search") === "1";
+                        if (useServerSearch) {
+                            var navUrl = new URL(window.location.href);
+                            if (query) {
+                                navUrl.searchParams.set("q", query);
+                            } else {
+                                navUrl.searchParams.delete("q");
+                            }
+                            if (excludeFilter) {
+                                navUrl.searchParams.set("exclude", excludeFilter.value.trim());
+                            }
+                            navUrl.searchParams.delete("page");
+                            if (navUrl.toString() !== window.location.href) {
+                                window.location.assign(navUrl.toString());
+                            }
+                            return;
                         }
-
                         if (!query) {
                             tbody.innerHTML = originalRows;
                             decorateButtons(tbody);
@@ -684,46 +858,14 @@
                                 pagination.innerHTML = originalPagination;
                                 pagination.style.display = "";
                             }
+                            lastRequestSignature = "";
+                            currentAjaxPage = 1;
+                            updateSearchParamInUrl("", 1);
                             applyLastViewedHighlight();
                             if (countEl) countEl.textContent = "";
                             return;
                         }
-                        if (pagination) {
-                            pagination.style.display = "none";
-                        }
-                        var url = "/products/search/?q=" + encodeURIComponent(query);
-                        var sort = input.getAttribute("data-sort");
-                        var dir = input.getAttribute("data-dir");
-                        if (sort) url += "&sort=" + encodeURIComponent(sort);
-                        if (dir) url += "&dir=" + encodeURIComponent(dir);
-                        if (currencyFilter && currencyFilter.value) {
-                            url += "&currency=" + encodeURIComponent(currencyFilter.value);
-                        }
-                        if (supplierFilter && supplierFilter.value) {
-                            url += "&supplier=" + encodeURIComponent(supplierFilter.value);
-                        }
-                        if (statusFilter && statusFilter.value) {
-                            url += "&status=" + encodeURIComponent(statusFilter.value);
-                        }
-                        activeController = new AbortController();
-                        fetch(url, {
-                            headers: { "X-Requested-With": "XMLHttpRequest" },
-                            signal: activeController.signal
-                        })
-                            .then(function (response) { return response.json(); })
-                            .then(function (data) {
-                                if (currentRequestId !== requestId) return;
-                                renderRows(data.items || []);
-                                if (countEl) countEl.textContent = "Found: " + data.count;
-                            })
-                            .catch(function (error) {
-                                if (error && error.name === "AbortError") return;
-                            })
-                            .finally(function () {
-                                if (currentRequestId === requestId) {
-                                    activeController = null;
-                                }
-                            });
+                        runAjaxSearch(query, 1, false);
                     }, 300);
                 });
                 if (currencyFilter) {
@@ -733,6 +875,9 @@
                             url.searchParams.set("currency", currencyFilter.value);
                         } else {
                             url.searchParams.delete("currency");
+                        }
+                        if (excludeFilter) {
+                            url.searchParams.set("exclude", excludeFilter.value.trim());
                         }
                         url.searchParams.delete("page");
                         window.location.href = url.toString();
@@ -781,8 +926,30 @@
                     statusFilter.addEventListener("change", function () {
                         var url = new URL(window.location.href);
                         url.searchParams.set("status", statusFilter.value || "all");
+                        if (excludeFilter) {
+                            url.searchParams.set("exclude", excludeFilter.value.trim());
+                        }
                         url.searchParams.delete("page");
                         window.location.href = url.toString();
+                    });
+                }
+                function applyExcludeFilter() {
+                    if (!excludeFilter) return;
+                    var url = new URL(window.location.href);
+                    var raw = excludeFilter.value.trim();
+                    url.searchParams.set("exclude", raw);
+                    url.searchParams.delete("page");
+                    window.location.href = url.toString();
+                }
+                if (excludeApplyBtn) {
+                    excludeApplyBtn.addEventListener("click", applyExcludeFilter);
+                }
+                if (excludeFilter) {
+                    excludeFilter.addEventListener("keydown", function (event) {
+                        if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+                            event.preventDefault();
+                            applyExcludeFilter();
+                        }
                     });
                 }
                 if (tbody) {
@@ -798,8 +965,10 @@
                     });
                 }
                 applyLastViewedHighlight();
-                if (input.value.trim()) {
-                    input.dispatchEvent(new Event("input"));
+                var serverSearchOnLoad = input.getAttribute("data-server-search") === "1";
+                if (input.value.trim() && !serverSearchOnLoad) {
+                    var initialPage = Number(new URL(window.location.href).searchParams.get("page") || "1");
+                    runAjaxSearch(input.value.trim(), initialPage, true);
                 }
             })();
         </script>
@@ -833,6 +1002,47 @@
                             bulkForm.appendChild(input);
                         });
                         bulkForm.submit();
+                    });
+                }
+            })();
+        </script>
+    {% endif %}
+    {% if show_bulk_delete and list_title == 'Suppliers Products' or show_bulk_delete and list_title == 'Supplier Products' %}
+        <script>
+            (function () {
+                var root = document.getElementById("supplier-bulk-root");
+                var toggleBtn = document.getElementById("bulk-mode-toggle");
+                var cancelBtn = document.getElementById("bulk-mode-cancel");
+                var bulkChangeBtn = document.getElementById("bulk-change-btn");
+                var selectAll = document.getElementById("product-select-all");
+                if (!root || !toggleBtn) return;
+
+                function setBulkMode(enabled) {
+                    root.classList.toggle("bulk-mode-on", enabled);
+                    root.classList.toggle("bulk-mode-off", !enabled);
+                    if (!enabled) {
+                        if (selectAll) {
+                            selectAll.checked = false;
+                        }
+                        document.querySelectorAll("input[name='product_ids']").forEach(function (box) {
+                            box.checked = false;
+                        });
+                    }
+                }
+
+                toggleBtn.addEventListener("click", function () {
+                    setBulkMode(!root.classList.contains("bulk-mode-on"));
+                });
+
+                if (bulkChangeBtn) {
+                    bulkChangeBtn.addEventListener("click", function () {
+                        setBulkMode(true);
+                    });
+                }
+
+                if (cancelBtn) {
+                    cancelBtn.addEventListener("click", function () {
+                        setBulkMode(false);
                     });
                 }
             })();

@@ -50,6 +50,43 @@ from .services.cbr_rates import upsert_cbr_markup_rates, upsert_cbr_markup_rates
 
 
 CRON_MARKER = "PERFUMEX_IMPORT_CRON"
+PRODUCT_REMOVED_EVENT_PREFIX = "SYSTEM_DEACTIVATE:"
+
+
+def _normalize_exclude_terms(raw: str) -> str:
+    text = (raw or "").replace(";", "\n").replace(",", "\n")
+    terms = []
+    seen = set()
+    for term in text.splitlines():
+        cleaned = term.strip()
+        if not cleaned:
+            continue
+        key = cleaned.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        terms.append(cleaned)
+    return "\n".join(terms)
+
+
+def _parse_exclude_terms(raw: str) -> list[str]:
+    normalized = _normalize_exclude_terms(raw)
+    return [term.lower() for term in normalized.splitlines() if term.strip()]
+
+
+def _resolve_supplier_exclude_terms(request) -> str:
+    raw_from_query = request.GET.get("exclude")
+    if raw_from_query is None:
+        if not request.user.is_authenticated:
+            return ""
+        return models.UserPreference.get_for_user(request.user).supplier_exclude_terms or ""
+    normalized = _normalize_exclude_terms(raw_from_query)
+    if request.user.is_authenticated:
+        prefs = models.UserPreference.get_for_user(request.user)
+        if (prefs.supplier_exclude_terms or "") != normalized:
+            prefs.supplier_exclude_terms = normalized
+            prefs.save(update_fields=["supplier_exclude_terms", "updated_at"])
+    return normalized
 
 
 def _runner_script_path() -> Path:
@@ -326,15 +363,25 @@ class SupplierOverviewView(LoginRequiredMixin, TemplateView):
             date_at=Coalesce("received_at", "created_at"),
         )
         supplier_filter = self.request.GET.get("supplier", "").strip()
-        status_filter = self.request.GET.get("status", "").strip()
+        status_filter = self.request.GET.get("status", "").strip().lower()
         log_sort = self.request.GET.get("log_sort", "date").strip()
         log_dir = self.request.GET.get("log_dir", "desc").strip().lower()
         if log_dir not in {"asc", "desc"}:
             log_dir = "desc"
         if supplier_filter:
             import_batches = import_batches.filter(supplier_id=supplier_filter)
-        if status_filter:
-            import_batches = import_batches.filter(status=status_filter)
+        if status_filter == "successful":
+            import_batches = import_batches.filter(status=models.ImportStatus.PROCESSED).exclude(
+                message_id__startswith=PRODUCT_REMOVED_EVENT_PREFIX
+            )
+        elif status_filter == "product_removed":
+            import_batches = import_batches.filter(
+                message_id__startswith=PRODUCT_REMOVED_EVENT_PREFIX
+            )
+        elif status_filter == "failed":
+            import_batches = import_batches.filter(status=models.ImportStatus.FAILED)
+        elif status_filter == "pending":
+            import_batches = import_batches.filter(status=models.ImportStatus.PENDING)
         if log_sort == "supplier":
             ordering = "supplier__name"
         elif log_sort == "status":
@@ -373,6 +420,24 @@ class SupplierOverviewView(LoginRequiredMixin, TemplateView):
         log_paginator = Paginator(import_batches, 25)
         log_page_number = self.request.GET.get("log_page", "1")
         log_page = log_paginator.get_page(log_page_number)
+        for batch in log_page.object_list:
+            is_removed = (batch.message_id or "").startswith(PRODUCT_REMOVED_EVENT_PREFIX)
+            batch.is_product_removed_event = is_removed
+            if is_removed:
+                batch.display_status = "product removed"
+                batch.row_class = "import-row-removed"
+            elif batch.status == models.ImportStatus.PROCESSED:
+                batch.display_status = "successful"
+                batch.row_class = "import-row-success"
+            elif batch.status == models.ImportStatus.FAILED:
+                batch.display_status = "failed"
+                batch.row_class = "import-row-failed"
+            elif batch.status == models.ImportStatus.PENDING:
+                batch.display_status = "pending"
+                batch.row_class = "import-row-pending"
+            else:
+                batch.display_status = batch.status
+                batch.row_class = ""
         for supplier in suppliers:
             run = latest_runs.get(supplier.id)
             progress = None
@@ -398,7 +463,12 @@ class SupplierOverviewView(LoginRequiredMixin, TemplateView):
         context["log_sort"] = log_sort
         context["log_dir"] = log_dir
         context["supplier_options"] = suppliers
-        context["status_options"] = models.ImportStatus.choices
+        context["status_options"] = [
+            ("successful", "Successful"),
+            ("product_removed", "Product removed"),
+            ("failed", "Failed"),
+            ("pending", "Pending"),
+        ]
         return context
 
 
@@ -410,6 +480,7 @@ class ImportSettingsView(LoginRequiredMixin, TemplateView):
         settings_obj = models.ImportSettings.get_solo()
         context["form"] = forms.ImportSettingsForm(instance=settings_obj)
         context["settings_obj"] = settings_obj
+        context["mailboxes"] = models.Mailbox.objects.order_by("name")
         if settings_obj.last_run_at:
             context["next_run_at"] = settings_obj.last_run_at + timezone.timedelta(
                 minutes=settings_obj.interval_minutes
@@ -601,19 +672,29 @@ class SupplierProductBulkDeleteView(LoginRequiredMixin, View):
 
 class SupplierProductSearchView(LoginRequiredMixin, View):
     def get(self, request):
+        page_size = 100
         query = request.GET.get("q", "").strip()
+        exclude_raw = _resolve_supplier_exclude_terms(request)
+        exclude_terms = _parse_exclude_terms(exclude_raw)
         currency = request.GET.get("currency", "").strip() or models.Currency.USD
         supplier_filter = request.GET.get("supplier", "").strip()
-        status_filter = request.GET.get("status", "").strip().lower() or "active"
+        status_filter = request.GET.get("status", "").strip().lower() or "all"
         if status_filter not in {"active", "inactive", "all"}:
-            status_filter = "active"
+            status_filter = "all"
         sort_field = request.GET.get("sort") or "current_price"
         sort_dir = request.GET.get("dir", "asc")
         allowed_sorts = {"supplier", "supplier_sku", "name", "current_price", "last_imported_at"}
         if sort_field not in allowed_sorts:
             sort_field = "current_price"
         prefix = "-" if sort_dir == "desc" else ""
-        ordering = f"{prefix}{sort_field}"
+        sort_db_field = {
+            "supplier": "supplier__name",
+            "supplier_sku": "supplier_sku",
+            "name": "name",
+            "current_price": "current_price",
+            "last_imported_at": "last_imported_at",
+        }.get(sort_field, "current_price")
+        ordering = f"{prefix}{sort_db_field}"
 
         queryset = models.SupplierProduct.objects.select_related("supplier")
         if query:
@@ -629,12 +710,20 @@ class SupplierProductSearchView(LoginRequiredMixin, View):
             queryset = queryset.filter(is_active=True)
         elif status_filter == "inactive":
             queryset = queryset.filter(is_active=False)
-        queryset = queryset.order_by(ordering)
-
-        total_count = queryset.count()
+        for term in exclude_terms:
+            queryset = queryset.exclude(name__icontains=term)
+        if status_filter == "all":
+            queryset = queryset.order_by("-is_active", ordering, "id")
+        else:
+            queryset = queryset.order_by(ordering, "id")
+        paginator = Paginator(queryset, page_size)
+        page_number = request.GET.get("page", "1")
+        page_obj = paginator.get_page(page_number)
+        visible_products = page_obj.object_list
+        total_count = paginator.count
         items = []
         rates = _get_latest_rates()
-        for product in queryset:
+        for product in visible_products:
             imported_at = ""
             if product.last_imported_at:
                 imported_at = timezone.localtime(product.last_imported_at).strftime(
@@ -659,7 +748,19 @@ class SupplierProductSearchView(LoginRequiredMixin, View):
                 }
             )
 
-        return JsonResponse({"count": total_count, "items": items})
+        return JsonResponse(
+            {
+                "count": total_count,
+                "shown": len(items),
+                "page": page_obj.number,
+                "num_pages": paginator.num_pages,
+                "has_next": page_obj.has_next(),
+                "has_previous": page_obj.has_previous(),
+                "next_page": page_obj.next_page_number() if page_obj.has_next() else None,
+                "previous_page": page_obj.previous_page_number() if page_obj.has_previous() else None,
+                "items": items,
+            }
+        )
 
 
 class SupplierImportView(LoginRequiredMixin, FormView):
@@ -1219,6 +1320,7 @@ class SupplierEmailImportStatusView(LoginRequiredMixin, View):
         progress = None
         if run.total_messages:
             progress = int((run.processed_messages / run.total_messages) * 100)
+        detailed_log_tail = (run.detailed_log or "")[-8000:]
         return JsonResponse(
             {
                 "status": run.status,
@@ -1226,6 +1328,7 @@ class SupplierEmailImportStatusView(LoginRequiredMixin, View):
                 "processed_files": run.processed_files,
                 "errors": run.errors,
                 "last_message": run.last_message,
+                "detailed_log": detailed_log_tail,
             }
         )
 
@@ -1242,12 +1345,14 @@ class SupplierEmailImportStatusAllView(LoginRequiredMixin, View):
                 progress = None
                 if run.total_messages:
                     progress = int((run.processed_messages / run.total_messages) * 100)
+                detailed_log_tail = (run.detailed_log or "")[-4000:]
                 latest[run.supplier_id] = {
                     "status": run.status,
                     "progress": progress,
                     "processed_files": run.processed_files,
                     "errors": run.errors,
                     "last_message": run.last_message,
+                    "detailed_log": detailed_log_tail,
                 }
         return JsonResponse({"runs": latest})
 
@@ -1621,6 +1726,7 @@ class SupplierFileMappingDeleteView(BaseDeleteView):
 
 class SupplierProductListView(BaseListView):
     model = models.SupplierProduct
+    paginate_by = 100
     list_display = (
         "supplier_sku",
         "name",
@@ -1639,13 +1745,38 @@ class SupplierProductListView(BaseListView):
     update_url_name = "prices:product_update"
     delete_url_name = "prices:product_delete"
 
+    def get_ordering(self):
+        sort_field = self.request.GET.get("sort")
+        sort_dir = self.request.GET.get("dir", "asc")
+        status_filter = self.request.GET.get("status", "").strip().lower() or "all"
+        if status_filter not in {"active", "inactive", "all"}:
+            status_filter = "all"
+        sort_map = {
+            "supplier": "supplier__name",
+            "supplier_sku": "supplier_sku",
+            "name": "name",
+            "current_price": "current_price",
+            "last_imported_at": "last_imported_at",
+        }
+        if sort_field not in self.list_display:
+            sort_field = "current_price"
+            sort_dir = "asc"
+        prefix = "-" if sort_dir == "desc" else ""
+        sort_expr = f"{prefix}{sort_map.get(sort_field, 'current_price')}"
+        if status_filter == "all":
+            return ("-is_active", sort_expr, "id")
+        return (sort_expr, "id")
+
     def get_queryset(self):
         queryset = super().get_queryset()
         query = self.request.GET.get("q", "").strip()
+        exclude_raw = _resolve_supplier_exclude_terms(self.request)
+        exclude_terms = _parse_exclude_terms(exclude_raw)
+        self._exclude_terms_raw = exclude_raw
         supplier_filter = self.request.GET.get("supplier", "").strip()
-        status_filter = self.request.GET.get("status", "").strip().lower() or "active"
+        status_filter = self.request.GET.get("status", "").strip().lower() or "all"
         if status_filter not in {"active", "inactive", "all"}:
-            status_filter = "active"
+            status_filter = "all"
         if query:
             tokens = [token for token in re.split(r"\s+", query) if token]
             for token in tokens:
@@ -1659,15 +1790,17 @@ class SupplierProductListView(BaseListView):
             queryset = queryset.filter(is_active=True)
         elif status_filter == "inactive":
             queryset = queryset.filter(is_active=False)
+        for term in exclude_terms:
+            queryset = queryset.exclude(name__icontains=term)
         return queryset
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         currency = self.request.GET.get("currency", "").strip() or models.Currency.USD
         supplier_filter = self.request.GET.get("supplier", "").strip()
-        status_filter = self.request.GET.get("status", "").strip().lower() or "active"
+        status_filter = self.request.GET.get("status", "").strip().lower() or "all"
         if status_filter not in {"active", "inactive", "all"}:
-            status_filter = "active"
+            status_filter = "all"
         currency_options = [choice[0] for choice in models.Currency.choices]
         context["currency_filter"] = currency
         context["currency_options"] = currency_options
@@ -1675,6 +1808,7 @@ class SupplierProductListView(BaseListView):
         context["supplier_options"] = models.Supplier.objects.order_by("name")
         context["status_filter"] = status_filter
         context["status_options"] = [("all", "All"), ("active", "Active"), ("inactive", "Inactive")]
+        context["exclude_terms"] = getattr(self, "_exclude_terms_raw", _resolve_supplier_exclude_terms(self.request))
         context["show_currency_filter"] = self.show_currency_filter
         context["show_cleanup"] = True
         context["show_search"] = getattr(self, "show_search", False)

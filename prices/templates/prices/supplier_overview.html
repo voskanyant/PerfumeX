@@ -87,6 +87,7 @@
                             var statusEl = row.querySelector("[data-email-status]");
                             var progressEl = row.querySelector("[data-email-progress]");
                             var messageEl = row.querySelector("[data-email-message]");
+                            var logEl = row.querySelector("[data-email-log]");
                             var updateBtn = row.querySelector("[data-email-update]");
                             var cancelBtn = row.querySelector("[data-email-cancel]");
 
@@ -94,6 +95,7 @@
                                 if (statusEl) statusEl.textContent = "-";
                                 if (progressEl) progressEl.parentElement.style.display = "none";
                                 if (messageEl) messageEl.textContent = "";
+                                if (logEl) logEl.textContent = "";
                                 if (updateBtn) updateBtn.disabled = false;
                                 if (cancelBtn) cancelBtn.style.display = "none";
                                 row.setAttribute("data-email-running", "0");
@@ -112,6 +114,12 @@
                             }
                             if (messageEl && run.last_message) {
                                 messageEl.textContent = run.last_message;
+                            }
+                            if (logEl && run.detailed_log !== undefined) {
+                                logEl.textContent = run.detailed_log || "";
+                                if (run.detailed_log) {
+                                    logEl.classList.remove("d-none");
+                                }
                             }
                             if (run.status === "running") {
                                 anyRunning = true;
@@ -180,8 +188,17 @@
                                     {% if row.latest_run.last_message %}
                                         <div class="muted small" data-email-message>{{ row.latest_run.last_message }}</div>
                                     {% endif %}
+                                    {% if row.latest_run.detailed_log %}
+                                        <details class="mt-1">
+                                            <summary class="muted small">Detailed log</summary>
+                                            <pre class="small mt-1 mb-0" style="max-height: 240px; overflow: auto;" data-email-log>{{ row.latest_run.detailed_log }}</pre>
+                                        </details>
+                                    {% else %}
+                                        <pre class="small mt-1 mb-0 d-none" style="max-height: 240px; overflow: auto;" data-email-log></pre>
+                                    {% endif %}
                                 {% else %}
                                     <span data-email-status>-</span>
+                                    <pre class="small mt-1 mb-0 d-none" style="max-height: 240px; overflow: auto;" data-email-log></pre>
                                 {% endif %}
                             </td>
                             <td class="actions" data-label="Actions">
@@ -298,12 +315,12 @@
                     </thead>
                     <tbody>
                         {% for batch in import_batches %}
-                            <tr>
+                            <tr class="{{ batch.row_class }}">
                                 <td data-label="Select"><input type="checkbox" name="import_ids" value="{{ batch.pk }}"></td>
                                 <td data-label="Date">{{ batch.received_at|default:batch.created_at|timezone:"Europe/Moscow"|date:"d/m/Y H:i" }}</td>
                                 <td data-label="Updated at">{{ batch.updated_at|default:batch.created_at|timezone:"Europe/Moscow"|date:"d/m/Y H:i" }}</td>
                                 <td data-label="Supplier">{{ batch.supplier.name }}</td>
-                                <td data-label="Status">{{ batch.status }}</td>
+                                <td data-label="Status">{{ batch.display_status }}</td>
                                 <td data-label="Mailbox">{{ batch.mailbox|default:"-" }}</td>
                                 <td data-label="Files">
                                     {% with files=batch.importfile_set.all %}
@@ -335,7 +352,17 @@
                                                 {% endif %}
                                             {% endwith %}
                                         {% else %}
-                                            -
+                                            {% if batch.error_message %}
+                                                <div class="files-summary">{{ batch.error_message|truncatechars:120 }}</div>
+                                                <details class="files-details">
+                                                    <summary>Show details</summary>
+                                                    <div class="files-details-list">
+                                                        <div>{{ batch.error_message }}</div>
+                                                    </div>
+                                                </details>
+                                            {% else %}
+                                                -
+                                            {% endif %}
                                         {% endif %}
                                     {% endwith %}
                                 </td>

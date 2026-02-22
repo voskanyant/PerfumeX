@@ -14,8 +14,8 @@
     </div>
     <div class="card">
         <div class="mb-3">
-            <h2 class="page-title mb-1">Cron Settings</h2>
-            <p class="page-subtitle mb-0">Configure auto-run frequency, safety limits, and scheduler controls.</p>
+            <h2 class="page-title mb-1">Email Settings</h2>
+            <p class="page-subtitle mb-0">Configure mailbox checks, import rules, and scheduler controls.</p>
         </div>
         <form method="post" class="row g-3 align-items-end">
             {% csrf_token %}
@@ -51,6 +51,11 @@
                 <label class="form-label" for="id_supplier_timeout_minutes">Supplier timeout (minutes)</label>
                 {{ form.supplier_timeout_minutes }}
                 <div class="form-text">Stop a supplier import if it exceeds this time. It will retry later.</div>
+            </div>
+            <div class="col-12 col-md-6">
+                <label class="form-label" for="id_deactivate_products_after_days">Deactivate products after no price for (days)</label>
+                {{ form.deactivate_products_after_days }}
+                <div class="form-text">Set 0 to disable. Active supplier products older than this threshold are set inactive.</div>
             </div>
             <div class="col-12">
                 <h6 class="fw-semibold mb-0 mt-2">Additional rules</h6>
@@ -114,6 +119,54 @@
             {% if cron_status.error %}
                 <div class="mt-1 text-danger"><strong>Error:</strong> {{ cron_status.error }}</div>
             {% endif %}
+        </div>
+
+        <div class="mt-4">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+                <h6 class="fw-semibold mb-0">Mailboxes</h6>
+                <a class="button secondary" href="{% url 'prices:mailbox_create' %}">Add mailbox</a>
+            </div>
+            <div class="table-responsive">
+                <table class="table align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Host</th>
+                            <th>Username</th>
+                            <th>Last checked</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for mailbox in mailboxes %}
+                            <tr>
+                                <td>{{ mailbox.name }}</td>
+                                <td>{{ mailbox.host }}:{{ mailbox.port }}</td>
+                                <td>{{ mailbox.username }}</td>
+                                <td>
+                                    {% if mailbox.last_checked_at %}
+                                        {{ mailbox.last_checked_at|timezone:"Europe/Moscow"|date:"d/m/Y H:i" }}
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if mailbox.is_active %}active{% else %}inactive{% endif %}
+                                </td>
+                                <td class="d-flex gap-2">
+                                    <a class="button secondary" href="{% url 'prices:mailbox_update' mailbox.pk %}">Edit</a>
+                                    <a class="button danger" href="{% url 'prices:mailbox_delete' mailbox.pk %}">Delete</a>
+                                </td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="6" class="muted">No mailboxes yet.</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
 
