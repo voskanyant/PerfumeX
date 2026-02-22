@@ -42,11 +42,6 @@ urlpatterns = [
     path("suppliers/<int:pk>/import/", views.SupplierImportView.as_view(), name="supplier_import"),
     path("suppliers/<int:pk>/import-email/", views.SupplierEmailImportView.as_view(), name="supplier_import_email"),
     path("suppliers/<int:pk>/import-email/backfill/", views.SupplierEmailBackfillView.as_view(), name="supplier_import_email_backfill"),
-    path(
-        "suppliers/<int:pk>/mixed-backfill/",
-        views.SupplierMixedCurrencyBackfillView.as_view(),
-        name="supplier_mixed_backfill",
-    ),
     path("suppliers/import-email/backfill/", views.SupplierEmailBackfillBulkView.as_view(), name="supplier_import_email_backfill_bulk"),
     path("suppliers/rates/recalculate/", views.SupplierRatesRecalculateView.as_view(), name="supplier_rates_recalculate"),
     path("suppliers/import-email/", views.SupplierEmailImportAllView.as_view(), name="supplier_import_email_all"),

@@ -4,8 +4,74 @@
 {% block title %}Import Prices{% endblock %}
 
 {% block content %}
+    <style>
+        @media (max-width: 991.98px) {
+            .import-overview-header {
+                gap: 12px;
+            }
+            .import-overview-header .button {
+                width: 100%;
+                justify-content: center;
+            }
+            .supplier-import-table.table-mobile tr {
+                padding: 12px;
+                border-radius: 14px;
+            }
+            .supplier-import-table.table-mobile td {
+                display: block;
+                padding: 4px 0;
+            }
+            .supplier-import-table.table-mobile td::before {
+                display: block;
+                min-width: 0;
+                margin-bottom: 4px;
+            }
+            .supplier-import-table.table-mobile td.import-col-select::before {
+                display: none;
+            }
+            .supplier-import-table.table-mobile td.import-col-select {
+                padding-bottom: 2px;
+            }
+            .supplier-import-table.table-mobile td.import-col-supplier {
+                font-size: 18px;
+                font-weight: 700;
+                padding-bottom: 6px;
+                border-bottom: 1px dashed var(--app-border);
+                margin-bottom: 6px;
+            }
+            .supplier-import-table.table-mobile td.import-col-last {
+                font-size: 14px;
+            }
+            .supplier-import-table.table-mobile td.import-col-email {
+                background: rgba(15, 23, 42, 0.04);
+                border: 1px solid var(--app-border);
+                border-radius: 10px;
+                padding: 8px;
+                margin-top: 6px;
+            }
+            .supplier-import-table.table-mobile td.import-col-actions {
+                margin-top: 8px;
+            }
+            .supplier-import-table.table-mobile td.import-col-actions .d-inline-flex {
+                display: grid !important;
+                grid-template-columns: 1fr 1fr;
+                gap: 8px;
+                width: 100%;
+            }
+            .supplier-import-table.table-mobile td.import-col-actions .button {
+                width: 100%;
+                justify-content: center;
+            }
+            .supplier-import-table.table-mobile td.import-col-actions form {
+                margin: 0;
+            }
+            .supplier-import-table.table-mobile td.import-col-actions .button.icon {
+                grid-column: span 2;
+            }
+        }
+    </style>
     <div class="card mb-3">
-        <div class="d-flex flex-wrap align-items-start justify-content-between gap-3">
+        <div class="d-flex flex-wrap align-items-start justify-content-between gap-3 import-overview-header">
             <div>
                 <h1 class="page-title">Import Prices</h1>
                 <p class="page-subtitle">Manage imports per supplier.</p>
@@ -148,7 +214,7 @@
     <div class="card mb-3">
         {% if rows %}
             <div class="table-wrap table-responsive">
-                <table class="table table-sm table-hover align-middle mb-0 table-mobile">
+                <table class="table table-sm table-hover align-middle mb-0 table-mobile supplier-import-table">
                 <thead>
                     <tr>
                         <th><input type="checkbox" id="supplier-select-all"></th>
@@ -161,16 +227,16 @@
                 <tbody>
                     {% for row in rows %}
                         <tr data-supplier-id="{{ row.supplier.pk }}" data-email-running="{% if row.is_running %}1{% else %}0{% endif %}">
-                            <td data-label="Select"><input type="checkbox" class="supplier-select" value="{{ row.supplier.pk }}"></td>
-                            <td data-label="Supplier">{{ row.supplier.name }}</td>
-                            <td data-label="Last import">
+                            <td class="import-col-select" data-label="Select"><input type="checkbox" class="supplier-select" value="{{ row.supplier.pk }}"></td>
+                            <td class="import-col-supplier" data-label="Supplier">{{ row.supplier.name }}</td>
+                            <td class="import-col-last" data-label="Last import">
                                 {% if row.latest_import %}
                                     {{ row.latest_import.received_at|default:row.latest_import.created_at|timezone:"Europe/Moscow"|date:"d/m/Y H:i" }}
                                 {% else %}
                                     -
                                 {% endif %}
                             </td>
-                            <td data-label="Email import">
+                            <td class="import-col-email" data-label="Email import">
                                 {% if row.latest_run %}
                                     <span data-email-status>{{ row.latest_run.status }}</span>
                                     {% if row.latest_run.status == "running" %}
@@ -201,7 +267,7 @@
                                     <pre class="small mt-1 mb-0 d-none" style="max-height: 240px; overflow: auto;" data-email-log></pre>
                                 {% endif %}
                             </td>
-                            <td class="actions" data-label="Actions">
+                            <td class="actions import-col-actions" data-label="Actions">
                                 <div class="d-inline-flex flex-wrap gap-2">
                                     <a class="button secondary icon" href="{% url 'prices:supplier_import' row.supplier.pk %}" title="Edit mapping" aria-label="Edit mapping">
                                         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">

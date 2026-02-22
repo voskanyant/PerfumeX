@@ -223,33 +223,3 @@ class CBRSyncRangeForm(forms.Form):
             self.add_error("end_date", "End date must be on or after start date.")
         return cleaned_data
 
-
-class MixedCurrencyBackfillForm(forms.Form):
-    start_date = forms.DateField(required=True, widget=forms.DateInput(attrs={"type": "date"}))
-    end_date = forms.DateField(required=False, widget=forms.DateInput(attrs={"type": "date"}))
-    target_currency = forms.ChoiceField(
-        choices=models.Currency.choices,
-        initial=models.Currency.RUB,
-    )
-    fallback_currency = forms.ChoiceField(
-        choices=models.Currency.choices,
-        initial=models.Currency.RUB,
-    )
-    usd_markup_percent = forms.DecimalField(
-        required=True,
-        initial=3.0,
-        min_value=0,
-        decimal_places=2,
-        max_digits=6,
-    )
-    replace_range = forms.BooleanField(required=False, initial=False)
-    dry_run = forms.BooleanField(required=False, initial=False)
-
-    def clean(self):
-        cleaned = super().clean()
-        start_date = cleaned.get("start_date")
-        end_date = cleaned.get("end_date")
-        if start_date and end_date and start_date > end_date:
-            self.add_error("end_date", "End date must be greater than or equal to start date.")
-        return cleaned
-

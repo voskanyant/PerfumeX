@@ -319,6 +319,36 @@ def _get_historical_usd_rub_rate(rate_date):
     return None
 
 
+def _get_rates_for_date(rate_date):
+    rates = {}
+    for rate in models.ExchangeRate.objects.filter(rate_date__lte=rate_date).order_by(
+        "-rate_date", "-id"
+    ):
+        key = (rate.from_currency, rate.to_currency)
+        if key not in rates:
+            rates[key] = rate.rate
+    return rates
+
+
+def _convert_price_with_rates(
+    amount: Decimal,
+    from_currency: str,
+    to_currency: str,
+    rates: dict[tuple[str, str], Decimal],
+) -> Decimal | None:
+    if amount is None or not from_currency or not to_currency:
+        return None
+    if from_currency == to_currency:
+        return amount
+    direct = rates.get((from_currency, to_currency))
+    if direct and direct != 0:
+        return (amount * direct).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    inverse = rates.get((to_currency, from_currency))
+    if inverse and inverse != 0:
+        return (amount / inverse).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    return None
+
+
 def _compute_snapshot_prices(price: Decimal, currency: str, usd_rub_rate):
     amount = Decimal(price)
     if currency == models.Currency.USD:
@@ -495,6 +525,8 @@ def process_import_file(import_file: models.ImportFile) -> None:
     now = received_at or timezone.now()
     rate_lookup_date = timezone.localtime(now).date() if timezone.is_aware(now) else now.date()
     usd_rub_rate = _get_historical_usd_rub_rate(rate_lookup_date)
+    rates_for_date = _get_rates_for_date(rate_lookup_date)
+    supplier_currency = import_file.import_batch.supplier.default_currency
 
     if not parsed_rows:
         raise RuntimeError(
@@ -505,7 +537,23 @@ def process_import_file(import_file: models.ImportFile) -> None:
         key = _identity_key(parsed.sku, parsed.name)
         if not key:
             continue
-        unique_rows[key] = parsed
+        normalized_price = _convert_price_with_rates(
+            parsed.price,
+            parsed.currency,
+            supplier_currency,
+            rates_for_date,
+        )
+        if normalized_price is None:
+            raise RuntimeError(
+                f"Missing exchange rate for {parsed.currency}->{supplier_currency} "
+                f"on or before {rate_lookup_date}."
+            )
+        unique_rows[key] = ParsedRow(
+            sku=parsed.sku,
+            name=parsed.name,
+            price=normalized_price,
+            currency=supplier_currency,
+        )
     if len(unique_rows) < 100:
         raise RuntimeError(
             f"Too few products ({len(unique_rows)}). Expected at least 100."

@@ -27,7 +27,6 @@ from django.views.decorators.http import require_POST
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 from datetime import datetime, time
-import io
 
 from decimal import Decimal
 import threading
@@ -790,7 +789,6 @@ class SupplierImportView(LoginRequiredMixin, FormView):
         context = super().get_context_data(**kwargs)
         supplier = get_object_or_404(models.Supplier, pk=self.kwargs["pk"])
         context["supplier"] = supplier
-        context["mixed_backfill_form"] = forms.MixedCurrencyBackfillForm()
         return context
 
     def get_initial(self):
@@ -991,108 +989,6 @@ class SupplierEmailBackfillView(LoginRequiredMixin, View):
 
         thread = threading.Thread(target=_run, daemon=True)
         thread.start()
-        return redirect("prices:supplier_import", pk=pk)
-
-
-class SupplierMixedCurrencyBackfillView(LoginRequiredMixin, View):
-    def post(self, request, pk):
-        supplier = get_object_or_404(models.Supplier, pk=pk)
-        form = forms.MixedCurrencyBackfillForm(request.POST)
-        if not form.is_valid():
-            messages.error(request, "Invalid mixed-currency backfill parameters.")
-            return redirect("prices:supplier_import", pk=pk)
-
-        if models.EmailImportRun.objects.filter(
-            supplier=supplier, status=models.EmailImportStatus.RUNNING
-        ).exists():
-            messages.info(request, "Another background task is already running for this supplier.")
-            return redirect("prices:supplier_import", pk=pk)
-
-        cleaned = form.cleaned_data
-        start_date = cleaned["start_date"].isoformat()
-        end_date = cleaned["end_date"].isoformat() if cleaned.get("end_date") else ""
-        target_currency = cleaned["target_currency"]
-        fallback_currency = cleaned["fallback_currency"]
-        usd_markup_percent = cleaned["usd_markup_percent"]
-        replace_range = bool(cleaned.get("replace_range"))
-        dry_run = bool(cleaned.get("dry_run"))
-
-        run = models.EmailImportRun.objects.create(
-            supplier=supplier,
-            status=models.EmailImportStatus.RUNNING,
-            last_message=(
-                f"Mixed backfill started: {start_date}"
-                + (f" to {end_date}" if end_date else " to today")
-            ),
-        )
-
-        def _run():
-            close_old_connections()
-            output = io.StringIO()
-            try:
-                kwargs = {
-                    "supplier_id": supplier.id,
-                    "start_date": start_date,
-                    "target_currency": target_currency,
-                    "fallback_currency": fallback_currency,
-                    "usd_markup_percent": usd_markup_percent,
-                    "stdout": output,
-                }
-                if end_date:
-                    kwargs["end_date"] = end_date
-                if replace_range:
-                    kwargs["replace_range"] = True
-                if dry_run:
-                    kwargs["dry_run"] = True
-
-                call_command("backfill_mixed_currency_history", **kwargs)
-                lines = [line.strip() for line in output.getvalue().splitlines() if line.strip()]
-                summary = lines[-1] if lines else "Mixed currency backfill finished."
-                processed_files = 0
-                errors = 0
-                sample_error = ""
-                for line in lines:
-                    if line.startswith("- conversion_error_sample:") and not sample_error:
-                        sample_error = line.replace("- conversion_error_sample:", "").strip()
-                    if line.startswith("SUMMARY "):
-                        summary = line
-                        parts = line.replace("SUMMARY ", "").split()
-                        data = {}
-                        for part in parts:
-                            if "=" in part:
-                                key, value = part.split("=", 1)
-                                data[key] = value
-                        try:
-                            processed_files = int(data.get("files_total", "0"))
-                        except ValueError:
-                            processed_files = 0
-                        try:
-                            errors = int(data.get("rows_failed_conversion", "0")) + int(
-                                data.get("files_failed_parse", "0")
-                            )
-                        except ValueError:
-                            errors = 0
-                        break
-                if sample_error:
-                    summary = f"{summary} sample_error={sample_error[:150]}"
-                models.EmailImportRun.objects.filter(id=run.id).update(
-                    status=models.EmailImportStatus.FINISHED,
-                    finished_at=timezone.now(),
-                    processed_files=processed_files,
-                    errors=errors,
-                    last_message=summary,
-                )
-            except Exception as exc:
-                models.EmailImportRun.objects.filter(id=run.id).update(
-                    status=models.EmailImportStatus.FAILED,
-                    finished_at=timezone.now(),
-                    errors=1,
-                    last_message=str(exc),
-                )
-
-        thread = threading.Thread(target=_run, daemon=True)
-        thread.start()
-        messages.success(request, "Mixed-currency backfill started in background.")
         return redirect("prices:supplier_import", pk=pk)
 
 
@@ -1901,7 +1797,16 @@ class SupplierProductDetailView(LoginRequiredMixin, DetailView):
                 continue
             seen_days.add(day_key)
             latest_by_day.append(snapshot)
-        context["snapshots"] = latest_by_day
+        history_paginator = Paginator(latest_by_day, 100)
+        history_page_obj = history_paginator.get_page(
+            self.request.GET.get("history_page")
+        )
+        context["snapshots"] = history_page_obj.object_list
+        context["history_page_obj"] = history_page_obj
+        context["history_is_paginated"] = history_page_obj.has_other_pages()
+        history_query_params = self.request.GET.copy()
+        history_query_params.pop("history_page", None)
+        context["history_querystring"] = history_query_params.urlencode()
         chart_labels = []
         chart_values = []
         rates_by_date_cache = {}
@@ -1935,7 +1840,7 @@ class SupplierProductDetailView(LoginRequiredMixin, DetailView):
             if chart_price is None:
                 chart_price = snapshot.price
             chart_values.append(float(chart_price))
-        for snapshot in latest_by_day:
+        for snapshot in history_page_obj.object_list:
             snapshot_date = timezone.localtime(snapshot.recorded_at).date()
             rates_for_snapshot = _get_rates_for_date(
                 snapshot_date, rates_by_date_cache
