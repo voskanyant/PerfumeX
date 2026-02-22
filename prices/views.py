@@ -1433,6 +1433,25 @@ def _get_latest_rates() -> dict[tuple[str, str], Decimal]:
     return rates
 
 
+def _get_rates_for_date(
+    rate_date,
+    cache: dict,
+) -> dict[tuple[str, str], Decimal]:
+    if not rate_date:
+        return {}
+    if rate_date in cache:
+        return cache[rate_date]
+    rates: dict[tuple[str, str], Decimal] = {}
+    for rate in models.ExchangeRate.objects.filter(rate_date__lte=rate_date).order_by(
+        "-rate_date", "-id"
+    ):
+        key = (rate.from_currency, rate.to_currency)
+        if key not in rates:
+            rates[key] = rate.rate
+    cache[rate_date] = rates
+    return rates
+
+
 def _convert_price(
     price: Decimal | None,
     from_currency: str,
@@ -1455,7 +1474,7 @@ def _convert_price(
 def _format_price(price: Decimal | None, currency: str) -> str:
     if price is None:
         return "-"
-    symbol = {"USD": "$", "RUB": "₽"}.get((currency or "").upper(), currency)
+    symbol = {"USD": "$", "RUB": "\u20BD"}.get((currency or "").upper(), currency)
     return f"{price:.2f} {symbol}"
 
 
@@ -1733,8 +1752,12 @@ class SupplierProductDetailView(LoginRequiredMixin, DetailView):
         context["snapshots"] = latest_by_day
         chart_labels = []
         chart_values = []
-        rates = _get_latest_rates()
+        rates_by_date_cache = {}
         for snapshot in reversed(latest_by_day):
+            snapshot_date = timezone.localtime(snapshot.recorded_at).date()
+            rates_for_snapshot = _get_rates_for_date(
+                snapshot_date, rates_by_date_cache
+            )
             chart_labels.append(
                 timezone.localtime(snapshot.recorded_at).strftime("%d/%m/%Y")
             )
@@ -1743,27 +1766,43 @@ class SupplierProductDetailView(LoginRequiredMixin, DetailView):
                 chart_price = snapshot.price_usd
                 if chart_price is None:
                     chart_price = _convert_price(
-                        snapshot.price, snapshot.currency, models.Currency.USD, rates
+                        snapshot.price,
+                        snapshot.currency,
+                        models.Currency.USD,
+                        rates_for_snapshot,
                     )
             elif chart_currency == "rub":
                 chart_price = snapshot.price_rub
                 if chart_price is None:
                     chart_price = _convert_price(
-                        snapshot.price, snapshot.currency, models.Currency.RUB, rates
+                        snapshot.price,
+                        snapshot.currency,
+                        models.Currency.RUB,
+                        rates_for_snapshot,
                     )
             if chart_price is None:
                 chart_price = snapshot.price
             chart_values.append(float(chart_price))
         for snapshot in latest_by_day:
+            snapshot_date = timezone.localtime(snapshot.recorded_at).date()
+            rates_for_snapshot = _get_rates_for_date(
+                snapshot_date, rates_by_date_cache
+            )
             display_rub = snapshot.price_rub
             if display_rub is None:
                 display_rub = _convert_price(
-                    snapshot.price, snapshot.currency, models.Currency.RUB, rates
+                    snapshot.price,
+                    snapshot.currency,
+                    models.Currency.RUB,
+                    rates_for_snapshot,
                 )
             display_usd = snapshot.price_usd
             if display_usd is None:
                 display_usd = _convert_price(
-                    snapshot.price, snapshot.currency, models.Currency.USD, rates
+                    snapshot.price,
+                    snapshot.currency,
+                    models.Currency.USD,
+                    rates_for_snapshot,
                 )
             snapshot.display_price_rub = display_rub
             snapshot.display_price_usd = display_usd
@@ -1773,7 +1812,7 @@ class SupplierProductDetailView(LoginRequiredMixin, DetailView):
         context["chart_currency_symbol"] = {
             "original": "",
             "usd": "$",
-            "rub": "₽",
+            "rub": "\u20BD",
         }.get(chart_currency, "")
         context["start_value"] = start_value
         context["end_value"] = end_value
@@ -2221,4 +2260,5 @@ class ExchangeRateUpdateView(BaseUpdateView):
 class ExchangeRateDeleteView(BaseDeleteView):
     model = models.ExchangeRate
     success_url_name = "prices:exchange_rate_list"
+
 
