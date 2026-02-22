@@ -27,7 +27,8 @@
             <table class="table table-sm table-hover align-middle mb-0 table-mobile">
                 <thead>
                     <tr>
-                        <th>Date</th>
+                        <th>Received at</th>
+                        <th>Updated at</th>
                         <th>Supplier</th>
                         <th>Status</th>
                         <th>Mailbox</th>
@@ -37,10 +38,19 @@
                 </thead>
                 <tbody>
                     <tr>
-                        <td data-label="Date">{{ object.received_at|default:object.created_at|timezone:"Europe/Moscow"|date:"d/m/Y H:i" }}</td>
+                        <td data-label="Received at">{{ received_at_display|timezone:"Europe/Moscow"|date:"d/m/Y H:i" }}</td>
+                        <td data-label="Updated at">{{ updated_at_display|timezone:"Europe/Moscow"|date:"d/m/Y H:i" }}</td>
                         <td data-label="Supplier">{{ object.supplier.name }}</td>
                         <td data-label="Status">{{ object.status }}</td>
-                        <td data-label="Mailbox">{{ object.mailbox|default:"-" }}</td>
+                        <td data-label="Mailbox">
+                            {% if object.mailbox %}
+                                {{ object.mailbox.name }}
+                            {% elif object.message_id %}
+                                Unknown mailbox
+                            {% else %}
+                                Manual upload / Backfill
+                            {% endif %}
+                        </td>
                         <td data-label="Message ID" style="word-break: break-all;">{{ object.message_id|default:"-" }}</td>
                         <td data-label="Error">{{ object.error_message|default:"-" }}</td>
                     </tr>

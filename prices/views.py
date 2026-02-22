@@ -410,37 +410,6 @@ class ImportSettingsView(LoginRequiredMixin, TemplateView):
         settings_obj = models.ImportSettings.get_solo()
         context["form"] = forms.ImportSettingsForm(instance=settings_obj)
         context["settings_obj"] = settings_obj
-        suppliers = list(
-            models.Supplier.objects.filter(is_active=True, from_address_pattern__gt="").order_by("name")
-        )
-        batch_size = settings_obj.supplier_batch_size or len(suppliers) or 1
-        if suppliers:
-            if batch_size >= len(suppliers):
-                current_batch = suppliers
-                next_offset = 0
-            else:
-                offset = settings_obj.supplier_batch_offset % len(suppliers)
-                end = offset + batch_size
-                if end <= len(suppliers):
-                    current_batch = suppliers[offset:end]
-                else:
-                    current_batch = suppliers[offset:] + suppliers[: end - len(suppliers)]
-                next_offset = (offset + batch_size) % len(suppliers)
-            if batch_size >= len(suppliers):
-                next_batch = suppliers
-            else:
-                end = next_offset + batch_size
-                if end <= len(suppliers):
-                    next_batch = suppliers[next_offset:end]
-                else:
-                    next_batch = suppliers[next_offset:] + suppliers[: end - len(suppliers)]
-        else:
-            current_batch = []
-            next_batch = []
-
-        context["current_batch"] = current_batch
-        context["next_batch"] = next_batch
-        context["supplier_statuses"] = suppliers
         if settings_obj.last_run_at:
             context["next_run_at"] = settings_obj.last_run_at + timezone.timedelta(
                 minutes=settings_obj.interval_minutes
@@ -584,7 +553,11 @@ class ImportDetailView(LoginRequiredMixin, DetailView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context["import_files"] = self.object.importfile_set.all().order_by("id")
+        import_files = self.object.importfile_set.all().order_by("id")
+        context["import_files"] = import_files
+        context["received_at_display"] = self.object.received_at or self.object.created_at
+        updated_at = import_files.aggregate(updated_at=Max("processed_at")).get("updated_at")
+        context["updated_at_display"] = updated_at or self.object.created_at
         back_url = self.request.GET.get("next", "").strip()
         if back_url and url_has_allowed_host_and_scheme(
             back_url, allowed_hosts={self.request.get_host()}
@@ -1332,7 +1305,10 @@ class CurrencyRateView(LoginRequiredMixin, TemplateView):
             initial={"cbr_markup_percent": settings_obj.cbr_markup_percent}
         )
         context["cbr_range_form"] = forms.CBRSyncRangeForm(
-            initial={"start_date": timezone.localdate(), "end_date": timezone.localdate()}
+            initial={
+                "start_date": timezone.localdate().strftime("%d/%m/%Y"),
+                "end_date": timezone.localdate().strftime("%d/%m/%Y"),
+            }
         )
         context["settings_obj"] = settings_obj
         return context
@@ -1372,22 +1348,30 @@ class CurrencyRateView(LoginRequiredMixin, TemplateView):
                 return self.render_to_response(context)
             start_date = range_form.cleaned_data["start_date"]
             end_date = range_form.cleaned_data.get("end_date") or start_date
-            result = upsert_cbr_markup_rates_range(
-                start_date=start_date,
-                end_date=end_date,
-                markup_percent=settings_obj.cbr_markup_percent,
+
+            # Long date ranges can exceed request timeouts; run in background.
+            def _sync_cbr_range_async(sync_start, sync_end, markup_percent):
+                close_old_connections()
+                try:
+                    upsert_cbr_markup_rates_range(
+                        start_date=sync_start,
+                        end_date=sync_end,
+                        markup_percent=markup_percent,
+                    )
+                except Exception:
+                    # Keep request stable; details can be inspected in server logs.
+                    pass
+
+            thread = threading.Thread(
+                target=_sync_cbr_range_async,
+                args=(start_date, end_date, settings_obj.cbr_markup_percent),
+                daemon=True,
             )
-            if result["errors"]:
-                messages.warning(
-                    request,
-                    f"Range sync finished with warnings: {result['synced_days']}/{result['total_days']} days synced.",
-                )
-                messages.warning(request, " | ".join(result["errors"][:5]))
-            else:
-                messages.success(
-                    request,
-                    f"CBR range synced: {result['synced_days']} day(s).",
-                )
+            thread.start()
+            messages.success(
+                request,
+                f"CBR range sync started in background: {start_date} to {end_date}.",
+            )
             return redirect("prices:currency_rates")
 
         form = forms.ExchangeRateForm(request.POST)
@@ -1718,6 +1702,9 @@ class SupplierProductDetailView(LoginRequiredMixin, DetailView):
             context["back_url"] = reverse_lazy("prices:product_list")
         start_value = self.request.GET.get("start", "").strip()
         end_value = self.request.GET.get("end", "").strip()
+        chart_currency = self.request.GET.get("chart_currency", "original").strip().lower()
+        if chart_currency not in {"original", "usd", "rub"}:
+            chart_currency = "original"
         context["link_form"] = forms.SupplierProductLinkForm(instance=self.object)
         context["our_product"] = self.object.our_product
         start_dt = self._parse_datetime(start_value)
@@ -1746,13 +1733,35 @@ class SupplierProductDetailView(LoginRequiredMixin, DetailView):
         context["snapshots"] = latest_by_day
         chart_labels = []
         chart_values = []
+        rates = _get_latest_rates() if chart_currency in {"usd", "rub"} else {}
         for snapshot in reversed(latest_by_day):
             chart_labels.append(
                 timezone.localtime(snapshot.recorded_at).strftime("%d/%m/%Y")
             )
-            chart_values.append(float(snapshot.price))
+            chart_price = snapshot.price
+            if chart_currency == "usd":
+                chart_price = snapshot.price_usd
+                if chart_price is None:
+                    chart_price = _convert_price(
+                        snapshot.price, snapshot.currency, models.Currency.USD, rates
+                    )
+            elif chart_currency == "rub":
+                chart_price = snapshot.price_rub
+                if chart_price is None:
+                    chart_price = _convert_price(
+                        snapshot.price, snapshot.currency, models.Currency.RUB, rates
+                    )
+            if chart_price is None:
+                chart_price = snapshot.price
+            chart_values.append(float(chart_price))
         context["chart_labels"] = chart_labels
         context["chart_values"] = chart_values
+        context["chart_currency"] = chart_currency
+        context["chart_currency_symbol"] = {
+            "original": "",
+            "usd": "$",
+            "rub": "₽",
+        }.get(chart_currency, "")
         context["start_value"] = start_value
         context["end_value"] = end_value
         return context

@@ -89,7 +89,7 @@
                                 <input type="hidden" name="page" value="{{ rates_page.number }}">
                             </form>
                             <td data-label="Select"><input type="checkbox" name="rate_ids" value="{{ rate.pk }}" form="rate-bulk-delete-form"></td>
-                            <td data-label="Date"><input type="date" name="rate_date" value="{{ rate.rate_date|date:'Y-m-d' }}" form="rate-form-{{ rate.pk }}"></td>
+                            <td data-label="Date"><input type="text" name="rate_date" value="{{ rate.rate_date|date:'d/m/Y' }}" placeholder="dd/mm/yyyy" form="rate-form-{{ rate.pk }}"></td>
                             <td data-label="From">
                                 <select name="from_currency" form="rate-form-{{ rate.pk }}">
                                     <option value="RUB"{% if rate.from_currency == "RUB" %} selected{% endif %}>RUB</option>

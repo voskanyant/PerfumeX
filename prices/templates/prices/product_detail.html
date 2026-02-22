@@ -51,6 +51,11 @@
                 <p class="page-subtitle">Latest daily price snapshots.</p>
             </div>
         </div>
+        <div class="d-flex flex-wrap gap-2 mt-2">
+            <button class="button {% if chart_currency != 'original' %}secondary{% endif %}" type="button" data-chart-currency="original">Original</button>
+            <button class="button {% if chart_currency != 'usd' %}secondary{% endif %}" type="button" data-chart-currency="usd">USD</button>
+            <button class="button {% if chart_currency != 'rub' %}secondary{% endif %}" type="button" data-chart-currency="rub">RUB</button>
+        </div>
         <div class="mt-3">
             <canvas id="price-chart" height="140"></canvas>
         </div>
@@ -60,6 +65,7 @@
             <button class="button secondary" type="button" data-range="2y">2y</button>
         </div>
         <form method="get" class="row g-3 align-items-end mt-2">
+            <input type="hidden" name="chart_currency" id="chart-currency-input" value="{{ chart_currency }}">
             <div class="col-12 col-md-5">
                 <label for="start" class="form-label">Start</label>
                 <input id="start" name="start" type="datetime-local" value="{{ start_value }}">
@@ -113,12 +119,27 @@
     </div>
     {{ chart_labels|json_script:"chart-labels" }}
     {{ chart_values|json_script:"chart-values" }}
+    {{ chart_currency_symbol|json_script:"chart-currency-symbol" }}
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <script>
         (function () {
             var labels = JSON.parse(document.getElementById("chart-labels").textContent || "[]");
             var values = JSON.parse(document.getElementById("chart-values").textContent || "[]");
+            var currencySymbol = JSON.parse(document.getElementById("chart-currency-symbol").textContent || "\"\"");
             var ctx = document.getElementById("price-chart");
+            var chartCurrencyInput = document.getElementById("chart-currency-input");
+            var filterForm = document.querySelector("form.row.g-3.align-items-end.mt-2");
+            document.querySelectorAll("button[data-chart-currency]").forEach(function (button) {
+                button.addEventListener("click", function () {
+                    var mode = button.getAttribute("data-chart-currency");
+                    if (chartCurrencyInput) {
+                        chartCurrencyInput.value = mode;
+                    }
+                    if (filterForm) {
+                        filterForm.submit();
+                    }
+                });
+            });
             if (!ctx || !labels.length) return;
             document.querySelectorAll("button[data-range]").forEach(function (button) {
                 button.addEventListener("click", function () {
@@ -196,7 +217,8 @@
                             intersect: false,
                             callbacks: {
                                 label: function (ctx) {
-                                    return "Price: " + ctx.parsed.y.toFixed(2);
+                                    var suffix = currencySymbol ? " " + currencySymbol : "";
+                                    return "Price: " + ctx.parsed.y.toFixed(2) + suffix;
                                 }
                             }
                         }
