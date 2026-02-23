@@ -496,6 +496,7 @@ class ImportDetailedLogsView(LoginRequiredMixin, TemplateView):
         context = super().get_context_data(**kwargs)
         supplier_filter = self.request.GET.get("supplier", "").strip()
         status_filter = self.request.GET.get("run_status", "").strip()
+        batch_status_filter = self.request.GET.get("batch_status", "").strip()
         runs = models.EmailImportRun.objects.select_related("supplier").order_by("-started_at")
         if supplier_filter:
             runs = runs.filter(supplier_id=supplier_filter)
@@ -503,15 +504,40 @@ class ImportDetailedLogsView(LoginRequiredMixin, TemplateView):
             runs = runs.filter(status=status_filter)
         paginator = Paginator(runs, 30)
         page = paginator.get_page(self.request.GET.get("page", "1"))
+
+        batches = (
+            models.ImportBatch.objects.select_related("supplier", "mailbox")
+            .prefetch_related("importfile_set", "importfile_set__mapping")
+            .order_by("-created_at")
+        )
+        if supplier_filter:
+            batches = batches.filter(supplier_id=supplier_filter)
+        if batch_status_filter:
+            if batch_status_filter == "processed":
+                batches = batches.filter(status=models.ImportStatus.PROCESSED)
+            elif batch_status_filter == "failed":
+                batches = batches.filter(status=models.ImportStatus.FAILED)
+            elif batch_status_filter == "pending":
+                batches = batches.filter(status=models.ImportStatus.PENDING)
+        batch_paginator = Paginator(batches, 20)
+        batch_page = batch_paginator.get_page(self.request.GET.get("bpage", "1"))
+
         context["runs_page"] = page
+        context["batches_page"] = batch_page
         context["supplier_filter"] = supplier_filter
         context["status_filter"] = status_filter
+        context["batch_status_filter"] = batch_status_filter
         context["supplier_options"] = models.Supplier.objects.order_by("name")
         context["run_status_options"] = [
             models.EmailImportStatus.RUNNING,
             models.EmailImportStatus.FINISHED,
             models.EmailImportStatus.FAILED,
             models.EmailImportStatus.CANCELED,
+        ]
+        context["batch_status_options"] = [
+            ("processed", "Processed"),
+            ("failed", "Failed"),
+            ("pending", "Pending"),
         ]
         context["import_section"] = "detailed_logs"
         context["detailed_logs_url"] = reverse_lazy("prices:import_detailed_logs")
@@ -977,7 +1003,8 @@ class SupplierEmailBackfillView(LoginRequiredMixin, View):
             close_old_connections()
             mailboxes = models.Mailbox.objects.filter(is_active=True)
             settings_obj = models.ImportSettings.get_solo()
-            timeout_seconds = max(60, settings_obj.supplier_timeout_minutes * 60)
+            timeout_minutes = int(settings_obj.supplier_timeout_minutes or 0)
+            timeout_seconds = timeout_minutes * 60 if timeout_minutes > 0 else None
             since_date = timezone.make_aware(datetime.combine(start_date, time(0, 0)))
             before_date = None
             if end_date:
@@ -1043,7 +1070,8 @@ class SupplierEmailBackfillBulkView(LoginRequiredMixin, View):
             close_old_connections()
             mailboxes = list(models.Mailbox.objects.filter(is_active=True))
             settings_obj = models.ImportSettings.get_solo()
-            timeout_seconds = max(60, settings_obj.supplier_timeout_minutes * 60)
+            timeout_minutes = int(settings_obj.supplier_timeout_minutes or 0)
+            timeout_seconds = timeout_minutes * 60 if timeout_minutes > 0 else None
             since_date = timezone.make_aware(datetime.combine(start_date, time(0, 0)))
             before_date = None
             if end_date:
@@ -1189,7 +1217,8 @@ class SupplierEmailImportAllView(LoginRequiredMixin, View):
             close_old_connections()
             mailboxes = list(models.Mailbox.objects.filter(is_active=True))
             settings_obj = models.ImportSettings.get_solo()
-            timeout_seconds = max(60, settings_obj.supplier_timeout_minutes * 60)
+            timeout_minutes = int(settings_obj.supplier_timeout_minutes or 0)
+            timeout_seconds = timeout_minutes * 60 if timeout_minutes > 0 else None
             for supplier in suppliers:
                 run = models.EmailImportRun.objects.create(
                     supplier=supplier, status=models.EmailImportStatus.RUNNING
