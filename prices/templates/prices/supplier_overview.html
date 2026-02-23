@@ -5,7 +5,47 @@
 
 {% block content %}
     <style>
+        .import-mega-nav {
+            border: 1px solid var(--app-border);
+            border-radius: 16px;
+            background: var(--app-surface);
+            padding: 0 18px;
+            margin-bottom: 14px;
+        }
+        .import-mega-nav-inner {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 24px;
+            border-bottom: 1px solid var(--app-border);
+        }
+        .import-mega-link {
+            display: inline-flex;
+            align-items: center;
+            height: 52px;
+            color: var(--app-muted);
+            text-decoration: none;
+            font-weight: 700;
+            border-bottom: 3px solid transparent;
+            margin-bottom: -1px;
+            transition: color 0.15s ease;
+        }
+        .import-mega-link:hover {
+            color: var(--app-text);
+        }
+        .import-mega-link.active {
+            color: var(--app-text);
+            border-bottom-color: #2563eb;
+        }
         @media (max-width: 991.98px) {
+            .import-mega-nav {
+                padding: 0 12px;
+            }
+            .import-mega-nav-inner {
+                gap: 14px;
+            }
+            .import-mega-link {
+                height: 46px;
+            }
             .import-overview-header {
                 gap: 12px;
             }
@@ -70,6 +110,19 @@
             }
         }
     </style>
+    <div class="import-mega-nav">
+        <div class="import-mega-nav-inner">
+            <a class="import-mega-link {% if import_section == 'overview' %}active{% endif %}" href="{{ overview_url }}">
+                Suppliers
+            </a>
+            <a class="import-mega-link {% if import_section == 'detailed_logs' %}active{% endif %}" href="{{ detailed_logs_url }}">
+                Detailed logs
+            </a>
+            <a class="import-mega-link {% if import_section == 'settings' %}active{% endif %}" href="{% url 'prices:import_settings' %}">
+                Import settings
+            </a>
+        </div>
+    </div>
     <div class="card mb-3">
         <div class="d-flex flex-wrap align-items-start justify-content-between gap-3 import-overview-header">
             <div>

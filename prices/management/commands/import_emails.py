@@ -30,6 +30,16 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument("--mailbox", help="Mailbox name to process.")
+        parser.add_argument(
+            "--supplier-id",
+            type=int,
+            help="Process only this supplier id.",
+        )
+        parser.add_argument(
+            "--run-id",
+            type=int,
+            help="Existing EmailImportRun id to update progress for.",
+        )
         parser.add_argument("--all", action="store_true", help="Process all messages.")
         parser.add_argument("--limit", type=int, default=0, help="Limit messages.")
         parser.add_argument(
@@ -175,6 +185,71 @@ class Command(BaseCommand):
         if not suppliers:
             settings_obj.last_run_at = timezone.now()
             settings_obj.save(update_fields=["last_run_at"])
+            return
+
+        supplier_id = options.get("supplier_id")
+        run_id = options.get("run_id")
+        if supplier_id:
+            supplier = models.Supplier.objects.filter(
+                id=supplier_id, is_active=True
+            ).first()
+            if not supplier:
+                self.stdout.write("Supplier not found or inactive.")
+                if run_id:
+                    models.EmailImportRun.objects.filter(id=run_id).update(
+                        status=models.EmailImportStatus.FAILED,
+                        finished_at=timezone.now(),
+                        errors=F("errors") + 1,
+                        last_message="Supplier not found or inactive.",
+                    )
+                return
+            if not supplier.from_address_pattern:
+                self.stdout.write("Supplier has no sender email configured.")
+                if run_id:
+                    models.EmailImportRun.objects.filter(id=run_id).update(
+                        status=models.EmailImportStatus.FAILED,
+                        finished_at=timezone.now(),
+                        errors=F("errors") + 1,
+                        last_message="Supplier has no sender email configured.",
+                    )
+                return
+
+            latest_batch = _get_supplier_latest_batch_time(supplier)
+            if latest_batch and timezone.is_naive(latest_batch):
+                latest_batch = timezone.make_aware(latest_batch)
+            if latest_batch:
+                since_date = timezone.localtime(latest_batch) - timezone.timedelta(days=1)
+            else:
+                base_days = supplier.email_search_days or 7
+                since_date = timezone.now() - timezone.timedelta(days=base_days)
+            self.stdout.write(
+                f"Checking supplier {supplier.name} (since {since_date:%Y-%m-%d %H:%M})"
+            )
+            summary = run_import(
+                mailboxes=mailboxes,
+                supplier_id=supplier.id,
+                mark_seen=False,
+                limit=limit,
+                max_bytes=options["max_bytes"],
+                max_seconds=timeout_minutes * 60,
+                logger=self.stdout.write,
+                run_id=run_id,
+                search_criteria="ALL",
+                since_date=since_date,
+                min_received_at=latest_batch,
+                from_filter=supplier.from_address_pattern or None,
+                subject_filter=supplier.price_subject_pattern or None,
+                dedupe_same_day_only=True,
+                use_uid_cursor=not options["force"],
+            )
+            self.stdout.write(
+                "Import summary: "
+                f"matched={summary.get('matched_files', 0)} "
+                f"processed={summary.get('processed_files', 0)} "
+                f"duplicates={summary.get('skipped_duplicates', 0)} "
+                f"errors={summary.get('errors', 0)} "
+                f"timed_out={summary.get('timed_out', False)}"
+            )
             return
 
         max_days = max([s.email_search_days for s in suppliers] or [7])

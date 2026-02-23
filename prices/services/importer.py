@@ -271,6 +271,7 @@ def _parse_rows(
     currency_col: int,
     default_currency: str,
     skip_until_valid: bool = True,
+    parse_stats: dict | None = None,
 ) -> Iterable[ParsedRow]:
     sku_idx = sku_col - 1 if sku_col else None
     name_indexes = [value - 1 for value in name_cols if value]
@@ -281,6 +282,8 @@ def _parse_rows(
     for row in rows:
         max_index = max([price_idx, *name_indexes, sku_idx if sku_idx is not None else 0])
         if len(row) <= max_index:
+            if parse_stats is not None:
+                parse_stats["row_too_short"] = parse_stats.get("row_too_short", 0) + 1
             continue
         sku = ""
         if sku_idx is not None and sku_idx < len(row):
@@ -296,15 +299,26 @@ def _parse_rows(
         if name:
             lowered = name.lower()
             if any(term in lowered for term in skip_terms):
+                if parse_stats is not None:
+                    parse_stats["skip_term"] = parse_stats.get("skip_term", 0) + 1
                 if not found_data:
                     continue
                 continue
             if _is_invalid_short_name(name):
+                if parse_stats is not None:
+                    parse_stats["invalid_short_name"] = parse_stats.get("invalid_short_name", 0) + 1
                 if not found_data:
                     continue
                 continue
         price = _parse_decimal(row[price_idx])
         if not name or price is None or price == 0:
+            if parse_stats is not None:
+                if not name:
+                    parse_stats["empty_name"] = parse_stats.get("empty_name", 0) + 1
+                if price is None:
+                    parse_stats["invalid_price"] = parse_stats.get("invalid_price", 0) + 1
+                elif price == 0:
+                    parse_stats["zero_price"] = parse_stats.get("zero_price", 0) + 1
             if not found_data:
                 continue
             continue
@@ -315,6 +329,8 @@ def _parse_rows(
             detected_currency = _detect_currency(row[price_idx])
         detected_currency = detected_currency or default_currency
         found_data = True
+        if parse_stats is not None:
+            parse_stats["parsed"] = parse_stats.get("parsed", 0) + 1
         yield ParsedRow(sku=sku, name=name, price=price, currency=detected_currency)
 
 
@@ -428,20 +444,25 @@ def process_import_file(import_file: models.ImportFile) -> None:
     currency_col = int(column_map.get("currency", 0) or 0)
     if not name_cols or not price_col:
         raise RuntimeError("Mapping must include name and price columns.")
+    parse_stats: dict[str, int] = {}
 
-    if extension in {".csv"}:
-        rows = _iter_rows_csv(path, start_row)
-        parsed_rows = list(
+    def _collect_parsed(rows_iter):
+        return list(
             _parse_rows(
-                rows,
+                rows_iter,
                 sku_col,
                 name_cols,
                 price_col,
                 currency_col,
                 import_file.import_batch.supplier.default_currency,
                 skip_until_valid=True,
+                parse_stats=parse_stats,
             )
         )
+
+    if extension in {".csv"}:
+        rows = _iter_rows_csv(path, start_row)
+        parsed_rows = _collect_parsed(rows)
     elif extension in {".xlsx"}:
         parsed_rows = []
         sheet_names = [
@@ -457,30 +478,10 @@ def process_import_file(import_file: models.ImportFile) -> None:
         if sheet_names or sheet_indexes:
             for name in sheet_names:
                 rows = _iter_rows_xlsx(path, name, None, start_row)
-                parsed_rows.extend(
-                    _parse_rows(
-                        rows,
-                        sku_col,
-                        name_cols,
-                        price_col,
-                        currency_col,
-                        import_file.import_batch.supplier.default_currency,
-                        skip_until_valid=True,
-                    )
-                )
+                parsed_rows.extend(_collect_parsed(rows))
             for index in sheet_indexes:
                 rows = _iter_rows_xlsx(path, "", index, start_row)
-                parsed_rows.extend(
-                    _parse_rows(
-                        rows,
-                        sku_col,
-                        name_cols,
-                        price_col,
-                        currency_col,
-                        import_file.import_batch.supplier.default_currency,
-                        skip_until_valid=True,
-                    )
-                )
+                parsed_rows.extend(_collect_parsed(rows))
         else:
             try:
                 import openpyxl
@@ -490,32 +491,12 @@ def process_import_file(import_file: models.ImportFile) -> None:
             workbook = openpyxl.load_workbook(path, data_only=True, read_only=True)
             try:
                 rows = _iter_rows_xlsx_sheet(workbook, mapping.sheet_name, mapping.sheet_index, start_row)
-                parsed_rows = list(
-                    _parse_rows(
-                        rows,
-                        sku_col,
-                        name_cols,
-                        price_col,
-                        currency_col,
-                        import_file.import_batch.supplier.default_currency,
-                        skip_until_valid=True,
-                    )
-                )
+                parsed_rows = _collect_parsed(rows)
                 # Some supplier files keep the price table on a non-active sheet.
                 if not parsed_rows and not mapping.sheet_name and mapping.sheet_index is None:
                     for sheet in workbook.worksheets:
                         rows = _iter_rows_xlsx_sheet(workbook, sheet.title, None, start_row)
-                        candidate_rows = list(
-                            _parse_rows(
-                                rows,
-                                sku_col,
-                                name_cols,
-                                price_col,
-                                currency_col,
-                                import_file.import_batch.supplier.default_currency,
-                                skip_until_valid=True,
-                            )
-                        )
+                        candidate_rows = _collect_parsed(rows)
                         if candidate_rows:
                             parsed_rows = candidate_rows
                             break
@@ -536,30 +517,10 @@ def process_import_file(import_file: models.ImportFile) -> None:
         if sheet_names or sheet_indexes:
             for name in sheet_names:
                 rows = _iter_rows_xls_path(path, name, None, start_row)
-                parsed_rows.extend(
-                    _parse_rows(
-                        rows,
-                        sku_col,
-                        name_cols,
-                        price_col,
-                        currency_col,
-                        import_file.import_batch.supplier.default_currency,
-                        skip_until_valid=True,
-                    )
-                )
+                parsed_rows.extend(_collect_parsed(rows))
             for index in sheet_indexes:
                 rows = _iter_rows_xls_path(path, "", index, start_row)
-                parsed_rows.extend(
-                    _parse_rows(
-                        rows,
-                        sku_col,
-                        name_cols,
-                        price_col,
-                        currency_col,
-                        import_file.import_batch.supplier.default_currency,
-                        skip_until_valid=True,
-                    )
-                )
+                parsed_rows.extend(_collect_parsed(rows))
         else:
             try:
                 import xlrd
@@ -574,31 +535,11 @@ def process_import_file(import_file: models.ImportFile) -> None:
             else:
                 selected_sheet = workbook.sheet_by_index(0)
             rows = _iter_rows_xls_sheet(selected_sheet, start_row)
-            parsed_rows = list(
-                _parse_rows(
-                    rows,
-                    sku_col,
-                    name_cols,
-                    price_col,
-                    currency_col,
-                    import_file.import_batch.supplier.default_currency,
-                    skip_until_valid=True,
-                )
-            )
+            parsed_rows = _collect_parsed(rows)
             if not parsed_rows and not mapping.sheet_name and mapping.sheet_index is None:
                 for idx in range(workbook.nsheets):
                     rows = _iter_rows_xls_sheet(workbook.sheet_by_index(idx), start_row)
-                    candidate_rows = list(
-                        _parse_rows(
-                            rows,
-                            sku_col,
-                            name_cols,
-                            price_col,
-                            currency_col,
-                            import_file.import_batch.supplier.default_currency,
-                            skip_until_valid=True,
-                        )
-                    )
+                    candidate_rows = _collect_parsed(rows)
                     if candidate_rows:
                         parsed_rows = candidate_rows
                         break
@@ -623,43 +564,13 @@ def process_import_file(import_file: models.ImportFile) -> None:
             try:
                 if extension in {".csv"}:
                     rows = _iter_rows_csv(path, candidate_start)
-                    candidate_parsed = list(
-                        _parse_rows(
-                            rows,
-                            sku_col,
-                            name_cols,
-                            price_col,
-                            currency_col,
-                            import_file.import_batch.supplier.default_currency,
-                            skip_until_valid=True,
-                        )
-                    )
+                    candidate_parsed = _collect_parsed(rows)
                 elif extension in {".xlsx"}:
                     rows = _iter_rows_xlsx(path, mapping.sheet_name, mapping.sheet_index, candidate_start)
-                    candidate_parsed = list(
-                        _parse_rows(
-                            rows,
-                            sku_col,
-                            name_cols,
-                            price_col,
-                            currency_col,
-                            import_file.import_batch.supplier.default_currency,
-                            skip_until_valid=True,
-                        )
-                    )
+                    candidate_parsed = _collect_parsed(rows)
                 elif extension in {".xls"}:
                     rows = _iter_rows_xls_path(path, mapping.sheet_name, mapping.sheet_index, candidate_start)
-                    candidate_parsed = list(
-                        _parse_rows(
-                            rows,
-                            sku_col,
-                            name_cols,
-                            price_col,
-                            currency_col,
-                            import_file.import_batch.supplier.default_currency,
-                            skip_until_valid=True,
-                        )
-                    )
+                    candidate_parsed = _collect_parsed(rows)
                 else:
                     candidate_parsed = []
             except Exception:
@@ -669,8 +580,73 @@ def process_import_file(import_file: models.ImportFile) -> None:
                 break
 
     if not parsed_rows:
+        required_cols = []
+        if sku_col:
+            required_cols.append(("sku", sku_col))
+        for idx, col in enumerate(name_cols, start=1):
+            required_cols.append((f"name{idx}", col))
+        required_cols.append(("price", price_col))
+        if currency_col:
+            required_cols.append(("currency", currency_col))
+        required_max_col = max((col for _, col in required_cols), default=0)
+
+        max_cols_hint = None
+        selected_sheet_hint = ""
+        try:
+            if extension == ".xlsx":
+                import openpyxl
+
+                wb = openpyxl.load_workbook(path, data_only=True, read_only=True)
+                try:
+                    if mapping.sheet_name:
+                        sh = wb[mapping.sheet_name]
+                    elif mapping.sheet_index is not None:
+                        sh = wb.worksheets[mapping.sheet_index]
+                    else:
+                        sh = wb.active
+                    max_cols_hint = int(sh.max_column or 0)
+                    selected_sheet_hint = sh.title
+                finally:
+                    wb.close()
+            elif extension == ".xls":
+                import xlrd
+
+                wb = xlrd.open_workbook(path)
+                if mapping.sheet_name:
+                    sh = wb.sheet_by_name(mapping.sheet_name)
+                    selected_sheet_hint = mapping.sheet_name
+                elif mapping.sheet_index is not None:
+                    sh = wb.sheet_by_index(mapping.sheet_index)
+                    selected_sheet_hint = sh.name
+                else:
+                    sh = wb.sheet_by_index(0)
+                    selected_sheet_hint = sh.name
+                max_cols_hint = int(sh.ncols or 0)
+            elif extension == ".csv":
+                rows = list(_iter_rows_csv(path, start_row))
+                max_cols_hint = max((len(r) for r in rows), default=0)
+        except Exception:
+            max_cols_hint = None
+
+        missing_cols = []
+        if max_cols_hint is not None and max_cols_hint < required_max_col:
+            for label, col in required_cols:
+                if col > max_cols_hint:
+                    missing_cols.append(f"{label}:{col}")
+
+        name_cols_text = ",".join(str(col) for col in name_cols) or "-"
+        missing_cols_text = ", ".join(missing_cols) if missing_cols else "-"
+        detected_cols_text = str(max_cols_hint) if max_cols_hint is not None else "unknown"
+        selected_sheet_text = selected_sheet_hint or "-"
         raise RuntimeError(
-            "No data rows parsed. Check header row and column numbers."
+            "No data rows parsed. "
+            f"Selected sheet: {selected_sheet_text}. "
+            f"Header row: {start_row}. "
+            f"Configured columns: sku={sku_col or '-'}, name={name_cols_text}, "
+            f"price={price_col}, currency={currency_col or '-'}; "
+            f"detected max columns in sheet: {detected_cols_text}. "
+            f"Missing configured columns: {missing_cols_text}. "
+            f"Row diagnostics: {parse_stats}."
         )
     unique_rows = {}
     for parsed in parsed_rows:

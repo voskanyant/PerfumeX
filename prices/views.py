@@ -482,6 +482,40 @@ class SupplierOverviewView(LoginRequiredMixin, TemplateView):
             ("failed", "Failed"),
             ("pending", "Pending"),
         ]
+        context["import_section"] = "overview"
+        context["detailed_logs_url"] = reverse_lazy("prices:import_detailed_logs")
+        context["overview_url"] = reverse_lazy("prices:supplier_overview")
+        context["current_query"] = self.request.GET.urlencode()
+        return context
+
+
+class ImportDetailedLogsView(LoginRequiredMixin, TemplateView):
+    template_name = "prices/import_detailed_logs.html"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        supplier_filter = self.request.GET.get("supplier", "").strip()
+        status_filter = self.request.GET.get("run_status", "").strip()
+        runs = models.EmailImportRun.objects.select_related("supplier").order_by("-started_at")
+        if supplier_filter:
+            runs = runs.filter(supplier_id=supplier_filter)
+        if status_filter:
+            runs = runs.filter(status=status_filter)
+        paginator = Paginator(runs, 30)
+        page = paginator.get_page(self.request.GET.get("page", "1"))
+        context["runs_page"] = page
+        context["supplier_filter"] = supplier_filter
+        context["status_filter"] = status_filter
+        context["supplier_options"] = models.Supplier.objects.order_by("name")
+        context["run_status_options"] = [
+            models.EmailImportStatus.RUNNING,
+            models.EmailImportStatus.FINISHED,
+            models.EmailImportStatus.FAILED,
+            models.EmailImportStatus.CANCELED,
+        ]
+        context["import_section"] = "detailed_logs"
+        context["detailed_logs_url"] = reverse_lazy("prices:import_detailed_logs")
+        context["overview_url"] = reverse_lazy("prices:supplier_overview")
         return context
 
 
@@ -501,6 +535,10 @@ class ImportSettingsView(LoginRequiredMixin, TemplateView):
         else:
             context["next_run_at"] = None
         context["cron_status"] = _get_cron_status()
+        context["import_section"] = "settings"
+        context["overview_url"] = reverse_lazy("prices:supplier_overview")
+        context["detailed_logs_url"] = reverse_lazy("prices:import_detailed_logs")
+        context["import_settings_url"] = reverse_lazy("prices:import_settings")
         return context
 
     def post(self, request, *args, **kwargs):
@@ -884,34 +922,10 @@ class SupplierEmailImportView(LoginRequiredMixin, View):
         run = models.EmailImportRun.objects.create(
             supplier=supplier, status=models.EmailImportStatus.RUNNING
         )
+
         def _run():
             close_old_connections()
-            mailboxes = models.Mailbox.objects.filter(is_active=True)
-            settings_obj = models.ImportSettings.get_solo()
-            timeout_seconds = max(60, settings_obj.supplier_timeout_minutes * 60)
-            latest_batch = _get_supplier_latest_batch_time(supplier)
-            if latest_batch and timezone.is_naive(latest_batch):
-                latest_batch = timezone.make_aware(latest_batch)
-            if latest_batch:
-                since_date = timezone.localtime(latest_batch) - timezone.timedelta(days=1)
-            else:
-                since_date = timezone.now() - timezone.timedelta(days=supplier.email_search_days)
-            run_import(
-                mailboxes=mailboxes,
-                supplier_id=supplier.id,
-                mark_seen=True,
-                limit=0,
-                max_bytes=20_000_000,
-                max_seconds=timeout_seconds,
-                logger=None,
-                run_id=run.id,
-                search_criteria="ALL",
-                since_date=since_date,
-                min_received_at=latest_batch,
-                from_filter=supplier.from_address_pattern or None,
-                subject_filter=supplier.price_subject_pattern or None,
-                dedupe_same_day_only=True,
-            )
+            call_command("import_emails", force=True, supplier_id=supplier.id, run_id=run.id)
 
         thread = threading.Thread(target=_run, daemon=True)
         thread.start()

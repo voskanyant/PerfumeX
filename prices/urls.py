@@ -14,6 +14,11 @@ urlpatterns = [
         views.SupplierOverviewView.as_view(),
         name="supplier_overview",
     ),
+    path(
+        "suppliers/overview/detailed-logs/",
+        views.ImportDetailedLogsView.as_view(),
+        name="import_detailed_logs",
+    ),
     path("imports/new/", views.ImportWizardView.as_view(), name="import_wizard"),
     path("imports/<int:pk>/", views.ImportDetailView.as_view(), name="import_detail"),
     path("imports/<int:pk>/delete/", views.ImportDeleteView.as_view(), name="import_delete"),
