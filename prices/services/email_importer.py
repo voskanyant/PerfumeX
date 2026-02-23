@@ -708,13 +708,14 @@ def run_import(
                     content_hash = hashlib.sha256(payload).hexdigest()
                     if dedupe_same_day_only and received_at:
                         day_start_utc, day_end_utc = _local_day_bounds(received_at)
-                        # Deduplicate within the same supplier + mailbox + local day.
+                        # Deduplicate within the same supplier + local day across all
+                        # mailboxes so the same attachment hash is imported once.
                         # Include pending files too so repeated attachments in the same run
                         # are skipped immediately.
                         exists = models.ImportFile.objects.filter(
                             content_hash=content_hash,
+                            file_kind=file_kind,
                             import_batch__supplier=matched_supplier,
-                            import_batch__mailbox=mailbox,
                             import_batch__received_at__gte=day_start_utc,
                             import_batch__received_at__lt=day_end_utc,
                             status__in=[

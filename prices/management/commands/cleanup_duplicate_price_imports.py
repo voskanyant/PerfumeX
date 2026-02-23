@@ -14,7 +14,7 @@ from prices.services.importer import delete_import_batch
 class Command(BaseCommand):
     help = (
         "Cleanup duplicate PRICE imports using rule: "
-        "supplier + mailbox + local day + content_hash (keep one)."
+        "supplier + local day + content_hash (keep one, across mailboxes)."
     )
 
     def add_arguments(self, parser):
@@ -65,12 +65,11 @@ class Command(BaseCommand):
             self.stdout.write("No price imports found.")
             return
 
-        groups: dict[tuple[int, int, object, str], list[models.ImportFile]] = defaultdict(list)
+        groups: dict[tuple[int, object, str], list[models.ImportFile]] = defaultdict(list)
         for f in files:
             batch = f.import_batch
             if not batch:
                 continue
-            mailbox_id = batch.mailbox_id or 0
             at = batch.received_at or batch.created_at
             if at is None:
                 continue
@@ -79,7 +78,7 @@ class Command(BaseCommand):
                 continue
             if end_date and local_day > end_date:
                 continue
-            key = (batch.supplier_id, mailbox_id, local_day, f.content_hash)
+            key = (batch.supplier_id, local_day, f.content_hash)
             groups[key].append(f)
 
         if not groups:
@@ -114,7 +113,7 @@ class Command(BaseCommand):
             supplier_name = keep.import_batch.supplier.name if keep.import_batch and keep.import_batch.supplier else "?"
             mailbox_name = keep.import_batch.mailbox.name if keep.import_batch and keep.import_batch.mailbox else "-"
             self.stdout.write(
-                f"[dup-group] supplier={supplier_name} mailbox={mailbox_name} day={key[2]} hash={key[3][:12]}... keep_file_id={keep.id} drop={len(members_sorted)-1}"
+                f"[dup-group] supplier={supplier_name} mailbox={mailbox_name} day={key[1]} hash={key[2][:12]}... keep_file_id={keep.id} drop={len(members_sorted)-1}"
             )
 
         if not duplicate_files:
@@ -176,4 +175,3 @@ class Command(BaseCommand):
             return datetime.strptime(text, "%Y-%m-%d").date()
         except ValueError:
             raise SystemExit(f"Invalid date format: {text}. Expected YYYY-MM-DD")
-

@@ -47,9 +47,21 @@ def _detect_currency(cell_value) -> str | None:
     if not text:
         return None
     upper = text.upper()
-    if "USD" in upper or "$" in upper:
+    lower = text.lower()
+    rub_upper = "\u0420\u0423\u0411"
+    rub_lower = "\u0440\u0443\u0431"
+    dol_lower = "\u0434\u043e\u043b"
+    if "USD" in upper or "$" in upper or dol_lower in lower:
         return models.Currency.USD
-    if "RUB" in upper or "RUR" in upper or "РУБ" in upper or "₽" in upper:
+    if (
+        "RUB" in upper
+        or "RUR" in upper
+        or rub_upper in upper
+        or rub_lower in lower
+        or "Ð Ð£Ð‘" in upper
+        or "â‚½" in upper
+        or "\u20BD" in text
+    ):
         return models.Currency.RUB
     return None
 
