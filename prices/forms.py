@@ -175,7 +175,7 @@ class ImportSettingsForm(forms.ModelForm):
             "interval_minutes": "How often to check all mailboxes for new price lists.",
             "auto_mark_seen": "Recommended on. Prevents re-reading the same unseen emails every run.",
             "max_messages_per_run": "Safety limit for one run to avoid long/stuck IMAP sessions.",
-            "supplier_timeout_minutes": "Stop a supplier import if it exceeds this time. It will retry later.",
+            "supplier_timeout_minutes": "Stop a supplier import if it exceeds this time. Set 0 to disable timeout.",
             "deactivate_products_after_days": "Set 0 to disable. Active supplier products older than this threshold are set inactive.",
             "cbr_markup_percent": "Applied to daily USD->RUB CBR rate (e.g. 3.0).",
             "filename_blacklist_terms": "If filename contains any term, the file is skipped. One term per line (or comma-separated).",
@@ -183,7 +183,7 @@ class ImportSettingsForm(forms.ModelForm):
         widgets = {
             "interval_minutes": forms.NumberInput(attrs={"min": 5, "step": 5}),
             "max_messages_per_run": forms.NumberInput(attrs={"min": 1, "step": 1}),
-            "supplier_timeout_minutes": forms.NumberInput(attrs={"min": 1, "step": 1}),
+            "supplier_timeout_minutes": forms.NumberInput(attrs={"min": 0, "step": 1}),
             "deactivate_products_after_days": forms.NumberInput(attrs={"min": 0, "step": 1}),
             "cbr_markup_percent": forms.NumberInput(attrs={"min": 0, "step": 0.001}),
             "filename_blacklist_terms": forms.Textarea(attrs={"rows": 6}),
@@ -222,4 +222,3 @@ class CBRSyncRangeForm(forms.Form):
         if start_date and end_date and end_date < start_date:
             self.add_error("end_date", "End date must be on or after start date.")
         return cleaned_data
-

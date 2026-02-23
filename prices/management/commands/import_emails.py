@@ -130,19 +130,21 @@ class Command(BaseCommand):
             self.stdout.write(f"Retried stale failed files: {retried}.")
 
         settings_obj = models.ImportSettings.get_solo()
-        timeout_minutes = settings_obj.supplier_timeout_minutes or 5
-        timeout_cutoff = timezone.now() - timezone.timedelta(minutes=timeout_minutes)
-        stale_runs = models.EmailImportRun.objects.filter(
-            status=models.EmailImportStatus.RUNNING,
-            started_at__lt=timeout_cutoff,
-        )
-        if stale_runs.exists():
-            stale_runs.update(
-                status=models.EmailImportStatus.FAILED,
-                finished_at=timezone.now(),
-                errors=F("errors") + 1,
-                last_message="Auto-failed timeout. Previous run exceeded supplier timeout.",
+        timeout_minutes = int(settings_obj.supplier_timeout_minutes or 0)
+        timeout_seconds = timeout_minutes * 60 if timeout_minutes > 0 else None
+        if timeout_minutes > 0:
+            timeout_cutoff = timezone.now() - timezone.timedelta(minutes=timeout_minutes)
+            stale_runs = models.EmailImportRun.objects.filter(
+                status=models.EmailImportStatus.RUNNING,
+                started_at__lt=timeout_cutoff,
             )
+            if stale_runs.exists():
+                stale_runs.update(
+                    status=models.EmailImportStatus.FAILED,
+                    finished_at=timezone.now(),
+                    errors=F("errors") + 1,
+                    last_message="Auto-failed timeout. Previous run exceeded supplier timeout.",
+                )
         if not options["force"]:
             if not settings_obj.enabled:
                 self.stdout.write("Import settings disabled. Use --force to run.")
@@ -231,7 +233,7 @@ class Command(BaseCommand):
                 mark_seen=False,
                 limit=limit,
                 max_bytes=options["max_bytes"],
-                max_seconds=timeout_minutes * 60,
+                max_seconds=timeout_seconds,
                 logger=self.stdout.write,
                 run_id=run_id,
                 search_criteria="ALL",
@@ -267,7 +269,7 @@ class Command(BaseCommand):
             mark_seen=False,
             limit=limit,
             max_bytes=options["max_bytes"],
-            max_seconds=timeout_minutes * 60,
+            max_seconds=timeout_seconds,
             logger=self.stdout.write,
             search_criteria="ALL",
             since_date=since_date,
