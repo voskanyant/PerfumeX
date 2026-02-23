@@ -1888,6 +1888,9 @@ class SupplierProductDetailView(LoginRequiredMixin, DetailView):
             rates_for_snapshot = _get_rates_for_date(
                 snapshot_date, rates_by_date_cache
             )
+            usd_rub_rate = rates_for_snapshot.get(
+                (models.Currency.USD, models.Currency.RUB)
+            )
             display_rub = snapshot.price_rub
             if display_rub is None:
                 display_rub = _convert_price(
@@ -1906,6 +1909,7 @@ class SupplierProductDetailView(LoginRequiredMixin, DetailView):
                 )
             snapshot.display_price_rub = display_rub
             snapshot.display_price_usd = display_usd
+            snapshot.display_exchange_rate = usd_rub_rate
         context["chart_labels"] = chart_labels
         context["chart_values"] = chart_values
         context["chart_currency"] = chart_currency

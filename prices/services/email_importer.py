@@ -305,19 +305,29 @@ def run_import(
     supplier_stats: dict[int, dict[str, object]] = {}
     unmatched_samples: dict[tuple[str, str, str], int] = {}
     log_lines: list[str] = []
-    max_log_lines = 500
+    max_log_lines = 2000
+    unmatched_log_count = 0
+    unmatched_log_limit = 25
 
     def _log_line(msg):
         stamp = timezone.localtime(timezone.now()).strftime("%H:%M:%S")
         log_lines.append(f"[{stamp}] {msg}")
         if len(log_lines) > max_log_lines:
             del log_lines[: len(log_lines) - max_log_lines]
-        if run_id and (len(log_lines) % 25 == 0):
+        if run_id and (len(log_lines) <= 3 or len(log_lines) % 10 == 0):
             models.EmailImportRun.objects.filter(id=run_id).update(
                 detailed_log="\n".join(log_lines)
             )
         if logger:
             logger(msg)
+
+    def _short(value, limit=180):
+        if value is None:
+            return ""
+        text = str(value).replace("\n", " ").replace("\r", " ").strip()
+        if len(text) <= limit:
+            return text
+        return f"{text[: limit - 1]}…"
 
     def note(msg):
         nonlocal last_message
@@ -340,6 +350,11 @@ def run_import(
         models.EmailImportRun.objects.filter(id=run_id).update(
             status=models.EmailImportStatus.RUNNING
         )
+    _log_line(
+        "Run started: "
+        f"mailboxes={len(mailboxes)} supplier_id={supplier_id or '-'} "
+        f"criteria={search_criteria} since={since_date or '-'} limit={limit or 'none'}"
+    )
     def check_timeout(context=""):
         nonlocal timed_out
         if not max_seconds:
@@ -586,9 +601,15 @@ def run_import(
                 if not client:
                     continue
                 if status != "OK" or not msg_data:
+                    _log_line(
+                        f"{mailbox.name}: skip message {msg_id.decode(errors='ignore')} - fetch body failed."
+                    )
                     continue
                 raw_email = _extract_raw_email_from_fetch(msg_data)
                 if not raw_email:
+                    _log_line(
+                        f"{mailbox.name}: skip message {msg_id.decode(errors='ignore')} - empty RFC822 payload."
+                    )
                     continue
                 uid_int = _uid_to_int(msg_id)
                 if uid_int and uid_int > max_processed_uid:
@@ -597,6 +618,13 @@ def run_import(
                 subject = _decode_header(message.get("Subject", ""))
                 from_addr = parseaddr(message.get("From", ""))[1]
                 message_id = (message.get("Message-ID") or "").strip()
+                _log_line(
+                    "Message "
+                    f"{msg_id.decode(errors='ignore')} "
+                    f"from={_short(from_addr, 80)} "
+                    f"subject='{_short(subject, 120)}' "
+                    f"msgid={_short(message_id, 80) or '-'}"
+                )
                 if not received_at and message.get("Date"):
                     try:
                         received_at = parsedate_to_datetime(message.get("Date"))
@@ -621,13 +649,22 @@ def run_import(
                         ext = _infer_extension(content_type)
                         if ext and part.get_content_maintype() != "text":
                             filename = f"attachment_{timezone.now():%Y%m%d_%H%M%S}{ext}"
+                            _log_line(
+                                f"{mailbox.name}: inferred attachment filename '{filename}' from content-type={content_type or '-'}."
+                            )
                         else:
                             summary["skipped_no_filename"] += 1
+                            _log_line(
+                                f"{mailbox.name}: SKIP attachment in message {msg_id.decode(errors='ignore')} - no filename."
+                            )
                             continue
                     summary["attachments_seen"] += 1
                     lowered_filename = filename.lower()
                     if blacklist_terms and any(term in lowered_filename for term in blacklist_terms):
                         summary["skipped_blacklist"] += 1
+                        _log_line(
+                            f"{mailbox.name}: SKIP '{filename}' - blacklist match."
+                        )
                         if run_id:
                             models.EmailImportRun.objects.filter(id=run_id).update(
                                 last_message=f"Skipped by filename blacklist: {filename}"
@@ -637,6 +674,9 @@ def run_import(
                     payload = part.get_payload(decode=True)
                     if not payload:
                         summary["skipped_no_payload"] += 1
+                        _log_line(
+                            f"{mailbox.name}: SKIP '{filename}' - empty payload."
+                        )
                         continue
 
                     rule = _pick_rule(mailbox, from_addr, subject, filename, supplier_id)
@@ -667,8 +707,16 @@ def run_import(
                                 (filename or "").strip()[:120],
                             )
                             unmatched_samples[key] = unmatched_samples.get(key, 0) + 1
+                            if unmatched_log_count < unmatched_log_limit:
+                                unmatched_log_count += 1
+                                _log_line(
+                                    f"{mailbox.name}: UNMATCHED '{filename}' from={_short(from_addr, 80)} subject='{_short(subject, 100)}'."
+                                )
                             continue
                     summary["matched_files"] += 1
+                    _log_line(
+                        f"{mailbox.name}: MATCH supplier='{matched_supplier.name}' file='{filename}'."
+                    )
                     if run_id:
                         models.EmailImportRun.objects.filter(id=run_id).update(
                             matched_files=F("matched_files") + 1
@@ -702,6 +750,9 @@ def run_import(
                                     last_message=f"Skipped unsupported file: {filename}"
                                 )
                             summary["skipped_unsupported_extension"] += 1
+                            _log_line(
+                                f"{mailbox.name}: SKIP '{filename}' - unsupported extension for price import."
+                            )
                             last_message = f"Skipped unsupported file: {filename}"
                             continue
 
@@ -731,6 +782,9 @@ def run_import(
                         ).exists()
                     if exists:
                         summary["skipped_duplicates"] += 1
+                        _log_line(
+                            f"{mailbox.name}: SKIP duplicate '{filename}' (supplier={matched_supplier.name}, hash={content_hash[:10]}...)."
+                        )
                         if run_id:
                             models.EmailImportRun.objects.filter(id=run_id).update(
                                 skipped_duplicates=F("skipped_duplicates") + 1
@@ -785,12 +839,18 @@ def run_import(
                         status=models.ImportStatus.PENDING,
                     )
                     import_file.file.save(filename, ContentFile(payload), save=True)
+                    _log_line(
+                        f"{mailbox.name}: PROCESS file='{filename}' supplier='{matched_supplier.name}' kind={file_kind} import_file_id={import_file.id}."
+                    )
                     processed_any = True
                     try:
                         process_import_file(import_file)
                         import_file.status = models.ImportStatus.PROCESSED
                         import_file.save(update_fields=["status"])
                         summary["processed_files"] += 1
+                        _log_line(
+                            f"{mailbox.name}: OK file='{filename}' supplier='{matched_supplier.name}' import_file_id={import_file.id}."
+                        )
                         stats["processed"] = stats.get("processed", 0) + 1
                         if run_id:
                             models.EmailImportRun.objects.filter(id=run_id).update(
@@ -804,13 +864,16 @@ def run_import(
                         batch.error_message = str(exc)
                         batch.save(update_fields=["status", "error_message"])
                         summary["errors"] += 1
+                        _log_line(
+                            f"{mailbox.name}: FAIL file='{filename}' supplier='{matched_supplier.name}' import_file_id={import_file.id} error={_short(exc, 260)}"
+                        )
                         stats["errors"] = stats.get("errors", 0) + 1
                         if run_id:
                             models.EmailImportRun.objects.filter(id=run_id).update(
                                 errors=F("errors") + 1,
                                 last_message=str(exc),
                             )
-                        last_message = str(exc)
+                        last_message = f"Import failed: {filename} (see detailed log)."
                         stats["last_message"] = str(exc)
 
                 for batch in batch_by_supplier.values():

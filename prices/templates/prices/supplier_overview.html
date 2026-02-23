@@ -232,7 +232,9 @@
                                 }
                             }
                             if (messageEl && run.last_message) {
-                                messageEl.textContent = run.last_message;
+                                var fullMessage = String(run.last_message);
+                                messageEl.textContent = fullMessage.length > 180 ? (fullMessage.slice(0, 179) + "…") : fullMessage;
+                                messageEl.title = fullMessage;
                             }
                             if (logEl && run.detailed_log !== undefined) {
                                 logEl.textContent = run.detailed_log || "";
@@ -305,7 +307,7 @@
                                         </div>
                                     {% endif %}
                                     {% if row.latest_run.last_message %}
-                                        <div class="muted small" data-email-message>{{ row.latest_run.last_message }}</div>
+                                        <div class="muted small" data-email-message title="{{ row.latest_run.last_message }}">{{ row.latest_run.last_message|truncatechars:180 }}</div>
                                     {% endif %}
                                     {% if row.latest_run.detailed_log %}
                                         <details class="mt-1">
