@@ -188,6 +188,19 @@ def _iter_rows_xlsx(
         workbook.close()
 
 
+def _iter_rows_xlsx_sheet(
+    workbook, sheet_name: str, sheet_index: int | None, start_row: int
+):
+    if sheet_name:
+        sheet = workbook[sheet_name]
+    elif sheet_index is not None:
+        sheet = workbook.worksheets[sheet_index]
+    else:
+        sheet = workbook.active
+    for row in sheet.iter_rows(min_row=start_row, values_only=True):
+        yield list(row)
+
+
 def _iter_rows_xlsx_file(file_obj, sheet_name: str, sheet_index: int | None, start_row: int):
     try:
         import openpyxl
@@ -223,6 +236,11 @@ def _iter_rows_xls_path(path: Path, sheet_name: str, sheet_index: int | None, st
         sheet = workbook.sheet_by_index(sheet_index)
     else:
         sheet = workbook.sheet_by_index(0)
+    for row_idx in range(start_row - 1, sheet.nrows):
+        yield sheet.row_values(row_idx)
+
+
+def _iter_rows_xls_sheet(sheet, start_row: int):
     for row_idx in range(start_row - 1, sheet.nrows):
         yield sheet.row_values(row_idx)
 
@@ -464,18 +482,45 @@ def process_import_file(import_file: models.ImportFile) -> None:
                     )
                 )
         else:
-            rows = _iter_rows_xlsx(path, mapping.sheet_name, mapping.sheet_index, start_row)
-            parsed_rows = list(
-                _parse_rows(
-                    rows,
-                    sku_col,
-                    name_cols,
-                    price_col,
-                    currency_col,
-                    import_file.import_batch.supplier.default_currency,
-                    skip_until_valid=True,
+            try:
+                import openpyxl
+            except ImportError as exc:
+                raise RuntimeError("openpyxl is required to read .xlsx files") from exc
+
+            workbook = openpyxl.load_workbook(path, data_only=True, read_only=True)
+            try:
+                rows = _iter_rows_xlsx_sheet(workbook, mapping.sheet_name, mapping.sheet_index, start_row)
+                parsed_rows = list(
+                    _parse_rows(
+                        rows,
+                        sku_col,
+                        name_cols,
+                        price_col,
+                        currency_col,
+                        import_file.import_batch.supplier.default_currency,
+                        skip_until_valid=True,
+                    )
                 )
-            )
+                # Some supplier files keep the price table on a non-active sheet.
+                if not parsed_rows and not mapping.sheet_name and mapping.sheet_index is None:
+                    for sheet in workbook.worksheets:
+                        rows = _iter_rows_xlsx_sheet(workbook, sheet.title, None, start_row)
+                        candidate_rows = list(
+                            _parse_rows(
+                                rows,
+                                sku_col,
+                                name_cols,
+                                price_col,
+                                currency_col,
+                                import_file.import_batch.supplier.default_currency,
+                                skip_until_valid=True,
+                            )
+                        )
+                        if candidate_rows:
+                            parsed_rows = candidate_rows
+                            break
+            finally:
+                workbook.close()
     elif extension in {".xls"}:
         parsed_rows = []
         sheet_names = [
@@ -516,7 +561,19 @@ def process_import_file(import_file: models.ImportFile) -> None:
                     )
                 )
         else:
-            rows = _iter_rows_xls_path(path, mapping.sheet_name, mapping.sheet_index, start_row)
+            try:
+                import xlrd
+            except ImportError as exc:
+                raise RuntimeError("xlrd is required to read .xls files") from exc
+
+            workbook = xlrd.open_workbook(path)
+            if mapping.sheet_name:
+                selected_sheet = workbook.sheet_by_name(mapping.sheet_name)
+            elif mapping.sheet_index is not None:
+                selected_sheet = workbook.sheet_by_index(mapping.sheet_index)
+            else:
+                selected_sheet = workbook.sheet_by_index(0)
+            rows = _iter_rows_xls_sheet(selected_sheet, start_row)
             parsed_rows = list(
                 _parse_rows(
                     rows,
@@ -528,6 +585,23 @@ def process_import_file(import_file: models.ImportFile) -> None:
                     skip_until_valid=True,
                 )
             )
+            if not parsed_rows and not mapping.sheet_name and mapping.sheet_index is None:
+                for idx in range(workbook.nsheets):
+                    rows = _iter_rows_xls_sheet(workbook.sheet_by_index(idx), start_row)
+                    candidate_rows = list(
+                        _parse_rows(
+                            rows,
+                            sku_col,
+                            name_cols,
+                            price_col,
+                            currency_col,
+                            import_file.import_batch.supplier.default_currency,
+                            skip_until_valid=True,
+                        )
+                    )
+                    if candidate_rows:
+                        parsed_rows = candidate_rows
+                        break
     else:
         raise RuntimeError(f"Unsupported file type: {extension}")
 
