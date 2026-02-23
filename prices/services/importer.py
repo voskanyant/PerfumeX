@@ -416,7 +416,7 @@ def process_import_file(import_file: models.ImportFile) -> None:
 
     path = Path(import_file.file.path)
     extension = path.suffix.lower()
-    start_row = 1
+    start_row = mapping.header_row or 1
     column_map = mapping.column_map or {}
     sku_col = int(column_map.get("sku", 0))
     name_value = column_map.get("name", 0)
@@ -613,6 +613,60 @@ def process_import_file(import_file: models.ImportFile) -> None:
     usd_rub_rate = _get_historical_usd_rub_rate(rate_lookup_date)
     rates_for_date = _get_rates_for_date(rate_lookup_date)
     supplier_currency = import_file.import_batch.supplier.default_currency
+
+    if not parsed_rows:
+        # Some supplier files shift header/data row unexpectedly.
+        # If the configured start row yields nothing, retry a small range.
+        fallback_rows = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+        fallback_rows = [row for row in fallback_rows if row != start_row]
+        for candidate_start in fallback_rows:
+            try:
+                if extension in {".csv"}:
+                    rows = _iter_rows_csv(path, candidate_start)
+                    candidate_parsed = list(
+                        _parse_rows(
+                            rows,
+                            sku_col,
+                            name_cols,
+                            price_col,
+                            currency_col,
+                            import_file.import_batch.supplier.default_currency,
+                            skip_until_valid=True,
+                        )
+                    )
+                elif extension in {".xlsx"}:
+                    rows = _iter_rows_xlsx(path, mapping.sheet_name, mapping.sheet_index, candidate_start)
+                    candidate_parsed = list(
+                        _parse_rows(
+                            rows,
+                            sku_col,
+                            name_cols,
+                            price_col,
+                            currency_col,
+                            import_file.import_batch.supplier.default_currency,
+                            skip_until_valid=True,
+                        )
+                    )
+                elif extension in {".xls"}:
+                    rows = _iter_rows_xls_path(path, mapping.sheet_name, mapping.sheet_index, candidate_start)
+                    candidate_parsed = list(
+                        _parse_rows(
+                            rows,
+                            sku_col,
+                            name_cols,
+                            price_col,
+                            currency_col,
+                            import_file.import_batch.supplier.default_currency,
+                            skip_until_valid=True,
+                        )
+                    )
+                else:
+                    candidate_parsed = []
+            except Exception:
+                candidate_parsed = []
+            if candidate_parsed:
+                parsed_rows = candidate_parsed
+                break
 
     if not parsed_rows:
         raise RuntimeError(
