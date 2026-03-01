@@ -182,8 +182,8 @@
                             </div>
                             <a class="button secondary" href="{{ overview_url }}?supplier={{ run.supplier.id }}">Open supplier</a>
                         </div>
-                        {% if run.detailed_log %}
-                            <pre class="run-log-pre">{{ run.detailed_log }}</pre>
+                        {% if run.console_log %}
+                            <pre class="run-log-pre">{{ run.console_log }}</pre>
                         {% else %}
                             <p class="run-log-empty">No detailed lines available for this run.</p>
                         {% endif %}
@@ -247,20 +247,7 @@
                             </div>
                             <a class="button secondary" href="{% url 'prices:import_detail' batch.id %}">Open batch</a>
                         </div>
-                        {% if batch.error_message %}
-                            <pre class="run-log-pre">{{ batch.error_message }}</pre>
-                        {% endif %}
-                        <div class="run-log-summary">
-                            {% for f in batch.importfile_set.all %}
-                                <span>
-                                    {{ f.file_kind }}: {{ f.filename }}
-                                    ({{ f.status }})
-                                    {% if f.error_message %} - {{ f.error_message }}{% endif %}
-                                </span>
-                            {% empty %}
-                                <span>No files linked.</span>
-                            {% endfor %}
-                        </div>
+                        <pre class="run-log-pre">{{ batch.console_log }}</pre>
                     </div>
                 {% endfor %}
             </div>

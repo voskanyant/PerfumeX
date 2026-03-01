@@ -245,6 +245,45 @@ def _find_all_mail_folder(client):
     return None
 
 
+def _find_archive_like_folder(client):
+    """
+    Find archive-like folder for non-Gmail providers (e.g. mail.ru).
+    Prefer folders flagged as \\Archive, then common archive name patterns.
+    """
+    try:
+        status, data = client.list()
+    except Exception:
+        return None
+    if status != "OK" or not data:
+        return None
+
+    archive_candidates = []
+    name_candidates = []
+    for row in data:
+        if not row:
+            continue
+        text = row.decode(errors="ignore")
+        lowered = text.lower()
+        quoted = re.findall(r'"([^"]*)"', text)
+        folder_name = quoted[-1] if quoted else None
+        if not folder_name:
+            parts = text.rsplit(" ", 1)
+            if len(parts) == 2:
+                folder_name = parts[-1].strip('"')
+        if not folder_name:
+            continue
+        if "\\Archive" in text:
+            archive_candidates.append(folder_name)
+            continue
+        if any(token in lowered for token in ("archive", "архив", "all mail")):
+            name_candidates.append(folder_name)
+    if archive_candidates:
+        return archive_candidates[0]
+    if name_candidates:
+        return name_candidates[0]
+    return None
+
+
 def _select_mailbox(client, folder_name):
     if not folder_name:
         return False
@@ -305,7 +344,7 @@ def run_import(
     supplier_stats: dict[int, dict[str, object]] = {}
     unmatched_samples: dict[tuple[str, str, str], int] = {}
     log_lines: list[str] = []
-    max_log_lines = 2000
+    max_log_lines = 20000
     unmatched_log_count = 0
     unmatched_log_limit = 25
 
@@ -350,10 +389,12 @@ def run_import(
         models.EmailImportRun.objects.filter(id=run_id).update(
             status=models.EmailImportStatus.RUNNING
         )
+    timeout_label = "disabled" if not max_seconds else f"{int(max_seconds // 60)}m"
     _log_line(
         "Run started: "
         f"mailboxes={len(mailboxes)} supplier_id={supplier_id or '-'} "
-        f"criteria={search_criteria} since={since_date or '-'} limit={limit or 'none'}"
+        f"criteria={search_criteria} since={since_date or '-'} limit={limit or 'none'} "
+        f"timeout={timeout_label}"
     )
     def check_timeout(context=""):
         nonlocal timed_out
@@ -487,6 +528,32 @@ def run_import(
                             f"Skipping mailbox due mailbox re-select failure: {mailbox.name} ({selected_folder})"
                         )
                         continue
+            elif mailbox.host and any(
+                domain in mailbox.host.lower()
+                for domain in ("mail.ru", "inbox.ru", "list.ru", "bk.ru")
+            ):
+                # mail.ru-family providers may keep relevant messages outside INBOX.
+                # For supplier/manual runs, try archive-like folder and merge with INBOX.
+                # This keeps broad cron runs lightweight while making targeted runs reliable.
+                if supplier or from_filter or subject_filter:
+                    try:
+                        archive_folder = _find_archive_like_folder(client)
+                        if archive_folder and _select_mailbox(client, archive_folder):
+                            status, data, client = _imap_search(
+                                client, mailbox, criteria, _log_line, selected_folder=archive_folder
+                            )
+                            if status == "OK":
+                                archive_ids = set(data[0].split())
+                                if archive_ids:
+                                    merged = set(message_ids) | archive_ids
+                                    message_ids = list(merged)
+                                    note(
+                                        f"{mailbox.name}: found {len(archive_ids)} message(s) in archive folder '{archive_folder}'."
+                                    )
+                            # Return to INBOX for fetch loop.
+                            _select_mailbox(client, "INBOX")
+                    except Exception as exc:
+                        _log(_log_line, f"mail.ru archive fallback failed ({mailbox.name}): {exc}")
             # Process oldest first so history is built chronologically.
             try:
                 message_ids = sorted(message_ids, key=lambda x: int(x))
@@ -510,8 +577,14 @@ def run_import(
                 message_ids = filtered_ids
             if limit:
                 if use_uid_cursor and not supplier and not from_filter and not subject_filter:
-                    # With UID cursor, process oldest new first to drain backlog safely.
-                    message_ids = message_ids[:limit]
+                    # For recurring auto-import runs we prioritize newest messages first.
+                    # This prevents "stuck" behavior after mailbox re-enable when UID backlog is large.
+                    backlog = max(0, len(message_ids) - limit)
+                    if backlog:
+                        _log_line(
+                            f"{mailbox.name}: backlog={backlog} message(s); processing newest {limit}."
+                        )
+                    message_ids = message_ids[-limit:]
                 else:
                     # Without cursor, newest-first is safer for manual recovery runs.
                     message_ids = message_ids[-limit:]

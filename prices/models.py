@@ -194,6 +194,36 @@ def _safe_file_part(value: str) -> str:
     return text or "file"
 
 
+def _strip_leading_datetime_prefix(value: str) -> str:
+    """
+    Remove legacy leading datetime prefixes to avoid building names like:
+    2026-02-24_20-00_supplier_2026-02-24_20-00_original.xlsx
+    """
+    text = (value or "").strip()
+    if not text:
+        return text
+
+    # Examples handled:
+    # 2026-02-24_20-00_file
+    # 2026-02-24_20-00-15_file
+    # supplier_2026-02-24_20-00_file
+    # supplier__2026-02-24_20-00__file
+    datetime_token = r"\d{4}-\d{2}-\d{2}[ _-]\d{2}[-_:]\d{2}(?:[-_:]\d{2})?"
+    patterns = [
+        rf"^(?:{datetime_token})[_-]*",
+        rf"^[A-Za-z0-9._-]{{2,48}}__?(?:{datetime_token})[_-]*",
+    ]
+    for _ in range(3):
+        updated = text
+        for pattern in patterns:
+            updated = re.sub(pattern, "", updated, count=1)
+        updated = updated.strip("._-")
+        if updated == text:
+            break
+        text = updated
+    return text or value
+
+
 def build_import_file_path(import_file: "ImportFile", filename: str) -> str:
     # Keep full storage path <= 100 chars for deployments where FileField DB column
     # is still varchar(100).
@@ -217,7 +247,8 @@ def build_import_file_path(import_file: "ImportFile", filename: str) -> str:
     local_received = timezone.localtime(received_at)
     dt_prefix = local_received.strftime("%Y-%m-%d_%H-%M")
 
-    original_part = _safe_file_part(stem)
+    normalized_stem = _strip_leading_datetime_prefix(stem)
+    original_part = _safe_file_part(normalized_stem)
     base_prefix = f"{dt_prefix}_{supplier_slug_file}_"
 
     folder_prefix = f"imports/{supplier_folder}/"

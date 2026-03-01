@@ -504,6 +504,7 @@ class ImportDetailedLogsView(LoginRequiredMixin, TemplateView):
             runs = runs.filter(status=status_filter)
         paginator = Paginator(runs, 30)
         page = paginator.get_page(self.request.GET.get("page", "1"))
+        run_items = list(page.object_list)
 
         batches = (
             models.ImportBatch.objects.select_related("supplier", "mailbox")
@@ -521,6 +522,74 @@ class ImportDetailedLogsView(LoginRequiredMixin, TemplateView):
                 batches = batches.filter(status=models.ImportStatus.PENDING)
         batch_paginator = Paginator(batches, 20)
         batch_page = batch_paginator.get_page(self.request.GET.get("bpage", "1"))
+        batch_items = list(batch_page.object_list)
+
+        for run in run_items:
+            run.console_log = run.detailed_log or ""
+            if run.console_log:
+                continue
+            started = run.started_at
+            finished = run.finished_at or timezone.now()
+            related_batches = [
+                b
+                for b in batch_items
+                if b.supplier_id == run.supplier_id
+                and b.created_at >= started
+                and b.created_at <= finished
+            ]
+            lines = []
+            for batch in related_batches:
+                stamp_dt = batch.received_at or batch.created_at
+                stamp = timezone.localtime(stamp_dt).strftime("%H:%M:%S") if stamp_dt else "--:--:--"
+                mailbox_name = batch.mailbox.name if batch.mailbox else "manual/backfill"
+                lines.append(
+                    f"[{stamp}] BATCH supplier={batch.supplier.name} status={batch.status} mailbox={mailbox_name}"
+                )
+                for file_obj in batch.importfile_set.all():
+                    file_stamp_dt = file_obj.processed_at or batch.created_at
+                    file_stamp = (
+                        timezone.localtime(file_stamp_dt).strftime("%H:%M:%S")
+                        if file_stamp_dt
+                        else "--:--:--"
+                    )
+                    mapping_name = str(file_obj.mapping) if file_obj.mapping else "-"
+                    lines.append(
+                        f"[{file_stamp}] FILE status={file_obj.status} kind={file_obj.file_kind} "
+                        f"mapping={mapping_name} name='{file_obj.filename}'"
+                    )
+                    if file_obj.error_message:
+                        lines.append(f"[{file_stamp}] ERROR {file_obj.error_message}")
+            run.console_log = "\n".join(lines)
+
+        for batch in batch_items:
+            lines = []
+            stamp_dt = batch.received_at or batch.created_at
+            stamp = timezone.localtime(stamp_dt).strftime("%H:%M:%S") if stamp_dt else "--:--:--"
+            mailbox_name = batch.mailbox.name if batch.mailbox else "manual/backfill"
+            lines.append(
+                f"[{stamp}] BATCH supplier={batch.supplier.name} status={batch.status} mailbox={mailbox_name} "
+                f"message_id={batch.message_id or '-'}"
+            )
+            for file_obj in batch.importfile_set.all():
+                file_stamp_dt = file_obj.processed_at or batch.created_at
+                file_stamp = (
+                    timezone.localtime(file_stamp_dt).strftime("%H:%M:%S")
+                    if file_stamp_dt
+                    else "--:--:--"
+                )
+                mapping_name = str(file_obj.mapping) if file_obj.mapping else "-"
+                lines.append(
+                    f"[{file_stamp}] FILE status={file_obj.status} kind={file_obj.file_kind} "
+                    f"mapping={mapping_name} name='{file_obj.filename}'"
+                )
+                if file_obj.error_message:
+                    lines.append(f"[{file_stamp}] ERROR {file_obj.error_message}")
+            if batch.error_message:
+                lines.append(f"[{stamp}] BATCH_ERROR {batch.error_message}")
+            batch.console_log = "\n".join(lines)
+
+        page.object_list = run_items
+        batch_page.object_list = batch_items
 
         context["runs_page"] = page
         context["batches_page"] = batch_page

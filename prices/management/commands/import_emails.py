@@ -158,6 +158,15 @@ class Command(BaseCommand):
         mailboxes = models.Mailbox.objects.filter(is_active=True)
         if options["mailbox"]:
             mailboxes = mailboxes.filter(name=options["mailbox"])
+        mailbox_list = list(mailboxes)
+        if mailbox_list:
+            self.stdout.write(
+                "Active mailboxes: "
+                + ", ".join([f"{m.name}({m.protocol})" for m in mailbox_list])
+            )
+        else:
+            self.stdout.write("No active mailboxes configured.")
+            return
 
         limit = options["limit"] if options["limit"] else settings_obj.max_messages_per_run
 
@@ -228,7 +237,7 @@ class Command(BaseCommand):
                 f"Checking supplier {supplier.name} (since {since_date:%Y-%m-%d %H:%M})"
             )
             summary = run_import(
-                mailboxes=mailboxes,
+                mailboxes=mailbox_list,
                 supplier_id=supplier.id,
                 mark_seen=False,
                 limit=limit,
@@ -264,7 +273,7 @@ class Command(BaseCommand):
 
         self.stdout.write(f"Checking mailboxes (since {since_date:%Y-%m-%d %H:%M})")
         summary = run_import(
-            mailboxes=mailboxes,
+            mailboxes=mailbox_list,
             supplier_id=None,
             mark_seen=False,
             limit=limit,
