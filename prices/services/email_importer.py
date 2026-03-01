@@ -18,6 +18,19 @@ from prices import models
 from prices.services.importer import process_import_file
 
 
+def _mailbox_host_candidates(mailbox):
+    host = (mailbox.host or "").strip()
+    candidates = []
+    if host:
+        candidates.append(host)
+    lowered = host.lower()
+    # mail.ru family domains commonly use imap.mail.ru regardless of sender domain.
+    if any(domain in lowered for domain in ("mail.ru", "inbox.ru", "list.ru", "bk.ru")):
+        if "imap.mail.ru" not in {c.lower() for c in candidates}:
+            candidates.append("imap.mail.ru")
+    return candidates
+
+
 def _decode_header(value):
     if not value:
         return ""
@@ -122,19 +135,23 @@ def _find_supplier_fallback(suppliers, from_addr, subject, filename):
 
 
 def _connect_imap(mailbox, logger, select_folder="INBOX"):
+    host_candidates = _mailbox_host_candidates(mailbox)
     for attempt in range(2):
-        try:
-            client = imaplib.IMAP4_SSL(mailbox.host, mailbox.port, timeout=45)
-            client.login(mailbox.username, mailbox.password)
-            if not _select_mailbox(client, select_folder):
-                raise RuntimeError(f"Could not select mailbox: {select_folder}")
-            return client
-        except Exception as exc:
-            _log(
-                logger,
-                f"IMAP connection failed for {mailbox.name} (attempt {attempt + 1}/2): {exc}",
-            )
-            time.sleep(1)
+        for host in host_candidates:
+            try:
+                client = imaplib.IMAP4_SSL(host, mailbox.port, timeout=45)
+                client.login(mailbox.username, mailbox.password)
+                if not _select_mailbox(client, select_folder):
+                    raise RuntimeError(f"Could not select mailbox: {select_folder}")
+                if (mailbox.host or "").strip().lower() != host.lower():
+                    _log(logger, f"{mailbox.name}: connected via fallback host {host}.")
+                return client
+            except Exception as exc:
+                _log(
+                    logger,
+                    f"IMAP connection failed for {mailbox.name} via {host} (attempt {attempt + 1}/2): {exc}",
+                )
+        time.sleep(1)
     return None
 
 
@@ -533,9 +550,9 @@ def run_import(
                 for domain in ("mail.ru", "inbox.ru", "list.ru", "bk.ru")
             ):
                 # mail.ru-family providers may keep relevant messages outside INBOX.
-                # For supplier/manual runs, try archive-like folder and merge with INBOX.
-                # This keeps broad cron runs lightweight while making targeted runs reliable.
-                if supplier or from_filter or subject_filter:
+                # For supplier/manual runs OR when INBOX is empty, try archive-like folder.
+                # This keeps broad cron runs lightweight but prevents missing archived mail.
+                if supplier or from_filter or subject_filter or not inbox_ids:
                     try:
                         archive_folder = _find_archive_like_folder(client)
                         if archive_folder and _select_mailbox(client, archive_folder):

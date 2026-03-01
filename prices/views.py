@@ -1070,7 +1070,9 @@ class SupplierEmailBackfillView(LoginRequiredMixin, View):
 
         def _run():
             close_old_connections()
-            mailboxes = models.Mailbox.objects.filter(is_active=True)
+            mailboxes = models.Mailbox.objects.filter(is_active=True).order_by(
+                "priority", "id"
+            )
             settings_obj = models.ImportSettings.get_solo()
             timeout_minutes = int(settings_obj.supplier_timeout_minutes or 0)
             timeout_seconds = timeout_minutes * 60 if timeout_minutes > 0 else None
@@ -1137,7 +1139,9 @@ class SupplierEmailBackfillBulkView(LoginRequiredMixin, View):
 
         def _run_bulk():
             close_old_connections()
-            mailboxes = list(models.Mailbox.objects.filter(is_active=True))
+            mailboxes = list(
+                models.Mailbox.objects.filter(is_active=True).order_by("priority", "id")
+            )
             settings_obj = models.ImportSettings.get_solo()
             timeout_minutes = int(settings_obj.supplier_timeout_minutes or 0)
             timeout_seconds = timeout_minutes * 60 if timeout_minutes > 0 else None
@@ -1284,7 +1288,9 @@ class SupplierEmailImportAllView(LoginRequiredMixin, View):
 
         def _run_all():
             close_old_connections()
-            mailboxes = list(models.Mailbox.objects.filter(is_active=True))
+            mailboxes = list(
+                models.Mailbox.objects.filter(is_active=True).order_by("priority", "id")
+            )
             settings_obj = models.ImportSettings.get_solo()
             timeout_minutes = int(settings_obj.supplier_timeout_minutes or 0)
             timeout_seconds = timeout_minutes * 60 if timeout_minutes > 0 else None
@@ -1651,7 +1657,8 @@ def _save_supplier_mapping_from_import_form(form, supplier):
 
 class MailboxListView(BaseListView):
     model = models.Mailbox
-    list_display = ("name", "protocol", "host", "username", "is_active")
+    list_display = ("priority", "name", "protocol", "host", "username", "is_active")
+    ordering = ("priority", "id")
     create_url_name = "prices:mailbox_create"
     update_url_name = "prices:mailbox_update"
     delete_url_name = "prices:mailbox_delete"

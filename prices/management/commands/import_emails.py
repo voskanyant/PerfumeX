@@ -155,7 +155,9 @@ class Command(BaseCommand):
                     self.stdout.write("Skipped. Last run too recent.")
                     return
 
-        mailboxes = models.Mailbox.objects.filter(is_active=True)
+        mailboxes = models.Mailbox.objects.filter(is_active=True).order_by(
+            "priority", "id"
+        )
         if options["mailbox"]:
             mailboxes = mailboxes.filter(name=options["mailbox"])
         mailbox_list = list(mailboxes)

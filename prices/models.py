@@ -67,9 +67,23 @@ class Mailbox(models.Model):
     password = models.CharField(max_length=200)
     use_ssl = models.BooleanField(default=True)
     is_active = models.BooleanField(default=True)
+    priority = models.PositiveIntegerField(default=100, db_index=True)
     last_inbox_uid = models.BigIntegerField(default=0)
     last_all_mail_uid = models.BigIntegerField(default=0)
     last_checked_at = models.DateTimeField(null=True, blank=True)
+
+    def save(self, *args, **kwargs):
+        # If mailbox was deactivated and is turned on again, reset UID cursors
+        # so importer doesn't stay pinned to stale offsets.
+        if self.pk:
+            previous = Mailbox.objects.filter(pk=self.pk).values(
+                "is_active", "last_inbox_uid", "last_all_mail_uid", "last_checked_at"
+            ).first()
+            if previous and not previous["is_active"] and self.is_active:
+                self.last_inbox_uid = 0
+                self.last_all_mail_uid = 0
+                self.last_checked_at = None
+        return super().save(*args, **kwargs)
 
     def __str__(self) -> str:
         return self.name
