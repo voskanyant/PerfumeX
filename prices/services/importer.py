@@ -29,11 +29,42 @@ def _parse_decimal(value) -> Decimal | None:
     text = str(value).strip()
     if not text:
         return None
-    text = text.replace(" ", "")
-    match = re.search(r"-?\d+(?:[.,]\d+)?", text)
-    if match:
-        text = match.group(0)
-    text = text.replace(",", ".")
+    # Keep only number-ish chunk, including common thousands separators.
+    match = re.search(r"[-+]?\d[\d\s\u00A0\u202F.,']*", text)
+    if not match:
+        return None
+    text = match.group(0)
+    # Normalize all kinds of spaces and apostrophe thousands separators.
+    text = re.sub(r"[\s\u00A0\u202F']", "", text)
+    if not text:
+        return None
+
+    # Resolve decimal separator heuristically.
+    has_comma = "," in text
+    has_dot = "." in text
+    if has_comma and has_dot:
+        # Last separator is decimal, other one is thousands.
+        if text.rfind(",") > text.rfind("."):
+            text = text.replace(".", "")
+            text = text.replace(",", ".")
+        else:
+            text = text.replace(",", "")
+    elif has_comma:
+        parts = text.split(",")
+        if len(parts) == 2 and len(parts[1]) in (1, 2):
+            text = parts[0] + "." + parts[1]
+        elif len(parts) >= 2 and len(parts[-1]) in (1, 2):
+            text = "".join(parts[:-1]) + "." + parts[-1]
+        else:
+            text = "".join(parts)
+    elif has_dot:
+        parts = text.split(".")
+        if len(parts) == 2 and len(parts[1]) in (1, 2):
+            text = parts[0] + "." + parts[1]
+        elif len(parts) >= 2 and len(parts[-1]) in (1, 2):
+            text = "".join(parts[:-1]) + "." + parts[-1]
+        else:
+            text = "".join(parts)
     try:
         return Decimal(text)
     except InvalidOperation:
