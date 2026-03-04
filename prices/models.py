@@ -316,6 +316,12 @@ class PriceSnapshot(models.Model):
     price_usd = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
     recorded_at = models.DateTimeField(default=timezone.now)
 
+    class Meta:
+        indexes = [
+            models.Index(fields=["supplier_product", "-recorded_at"]),
+            models.Index(fields=["supplier_product", "recorded_at"]),
+        ]
+
     def __str__(self) -> str:
         return f"{self.supplier_product} / {self.price} {self.currency}"
 

@@ -73,6 +73,21 @@
             margin: -8px 0 4px;
             border-bottom: 1px solid var(--app-border);
         }
+        .filters.filters-products .filter-item.search-full-width.is-pinned {
+            position: fixed;
+            left: 0;
+            right: auto;
+            z-index: 1045;
+            border: 1px solid var(--app-border);
+            border-radius: 12px;
+            padding: 10px 12px;
+            margin: 0;
+            box-shadow: var(--app-shadow);
+        }
+        .filters.filters-products .search-sticky-placeholder {
+            display: none;
+            width: 100%;
+        }
         .extra-filters-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -153,38 +168,16 @@
         .supplier-filter-link:hover {
             border-bottom-color: #94a3b8;
         }
-        .name-copy-wrap {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-        }
-        .name-copy-btn {
-            border: 0;
-            background: transparent;
-            color: #64748b;
-            padding: 0;
-            line-height: 1;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-        }
-        .name-copy-btn:hover {
-            color: #0f172a;
-        }
-        .name-copy-btn svg {
-            width: 14px;
-            height: 14px;
-        }
-        .name-copy-btn.copied {
-            color: #16a34a;
-        }
         @media (max-width: 991.98px) {
             .filters.filters-products .filter-item.search-full-width {
                 top: 64px;
                 z-index: 1040;
                 padding-top: 10px;
                 margin-top: -10px;
+            }
+            .filters.filters-products .filter-item.search-full-width.is-pinned {
+                border-radius: 10px;
+                padding: 8px 10px;
             }
         }
     </style>
@@ -491,31 +484,12 @@
                                     {% else %}
                                         <td data-field="{{ field }}"
                                             data-label="{% if field == 'supplier' %}Supplier{% elif field == 'supplier_sku' %}SKU{% elif field == 'name' %}Name{% else %}{{ field|capfirst }}{% endif %}">
-                                            {% if field == "name" and show_status %}
-                                                <span class="status-dot {% if obj.is_active %}active{% else %}inactive{% endif %}"></span>
-                                            {% endif %}
                                             {% if link_detail and detail_url_name and field == "name" %}
-                                                <span class="name-copy-wrap">
-                                                    <a href="{% url detail_url_name obj.pk %}?next={{ request.get_full_path|urlencode }}&from={{ obj.pk }}">{{ obj|get_attr:field }}</a>
-                                                    <button type="button" class="name-copy-btn" data-copy-text="{{ obj|get_attr:field }}" title="Copy name" aria-label="Copy product name">
-                                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                                                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                                                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                                                        </svg>
-                                                    </button>
-                                                </span>
+                                                <a href="{% url detail_url_name obj.pk %}?next={{ request.get_full_path|urlencode }}&from={{ obj.pk }}">{{ obj|get_attr:field }}</a>
                                             {% elif field == "supplier" and obj.supplier_id %}
                                                 <a href="?supplier={{ obj.supplier_id }}" class="supplier-filter-link" data-supplier-id="{{ obj.supplier_id }}">{{ obj|get_attr:field }}</a>
                                             {% elif field == "name" %}
-                                                <span class="name-copy-wrap">
-                                                    <span>{{ obj|get_attr:field }}</span>
-                                                    <button type="button" class="name-copy-btn" data-copy-text="{{ obj|get_attr:field }}" title="Copy name" aria-label="Copy product name">
-                                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                                                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                                                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                                                        </svg>
-                                                    </button>
-                                                </span>
+                                                <span>{{ obj|get_attr:field }}</span>
                                             {% else %}
                                                 {{ obj|get_attr:field }}
                                             {% endif %}
@@ -653,6 +627,79 @@
                     : [];
                 var selectedSupplierIds = [];
                 var lastViewedKey = "products_last_viewed_id";
+                var stickySearchItem = input.closest(".filter-item.search-full-width");
+                var stickyPlaceholder = null;
+                var isPinnedSearch = false;
+                var tableCard = document.querySelector(".card.p-2.p-md-3");
+
+                function getStickyTopOffset() {
+                    return window.matchMedia("(max-width: 991.98px)").matches ? 64 : 72;
+                }
+
+                function ensureStickyPlaceholder() {
+                    if (!stickySearchItem) return null;
+                    if (stickyPlaceholder) return stickyPlaceholder;
+                    stickyPlaceholder = document.createElement("div");
+                    stickyPlaceholder.className = "search-sticky-placeholder";
+                    stickySearchItem.insertAdjacentElement("afterend", stickyPlaceholder);
+                    return stickyPlaceholder;
+                }
+
+                function setPinnedSearchState(shouldPin) {
+                    if (!stickySearchItem) return;
+                    var placeholder = ensureStickyPlaceholder();
+                    if (shouldPin && !isPinnedSearch) {
+                        var rect = stickySearchItem.getBoundingClientRect();
+                        if (placeholder) {
+                            placeholder.style.height = rect.height + "px";
+                            placeholder.style.display = "block";
+                        }
+                        stickySearchItem.classList.add("is-pinned");
+                        stickySearchItem.style.width = rect.width + "px";
+                        stickySearchItem.style.left = rect.left + "px";
+                        stickySearchItem.style.top = getStickyTopOffset() + "px";
+                        isPinnedSearch = true;
+                        return;
+                    }
+                    if (!shouldPin && isPinnedSearch) {
+                        stickySearchItem.classList.remove("is-pinned");
+                        stickySearchItem.style.width = "";
+                        stickySearchItem.style.left = "";
+                        stickySearchItem.style.top = "";
+                        if (placeholder) {
+                            placeholder.style.display = "none";
+                            placeholder.style.height = "";
+                        }
+                        isPinnedSearch = false;
+                    }
+                }
+
+                function syncPinnedSearchGeometry() {
+                    if (!stickySearchItem || !isPinnedSearch) return;
+                    var placeholder = ensureStickyPlaceholder();
+                    if (!placeholder) return;
+                    var rect = placeholder.getBoundingClientRect();
+                    stickySearchItem.style.width = rect.width + "px";
+                    stickySearchItem.style.left = rect.left + "px";
+                    stickySearchItem.style.top = getStickyTopOffset() + "px";
+                }
+
+                function updatePinnedSearchOnScroll() {
+                    if (!stickySearchItem) return;
+                    var topOffset = getStickyTopOffset();
+                    var referenceRect = isPinnedSearch && stickyPlaceholder
+                        ? stickyPlaceholder.getBoundingClientRect()
+                        : stickySearchItem.getBoundingClientRect();
+                    var tableBottom = tableCard
+                        ? tableCard.getBoundingClientRect().bottom
+                        : Number.POSITIVE_INFINITY;
+                    var thresholdBottom = topOffset + Math.max(stickySearchItem.offsetHeight, 72) + 8;
+                    var shouldPin = referenceRect.top <= topOffset && tableBottom > thresholdBottom;
+                    setPinnedSearchState(shouldPin);
+                    if (shouldPin) {
+                        syncPinnedSearchGeometry();
+                    }
+                }
 
                 function decorateButtons(container) {
                     if (!container) return;
@@ -947,16 +994,6 @@
 
                         if (detailBase && item.id) {
                             name = "<a href='" + detailBase + item.id + "/?next=" + encodeURIComponent(nextValue) + "&from=" + item.id + "'>" + escapedName + "</a>";
-                        }
-                        var copyBtnHtml = "<button type='button' class='name-copy-btn' data-copy-text='" + escapedName + "' title='Copy name' aria-label='Copy product name'>" +
-                            "<svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' aria-hidden='true'>" +
-                            "<rect x='9' y='9' width='13' height='13' rx='2' ry='2'></rect>" +
-                            "<path d='M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1'></path>" +
-                            "</svg></button>";
-                        name = "<span class='name-copy-wrap'>" + name + copyBtnHtml + "</span>";
-                        if (item.is_active !== undefined) {
-                            var dotClass = item.is_active ? "active" : "inactive";
-                            name = "<span class='status-dot " + dotClass + "'></span>" + name;
                         }
 
                         var checkboxCell = bulkEnabled
@@ -1278,23 +1315,6 @@
                     });
                 }
                 if (tbody) {
-                    function copyTextToClipboard(text) {
-                        var value = String(text || "").trim();
-                        if (!value) return;
-                        if (navigator.clipboard && navigator.clipboard.writeText) {
-                            navigator.clipboard.writeText(value).catch(function () {});
-                            return;
-                        }
-                        var temp = document.createElement("textarea");
-                        temp.value = value;
-                        temp.style.position = "fixed";
-                        temp.style.opacity = "0";
-                        document.body.appendChild(temp);
-                        temp.focus();
-                        temp.select();
-                        try { document.execCommand("copy"); } catch (e) {}
-                        document.body.removeChild(temp);
-                    }
                     tbody.addEventListener("click", function (event) {
                         var isMobileProductsTable =
                             table &&
@@ -1309,17 +1329,6 @@
                                 tappedRow.classList.toggle("sku-expanded");
                                 return;
                             }
-                        }
-                        var copyBtn = event.target.closest("button.name-copy-btn[data-copy-text]");
-                        if (copyBtn) {
-                            event.preventDefault();
-                            event.stopPropagation();
-                            copyTextToClipboard(copyBtn.getAttribute("data-copy-text") || "");
-                            copyBtn.classList.add("copied");
-                            setTimeout(function () {
-                                copyBtn.classList.remove("copied");
-                            }, 900);
-                            return;
                         }
                         var supplierLink = event.target.closest("a.supplier-filter-link[data-supplier-id]");
                         if (supplierLink) {
@@ -1350,6 +1359,12 @@
                         }
                     });
                 }
+                updatePinnedSearchOnScroll();
+                window.addEventListener("scroll", updatePinnedSearchOnScroll, { passive: true });
+                window.addEventListener("resize", function () {
+                    updatePinnedSearchOnScroll();
+                    syncPinnedSearchGeometry();
+                });
                 applyLastViewedHighlight();
                 var serverSearchOnLoad = input.getAttribute("data-server-search") === "1";
                 if (input.value.trim() && !serverSearchOnLoad) {

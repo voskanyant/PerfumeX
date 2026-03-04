@@ -250,15 +250,37 @@
                 font-weight: 600;
                 color: #111827;
             }
+            .products-mobile tr.inactive-product-row {
+                border-color: #e5e7eb;
+                box-shadow: 0 0 0 1px #eef2f7 inset;
+            }
             .products-mobile tr.inactive-product-row td {
-                background: #f3f4f6;
-                color: #6b7280;
+                background: #f8fafc;
+                color: #94a3b8;
             }
             .products-mobile tr.inactive-product-row td[data-field="name"] a {
-                color: #4b5563;
+                color: #64748b;
+                font-weight: 500;
             }
-            .products-mobile tr.inactive-product-row .status-dot.inactive {
-                background: #9ca3af;
+            .products-mobile tr.inactive-product-row td[data-field="name"] {
+                position: relative;
+                padding-right: 78px;
+            }
+            .products-mobile tr.inactive-product-row td[data-field="name"]::after {
+                content: "Inactive";
+                position: absolute;
+                right: 0;
+                top: 1px;
+                font-size: 10px;
+                font-weight: 700;
+                letter-spacing: 0.04em;
+                text-transform: uppercase;
+                color: #64748b;
+                background: #eef2f7;
+                border: 1px solid #dbe3ee;
+                border-radius: 999px;
+                padding: 2px 8px;
+                line-height: 1.2;
             }
             .products-mobile tr.inactive-divider-row td {
                 background: #e5e7eb;
@@ -270,6 +292,25 @@
                 border-top: 2px solid #d1d5db;
                 padding-top: 10px;
                 padding-bottom: 10px;
+            }
+            .price-delta-wrap {
+                margin-top: 3px;
+            }
+            .price-delta-badge {
+                display: inline-block;
+                font-size: 11px;
+                font-weight: 700;
+                line-height: 1.2;
+                border-radius: 999px;
+                padding: 2px 7px;
+            }
+            .price-delta-badge.up {
+                color: #b91c1c;
+                background: rgba(239, 68, 68, 0.14);
+            }
+            .price-delta-badge.down {
+                color: #166534;
+                background: rgba(34, 197, 94, 0.16);
             }
             @media (min-width: 992px) {
                 .products-mobile th,
@@ -380,14 +421,19 @@
                 .products-mobile tr {
                     display: grid;
                     grid-template-columns: 1fr 1fr;
-                    gap: 6px 12px;
+                    gap: 3px 10px;
                     position: relative;
                     -webkit-tap-highlight-color: transparent;
+                    margin-bottom: 16px;
+                    padding: 8px 10px 14px;
+                    border-radius: 12px;
                 }
                 .products-mobile td {
-                    padding: 4px 0;
+                    padding: 2px 0;
                     background: transparent !important;
                     box-shadow: none !important;
+                    line-height: 1.25;
+                    font-size: 0.97rem;
                 }
                 .products-mobile td::before {
                     display: none;
@@ -397,28 +443,55 @@
                     font-weight: 600;
                     display: flex;
                     align-items: flex-start;
-                    gap: 4px;
-                    padding-bottom: 2px;
+                    gap: 3px;
+                    padding-bottom: 0;
                     justify-content: flex-start;
                     padding-right: 24px;
+                    line-height: 1.22;
                 }
                 .products-mobile td[data-field="name"] .status-dot {
-                    margin-right: 0;
-                    margin-top: 0.42em;
+                    display: none !important;
                 }
                 .products-mobile td[data-field="supplier"] {
                     order: 2;
+                    font-weight: 500;
+                    color: #334155;
                 }
                 .products-mobile td[data-field="current_price"] {
                     order: 3;
                     text-align: right;
+                    font-weight: 700;
+                    font-size: 1.08rem;
+                    color: #0f172a;
                 }
                 .products-mobile td[data-field="supplier_sku"] {
                     order: 4;
+                    color: #9ca3af;
+                    font-size: 0.84rem;
+                    font-weight: 500;
+                    display: none;
+                }
+                .products-mobile tr.sku-expanded td[data-field="supplier_sku"] {
+                    display: block;
                 }
                 .products-mobile td[data-field="last_imported_at"] {
                     order: 5;
+                    position: absolute;
+                    right: 10px;
+                    bottom: -11px;
+                    width: auto;
                     text-align: right;
+                    color: #475569;
+                    font-size: 0.74rem;
+                    font-weight: 700;
+                    line-height: 1.1;
+                    letter-spacing: 0.01em;
+                    padding: 3px 10px;
+                    border-radius: 999px;
+                    border: 1px solid var(--app-border);
+                    background: #f8fafc;
+                    box-shadow: 0 0 0 4px var(--app-bg);
+                    z-index: 3;
                 }
                 .products-mobile td[data-field="supplier"],
                 .products-mobile td[data-field="current_price"],
@@ -429,8 +502,8 @@
                 }
                 .products-mobile td.actions {
                     position: absolute;
-                    right: 10px;
-                    top: 8px;
+                    right: 8px;
+                    top: 6px;
                     margin: 0;
                     padding: 0;
                     width: auto;

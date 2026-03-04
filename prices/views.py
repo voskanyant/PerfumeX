@@ -33,8 +33,18 @@ import threading
 import re
 import unicodedata
 
-from django.db.models import Max, Q
-from django.db.models.functions import Coalesce
+from django.db.models import (
+    Case,
+    DecimalField,
+    ExpressionWrapper,
+    F,
+    Max,
+    Q,
+    Value,
+    When,
+    Window,
+)
+from django.db.models.functions import Coalesce, RowNumber, TruncDate
 
 from . import forms, models
 from django.shortcuts import get_object_or_404, redirect
@@ -85,6 +95,96 @@ def _parse_search_query(raw: str) -> tuple[list[str], list[str]]:
         else:
             include_tokens.append(cleaned)
     return include_tokens, exclude_tokens
+
+
+def _parse_supplier_filter_ids(raw: str) -> list[int]:
+    ids: list[int] = []
+    seen: set[int] = set()
+    for token in re.split(r"[\s,]+", (raw or "").strip()):
+        if not token:
+            continue
+        try:
+            value = int(token)
+        except (TypeError, ValueError):
+            continue
+        if value <= 0 or value in seen:
+            continue
+        seen.add(value)
+        ids.append(value)
+    return ids
+
+
+def _supplier_filter_ids_from_request(request) -> list[int]:
+    raw_values = request.GET.getlist("supplier")
+    merged_raw = ",".join([val for val in raw_values if val])
+    return _parse_supplier_filter_ids(merged_raw)
+
+
+def _serialize_supplier_filter_ids(ids: list[int]) -> str:
+    return ",".join(str(x) for x in ids)
+
+
+def _parse_decimal_query_param(raw: str) -> Decimal | None:
+    text = (raw or "").strip()
+    if not text:
+        return None
+    text = text.replace(" ", "").replace(",", ".")
+    try:
+        return Decimal(text)
+    except Exception:
+        return None
+
+
+def _apply_supplier_price_filter(queryset, request):
+    price_min_raw = request.GET.get("price_min", "")
+    price_max_raw = request.GET.get("price_max", "")
+    price_min = _parse_decimal_query_param(price_min_raw)
+    price_max = _parse_decimal_query_param(price_max_raw)
+    if price_min is None and price_max is None:
+        return queryset, price_min_raw, price_max_raw
+
+    currency = request.GET.get("currency", "").strip() or models.Currency.USD
+    output_field = DecimalField(max_digits=14, decimal_places=6)
+    display_price_expr = F("current_price")
+
+    if currency in {models.Currency.USD, models.Currency.RUB}:
+        rates = _get_latest_rates()
+        usd_rub_rate = rates.get((models.Currency.USD, models.Currency.RUB))
+        if usd_rub_rate and usd_rub_rate > 0:
+            rate_value = Value(usd_rub_rate)
+            if currency == models.Currency.USD:
+                display_price_expr = Case(
+                    When(currency=models.Currency.USD, then=F("current_price")),
+                    When(
+                        currency=models.Currency.RUB,
+                        then=ExpressionWrapper(
+                            F("current_price") / rate_value,
+                            output_field=output_field,
+                        ),
+                    ),
+                    default=F("current_price"),
+                    output_field=output_field,
+                )
+            else:
+                display_price_expr = Case(
+                    When(currency=models.Currency.RUB, then=F("current_price")),
+                    When(
+                        currency=models.Currency.USD,
+                        then=ExpressionWrapper(
+                            F("current_price") * rate_value,
+                            output_field=output_field,
+                        ),
+                    ),
+                    default=F("current_price"),
+                    output_field=output_field,
+                )
+
+    queryset = queryset.annotate(display_price_filter=display_price_expr)
+    if price_min is not None:
+        queryset = queryset.filter(display_price_filter__gte=price_min)
+    if price_max is not None:
+        queryset = queryset.filter(display_price_filter__lte=price_max)
+    return queryset, price_min_raw, price_max_raw
 
 
 def _resolve_supplier_exclude_terms(request) -> str:
@@ -375,14 +475,15 @@ class SupplierOverviewView(LoginRequiredMixin, TemplateView):
             updated_at=Coalesce(Max("importfile__processed_at"), "created_at"),
             date_at=Coalesce("received_at", "created_at"),
         )
-        supplier_filter = self.request.GET.get("supplier", "").strip()
+        supplier_filter_ids = _supplier_filter_ids_from_request(self.request)
+        supplier_filter = _serialize_supplier_filter_ids(supplier_filter_ids)
         status_filter = self.request.GET.get("status", "").strip().lower()
         log_sort = self.request.GET.get("log_sort", "date").strip()
         log_dir = self.request.GET.get("log_dir", "desc").strip().lower()
         if log_dir not in {"asc", "desc"}:
             log_dir = "desc"
-        if supplier_filter:
-            import_batches = import_batches.filter(supplier_id=supplier_filter)
+        if supplier_filter_ids:
+            import_batches = import_batches.filter(supplier_id__in=supplier_filter_ids)
         if status_filter == "successful":
             import_batches = import_batches.filter(status=models.ImportStatus.PROCESSED).exclude(
                 message_id__startswith=PRODUCT_REMOVED_EVENT_PREFIX
@@ -494,12 +595,13 @@ class ImportDetailedLogsView(LoginRequiredMixin, TemplateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        supplier_filter = self.request.GET.get("supplier", "").strip()
+        supplier_filter_ids = _supplier_filter_ids_from_request(self.request)
+        supplier_filter = _serialize_supplier_filter_ids(supplier_filter_ids)
         status_filter = self.request.GET.get("run_status", "").strip()
         batch_status_filter = self.request.GET.get("batch_status", "").strip()
         runs = models.EmailImportRun.objects.select_related("supplier").order_by("-started_at")
-        if supplier_filter:
-            runs = runs.filter(supplier_id=supplier_filter)
+        if supplier_filter_ids:
+            runs = runs.filter(supplier_id__in=supplier_filter_ids)
         if status_filter:
             runs = runs.filter(status=status_filter)
         paginator = Paginator(runs, 30)
@@ -511,8 +613,8 @@ class ImportDetailedLogsView(LoginRequiredMixin, TemplateView):
             .prefetch_related("importfile_set", "importfile_set__mapping")
             .order_by("-created_at")
         )
-        if supplier_filter:
-            batches = batches.filter(supplier_id=supplier_filter)
+        if supplier_filter_ids:
+            batches = batches.filter(supplier_id__in=supplier_filter_ids)
         if batch_status_filter:
             if batch_status_filter == "processed":
                 batches = batches.filter(status=models.ImportStatus.PROCESSED)
@@ -795,10 +897,10 @@ class SupplierProductCleanupView(LoginRequiredMixin, View):
 
 class SupplierProductInactiveCleanupView(LoginRequiredMixin, View):
     def post(self, request):
-        supplier_id = request.POST.get("supplier", "").strip()
+        supplier_ids = _parse_supplier_filter_ids(request.POST.get("supplier", ""))
         queryset = models.SupplierProduct.objects.filter(is_active=False)
-        if supplier_id:
-            queryset = queryset.filter(supplier_id=supplier_id)
+        if supplier_ids:
+            queryset = queryset.filter(supplier_id__in=supplier_ids)
         queryset.delete()
         return redirect("prices:product_list")
 
@@ -824,7 +926,7 @@ class SupplierProductSearchView(LoginRequiredMixin, View):
         exclude_raw = _resolve_supplier_exclude_terms(request)
         exclude_terms = _parse_exclude_terms(exclude_raw)
         currency = request.GET.get("currency", "").strip() or models.Currency.USD
-        supplier_filter = request.GET.get("supplier", "").strip()
+        supplier_filter_ids = _supplier_filter_ids_from_request(request)
         status_filter = request.GET.get("status", "").strip().lower() or "all"
         if status_filter not in {"active", "inactive", "all"}:
             status_filter = "all"
@@ -852,14 +954,15 @@ class SupplierProductSearchView(LoginRequiredMixin, View):
                 )
         for term in inline_exclude_tokens:
             queryset = queryset.exclude(name__icontains=term)
-        if supplier_filter:
-            queryset = queryset.filter(supplier_id=supplier_filter)
+        if supplier_filter_ids:
+            queryset = queryset.filter(supplier_id__in=supplier_filter_ids)
         if status_filter == "active":
             queryset = queryset.filter(is_active=True)
         elif status_filter == "inactive":
             queryset = queryset.filter(is_active=False)
         for term in exclude_terms:
             queryset = queryset.exclude(name__icontains=term)
+        queryset, _, _ = _apply_supplier_price_filter(queryset, request)
         if status_filter == "all":
             queryset = queryset.order_by("-is_active", ordering, "id")
         else:
@@ -884,15 +987,36 @@ class SupplierProductSearchView(LoginRequiredMixin, View):
                 display_price = _convert_price(
                     product.current_price, product.currency, currency, rates
                 )
+            product.display_price = display_price
+            product.display_currency = display_currency
+        _attach_previous_price_deltas(visible_products, currency, rates)
+        for product in visible_products:
+            imported_at = ""
+            if product.last_imported_at:
+                imported_at = timezone.localtime(product.last_imported_at).strftime(
+                    "%d/%m/%Y %H:%M"
+                )
             items.append(
                 {
                     "id": product.id,
                     "supplier": product.supplier.name,
+                    "supplier_id": product.supplier_id,
                     "supplier_sku": product.supplier_sku,
                     "name": product.name,
-                    "current_price": _format_price(display_price, display_currency),
+                    "current_price": _format_price(product.display_price, product.display_currency),
                     "last_imported_at": imported_at,
                     "is_active": product.is_active,
+                    "price_delta_direction": product.price_delta_direction,
+                    "price_delta_value": (
+                        _format_price(product.price_delta_value, product.display_currency)
+                        if product.price_delta_value is not None
+                        else ""
+                    ),
+                    "price_delta_percent": (
+                        f"{product.price_delta_percent:.2f}%"
+                        if product.price_delta_percent is not None
+                        else ""
+                    ),
                 }
             )
 
@@ -1587,6 +1711,40 @@ def _get_rates_for_date(
     return rates
 
 
+def _prime_rates_cache_for_dates(required_dates, cache: dict) -> None:
+    if not required_dates:
+        return
+    missing_dates = sorted(
+        {
+            d
+            for d in required_dates
+            if d and d not in cache
+        }
+    )
+    if not missing_dates:
+        return
+
+    max_date = missing_dates[-1]
+    rate_rows = (
+        models.ExchangeRate.objects.filter(rate_date__lte=max_date)
+        .order_by("rate_date", "id")
+        .values_list("rate_date", "from_currency", "to_currency", "rate")
+    )
+
+    current_rates: dict[tuple[str, str], Decimal] = {}
+    idx = 0
+    rows_len = 0
+    rows = list(rate_rows)
+    rows_len = len(rows)
+
+    for target_date in missing_dates:
+        while idx < rows_len and rows[idx][0] <= target_date:
+            _, from_currency, to_currency, rate = rows[idx]
+            current_rates[(from_currency, to_currency)] = rate
+            idx += 1
+        cache[target_date] = dict(current_rates)
+
+
 def _convert_price(
     price: Decimal | None,
     from_currency: str,
@@ -1611,6 +1769,70 @@ def _format_price(price: Decimal | None, currency: str) -> str:
         return "-"
     symbol = {"USD": "$", "RUB": "\u20BD"}.get((currency or "").upper(), currency)
     return f"{price:.2f} {symbol}"
+
+
+def _attach_previous_price_deltas(
+    products,
+    display_currency: str,
+    rates: dict[tuple[str, str], Decimal],
+) -> None:
+    product_list = list(products)
+    if not product_list:
+        return
+    product_ids = [product.id for product in product_list]
+    ranked = (
+        models.PriceSnapshot.objects.filter(supplier_product_id__in=product_ids)
+        .annotate(
+            rn=Window(
+                expression=RowNumber(),
+                partition_by=[F("supplier_product_id")],
+                order_by=[F("recorded_at").desc(), F("id").desc()],
+            )
+        )
+        .filter(rn__lte=2)
+        .values(
+            "supplier_product_id",
+            "rn",
+            "price",
+            "currency",
+        )
+    )
+    snapshots_by_product: dict[int, dict[int, tuple[Decimal, str]]] = defaultdict(dict)
+    for row in ranked:
+        snapshots_by_product[row["supplier_product_id"]][row["rn"]] = (
+            row["price"],
+            row["currency"],
+        )
+
+    for product in product_list:
+        product.price_delta_direction = ""
+        product.price_delta_value = None
+        product.price_delta_percent = None
+
+        previous = snapshots_by_product.get(product.id, {}).get(2)
+        if not previous:
+            continue
+
+        current_display = getattr(product, "display_price", None)
+        if current_display is None:
+            current_display = _convert_price(
+                product.current_price, product.currency, display_currency, rates
+            )
+        previous_price, previous_currency = previous
+        previous_display = _convert_price(
+            previous_price, previous_currency, display_currency, rates
+        )
+        if current_display is None or previous_display is None:
+            continue
+
+        delta = current_display - previous_display
+        if delta == 0:
+            continue
+
+        product.price_delta_direction = "up" if delta > 0 else "down"
+        product.price_delta_value = abs(delta)
+        if previous_display != 0:
+            product.price_delta_percent = (abs(delta) / previous_display) * Decimal("100")
 
 
 def _save_supplier_mapping_from_import_form(form, supplier):
@@ -1805,7 +2027,7 @@ class SupplierProductListView(BaseListView):
         exclude_raw = _resolve_supplier_exclude_terms(self.request)
         exclude_terms = _parse_exclude_terms(exclude_raw)
         self._exclude_terms_raw = exclude_raw
-        supplier_filter = self.request.GET.get("supplier", "").strip()
+        supplier_filter_ids = _supplier_filter_ids_from_request(self.request)
         status_filter = self.request.GET.get("status", "").strip().lower() or "all"
         if status_filter not in {"active", "inactive", "all"}:
             status_filter = "all"
@@ -1817,20 +2039,24 @@ class SupplierProductListView(BaseListView):
                 )
         for term in inline_exclude_tokens:
             queryset = queryset.exclude(name__icontains=term)
-        if supplier_filter:
-            queryset = queryset.filter(supplier_id=supplier_filter)
+        if supplier_filter_ids:
+            queryset = queryset.filter(supplier_id__in=supplier_filter_ids)
         if status_filter == "active":
             queryset = queryset.filter(is_active=True)
         elif status_filter == "inactive":
             queryset = queryset.filter(is_active=False)
         for term in exclude_terms:
             queryset = queryset.exclude(name__icontains=term)
+        queryset, self._price_min_raw, self._price_max_raw = _apply_supplier_price_filter(
+            queryset, self.request
+        )
         return queryset
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         currency = self.request.GET.get("currency", "").strip() or models.Currency.USD
-        supplier_filter = self.request.GET.get("supplier", "").strip()
+        supplier_filter_ids = _supplier_filter_ids_from_request(self.request)
+        supplier_filter = _serialize_supplier_filter_ids(supplier_filter_ids)
         status_filter = self.request.GET.get("status", "").strip().lower() or "all"
         if status_filter not in {"active", "inactive", "all"}:
             status_filter = "all"
@@ -1839,9 +2065,21 @@ class SupplierProductListView(BaseListView):
         context["currency_options"] = currency_options
         context["supplier_filter"] = supplier_filter
         context["supplier_options"] = models.Supplier.objects.order_by("name")
+        context["supplier_filter_names"] = []
+        if supplier_filter_ids:
+            name_map = {
+                supplier.id: supplier.name
+                for supplier in models.Supplier.objects.filter(id__in=supplier_filter_ids)
+            }
+            context["supplier_filter_names"] = [
+                {"id": sid, "name": name_map.get(sid, f"Supplier #{sid}")}
+                for sid in supplier_filter_ids
+            ]
         context["status_filter"] = status_filter
         context["status_options"] = [("all", "All"), ("active", "Active"), ("inactive", "Inactive")]
         context["exclude_terms"] = getattr(self, "_exclude_terms_raw", _resolve_supplier_exclude_terms(self.request))
+        context["price_min"] = getattr(self, "_price_min_raw", self.request.GET.get("price_min", ""))
+        context["price_max"] = getattr(self, "_price_max_raw", self.request.GET.get("price_max", ""))
         context["show_currency_filter"] = self.show_currency_filter
         context["show_cleanup"] = True
         context["show_search"] = getattr(self, "show_search", False)
@@ -1856,6 +2094,7 @@ class SupplierProductListView(BaseListView):
                 product.display_price = _convert_price(
                     product.current_price, product.currency, currency, rates
                 )
+            _attach_previous_price_deltas(context["object_list"], currency, rates)
         return context
 
 
@@ -1897,7 +2136,15 @@ class SupplierProductDetailView(LoginRequiredMixin, DetailView):
         end_dt = self._parse_datetime(end_value)
         snapshots = (
             models.PriceSnapshot.objects.filter(supplier_product=self.object)
-            .select_related("import_batch", "import_batch__supplier")
+            .only(
+                "id",
+                "recorded_at",
+                "price",
+                "currency",
+                "price_rub",
+                "price_usd",
+                "import_batch_id",
+            )
             .order_by("-recorded_at")
         )
         if start_dt:
@@ -1908,14 +2155,20 @@ class SupplierProductDetailView(LoginRequiredMixin, DetailView):
                     datetime.combine(end_dt.date(), time(23, 59, 59))
                 )
             snapshots = snapshots.filter(recorded_at__lte=end_dt)
-        latest_by_day = []
-        seen_days = set()
-        for snapshot in snapshots:
-            day_key = timezone.localtime(snapshot.recorded_at).date()
-            if day_key in seen_days:
-                continue
-            seen_days.add(day_key)
-            latest_by_day.append(snapshot)
+        tz = timezone.get_current_timezone()
+        latest_by_day_qs = (
+            snapshots.annotate(local_day=TruncDate("recorded_at", tzinfo=tz))
+            .annotate(
+                day_rank=Window(
+                    expression=RowNumber(),
+                    partition_by=[F("local_day")],
+                    order_by=[F("recorded_at").desc(), F("id").desc()],
+                )
+            )
+            .filter(day_rank=1)
+            .order_by("-recorded_at")
+        )
+        latest_by_day = list(latest_by_day_qs)
         history_paginator = Paginator(latest_by_day, 100)
         history_page_obj = history_paginator.get_page(
             self.request.GET.get("history_page")
@@ -1928,7 +2181,9 @@ class SupplierProductDetailView(LoginRequiredMixin, DetailView):
         context["history_querystring"] = history_query_params.urlencode()
         chart_labels = []
         chart_values = []
-        rates_by_date_cache = {}
+        rates_by_date_cache: dict = {}
+        required_dates = {timezone.localtime(s.recorded_at).date() for s in latest_by_day}
+        _prime_rates_cache_for_dates(required_dates, rates_by_date_cache)
         for snapshot in reversed(latest_by_day):
             snapshot_date = timezone.localtime(snapshot.recorded_at).date()
             rates_for_snapshot = _get_rates_for_date(
@@ -2070,11 +2325,12 @@ class ProductLinkingView(LoginRequiredMixin, TemplateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        supplier_filter = self.request.GET.get("supplier", "").strip()
+        supplier_filter_ids = _supplier_filter_ids_from_request(self.request)
+        supplier_filter = _serialize_supplier_filter_ids(supplier_filter_ids)
         search_query = self.request.GET.get("q", "").strip()
         supplier_products = models.SupplierProduct.objects.select_related("supplier")
-        if supplier_filter:
-            supplier_products = supplier_products.filter(supplier_id=supplier_filter)
+        if supplier_filter_ids:
+            supplier_products = supplier_products.filter(supplier_id__in=supplier_filter_ids)
         if search_query:
             supplier_products = supplier_products.filter(
                 Q(name__icontains=search_query)
