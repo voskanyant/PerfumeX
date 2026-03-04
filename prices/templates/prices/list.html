@@ -65,6 +65,8 @@
         }
         .filters.filters-products .filter-item.search-full-width {
             order: 1;
+        }
+        .filters.filters-products .search-inline-row {
             position: sticky;
             top: 72px;
             z-index: 30;
@@ -73,7 +75,7 @@
             margin: -8px 0 4px;
             border-bottom: 1px solid var(--app-border);
         }
-        .filters.filters-products .filter-item.search-full-width.is-pinned {
+        .filters.filters-products .search-inline-row.is-pinned {
             position: fixed;
             left: 0;
             right: auto;
@@ -169,13 +171,13 @@
             border-bottom-color: #94a3b8;
         }
         @media (max-width: 991.98px) {
-            .filters.filters-products .filter-item.search-full-width {
+            .filters.filters-products .search-inline-row {
                 top: 64px;
                 z-index: 1040;
                 padding-top: 10px;
                 margin-top: -10px;
             }
-            .filters.filters-products .filter-item.search-full-width.is-pinned {
+            .filters.filters-products .search-inline-row.is-pinned {
                 border-radius: 10px;
                 padding: 8px 10px;
             }
@@ -627,7 +629,7 @@
                     : [];
                 var selectedSupplierIds = [];
                 var lastViewedKey = "products_last_viewed_id";
-                var stickySearchItem = input.closest(".filter-item.search-full-width");
+                var stickySearchItem = input.closest(".search-inline-row") || input.closest(".filter-item.search-full-width");
                 var stickyPlaceholder = null;
                 var isPinnedSearch = false;
                 var tableCard = document.querySelector(".card.p-2.p-md-3");
