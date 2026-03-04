@@ -32,11 +32,46 @@
         .supplier-suggest-item:hover {
             background: #f3f4f6;
         }
+        .supplier-selected-chips {
+            margin-top: 8px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+        .supplier-selected-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 10px;
+            border: 1px solid var(--app-border);
+            border-radius: 999px;
+            font-size: 0.85rem;
+            color: #334155;
+            background: #f8fafc;
+        }
+        .supplier-selected-chip button {
+            border: 0;
+            background: transparent;
+            color: #64748b;
+            line-height: 1;
+            padding: 0;
+            font-size: 1rem;
+        }
+        .supplier-selected-chip button:hover {
+            color: #0f172a;
+        }
         .filter-item.search-full-width {
             grid-column: 1 / -1;
         }
         .filters.filters-products .filter-item.search-full-width {
             order: 1;
+            position: sticky;
+            top: 72px;
+            z-index: 30;
+            background: var(--app-surface);
+            padding: 8px 0 10px;
+            margin: -8px 0 4px;
+            border-bottom: 1px solid var(--app-border);
         }
         .extra-filters-grid {
             display: grid;
@@ -87,6 +122,70 @@
             display: inline-flex;
             align-items: center;
             justify-content: center;
+        }
+        .active-supplier-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 10px;
+            border: 1px solid var(--app-border);
+            border-radius: 999px;
+            font-size: 0.9rem;
+            color: #374151;
+            background: #f8fafc;
+        }
+        .active-supplier-chip button {
+            border: 0;
+            background: transparent;
+            color: #6b7280;
+            line-height: 1;
+            padding: 0 2px;
+            font-size: 1rem;
+        }
+        .active-supplier-chip button:hover {
+            color: #111827;
+        }
+        .supplier-filter-link {
+            color: inherit;
+            text-decoration: none;
+            border-bottom: 1px dashed #cbd5e1;
+        }
+        .supplier-filter-link:hover {
+            border-bottom-color: #94a3b8;
+        }
+        .name-copy-wrap {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .name-copy-btn {
+            border: 0;
+            background: transparent;
+            color: #64748b;
+            padding: 0;
+            line-height: 1;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+        .name-copy-btn:hover {
+            color: #0f172a;
+        }
+        .name-copy-btn svg {
+            width: 14px;
+            height: 14px;
+        }
+        .name-copy-btn.copied {
+            color: #16a34a;
+        }
+        @media (max-width: 991.98px) {
+            .filters.filters-products .filter-item.search-full-width {
+                top: 64px;
+                z-index: 1040;
+                padding-top: 10px;
+                margin-top: -10px;
+            }
         }
     </style>
     <div id="supplier-bulk-root"{% if list_title == 'Suppliers Products' or list_title == 'Supplier Products' %} class="bulk-mode-off"{% endif %}>
@@ -142,6 +241,12 @@
                         </svg>
                         Delete selected
                     </button>
+                {% endif %}
+                {% if supplier_filter_names %}
+                    <div class="active-supplier-chip" title="Supplier filter is active">
+                        <span>{{ supplier_filter_names|length }} supplier{{ supplier_filter_names|length|pluralize }} selected</span>
+                        <button type="button" id="clear-supplier-filter-btn" aria-label="Clear supplier filter">×</button>
+                    </div>
                 {% endif %}
                 {% if show_bulk_delete and list_title == 'Suppliers Products' or show_bulk_delete and list_title == 'Supplier Products' %}
                     <button class="button secondary bulk-gear-btn" type="button" id="bulk-mode-toggle" title="Bulk tools" aria-label="Bulk tools">
@@ -205,9 +310,10 @@
                                 <div class="filter-item">
                                     <label for="supplier-filter-search">Supplier</label>
                                     <div class="supplier-filter-wrap">
-                                        <input id="supplier-filter-search" type="text" placeholder="Type supplier name..." autocomplete="off">
+                                        <input id="supplier-filter-search" type="text" placeholder="Type supplier and press Enter..." autocomplete="off">
                                         <div id="supplier-suggest" class="supplier-suggest"></div>
                                     </div>
+                                    <div id="supplier-selected-chips" class="supplier-selected-chips"></div>
                                     <select id="supplier-option-source" hidden>
                                         {% for supplier in supplier_options %}
                                             <option value="{{ supplier.id }}">{{ supplier.name }}</option>
@@ -226,6 +332,15 @@
                                     </select>
                                 </div>
                             {% endif %}
+                            <div class="filter-item">
+                                <label for="price-min-filter">Min price</label>
+                                <input id="price-min-filter" type="text" value="{{ price_min|default:'' }}" placeholder="e.g. 100">
+                            </div>
+                            <div class="filter-item">
+                                <label for="price-max-filter">Max price</label>
+                                <input id="price-max-filter" type="text" value="{{ price_max|default:'' }}" placeholder="e.g. 500">
+                                <button class="button secondary w-100 mt-2" type="button" id="price-apply-btn">Apply price</button>
+                            </div>
                             <div class="filter-item">
                                 <label for="exclude-filter">Exclude words in name</label>
                                 <textarea id="exclude-filter" rows="3" placeholder="One word per line (or comma-separated)">{{ exclude_terms|default:'' }}</textarea>
@@ -257,9 +372,10 @@
                     <div class="filter-item">
                         <label for="supplier-filter-search">Supplier</label>
                         <div class="supplier-filter-wrap">
-                            <input id="supplier-filter-search" type="text" placeholder="Type supplier name..." autocomplete="off">
+                            <input id="supplier-filter-search" type="text" placeholder="Type supplier and press Enter..." autocomplete="off">
                             <div id="supplier-suggest" class="supplier-suggest"></div>
                         </div>
+                        <div id="supplier-selected-chips" class="supplier-selected-chips"></div>
                         <select id="supplier-option-source" hidden>
                             {% for supplier in supplier_options %}
                                 <option value="{{ supplier.id }}">{{ supplier.name }}</option>
@@ -294,7 +410,7 @@
                             <th data-field="{{ field }}">
                                 {% if current_sort == field %}
                                     {% if current_dir == "asc" %}
-                                        <a href="?sort={{ field }}&dir=desc{% if current_q %}&q={{ current_q }}{% endif %}{% if currency_filter %}&currency={{ currency_filter }}{% endif %}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if exclude_terms %}&exclude={{ exclude_terms|urlencode }}{% endif %}">
+                                        <a href="?sort={{ field }}&dir=desc{% if current_q %}&q={{ current_q }}{% endif %}{% if currency_filter %}&currency={{ currency_filter }}{% endif %}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if exclude_terms %}&exclude={{ exclude_terms|urlencode }}{% endif %}{% if price_min %}&price_min={{ price_min|urlencode }}{% endif %}{% if price_max %}&price_max={{ price_max|urlencode }}{% endif %}">
                                             {% if field == "current_price" %}
                                                 Price ({% if currency_filter %}{{ currency_filter|currency_symbol }}{% else %}Original{% endif %}) ▲
                                             {% else %}
@@ -302,7 +418,7 @@
                                             {% endif %}
                                         </a>
                                     {% else %}
-                                        <a href="?sort={{ field }}&dir=asc{% if current_q %}&q={{ current_q }}{% endif %}{% if currency_filter %}&currency={{ currency_filter }}{% endif %}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if exclude_terms %}&exclude={{ exclude_terms|urlencode }}{% endif %}">
+                                        <a href="?sort={{ field }}&dir=asc{% if current_q %}&q={{ current_q }}{% endif %}{% if currency_filter %}&currency={{ currency_filter }}{% endif %}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if exclude_terms %}&exclude={{ exclude_terms|urlencode }}{% endif %}{% if price_min %}&price_min={{ price_min|urlencode }}{% endif %}{% if price_max %}&price_max={{ price_max|urlencode }}{% endif %}">
                                             {% if field == "current_price" %}
                                                 Price ({% if currency_filter %}{{ currency_filter|currency_symbol }}{% else %}Original{% endif %}) ▼
                                             {% else %}
@@ -311,7 +427,7 @@
                                         </a>
                                     {% endif %}
                                 {% else %}
-                                    <a href="?sort={{ field }}&dir=asc{% if current_q %}&q={{ current_q }}{% endif %}{% if currency_filter %}&currency={{ currency_filter }}{% endif %}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if exclude_terms %}&exclude={{ exclude_terms|urlencode }}{% endif %}">
+                                    <a href="?sort={{ field }}&dir=asc{% if current_q %}&q={{ current_q }}{% endif %}{% if currency_filter %}&currency={{ currency_filter }}{% endif %}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if exclude_terms %}&exclude={{ exclude_terms|urlencode }}{% endif %}{% if price_min %}&price_min={{ price_min|urlencode }}{% endif %}{% if price_max %}&price_max={{ price_max|urlencode }}{% endif %}">
                                         {% if field == "current_price" %}
                                             Price ({% if currency_filter %}{{ currency_filter|currency_symbol }}{% else %}Original{% endif %})
                                         {% else %}
@@ -346,9 +462,31 @@
                                         <td data-field="{{ field }}" data-label="Last imported">{{ obj.last_imported_at|date:"d/m/Y H:i" }}</td>
                                     {% elif field == "current_price" %}
                                         {% if obj.display_price %}
-                                            <td data-field="{{ field }}" data-label="Price">{{ obj.display_price|floatformat:2 }} {{ obj.display_currency|currency_symbol }}</td>
+                                            <td data-field="{{ field }}" data-label="Price">
+                                                <div>{{ obj.display_price|floatformat:2 }} {{ obj.display_currency|currency_symbol }}</div>
+                                                {% if obj.price_delta_direction %}
+                                                    <div class="price-delta-wrap">
+                                                        <span class="price-delta-badge {{ obj.price_delta_direction }}">
+                                                            {% if obj.price_delta_direction == "down" %}↓{% else %}↑{% endif %}
+                                                            {{ obj.price_delta_value|floatformat:2 }} {{ obj.display_currency|currency_symbol }}
+                                                            {% if obj.price_delta_percent %}({{ obj.price_delta_percent|floatformat:2 }}%){% endif %}
+                                                        </span>
+                                                    </div>
+                                                {% endif %}
+                                            </td>
                                         {% else %}
-                                            <td data-field="{{ field }}" data-label="Price">{{ obj.current_price|default_if_none:"-" }}{% if obj.current_price|default_if_none:'' != '' %} {{ obj.currency|currency_symbol }}{% endif %}</td>
+                                            <td data-field="{{ field }}" data-label="Price">
+                                                <div>{{ obj.current_price|default_if_none:"-" }}{% if obj.current_price|default_if_none:'' != '' %} {{ obj.currency|currency_symbol }}{% endif %}</div>
+                                                {% if obj.price_delta_direction %}
+                                                    <div class="price-delta-wrap">
+                                                        <span class="price-delta-badge {{ obj.price_delta_direction }}">
+                                                            {% if obj.price_delta_direction == "down" %}↓{% else %}↑{% endif %}
+                                                            {{ obj.price_delta_value|floatformat:2 }} {{ obj.display_currency|currency_symbol }}
+                                                            {% if obj.price_delta_percent %}({{ obj.price_delta_percent|floatformat:2 }}%){% endif %}
+                                                        </span>
+                                                    </div>
+                                                {% endif %}
+                                            </td>
                                         {% endif %}
                                     {% else %}
                                         <td data-field="{{ field }}"
@@ -357,7 +495,27 @@
                                                 <span class="status-dot {% if obj.is_active %}active{% else %}inactive{% endif %}"></span>
                                             {% endif %}
                                             {% if link_detail and detail_url_name and field == "name" %}
-                                                <a href="{% url detail_url_name obj.pk %}?next={{ request.get_full_path|urlencode }}&from={{ obj.pk }}">{{ obj|get_attr:field }}</a>
+                                                <span class="name-copy-wrap">
+                                                    <a href="{% url detail_url_name obj.pk %}?next={{ request.get_full_path|urlencode }}&from={{ obj.pk }}">{{ obj|get_attr:field }}</a>
+                                                    <button type="button" class="name-copy-btn" data-copy-text="{{ obj|get_attr:field }}" title="Copy name" aria-label="Copy product name">
+                                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                                                        </svg>
+                                                    </button>
+                                                </span>
+                                            {% elif field == "supplier" and obj.supplier_id %}
+                                                <a href="?supplier={{ obj.supplier_id }}" class="supplier-filter-link" data-supplier-id="{{ obj.supplier_id }}">{{ obj|get_attr:field }}</a>
+                                            {% elif field == "name" %}
+                                                <span class="name-copy-wrap">
+                                                    <span>{{ obj|get_attr:field }}</span>
+                                                    <button type="button" class="name-copy-btn" data-copy-text="{{ obj|get_attr:field }}" title="Copy name" aria-label="Copy product name">
+                                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                                                        </svg>
+                                                    </button>
+                                                </span>
                                             {% else %}
                                                 {{ obj|get_attr:field }}
                                             {% endif %}
@@ -433,7 +591,7 @@
                     <ul class="pagination flex-wrap mb-0">
                         {% if page_obj.has_previous %}
                             <li class="page-item">
-                                <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if current_sort %}&sort={{ current_sort }}{% endif %}{% if current_dir %}&dir={{ current_dir }}{% endif %}{% if current_q %}&q={{ current_q }}{% endif %}{% if currency_filter %}&currency={{ currency_filter }}{% endif %}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if exclude_terms %}&exclude={{ exclude_terms|urlencode }}{% endif %}">Previous</a>
+                                <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if current_sort %}&sort={{ current_sort }}{% endif %}{% if current_dir %}&dir={{ current_dir }}{% endif %}{% if current_q %}&q={{ current_q }}{% endif %}{% if currency_filter %}&currency={{ currency_filter }}{% endif %}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if exclude_terms %}&exclude={{ exclude_terms|urlencode }}{% endif %}{% if price_min %}&price_min={{ price_min|urlencode }}{% endif %}{% if price_max %}&price_max={{ price_max|urlencode }}{% endif %}">Previous</a>
                             </li>
                         {% endif %}
                         {% for page_num in page_obj.paginator.page_range %}
@@ -441,13 +599,13 @@
                                 <li class="page-item active"><span class="page-link">{{ page_num }}</span></li>
                             {% elif page_num > page_obj.number|add:-3 and page_num < page_obj.number|add:3 %}
                                 <li class="page-item">
-                                    <a class="page-link" href="?page={{ page_num }}{% if current_sort %}&sort={{ current_sort }}{% endif %}{% if current_dir %}&dir={{ current_dir }}{% endif %}{% if current_q %}&q={{ current_q }}{% endif %}{% if currency_filter %}&currency={{ currency_filter }}{% endif %}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if exclude_terms %}&exclude={{ exclude_terms|urlencode }}{% endif %}">{{ page_num }}</a>
+                                    <a class="page-link" href="?page={{ page_num }}{% if current_sort %}&sort={{ current_sort }}{% endif %}{% if current_dir %}&dir={{ current_dir }}{% endif %}{% if current_q %}&q={{ current_q }}{% endif %}{% if currency_filter %}&currency={{ currency_filter }}{% endif %}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if exclude_terms %}&exclude={{ exclude_terms|urlencode }}{% endif %}{% if price_min %}&price_min={{ price_min|urlencode }}{% endif %}{% if price_max %}&price_max={{ price_max|urlencode }}{% endif %}">{{ page_num }}</a>
                                 </li>
                             {% endif %}
                         {% endfor %}
                         {% if page_obj.has_next %}
                             <li class="page-item">
-                                <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if current_sort %}&sort={{ current_sort }}{% endif %}{% if current_dir %}&dir={{ current_dir }}{% endif %}{% if current_q %}&q={{ current_q }}{% endif %}{% if currency_filter %}&currency={{ currency_filter }}{% endif %}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if exclude_terms %}&exclude={{ exclude_terms|urlencode }}{% endif %}">Next</a>
+                                <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if current_sort %}&sort={{ current_sort }}{% endif %}{% if current_dir %}&dir={{ current_dir }}{% endif %}{% if current_q %}&q={{ current_q }}{% endif %}{% if currency_filter %}&currency={{ currency_filter }}{% endif %}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if exclude_terms %}&exclude={{ exclude_terms|urlencode }}{% endif %}{% if price_min %}&price_min={{ price_min|urlencode }}{% endif %}{% if price_max %}&price_max={{ price_max|urlencode }}{% endif %}">Next</a>
                             </li>
                         {% endif %}
                     </ul>
@@ -469,9 +627,14 @@
                 var supplierFilterSearch = document.getElementById("supplier-filter-search");
                 var supplierSuggest = document.getElementById("supplier-suggest");
                 var supplierOptionSource = document.getElementById("supplier-option-source");
+                var supplierSelectedChips = document.getElementById("supplier-selected-chips");
+                var clearSupplierFilterBtn = document.getElementById("clear-supplier-filter-btn");
                 var statusFilter = document.getElementById("status-filter");
                 var excludeFilter = document.getElementById("exclude-filter");
                 var excludeApplyBtn = document.getElementById("exclude-apply-btn");
+                var priceMinFilter = document.getElementById("price-min-filter");
+                var priceMaxFilter = document.getElementById("price-max-filter");
+                var priceApplyBtn = document.getElementById("price-apply-btn");
                 if (!input) return;
                 var table = document.querySelector("table");
                 var tbody = table ? table.querySelector("tbody") : null;
@@ -488,6 +651,7 @@
                         return { id: String(opt.value || ""), name: String(opt.text || "") };
                     })
                     : [];
+                var selectedSupplierIds = [];
                 var lastViewedKey = "products_last_viewed_id";
 
                 function decorateButtons(container) {
@@ -516,8 +680,61 @@
                     });
                 }
 
+                function getPriceMinValue() {
+                    return priceMinFilter ? priceMinFilter.value.trim() : "";
+                }
+
+                function getPriceMaxValue() {
+                    return priceMaxFilter ? priceMaxFilter.value.trim() : "";
+                }
+
+                function setCommonFilters(url) {
+                    if (currencyFilter) {
+                        if (currencyFilter.value) {
+                            url.searchParams.set("currency", currencyFilter.value);
+                        } else {
+                            url.searchParams.delete("currency");
+                        }
+                    }
+                    if (supplierFilter) {
+                        if (supplierFilter.value) {
+                            url.searchParams.set("supplier", supplierFilter.value);
+                        } else {
+                            url.searchParams.delete("supplier");
+                        }
+                    }
+                    if (statusFilter) {
+                        if (statusFilter.value && statusFilter.value !== "all") {
+                            url.searchParams.set("status", statusFilter.value);
+                        } else {
+                            url.searchParams.delete("status");
+                        }
+                    }
+                    if (excludeFilter) {
+                        var excludeRaw = excludeFilter.value.trim();
+                        if (excludeRaw) {
+                            url.searchParams.set("exclude", excludeRaw);
+                        } else {
+                            url.searchParams.delete("exclude");
+                        }
+                    }
+                    var priceMinRaw = getPriceMinValue();
+                    var priceMaxRaw = getPriceMaxValue();
+                    if (priceMinRaw) {
+                        url.searchParams.set("price_min", priceMinRaw);
+                    } else {
+                        url.searchParams.delete("price_min");
+                    }
+                    if (priceMaxRaw) {
+                        url.searchParams.set("price_max", priceMaxRaw);
+                    } else {
+                        url.searchParams.delete("price_max");
+                    }
+                }
+
                 function updateSearchParamInUrl(query, page) {
                     var url = new URL(window.location.href);
+                    setCommonFilters(url);
                     if (query) {
                         url.searchParams.set("q", query);
                         if (page && Number(page) > 1) {
@@ -599,14 +816,47 @@
                     return "";
                 }
 
-                function hydrateSupplierSearch() {
-                    if (!supplierFilterSearch || !supplierFilter || !supplierFilter.value) return;
-                    var match = supplierOptions.find(function (opt) {
-                        return opt.id === supplierFilter.value;
+                function parseSupplierIds(raw) {
+                    var ids = [];
+                    if (!raw) return ids;
+                    String(raw).split(",").forEach(function (part) {
+                        var cleaned = String(part || "").trim();
+                        if (!cleaned || !/^\d+$/.test(cleaned)) return;
+                        if (ids.indexOf(cleaned) === -1) {
+                            ids.push(cleaned);
+                        }
                     });
-                    if (match) {
-                        supplierFilterSearch.value = match.name;
+                    return ids;
+                }
+
+                function syncSupplierHiddenValue() {
+                    if (!supplierFilter) return;
+                    supplierFilter.value = selectedSupplierIds.join(",");
+                }
+
+                function renderSupplierSelectedChips() {
+                    if (!supplierSelectedChips) return;
+                    if (!selectedSupplierIds.length) {
+                        supplierSelectedChips.innerHTML = "";
+                        return;
                     }
+                    supplierSelectedChips.innerHTML = selectedSupplierIds.map(function (sid) {
+                        var match = supplierOptions.find(function (opt) { return opt.id === sid; });
+                        var label = match ? match.name : ("Supplier #" + sid);
+                        return (
+                            "<span class='supplier-selected-chip'>" +
+                            escapeHtml(label) +
+                            "<button type='button' data-remove-supplier-id='" + escapeHtml(sid) + "' aria-label='Remove supplier'>x</button>" +
+                            "</span>"
+                        );
+                    }).join("");
+                }
+
+                function hydrateSupplierSelection() {
+                    if (!supplierFilter) return;
+                    selectedSupplierIds = parseSupplierIds(supplierFilter.value);
+                    syncSupplierHiddenValue();
+                    renderSupplierSelectedChips();
                 }
 
                 function hideSupplierSuggest() {
@@ -627,7 +877,10 @@
                         ? supplierOptions.slice(0, 20)
                         : supplierOptions.filter(function (opt) {
                             return opt.name.toLowerCase().indexOf(term) !== -1;
-                        }).slice(0, 20);
+                        });
+                    matches = matches.filter(function (opt) {
+                        return selectedSupplierIds.indexOf(opt.id) === -1;
+                    }).slice(0, 20);
                     if (!matches.length) {
                         hideSupplierSuggest();
                         return;
@@ -640,16 +893,15 @@
 
                 function applySupplierFilter() {
                     if (!supplierFilter || !supplierFilterSearch) return;
-                    supplierFilter.value = resolveSupplierIdByName(supplierFilterSearch.value);
+                    var resolvedId = resolveSupplierIdByName(supplierFilterSearch.value);
+                    if (resolvedId && selectedSupplierIds.indexOf(resolvedId) === -1) {
+                        selectedSupplierIds.push(resolvedId);
+                    }
+                    supplierFilterSearch.value = "";
+                    syncSupplierHiddenValue();
+                    renderSupplierSelectedChips();
                     var url = new URL(window.location.href);
-                    if (supplierFilter.value) {
-                        url.searchParams.set("supplier", supplierFilter.value);
-                    } else {
-                        url.searchParams.delete("supplier");
-                    }
-                    if (excludeFilter) {
-                        url.searchParams.set("exclude", excludeFilter.value.trim());
-                    }
+                    setCommonFilters(url);
                     url.searchParams.delete("page");
                     window.location.href = url.toString();
                 }
@@ -676,13 +928,32 @@
                     items.forEach(function (item) {
                         var supplier = escapeHtml(item.supplier);
                         var sku = escapeHtml(item.supplier_sku);
-                        var name = escapeHtml(item.name);
+                        var rawName = String(item.name || "");
+                        var escapedName = escapeHtml(rawName);
+                        var name = escapedName;
                         var price = escapeHtml(item.current_price);
+                        var deltaDirection = item.price_delta_direction || "";
+                        var deltaValue = escapeHtml(item.price_delta_value || "");
+                        var deltaPercent = escapeHtml(item.price_delta_percent || "");
+                        var priceHtml = "<div>" + price + "</div>";
+                        if (deltaDirection && deltaValue) {
+                            var arrow = deltaDirection === "down" ? "↓" : "↑";
+                            var deltaTail = deltaPercent ? " (" + deltaPercent + ")" : "";
+                            priceHtml += "<div class='price-delta-wrap'><span class='price-delta-badge " +
+                                escapeHtml(deltaDirection) + "'>" + arrow + " " + deltaValue + deltaTail +
+                                "</span></div>";
+                        }
                         var imported = escapeHtml(item.last_imported_at);
 
                         if (detailBase && item.id) {
-                            name = "<a href='" + detailBase + item.id + "/?next=" + encodeURIComponent(nextValue) + "&from=" + item.id + "'>" + name + "</a>";
+                            name = "<a href='" + detailBase + item.id + "/?next=" + encodeURIComponent(nextValue) + "&from=" + item.id + "'>" + escapedName + "</a>";
                         }
+                        var copyBtnHtml = "<button type='button' class='name-copy-btn' data-copy-text='" + escapedName + "' title='Copy name' aria-label='Copy product name'>" +
+                            "<svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' aria-hidden='true'>" +
+                            "<rect x='9' y='9' width='13' height='13' rx='2' ry='2'></rect>" +
+                            "<path d='M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1'></path>" +
+                            "</svg></button>";
+                        name = "<span class='name-copy-wrap'>" + name + copyBtnHtml + "</span>";
                         if (item.is_active !== undefined) {
                             var dotClass = item.is_active ? "active" : "inactive";
                             name = "<span class='status-dot " + dotClass + "'></span>" + name;
@@ -738,8 +1009,8 @@
                             checkboxCell +
                             "<td data-field='supplier_sku' data-label='SKU'>" + sku + "</td>" +
                             "<td data-field='name' data-label='Name'>" + name + "</td>" +
-                            "<td data-field='current_price' data-label='Price'>" + price + "</td>" +
-                            "<td data-field='supplier' data-label='Supplier'>" + supplier + "</td>" +
+                            "<td data-field='current_price' data-label='Price'>" + priceHtml + "</td>" +
+                            "<td data-field='supplier' data-label='Supplier'><a href='?supplier=" + encodeURIComponent(String(item.supplier_id || "")) + "' class='supplier-filter-link' data-supplier-id='" + escapeHtml(String(item.supplier_id || "")) + "'>" + supplier + "</a></td>" +
                             "<td data-field='last_imported_at' data-label='Last imported'>" + imported + "</td>" +
                             actionsCell +
                         "</tr>";
@@ -764,6 +1035,8 @@
                         supplierFilter ? supplierFilter.value : "",
                         statusFilter ? statusFilter.value : "",
                         excludeFilter ? excludeFilter.value.trim() : "",
+                        getPriceMinValue(),
+                        getPriceMaxValue(),
                         input.getAttribute("data-sort") || "",
                         input.getAttribute("data-dir") || "",
                         String(safePage)
@@ -797,6 +1070,12 @@
                     }
                     if (excludeFilter && excludeFilter.value.trim()) {
                         url += "&exclude=" + encodeURIComponent(excludeFilter.value.trim());
+                    }
+                    if (getPriceMinValue()) {
+                        url += "&price_min=" + encodeURIComponent(getPriceMinValue());
+                    }
+                    if (getPriceMaxValue()) {
+                        url += "&price_max=" + encodeURIComponent(getPriceMaxValue());
                     }
                     url += "&page=" + encodeURIComponent(String(safePage));
                     activeController = new AbortController();
@@ -841,9 +1120,7 @@
                             } else {
                                 navUrl.searchParams.delete("q");
                             }
-                            if (excludeFilter) {
-                                navUrl.searchParams.set("exclude", excludeFilter.value.trim());
-                            }
+                            setCommonFilters(navUrl);
                             navUrl.searchParams.delete("page");
                             if (navUrl.toString() !== window.location.href) {
                                 window.location.assign(navUrl.toString());
@@ -871,20 +1148,13 @@
                 if (currencyFilter) {
                     currencyFilter.addEventListener("change", function () {
                         var url = new URL(window.location.href);
-                        if (currencyFilter.value) {
-                            url.searchParams.set("currency", currencyFilter.value);
-                        } else {
-                            url.searchParams.delete("currency");
-                        }
-                        if (excludeFilter) {
-                            url.searchParams.set("exclude", excludeFilter.value.trim());
-                        }
+                        setCommonFilters(url);
                         url.searchParams.delete("page");
                         window.location.href = url.toString();
                     });
                 }
                 if (supplierFilter) {
-                    hydrateSupplierSearch();
+                    hydrateSupplierSelection();
                 }
                 if (supplierFilterSearch) {
                     supplierFilterSearch.addEventListener("input", function () {
@@ -896,7 +1166,6 @@
                     supplierFilterSearch.addEventListener("click", function () {
                         showSupplierSuggest(supplierFilterSearch.value, true);
                     });
-                    supplierFilterSearch.addEventListener("change", applySupplierFilter);
                     supplierFilterSearch.addEventListener("keydown", function (event) {
                         if (event.key === "Enter") {
                             event.preventDefault();
@@ -916,19 +1185,51 @@
                     supplierSuggest.addEventListener("mousedown", function (event) {
                         var target = event.target.closest(".supplier-suggest-item");
                         if (!target) return;
-                        supplierFilterSearch.value = target.getAttribute("data-name") || "";
-                        supplierFilter.value = target.getAttribute("data-id") || "";
+                        var targetId = target.getAttribute("data-id") || "";
+                        if (targetId && selectedSupplierIds.indexOf(targetId) === -1) {
+                            selectedSupplierIds.push(targetId);
+                        }
+                        supplierFilterSearch.value = "";
+                        syncSupplierHiddenValue();
+                        renderSupplierSelectedChips();
                         hideSupplierSuggest();
-                        applySupplierFilter();
+                        var suggestUrl = new URL(window.location.href);
+                        setCommonFilters(suggestUrl);
+                        suggestUrl.searchParams.delete("page");
+                        window.location.href = suggestUrl.toString();
+                    });
+                }
+                if (supplierSelectedChips) {
+                    supplierSelectedChips.addEventListener("click", function (event) {
+                        var removeBtn = event.target.closest("button[data-remove-supplier-id]");
+                        if (!removeBtn) return;
+                        var removeId = removeBtn.getAttribute("data-remove-supplier-id") || "";
+                        selectedSupplierIds = selectedSupplierIds.filter(function (sid) { return sid !== removeId; });
+                        syncSupplierHiddenValue();
+                        renderSupplierSelectedChips();
+                        var chipsUrl = new URL(window.location.href);
+                        setCommonFilters(chipsUrl);
+                        chipsUrl.searchParams.delete("page");
+                        window.location.href = chipsUrl.toString();
                     });
                 }
                 if (statusFilter) {
                     statusFilter.addEventListener("change", function () {
                         var url = new URL(window.location.href);
-                        url.searchParams.set("status", statusFilter.value || "all");
-                        if (excludeFilter) {
-                            url.searchParams.set("exclude", excludeFilter.value.trim());
-                        }
+                        setCommonFilters(url);
+                        url.searchParams.delete("page");
+                        window.location.href = url.toString();
+                    });
+                }
+                if (clearSupplierFilterBtn) {
+                    clearSupplierFilterBtn.addEventListener("click", function () {
+                        selectedSupplierIds = [];
+                        if (supplierFilter) supplierFilter.value = "";
+                        if (supplierFilterSearch) supplierFilterSearch.value = "";
+                        renderSupplierSelectedChips();
+                        var url = new URL(window.location.href);
+                        setCommonFilters(url);
+                        url.searchParams.delete("supplier");
                         url.searchParams.delete("page");
                         window.location.href = url.toString();
                     });
@@ -936,13 +1237,21 @@
                 function applyExcludeFilter() {
                     if (!excludeFilter) return;
                     var url = new URL(window.location.href);
-                    var raw = excludeFilter.value.trim();
-                    url.searchParams.set("exclude", raw);
+                    setCommonFilters(url);
+                    url.searchParams.delete("page");
+                    window.location.href = url.toString();
+                }
+                function applyPriceFilter() {
+                    var url = new URL(window.location.href);
+                    setCommonFilters(url);
                     url.searchParams.delete("page");
                     window.location.href = url.toString();
                 }
                 if (excludeApplyBtn) {
                     excludeApplyBtn.addEventListener("click", applyExcludeFilter);
+                }
+                if (priceApplyBtn) {
+                    priceApplyBtn.addEventListener("click", applyPriceFilter);
                 }
                 if (excludeFilter) {
                     excludeFilter.addEventListener("keydown", function (event) {
@@ -952,8 +1261,85 @@
                         }
                     });
                 }
+                if (priceMinFilter) {
+                    priceMinFilter.addEventListener("keydown", function (event) {
+                        if (event.key === "Enter") {
+                            event.preventDefault();
+                            applyPriceFilter();
+                        }
+                    });
+                }
+                if (priceMaxFilter) {
+                    priceMaxFilter.addEventListener("keydown", function (event) {
+                        if (event.key === "Enter") {
+                            event.preventDefault();
+                            applyPriceFilter();
+                        }
+                    });
+                }
                 if (tbody) {
+                    function copyTextToClipboard(text) {
+                        var value = String(text || "").trim();
+                        if (!value) return;
+                        if (navigator.clipboard && navigator.clipboard.writeText) {
+                            navigator.clipboard.writeText(value).catch(function () {});
+                            return;
+                        }
+                        var temp = document.createElement("textarea");
+                        temp.value = value;
+                        temp.style.position = "fixed";
+                        temp.style.opacity = "0";
+                        document.body.appendChild(temp);
+                        temp.focus();
+                        temp.select();
+                        try { document.execCommand("copy"); } catch (e) {}
+                        document.body.removeChild(temp);
+                    }
                     tbody.addEventListener("click", function (event) {
+                        var isMobileProductsTable =
+                            table &&
+                            table.classList.contains("products-mobile") &&
+                            window.matchMedia("(max-width: 991.98px)").matches;
+                        if (isMobileProductsTable) {
+                            var tappedRow = event.target.closest("tr[data-product-id]");
+                            var interactiveTap = event.target.closest(
+                                "a,button,input,summary,details,form,label,select,textarea"
+                            );
+                            if (tappedRow && !interactiveTap) {
+                                tappedRow.classList.toggle("sku-expanded");
+                                return;
+                            }
+                        }
+                        var copyBtn = event.target.closest("button.name-copy-btn[data-copy-text]");
+                        if (copyBtn) {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            copyTextToClipboard(copyBtn.getAttribute("data-copy-text") || "");
+                            copyBtn.classList.add("copied");
+                            setTimeout(function () {
+                                copyBtn.classList.remove("copied");
+                            }, 900);
+                            return;
+                        }
+                        var supplierLink = event.target.closest("a.supplier-filter-link[data-supplier-id]");
+                        if (supplierLink) {
+                            event.preventDefault();
+                            var supplierId = supplierLink.getAttribute("data-supplier-id") || "";
+                            selectedSupplierIds = supplierId ? [supplierId] : [];
+                            syncSupplierHiddenValue();
+                            renderSupplierSelectedChips();
+                            if (supplierFilterSearch) supplierFilterSearch.value = "";
+                            var supplierUrl = new URL(window.location.href);
+                            setCommonFilters(supplierUrl);
+                            if (supplierId) {
+                                supplierUrl.searchParams.set("supplier", supplierId);
+                            } else {
+                                supplierUrl.searchParams.delete("supplier");
+                            }
+                            supplierUrl.searchParams.delete("page");
+                            window.location.href = supplierUrl.toString();
+                            return;
+                        }
                         var link = event.target.closest("td[data-field='name'] a");
                         if (!link) return;
                         var row = event.target.closest("tr[data-product-id]");
@@ -1049,3 +1435,4 @@
         </script>
     {% endif %}
 {% endblock %}
+
