@@ -103,7 +103,19 @@
         .search-inline-row input {
             flex: 1;
         }
+        .search-input-wrap {
+            position: relative;
+            flex: 1;
+        }
+        .search-input-wrap input {
+            width: 100%;
+            padding-right: 56px;
+        }
         .search-clear-text {
+            position: absolute;
+            top: 50%;
+            right: 10px;
+            transform: translateY(-50%);
             border: 0;
             background: transparent;
             padding: 0;
@@ -290,8 +302,10 @@
                     <div class="filter-item search-full-width">
                         <label for="live-search">Search</label>
                         <div class="search-inline-row">
-                            <input id="live-search" type="text" value="{{ current_q|default:'' }}" placeholder="Search products..." data-sort="{{ current_sort|default:'current_price' }}" data-dir="{{ current_dir|default:'asc' }}"{% if link_detail %} data-detail-base="/products/"{% endif %}{% if show_bulk_delete %} data-bulk="1"{% endif %}{% if update_url_name %} data-edit-pattern="{% url update_url_name 0 %}"{% endif %}{% if delete_url_name %} data-delete-pattern="{% url delete_url_name 0 %}"{% endif %}>
-                            <button id="clear-search-btn" class="search-clear-text{% if not current_q %} is-hidden{% endif %}" type="button">Clear</button>
+                            <div class="search-input-wrap">
+                                <input id="live-search" type="text" value="{{ current_q|default:'' }}" placeholder="Search products..." data-sort="{{ current_sort|default:'current_price' }}" data-dir="{{ current_dir|default:'asc' }}"{% if link_detail %} data-detail-base="/products/"{% endif %}{% if show_bulk_delete %} data-bulk="1"{% endif %}{% if update_url_name %} data-edit-pattern="{% url update_url_name 0 %}"{% endif %}{% if delete_url_name %} data-delete-pattern="{% url delete_url_name 0 %}"{% endif %}>
+                                <button id="clear-search-btn" class="search-clear-text{% if not current_q %} is-hidden{% endif %}" type="button">Clear</button>
+                            </div>
                             <button class="button secondary icon filter-icon-btn" type="button" data-bs-toggle="offcanvas" data-bs-target="#product-filters-sidebar" aria-controls="product-filters-sidebar" title="Filters" aria-label="Filters">
                                 <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                                     <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
@@ -367,8 +381,10 @@
                     <div class="filter-item">
                         <label for="live-search">Search</label>
                         <div class="search-inline-row">
-                            <input id="live-search" type="text" value="{{ current_q|default:'' }}" placeholder="Search products..." data-sort="{{ current_sort|default:'current_price' }}" data-dir="{{ current_dir|default:'asc' }}"{% if link_detail %} data-detail-base="/products/" data-server-search="1"{% endif %}{% if show_bulk_delete %} data-bulk="1"{% endif %}{% if update_url_name %} data-edit-pattern="{% url update_url_name 0 %}"{% endif %}{% if delete_url_name %} data-delete-pattern="{% url delete_url_name 0 %}"{% endif %}>
-                            <button id="clear-search-btn" class="search-clear-text{% if not current_q %} is-hidden{% endif %}" type="button">Clear</button>
+                            <div class="search-input-wrap">
+                                <input id="live-search" type="text" value="{{ current_q|default:'' }}" placeholder="Search products..." data-sort="{{ current_sort|default:'current_price' }}" data-dir="{{ current_dir|default:'asc' }}"{% if link_detail %} data-detail-base="/products/" data-server-search="1"{% endif %}{% if show_bulk_delete %} data-bulk="1"{% endif %}{% if update_url_name %} data-edit-pattern="{% url update_url_name 0 %}"{% endif %}{% if delete_url_name %} data-delete-pattern="{% url delete_url_name 0 %}"{% endif %}>
+                                <button id="clear-search-btn" class="search-clear-text{% if not current_q %} is-hidden{% endif %}" type="button">Clear</button>
+                            </div>
                         </div>
                         <span id="search-count" class="muted" style="margin-left: 8px;"></span>
                     </div>
