@@ -51,7 +51,7 @@ from django.shortcuts import get_object_or_404, redirect
 
 from .services.importer import delete_import_batch, process_import_file
 from django.contrib import messages
-from django.db import close_old_connections
+from django.db import close_old_connections, connection
 
 from .services.email_importer import run_import
 from .services.importer import preview_mapping_file
@@ -95,6 +95,37 @@ def _parse_search_query(raw: str) -> tuple[list[str], list[str]]:
         else:
             include_tokens.append(cleaned)
     return include_tokens, exclude_tokens
+
+
+def _apply_supplier_product_token_filter(queryset, include_tokens: list[str]):
+    tokens = [token.strip() for token in include_tokens if token.strip()][:6]
+    if not tokens:
+        return queryset
+
+    use_trigram = connection.vendor == "postgresql"
+    trigram_similarity = None
+    if use_trigram:
+        try:
+            from django.contrib.postgres.search import TrigramSimilarity
+
+            trigram_similarity = TrigramSimilarity
+        except Exception:
+            use_trigram = False
+
+    for token in tokens:
+        token_q = Q(name__icontains=token) | Q(supplier__name__icontains=token)
+        if use_trigram and trigram_similarity and len(token) >= 3:
+            queryset = queryset.annotate(
+                token_name_similarity=trigram_similarity("name", token),
+                token_supplier_similarity=trigram_similarity("supplier__name", token),
+            ).filter(
+                token_q
+                | Q(token_name_similarity__gte=0.20)
+                | Q(token_supplier_similarity__gte=0.20)
+            )
+        else:
+            queryset = queryset.filter(token_q)
+    return queryset
 
 
 def _parse_supplier_filter_ids(raw: str) -> list[int]:
@@ -945,13 +976,20 @@ class SupplierProductSearchView(LoginRequiredMixin, View):
         }.get(sort_field, "current_price")
         ordering = f"{prefix}{sort_db_field}"
 
-        queryset = models.SupplierProduct.objects.select_related("supplier")
-        if include_tokens:
-            for token in include_tokens:
-                queryset = queryset.filter(
-                    Q(name__icontains=token)
-                    | Q(supplier__name__icontains=token)
-                )
+        queryset = (
+            models.SupplierProduct.objects.select_related("supplier").only(
+                "id",
+                "supplier_id",
+                "supplier__name",
+                "supplier_sku",
+                "name",
+                "currency",
+                "current_price",
+                "last_imported_at",
+                "is_active",
+            )
+        )
+        queryset = _apply_supplier_product_token_filter(queryset, include_tokens)
         for term in inline_exclude_tokens:
             queryset = queryset.exclude(name__icontains=term)
         if supplier_filter_ids:
@@ -2021,7 +2059,22 @@ class SupplierProductListView(BaseListView):
         return (sort_expr, "id")
 
     def get_queryset(self):
-        queryset = super().get_queryset()
+        queryset = (
+            super()
+            .get_queryset()
+            .select_related("supplier")
+            .only(
+                "id",
+                "supplier_id",
+                "supplier__name",
+                "supplier_sku",
+                "name",
+                "currency",
+                "current_price",
+                "last_imported_at",
+                "is_active",
+            )
+        )
         query = self.request.GET.get("q", "").strip()
         include_tokens, inline_exclude_tokens = _parse_search_query(query)
         exclude_raw = _resolve_supplier_exclude_terms(self.request)
@@ -2031,12 +2084,7 @@ class SupplierProductListView(BaseListView):
         status_filter = self.request.GET.get("status", "").strip().lower() or "all"
         if status_filter not in {"active", "inactive", "all"}:
             status_filter = "all"
-        if include_tokens:
-            for token in include_tokens:
-                queryset = queryset.filter(
-                    Q(name__icontains=token)
-                    | Q(supplier__name__icontains=token)
-                )
+        queryset = _apply_supplier_product_token_filter(queryset, include_tokens)
         for term in inline_exclude_tokens:
             queryset = queryset.exclude(name__icontains=term)
         if supplier_filter_ids:

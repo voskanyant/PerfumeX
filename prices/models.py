@@ -162,6 +162,22 @@ class SupplierProduct(models.Model):
                 fields=["supplier", "identity_key"], name="uniq_supplier_identity_key"
             )
         ]
+        indexes = [
+            models.Index(fields=["name"], name="prices_sp_name_idx"),
+            models.Index(fields=["supplier_sku"], name="prices_sp_sku_idx"),
+            models.Index(
+                fields=["is_active", "supplier"],
+                name="prices_sp_active_supplier_idx",
+            ),
+            models.Index(
+                fields=["is_active", "current_price"],
+                name="prices_sp_active_price_idx",
+            ),
+            models.Index(
+                fields=["is_active", "last_imported_at"],
+                name="prices_sp_active_lastimp_idx",
+            ),
+        ]
 
     def __str__(self) -> str:
         label = self.supplier_sku or self.name
