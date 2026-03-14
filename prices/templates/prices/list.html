@@ -103,6 +103,23 @@
         .search-inline-row input {
             flex: 1;
         }
+        .search-clear-text {
+            border: 0;
+            background: transparent;
+            padding: 0;
+            font-size: 0.85rem;
+            color: var(--app-muted);
+            text-decoration: underline;
+            text-underline-offset: 2px;
+            white-space: nowrap;
+        }
+        .search-clear-text:hover {
+            color: var(--app-text);
+        }
+        .search-clear-text.is-hidden {
+            visibility: hidden;
+            pointer-events: none;
+        }
         .filter-icon-btn {
             width: 36px;
             height: 36px;
@@ -274,6 +291,7 @@
                         <label for="live-search">Search</label>
                         <div class="search-inline-row">
                             <input id="live-search" type="text" value="{{ current_q|default:'' }}" placeholder="Search products..." data-sort="{{ current_sort|default:'current_price' }}" data-dir="{{ current_dir|default:'asc' }}"{% if link_detail %} data-detail-base="/products/"{% endif %}{% if show_bulk_delete %} data-bulk="1"{% endif %}{% if update_url_name %} data-edit-pattern="{% url update_url_name 0 %}"{% endif %}{% if delete_url_name %} data-delete-pattern="{% url delete_url_name 0 %}"{% endif %}>
+                            <button id="clear-search-btn" class="search-clear-text{% if not current_q %} is-hidden{% endif %}" type="button">Clear</button>
                             <button class="button secondary icon filter-icon-btn" type="button" data-bs-toggle="offcanvas" data-bs-target="#product-filters-sidebar" aria-controls="product-filters-sidebar" title="Filters" aria-label="Filters">
                                 <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                                     <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
@@ -348,7 +366,10 @@
                 {% if show_search %}
                     <div class="filter-item">
                         <label for="live-search">Search</label>
-                        <input id="live-search" type="text" value="{{ current_q|default:'' }}" placeholder="Search products..." data-sort="{{ current_sort|default:'current_price' }}" data-dir="{{ current_dir|default:'asc' }}"{% if link_detail %} data-detail-base="/products/" data-server-search="1"{% endif %}{% if show_bulk_delete %} data-bulk="1"{% endif %}{% if update_url_name %} data-edit-pattern="{% url update_url_name 0 %}"{% endif %}{% if delete_url_name %} data-delete-pattern="{% url delete_url_name 0 %}"{% endif %}>
+                        <div class="search-inline-row">
+                            <input id="live-search" type="text" value="{{ current_q|default:'' }}" placeholder="Search products..." data-sort="{{ current_sort|default:'current_price' }}" data-dir="{{ current_dir|default:'asc' }}"{% if link_detail %} data-detail-base="/products/" data-server-search="1"{% endif %}{% if show_bulk_delete %} data-bulk="1"{% endif %}{% if update_url_name %} data-edit-pattern="{% url update_url_name 0 %}"{% endif %}{% if delete_url_name %} data-delete-pattern="{% url delete_url_name 0 %}"{% endif %}>
+                            <button id="clear-search-btn" class="search-clear-text{% if not current_q %} is-hidden{% endif %}" type="button">Clear</button>
+                        </div>
                         <span id="search-count" class="muted" style="margin-left: 8px;"></span>
                     </div>
                 {% endif %}
@@ -602,6 +623,7 @@
                 var supplierFilter = document.getElementById("supplier-filter");
                 var supplierFilterSearch = document.getElementById("supplier-filter-search");
                 var supplierSuggest = document.getElementById("supplier-suggest");
+                var clearSearchBtn = document.getElementById("clear-search-btn");
                 var supplierOptionSource = document.getElementById("supplier-option-source");
                 var supplierSelectedChips = document.getElementById("supplier-selected-chips");
                 var clearSupplierFilterBtn = document.getElementById("clear-supplier-filter-btn");
@@ -844,6 +866,15 @@
                     var row = tbody.querySelector("tr[data-product-id='" + String(lastId).replace(/'/g, "\\'") + "']");
                     if (!row) return;
                     row.classList.add("last-viewed");
+                }
+
+                function syncClearSearchVisibility() {
+                    if (!clearSearchBtn) return;
+                    if ((input.value || "").trim()) {
+                        clearSearchBtn.classList.remove("is-hidden");
+                    } else {
+                        clearSearchBtn.classList.add("is-hidden");
+                    }
                 }
 
                 function resolveSupplierIdByName(name) {
@@ -1148,6 +1179,7 @@
                 });
 
                 input.addEventListener("input", function () {
+                    syncClearSearchVisibility();
                     clearTimeout(timer);
                     timer = setTimeout(function () {
                         var query = input.value.trim();
@@ -1184,6 +1216,14 @@
                         runAjaxSearch(query, 1, false);
                     }, 300);
                 });
+                if (clearSearchBtn) {
+                    clearSearchBtn.addEventListener("click", function () {
+                        input.value = "";
+                        syncClearSearchVisibility();
+                        input.dispatchEvent(new Event("input"));
+                        input.focus();
+                    });
+                }
                 if (currencyFilter) {
                     currencyFilter.addEventListener("change", function () {
                         var url = new URL(window.location.href);
@@ -1369,6 +1409,7 @@
                 });
                 applyLastViewedHighlight();
                 var serverSearchOnLoad = input.getAttribute("data-server-search") === "1";
+                syncClearSearchVisibility();
                 if (input.value.trim() && !serverSearchOnLoad) {
                     var initialPage = Number(new URL(window.location.href).searchParams.get("page") || "1");
                     runAjaxSearch(input.value.trim(), initialPage, true);
