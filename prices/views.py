@@ -51,7 +51,7 @@ from django.shortcuts import get_object_or_404, redirect
 
 from .services.importer import delete_import_batch, process_import_file
 from django.contrib import messages
-from django.db import close_old_connections, connection
+from django.db import close_old_connections
 
 from .services.email_importer import run_import
 from .services.importer import preview_mapping_file
@@ -102,29 +102,10 @@ def _apply_supplier_product_token_filter(queryset, include_tokens: list[str]):
     if not tokens:
         return queryset
 
-    use_trigram = connection.vendor == "postgresql"
-    trigram_similarity = None
-    if use_trigram:
-        try:
-            from django.contrib.postgres.search import TrigramSimilarity
-
-            trigram_similarity = TrigramSimilarity
-        except Exception:
-            use_trigram = False
-
     for token in tokens:
-        token_q = Q(name__icontains=token) | Q(supplier__name__icontains=token)
-        if use_trigram and trigram_similarity and len(token) >= 3:
-            queryset = queryset.annotate(
-                token_name_similarity=trigram_similarity("name", token),
-                token_supplier_similarity=trigram_similarity("supplier__name", token),
-            ).filter(
-                token_q
-                | Q(token_name_similarity__gte=0.20)
-                | Q(token_supplier_similarity__gte=0.20)
-            )
-        else:
-            queryset = queryset.filter(token_q)
+        queryset = queryset.filter(
+            Q(name__icontains=token) | Q(supplier__name__icontains=token)
+        )
     return queryset
 
 
