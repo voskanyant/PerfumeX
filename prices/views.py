@@ -2080,8 +2080,7 @@ class SupplierProductListView(BaseListView):
 
     def get_queryset(self):
         queryset = (
-            super()
-            .get_queryset()
+            models.SupplierProduct.objects.all()
             .select_related("supplier")
             .only(
                 "id",
