@@ -166,6 +166,46 @@ def _parse_decimal_query_param(raw: str) -> Decimal | None:
         return None
 
 
+def _display_price_expression_for_currency(currency: str):
+    output_field = DecimalField(max_digits=14, decimal_places=6)
+    display_price_expr = F("current_price")
+    if currency not in {models.Currency.USD, models.Currency.RUB}:
+        return display_price_expr
+
+    rates = _get_latest_rates()
+    usd_rub_rate = rates.get((models.Currency.USD, models.Currency.RUB))
+    if not usd_rub_rate or usd_rub_rate <= 0:
+        return display_price_expr
+
+    rate_value = Value(usd_rub_rate)
+    if currency == models.Currency.USD:
+        return Case(
+            When(currency=models.Currency.USD, then=F("current_price")),
+            When(
+                currency=models.Currency.RUB,
+                then=ExpressionWrapper(
+                    F("current_price") / rate_value,
+                    output_field=output_field,
+                ),
+            ),
+            default=F("current_price"),
+            output_field=output_field,
+        )
+
+    return Case(
+        When(currency=models.Currency.RUB, then=F("current_price")),
+        When(
+            currency=models.Currency.USD,
+            then=ExpressionWrapper(
+                F("current_price") * rate_value,
+                output_field=output_field,
+            ),
+        ),
+        default=F("current_price"),
+        output_field=output_field,
+    )
+
+
 def _apply_supplier_price_filter(queryset, request):
     price_min_raw = request.GET.get("price_min", "")
     price_max_raw = request.GET.get("price_max", "")
@@ -175,41 +215,7 @@ def _apply_supplier_price_filter(queryset, request):
         return queryset, price_min_raw, price_max_raw
 
     currency = request.GET.get("currency", "").strip() or models.Currency.USD
-    output_field = DecimalField(max_digits=14, decimal_places=6)
-    display_price_expr = F("current_price")
-
-    if currency in {models.Currency.USD, models.Currency.RUB}:
-        rates = _get_latest_rates()
-        usd_rub_rate = rates.get((models.Currency.USD, models.Currency.RUB))
-        if usd_rub_rate and usd_rub_rate > 0:
-            rate_value = Value(usd_rub_rate)
-            if currency == models.Currency.USD:
-                display_price_expr = Case(
-                    When(currency=models.Currency.USD, then=F("current_price")),
-                    When(
-                        currency=models.Currency.RUB,
-                        then=ExpressionWrapper(
-                            F("current_price") / rate_value,
-                            output_field=output_field,
-                        ),
-                    ),
-                    default=F("current_price"),
-                    output_field=output_field,
-                )
-            else:
-                display_price_expr = Case(
-                    When(currency=models.Currency.RUB, then=F("current_price")),
-                    When(
-                        currency=models.Currency.USD,
-                        then=ExpressionWrapper(
-                            F("current_price") * rate_value,
-                            output_field=output_field,
-                        ),
-                    ),
-                    default=F("current_price"),
-                    output_field=output_field,
-                )
-
+    display_price_expr = _display_price_expression_for_currency(currency)
     queryset = queryset.annotate(display_price_filter=display_price_expr)
     if price_min is not None:
         queryset = queryset.filter(display_price_filter__gte=price_min)
@@ -974,6 +980,10 @@ class SupplierProductSearchView(LoginRequiredMixin, View):
             "current_price": "current_price",
             "last_imported_at": "last_imported_at",
         }.get(sort_field, "current_price")
+        if sort_field == "current_price":
+            queryset_currency = currency if currency in {models.Currency.USD, models.Currency.RUB} else ""
+        else:
+            queryset_currency = ""
         ordering = f"{prefix}{sort_db_field}"
 
         queryset = (
@@ -989,6 +999,11 @@ class SupplierProductSearchView(LoginRequiredMixin, View):
                 "is_active",
             )
         )
+        if queryset_currency:
+            queryset = queryset.annotate(
+                display_price_sort=_display_price_expression_for_currency(queryset_currency)
+            )
+            ordering = f"{prefix}display_price_sort"
         queryset = _apply_supplier_product_token_filter(queryset, include_tokens)
         for term in inline_exclude_tokens:
             queryset = queryset.exclude(name__icontains=term)
@@ -2039,6 +2054,7 @@ class SupplierProductListView(BaseListView):
     def get_ordering(self):
         sort_field = self.request.GET.get("sort")
         sort_dir = self.request.GET.get("dir", "asc")
+        currency = self.request.GET.get("currency", "").strip() or models.Currency.USD
         status_filter = self.request.GET.get("status", "").strip().lower() or "all"
         if status_filter not in {"active", "inactive", "all"}:
             status_filter = "all"
@@ -2046,7 +2062,11 @@ class SupplierProductListView(BaseListView):
             "supplier": "supplier__name",
             "supplier_sku": "supplier_sku",
             "name": "name",
-            "current_price": "current_price",
+            "current_price": (
+                "display_price_sort"
+                if currency in {models.Currency.USD, models.Currency.RUB}
+                else "current_price"
+            ),
             "last_imported_at": "last_imported_at",
         }
         if sort_field not in self.list_display:
@@ -2075,6 +2095,11 @@ class SupplierProductListView(BaseListView):
                 "is_active",
             )
         )
+        currency = self.request.GET.get("currency", "").strip() or models.Currency.USD
+        if currency in {models.Currency.USD, models.Currency.RUB}:
+            queryset = queryset.annotate(
+                display_price_sort=_display_price_expression_for_currency(currency)
+            )
         query = self.request.GET.get("q", "").strip()
         include_tokens, inline_exclude_tokens = _parse_search_query(query)
         exclude_raw = _resolve_supplier_exclude_terms(self.request)
@@ -2098,6 +2123,9 @@ class SupplierProductListView(BaseListView):
         queryset, self._price_min_raw, self._price_max_raw = _apply_supplier_price_filter(
             queryset, self.request
         )
+        ordering = self.get_ordering()
+        if ordering:
+            queryset = queryset.order_by(*ordering)
         return queryset
 
     def get_context_data(self, **kwargs):
