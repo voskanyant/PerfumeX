@@ -655,7 +655,6 @@
                 var originalRows = tbody ? tbody.innerHTML : "";
                 var pagination = document.getElementById("pagination-controls");
                 var originalPagination = pagination ? pagination.innerHTML : "";
-                var timer = null;
                 var activeController = null;
                 var requestId = 0;
                 var lastRequestSignature = "";
@@ -1188,55 +1187,55 @@
                         });
                 }
 
+                function applySearchNow(query) {
+                    var useServerSearch = input.getAttribute("data-server-search") === "1";
+                    if (useServerSearch) {
+                        var navUrl = new URL(window.location.href);
+                        if (query) {
+                            navUrl.searchParams.set("q", query);
+                        } else {
+                            navUrl.searchParams.delete("q");
+                        }
+                        setCommonFilters(navUrl);
+                        navUrl.searchParams.delete("page");
+                        if (navUrl.toString() !== window.location.href) {
+                            window.location.assign(navUrl.toString());
+                        }
+                        return;
+                    }
+                    if (!query) {
+                        tbody.innerHTML = originalRows;
+                        decorateButtons(tbody);
+                        decorateInputs(tbody);
+                        if (pagination) {
+                            pagination.innerHTML = originalPagination;
+                            pagination.style.display = "";
+                        }
+                        lastRequestSignature = "";
+                        currentAjaxPage = 1;
+                        updateSearchParamInUrl("", 1);
+                        applyLastViewedHighlight();
+                        if (countEl) countEl.textContent = "";
+                        return;
+                    }
+                    runAjaxSearch(query, 1, false);
+                }
+
                 input.addEventListener("keydown", function (event) {
                     if (event.key === "Enter") {
                         event.preventDefault();
+                        applySearchNow(input.value.trim());
                     }
                 });
 
                 input.addEventListener("input", function () {
                     syncClearSearchVisibility();
-                    clearTimeout(timer);
-                    timer = setTimeout(function () {
-                        var query = input.value.trim();
-                        var useServerSearch = input.getAttribute("data-server-search") === "1";
-                        if (useServerSearch) {
-                            var navUrl = new URL(window.location.href);
-                            if (query) {
-                                navUrl.searchParams.set("q", query);
-                            } else {
-                                navUrl.searchParams.delete("q");
-                            }
-                            setCommonFilters(navUrl);
-                            navUrl.searchParams.delete("page");
-                            if (navUrl.toString() !== window.location.href) {
-                                window.location.assign(navUrl.toString());
-                            }
-                            return;
-                        }
-                        if (!query) {
-                            tbody.innerHTML = originalRows;
-                            decorateButtons(tbody);
-                            decorateInputs(tbody);
-                            if (pagination) {
-                                pagination.innerHTML = originalPagination;
-                                pagination.style.display = "";
-                            }
-                            lastRequestSignature = "";
-                            currentAjaxPage = 1;
-                            updateSearchParamInUrl("", 1);
-                            applyLastViewedHighlight();
-                            if (countEl) countEl.textContent = "";
-                            return;
-                        }
-                        runAjaxSearch(query, 1, false);
-                    }, 300);
                 });
                 if (clearSearchBtn) {
                     clearSearchBtn.addEventListener("click", function () {
                         input.value = "";
                         syncClearSearchVisibility();
-                        input.dispatchEvent(new Event("input"));
+                        applySearchNow("");
                         input.focus();
                     });
                 }
