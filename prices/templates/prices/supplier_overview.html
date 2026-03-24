@@ -7,8 +7,8 @@
     <style>
         .import-mega-nav {
             border: 1px solid var(--app-border);
-            border-radius: 16px;
-            background: var(--app-surface);
+            border-radius: 18px;
+            background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
             padding: 0 18px;
             margin-bottom: 14px;
         }
@@ -35,6 +35,19 @@
         .import-mega-link.active {
             color: var(--app-text);
             border-bottom-color: #2563eb;
+        }
+        .import-overview-header .button {
+            min-height: 34px;
+        }
+        #bulk-backfill-form,
+        #bulk-rates-form {
+            background: linear-gradient(180deg, #ffffff 0%, #fbfcff 100%);
+            border: 1px solid var(--app-border);
+            border-radius: 14px;
+            padding: 12px;
+        }
+        .supplier-import-table thead th {
+            background: linear-gradient(180deg, #f9fbff 0%, #f3f8ff 100%);
         }
         @media (max-width: 991.98px) {
             .import-mega-nav {
@@ -201,7 +214,7 @@
     <script>
         (function () {
             function updateAll() {
-                fetch("/suppliers/import-email/status/")
+                fetch("{% url 'prices:supplier_import_email_status_all' %}")
                     .then(function (res) { return res.json(); })
                     .then(function (data) {
                         var runs = data.runs || {};

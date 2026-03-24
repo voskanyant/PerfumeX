@@ -19,10 +19,15 @@ from django.conf.urls.static import static
 from django.contrib import admin
 from django.contrib.auth import views as auth_views
 from django.urls import include, path
+from prices import views as price_views
 
 urlpatterns = [
-    path("", include("prices.urls")),
-    path("admin/", admin.site.urls),
+    path("", price_views.ViewerProductListView.as_view(), name="viewer_home"),
+    path("products/search/", price_views.ViewerProductSearchView.as_view(), name="viewer_product_search"),
+    path("products/<int:pk>/", price_views.ViewerProductDetailView.as_view(), name="viewer_product_detail"),
+    path("account/profile/", price_views.UserProfileUpdateView.as_view(), name="user_profile"),
+    path("admin/", include("prices.urls")),
+    path("django-admin/", admin.site.urls),
     path("accounts/", include("django.contrib.auth.urls")),
     path("login/", auth_views.LoginView.as_view(), name="login"),
     path("logout/", auth_views.LogoutView.as_view(), name="logout"),

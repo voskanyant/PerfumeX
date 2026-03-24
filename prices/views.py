@@ -1,4 +1,6 @@
-from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
+from django.contrib.auth import get_user_model, update_session_auth_hash
+from django.contrib.auth.models import Group
 from django.urls import reverse_lazy
 from collections import defaultdict
 import hashlib
@@ -7,6 +9,7 @@ import stat
 import subprocess
 from pathlib import Path
 import logging
+from urllib.parse import urlencode
 
 from django.utils import timezone
 from django.conf import settings
@@ -62,6 +65,49 @@ from .services.cbr_rates import upsert_cbr_markup_rates, upsert_cbr_markup_rates
 CRON_MARKER = "PERFUMEX_IMPORT_CRON"
 PRODUCT_REMOVED_EVENT_PREFIX = "SYSTEM_DEACTIVATE:"
 logger = logging.getLogger(__name__)
+FRONT_FILTER_KEYS = ("q", "currency", "supplier", "status", "price_min", "price_max", "exclude")
+
+
+def _short_relative_datetime(value) -> str:
+    if not value:
+        return ""
+    dt = value
+    if timezone.is_naive(dt):
+        dt = timezone.make_aware(dt, timezone.get_current_timezone())
+    now = timezone.localtime(timezone.now())
+    dt_local = timezone.localtime(dt)
+    total_seconds = int((now - dt_local).total_seconds())
+    if total_seconds <= 0:
+        return "just now"
+    if total_seconds < 60:
+        return "just now"
+    if total_seconds < 3600:
+        return f"{total_seconds // 60}m ago"
+    if total_seconds < 86400:
+        return f"{total_seconds // 3600}h ago"
+    if total_seconds < 604800:
+        return f"{total_seconds // 86400}d ago"
+    if total_seconds < 2592000:
+        return f"{total_seconds // 604800}w ago"
+    if total_seconds < 31536000:
+        return f"{total_seconds // 2592000}mo ago"
+    return f"{total_seconds // 31536000}y ago"
+
+
+def _imported_age_class(value) -> str:
+    if not value:
+        return ""
+    dt = value
+    if timezone.is_naive(dt):
+        dt = timezone.make_aware(dt, timezone.get_current_timezone())
+    now = timezone.localtime(timezone.now())
+    dt_local = timezone.localtime(dt)
+    age_seconds = max(int((now - dt_local).total_seconds()), 0)
+    if age_seconds < 3 * 24 * 60 * 60:
+        return "age-fresh"
+    if age_seconds <= 5 * 24 * 60 * 60:
+        return "age-warn"
+    return "age-stale"
 
 
 def _normalize_exclude_terms(raw: str) -> str:
@@ -222,6 +268,33 @@ def _resolve_supplier_exclude_terms(request) -> str:
     return normalized
 
 
+def _collect_front_filter_values(request) -> dict[str, str]:
+    values: dict[str, str] = {}
+    for key in FRONT_FILTER_KEYS:
+        if key == "supplier":
+            supplier_values = [val for val in request.GET.getlist("supplier") if val]
+            raw = ",".join(supplier_values)
+        else:
+            raw = (request.GET.get(key, "") or "").strip()
+        values[key] = raw.strip() if isinstance(raw, str) else str(raw or "").strip()
+    return values
+
+
+def _has_front_filter_params(request) -> bool:
+    return any(key in request.GET for key in FRONT_FILTER_KEYS)
+
+
+def _save_front_filters_for_user(request) -> None:
+    if not request.user.is_authenticated:
+        return
+    prefs = models.UserPreference.get_for_user(request.user)
+    filters = _collect_front_filter_values(request)
+    prefs.supplier_front_filters = filters
+    if "exclude" in request.GET:
+        prefs.supplier_exclude_terms = _normalize_exclude_terms(filters.get("exclude", ""))
+    prefs.save(update_fields=["supplier_front_filters", "supplier_exclude_terms", "updated_at"])
+
+
 def _runner_script_path() -> Path:
     base_dir = Path(settings.BASE_DIR)
     return base_dir.parent / "run_import_emails.sh"
@@ -340,6 +413,46 @@ class DocumentationView(LoginRequiredMixin, TemplateView):
     template_name = "prices/documentation.html"
 
 
+class UserProfileUpdateView(LoginRequiredMixin, UpdateView):
+    model = get_user_model()
+    form_class = forms.UserProfileForm
+    template_name = "prices/form.html"
+
+    def get_object(self, queryset=None):
+        return self.request.user
+
+    def get_success_url(self):
+        next_url = self.request.GET.get("next", "").strip()
+        if next_url and url_has_allowed_host_and_scheme(
+            next_url, allowed_hosts={self.request.get_host()}
+        ):
+            return next_url
+        if self.request.user.is_staff:
+            return reverse_lazy("prices:dashboard")
+        return reverse_lazy("viewer_home")
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["object_name"] = "Profile"
+        return context
+
+    def form_valid(self, form):
+        response = super().form_valid(form)
+        if getattr(form, "password_changed", False):
+            update_session_auth_hash(self.request, self.object)
+        messages.success(self.request, "Profile updated.")
+        return response
+
+
+class StaffRequiredMixin(UserPassesTestMixin):
+    def test_func(self):
+        return bool(self.request.user and self.request.user.is_staff)
+
+    def handle_no_permission(self):
+        messages.error(self.request, "You do not have access to user management.")
+        return redirect("prices:dashboard")
+
+
 class BaseListView(LoginRequiredMixin, ListView):
     template_name = "prices/list.html"
     paginate_by = 50
@@ -378,6 +491,7 @@ class BaseListView(LoginRequiredMixin, ListView):
         context["show_create"] = self.show_create
         context["show_actions"] = self.show_actions
         context["show_action_menu"] = self.show_action_menu
+        context["show_search"] = getattr(self, "show_search", False)
         return context
 
 
@@ -1016,11 +1130,6 @@ class SupplierProductSearchView(LoginRequiredMixin, View):
         items = []
         rates = _get_latest_rates()
         for product in visible_products:
-            imported_at = ""
-            if product.last_imported_at:
-                imported_at = timezone.localtime(product.last_imported_at).strftime(
-                    "%d/%m/%Y %H:%M"
-                )
             display_price = product.current_price
             display_currency = product.currency
             if currency:
@@ -1032,11 +1141,12 @@ class SupplierProductSearchView(LoginRequiredMixin, View):
             product.display_currency = display_currency
         _attach_previous_price_deltas(visible_products, currency, rates)
         for product in visible_products:
-            imported_at = ""
-            if product.last_imported_at:
-                imported_at = timezone.localtime(product.last_imported_at).strftime(
-                    "%d/%m/%Y %H:%M"
-                )
+            imported_at = _short_relative_datetime(product.last_imported_at)
+            imported_at_full = (
+                timezone.localtime(product.last_imported_at).strftime("%d/%m/%Y %H:%M")
+                if product.last_imported_at
+                else ""
+            )
             items.append(
                 {
                     "id": product.id,
@@ -1046,6 +1156,8 @@ class SupplierProductSearchView(LoginRequiredMixin, View):
                     "name": product.name,
                     "current_price": _format_price(product.display_price, product.display_currency),
                     "last_imported_at": imported_at,
+                    "last_imported_at_full": imported_at_full,
+                    "last_imported_age_class": _imported_age_class(product.last_imported_at),
                     "is_active": product.is_active,
                     "price_delta_direction": product.price_delta_direction,
                     "price_delta_value": (
@@ -2057,6 +2169,9 @@ class SupplierProductListView(BaseListView):
     ordering = ("current_price",)
     show_search = True
     show_currency_filter = True
+    show_bulk_delete = True
+    link_detail = True
+    show_status = True
     detail_url_name = "prices:product_detail"
     create_url_name = "prices:product_create"
     update_url_name = "prices:product_update"
@@ -2169,10 +2284,12 @@ class SupplierProductListView(BaseListView):
         context["show_currency_filter"] = self.show_currency_filter
         context["show_cleanup"] = True
         context["show_search"] = getattr(self, "show_search", False)
-        context["link_detail"] = True
-        context["show_status"] = True
-        context["show_actions"] = True
-        context["show_bulk_delete"] = True
+        context["link_detail"] = getattr(self, "link_detail", False)
+        context["show_status"] = getattr(self, "show_status", False)
+        context["show_actions"] = getattr(self, "show_actions", False)
+        context["show_bulk_delete"] = getattr(self, "show_bulk_delete", False)
+        context["search_url"] = reverse_lazy("prices:product_search")
+        context["detail_base_url"] = reverse_lazy("prices:product_list")
         if currency:
             rates = _get_latest_rates()
             for product in context["object_list"]:
@@ -2182,6 +2299,52 @@ class SupplierProductListView(BaseListView):
                 )
             _attach_previous_price_deltas(context["object_list"], currency, rates)
         return context
+
+
+class ViewerProductListView(SupplierProductListView):
+    show_create = False
+    show_actions = False
+    show_action_menu = False
+    detail_url_name = "viewer_product_detail"
+    link_detail = True
+    update_url_name = ""
+    delete_url_name = ""
+    create_url_name = ""
+    show_bulk_delete = False
+
+    def dispatch(self, request, *args, **kwargs):
+        if request.user.is_authenticated:
+            prefs = models.UserPreference.get_for_user(request.user)
+            if _has_front_filter_params(request):
+                _save_front_filters_for_user(request)
+            else:
+                saved = prefs.supplier_front_filters or {}
+                if isinstance(saved, dict):
+                    clean = {
+                        key: (saved.get(key, "") or "").strip()
+                        for key in FRONT_FILTER_KEYS
+                        if isinstance(saved.get(key, ""), str) and (saved.get(key, "") or "").strip()
+                    }
+                    if clean:
+                        return redirect(f"{request.path}?{urlencode(clean)}")
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["viewer_mode"] = True
+        context["search_url"] = reverse_lazy("viewer_product_search")
+        context["show_cleanup"] = False
+        context["show_bulk_delete"] = False
+        context["link_detail"] = True
+        context["detail_base_url"] = "/products/"
+        return context
+
+
+class ViewerProductSearchView(SupplierProductSearchView):
+    def get(self, request):
+        if request.user.is_authenticated:
+            _save_front_filters_for_user(request)
+        return super().get(request)
 
 
 class SupplierProductDetailView(LoginRequiredMixin, DetailView):
@@ -2337,6 +2500,20 @@ class SupplierProductDetailView(LoginRequiredMixin, DetailView):
         }.get(chart_currency, "")
         context["start_value"] = start_value
         context["end_value"] = end_value
+        return context
+
+
+class ViewerProductDetailView(SupplierProductDetailView):
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        next_url = self.request.GET.get("next", "").strip()
+        if next_url and url_has_allowed_host_and_scheme(
+            next_url, allowed_hosts={self.request.get_host()}
+        ):
+            context["back_url"] = next_url
+        else:
+            context["back_url"] = reverse_lazy("viewer_home")
+        context["viewer_mode"] = True
         return context
 
 
@@ -2784,3 +2961,85 @@ class ExchangeRateDeleteView(BaseDeleteView):
     success_url_name = "prices:exchange_rate_list"
 
 
+class UserListView(StaffRequiredMixin, BaseListView):
+    model = get_user_model()
+    list_display = ("username", "email", "is_staff", "is_active", "date_joined")
+    list_title = "Users"
+    create_url_name = "prices:user_create"
+    update_url_name = "prices:user_update"
+    delete_url_name = "prices:user_delete"
+    detail_url_name = ""
+    show_search = True
+    ordering = ("username",)
+
+    def get_queryset(self):
+        queryset = super().get_queryset().order_by("username")
+        query = self.request.GET.get("q", "").strip()
+        if query:
+            queryset = queryset.filter(
+                Q(username__icontains=query)
+                | Q(email__icontains=query)
+                | Q(first_name__icontains=query)
+                | Q(last_name__icontains=query)
+            )
+        return queryset
+
+
+class UserCreateView(StaffRequiredMixin, BaseCreateView):
+    model = get_user_model()
+    form_class = forms.AppUserForm
+    success_url_name = "prices:user_list"
+
+
+class UserUpdateView(StaffRequiredMixin, BaseUpdateView):
+    model = get_user_model()
+    form_class = forms.AppUserForm
+    success_url_name = "prices:user_list"
+
+
+class UserDeleteView(StaffRequiredMixin, BaseDeleteView):
+    model = get_user_model()
+    success_url_name = "prices:user_list"
+
+    def post(self, request, *args, **kwargs):
+        obj = self.get_object()
+        if obj.id == request.user.id:
+            messages.error(request, "You cannot delete your own account.")
+            return redirect("prices:user_list")
+        return super().post(request, *args, **kwargs)
+
+
+class UserGroupListView(StaffRequiredMixin, BaseListView):
+    model = Group
+    list_display = ("name",)
+    list_title = "User Groups"
+    create_url_name = "prices:user_group_create"
+    update_url_name = "prices:user_group_update"
+    delete_url_name = "prices:user_group_delete"
+    detail_url_name = ""
+    show_search = True
+    ordering = ("name",)
+
+    def get_queryset(self):
+        queryset = super().get_queryset().order_by("name")
+        query = self.request.GET.get("q", "").strip()
+        if query:
+            queryset = queryset.filter(name__icontains=query)
+        return queryset
+
+
+class UserGroupCreateView(StaffRequiredMixin, BaseCreateView):
+    model = Group
+    form_class = forms.AppGroupForm
+    success_url_name = "prices:user_group_list"
+
+
+class UserGroupUpdateView(StaffRequiredMixin, BaseUpdateView):
+    model = Group
+    form_class = forms.AppGroupForm
+    success_url_name = "prices:user_group_list"
+
+
+class UserGroupDeleteView(StaffRequiredMixin, BaseDeleteView):
+    model = Group
+    success_url_name = "prices:user_group_list"

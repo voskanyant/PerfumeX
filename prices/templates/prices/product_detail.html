@@ -35,23 +35,25 @@
                 </div>
             </div>
         </div>
-        <form method="post" action="{% url 'prices:product_link' object.pk %}" class="mt-3">
-            {% csrf_token %}
-            <div class="row g-3 align-items-end">
-                <div class="col-12 col-md-6">
-                    <label for="id_our_product" class="form-label">Our product</label>
-                    {{ link_form.our_product }}
-                </div>
-                <div class="col-12 col-md-3">
-                    <button class="button secondary w-100" type="submit">Link</button>
-                </div>
-                {% if our_product %}
-                    <div class="col-12 col-md-3">
-                        <a class="button ghost w-100" href="{% url 'prices:our_product_detail' our_product.pk %}">Open Our Product</a>
+        {% if not viewer_mode %}
+            <form method="post" action="{% url 'prices:product_link' object.pk %}" class="mt-3">
+                {% csrf_token %}
+                <div class="row g-3 align-items-end">
+                    <div class="col-12 col-md-6">
+                        <label for="id_our_product" class="form-label">Our product</label>
+                        {{ link_form.our_product }}
                     </div>
-                {% endif %}
-            </div>
-        </form>
+                    <div class="col-12 col-md-3">
+                        <button class="button secondary w-100" type="submit">Link</button>
+                    </div>
+                    {% if our_product %}
+                        <div class="col-12 col-md-3">
+                            <a class="button ghost w-100" href="{% url 'prices:our_product_detail' our_product.pk %}">Open Our Product</a>
+                        </div>
+                    {% endif %}
+                </div>
+            </form>
+        {% endif %}
     </div>
     <div class="card mb-3">
         <div class="d-flex flex-wrap align-items-start justify-content-between gap-3">
@@ -126,7 +128,7 @@
                                 <td data-label="USD">{% if snapshot.display_price_usd|default_if_none:'' != '' %}{{ snapshot.display_price_usd|floatformat:2 }} ${% else %}-{% endif %}</td>
                                 <td data-label="Rate used">{% if snapshot.display_exchange_rate|default_if_none:'' != '' %}{{ snapshot.display_exchange_rate|floatformat:6 }}{% else %}-{% endif %}</td>
                                 <td data-label="Import">
-                                    {% if snapshot.import_batch_id %}
+                                    {% if not viewer_mode and snapshot.import_batch_id %}
                                         <a href="{% url 'prices:import_detail' snapshot.import_batch_id %}?next={{ back_url|urlencode }}">
                                             Open
                                         </a>

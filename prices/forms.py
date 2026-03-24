@@ -1,5 +1,7 @@
-﻿from django import forms
+from django import forms
 from django.utils import timezone
+from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Group, Permission
 
 from . import models
 
@@ -144,7 +146,7 @@ class SupplierImportForm(forms.Form):
     currency_column = forms.IntegerField(
         required=False,
         min_value=1,
-        help_text="Optional currency column (RUB/USD/₽). If empty, currency is detected from price cell or supplier default.",
+        help_text="Optional currency column (RUB/USD/?). If empty, currency is detected from price cell or supplier default.",
     )
 
 
@@ -222,3 +224,126 @@ class CBRSyncRangeForm(forms.Form):
         if start_date and end_date and end_date < start_date:
             self.add_error("end_date", "End date must be on or after start date.")
         return cleaned_data
+
+
+class AppUserForm(forms.ModelForm):
+    password1 = forms.CharField(
+        required=False,
+        widget=forms.PasswordInput(render_value=False),
+        label="Password",
+        help_text="Required for new users. Leave empty on edit to keep current password.",
+    )
+    password2 = forms.CharField(
+        required=False,
+        widget=forms.PasswordInput(render_value=False),
+        label="Confirm password",
+    )
+
+    class Meta:
+        model = get_user_model()
+        fields = (
+            "username",
+            "first_name",
+            "last_name",
+            "email",
+            "is_active",
+            "is_staff",
+            "groups",
+        )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["groups"].queryset = Group.objects.order_by("name")
+        self.fields["groups"].required = False
+
+    def clean(self):
+        cleaned_data = super().clean()
+        password1 = (cleaned_data.get("password1") or "").strip()
+        password2 = (cleaned_data.get("password2") or "").strip()
+        creating = not bool(getattr(self.instance, "pk", None))
+        if creating and not password1:
+            self.add_error("password1", "Password is required for new user.")
+        if password1 and password1 != password2:
+            self.add_error("password2", "Passwords do not match.")
+        return cleaned_data
+
+    def save(self, commit=True):
+        user = super().save(commit=False)
+        password1 = (self.cleaned_data.get("password1") or "").strip()
+        if password1:
+            user.set_password(password1)
+        if commit:
+            user.save()
+            self.save_m2m()
+        return user
+
+
+class AppGroupForm(forms.ModelForm):
+    permissions = forms.ModelMultipleChoiceField(
+        queryset=Permission.objects.none(),
+        required=False,
+        widget=forms.SelectMultiple(attrs={"size": 18}),
+    )
+
+    class Meta:
+        model = Group
+        fields = ("name", "permissions")
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["permissions"].queryset = Permission.objects.filter(
+            content_type__app_label__in=("prices", "auth")
+        ).order_by("content_type__app_label", "codename")
+
+
+class UserProfileForm(forms.ModelForm):
+    current_password = forms.CharField(
+        required=False,
+        widget=forms.PasswordInput(render_value=False),
+        label="Current password",
+    )
+    new_password1 = forms.CharField(
+        required=False,
+        widget=forms.PasswordInput(render_value=False),
+        label="New password",
+    )
+    new_password2 = forms.CharField(
+        required=False,
+        widget=forms.PasswordInput(render_value=False),
+        label="Confirm new password",
+    )
+
+    class Meta:
+        model = get_user_model()
+        fields = ("username", "first_name", "last_name", "email")
+
+    def clean(self):
+        cleaned_data = super().clean()
+        current_password = (cleaned_data.get("current_password") or "").strip()
+        new_password1 = (cleaned_data.get("new_password1") or "").strip()
+        new_password2 = (cleaned_data.get("new_password2") or "").strip()
+        wants_change = bool(current_password or new_password1 or new_password2)
+        if not wants_change:
+            return cleaned_data
+        if not current_password:
+            self.add_error("current_password", "Enter current password to change password.")
+        elif not self.instance.check_password(current_password):
+            self.add_error("current_password", "Current password is incorrect.")
+        if not new_password1:
+            self.add_error("new_password1", "Enter new password.")
+        if new_password1 and len(new_password1) < 6:
+            self.add_error("new_password1", "New password must be at least 6 characters.")
+        if new_password1 != new_password2:
+            self.add_error("new_password2", "New passwords do not match.")
+        return cleaned_data
+
+    def save(self, commit=True):
+        user = super().save(commit=False)
+        new_password1 = (self.cleaned_data.get("new_password1") or "").strip()
+        self.password_changed = False
+        if new_password1:
+            user.set_password(new_password1)
+            self.password_changed = True
+        if commit:
+            user.save()
+        return user

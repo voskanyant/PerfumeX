@@ -5,6 +5,30 @@
 
 {% block content %}
     <style>
+        .list-kpis {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 10px;
+        }
+        .list-kpi {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 5px 10px;
+            border: 1px solid var(--app-border);
+            border-radius: 999px;
+            background: var(--app-surface-soft);
+            font-size: 12px;
+            font-weight: 700;
+            color: #334155;
+        }
+        .list-kpi .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 999px;
+            background: var(--app-accent);
+        }
         .supplier-filter-wrap {
             position: relative;
         }
@@ -75,6 +99,12 @@
             margin: -8px 0 4px;
             border-bottom: 1px solid var(--app-border);
         }
+        .filters.filters-products {
+            background: linear-gradient(180deg, #ffffff 0%, #f9fbff 100%);
+            border: 1px solid var(--app-border);
+            border-radius: 14px;
+            padding: 12px;
+        }
         .filters.filters-products .search-inline-row.is-pinned {
             position: fixed;
             left: 0;
@@ -102,6 +132,8 @@
         }
         .search-inline-row input {
             flex: 1;
+            min-height: 44px;
+            font-size: 1rem;
         }
         .search-input-wrap {
             position: relative;
@@ -109,24 +141,35 @@
         }
         .search-input-wrap input {
             width: 100%;
-            padding-right: 56px;
+            padding-right: 52px;
         }
         .search-input-wrap.is-loading input {
             background-image: linear-gradient(
                 90deg,
-                rgba(74, 222, 128, 0.08) 0%,
-                rgba(74, 222, 128, 0.18) 35%,
-                rgba(74, 222, 128, 0.08) 70%
+                rgba(74, 222, 128, 0.15),
+                rgba(74, 222, 128, 0.15)
             );
-            background-size: 220% 100%;
-            animation: searchInputLoading 1.15s ease-in-out infinite;
+            background-repeat: no-repeat;
+            background-size: 0% 100%;
+            background-position: left center;
+            animation: searchInputLoading 1.4s ease-in-out infinite;
         }
         @keyframes searchInputLoading {
             0% {
-                background-position: 100% 0;
+                background-size: 0% 100%;
+                background-position: left center;
+            }
+            49% {
+                background-size: 100% 100%;
+                background-position: left center;
+            }
+            50% {
+                background-size: 100% 100%;
+                background-position: right center;
             }
             100% {
-                background-position: -100% 0;
+                background-size: 0% 100%;
+                background-position: right center;
             }
         }
         .search-clear-text {
@@ -134,17 +177,25 @@
             top: 50%;
             right: 10px;
             transform: translateY(-50%);
-            border: 0;
-            background: transparent;
+            width: 28px;
+            height: 28px;
+            border: 1px solid #cfd8e8;
+            border-radius: 999px;
+            background: #ffffff;
             padding: 0;
-            font-size: 0.85rem;
-            color: var(--app-muted);
-            text-decoration: underline;
-            text-underline-offset: 2px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1rem;
+            font-weight: 700;
+            line-height: 1;
+            color: #64748b;
             white-space: nowrap;
         }
         .search-clear-text:hover {
-            color: var(--app-text);
+            color: #0f172a;
+            border-color: #9fb3da;
+            background: #f8fbff;
         }
         .search-clear-text.is-hidden {
             visibility: hidden;
@@ -209,6 +260,128 @@
         .active-supplier-chip button:hover {
             color: #111827;
         }
+        .products-grid thead th {
+            background: linear-gradient(180deg, #edf4ff 0%, #e5efff 100%) !important;
+            border-bottom: 1px solid #cddcf6 !important;
+            color: #163c82;
+            font-weight: 800;
+        }
+        .products-grid tbody tr td {
+            border-bottom: 1px solid #edf2fb !important;
+        }
+        .products-grid tbody tr:nth-child(even):not(.inactive-divider-row):not(.inactive-product-row) td {
+            background: #fbfdff;
+        }
+        .products-grid tbody tr:hover td {
+            background: #eef5ff !important;
+        }
+        .products-grid td[data-field="current_price"] {
+            font-weight: 700;
+            color: #0f172a;
+        }
+        .products-grid td[data-field="supplier"] a {
+            color: #1e3a8a;
+            border-bottom-color: #bfdbfe;
+        }
+        .products-grid td[data-field="name"] a {
+            color: #0b1220;
+            font-weight: 700;
+        }
+        .products-grid td {
+            padding-top: 10px;
+            padding-bottom: 10px;
+        }
+        .cell-sku {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+            font-size: 13px;
+            color: #334155;
+            letter-spacing: 0.01em;
+        }
+        .cell-name {
+            display: inline-block;
+            line-height: 1.28;
+            font-weight: 700;
+            color: #0b1220;
+        }
+        .cell-price-main {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            font-weight: 800;
+            color: #0f172a;
+        }
+        .cell-supplier {
+            display: inline-flex;
+            align-items: center;
+            padding: 4px 11px;
+            border: 1px solid rgba(148, 163, 184, 0.35);
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.72);
+            backdrop-filter: blur(6px);
+            font-weight: 700;
+            font-size: 15px;
+            line-height: 1.2;
+            width: 124px;
+            max-width: 124px;
+            justify-content: center;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            color: #111827;
+            box-shadow: 0 1px 0 rgba(15, 23, 42, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.85);
+        }
+        .cell-imported {
+            color: #475569;
+            font-size: 13px;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+        .cell-imported.age-fresh {
+            color: #15803d !important;
+        }
+        .cell-imported.age-warn {
+            color: #b45309 !important;
+        }
+        .cell-imported.age-stale {
+            color: #b91c1c !important;
+        }
+        .cell-imported[data-full-datetime] {
+            position: relative;
+        }
+        .cell-imported[data-full-datetime]::after {
+            content: attr(data-full-datetime);
+            position: absolute;
+            right: 0;
+            bottom: calc(100% + 6px);
+            padding: 5px 8px;
+            border-radius: 8px;
+            border: 1px solid #cfd8e8;
+            background: #ffffff;
+            color: #334155;
+            font-size: 0.72rem;
+            font-weight: 600;
+            line-height: 1.2;
+            box-shadow: 0 8px 20px rgba(15, 23, 42, 0.12);
+            white-space: nowrap;
+            opacity: 0;
+            pointer-events: none;
+            transform: translateY(2px);
+            transition: opacity 0.12s ease, transform 0.12s ease;
+            z-index: 30;
+        }
+        .cell-imported[data-full-datetime]:hover::after,
+        .cell-imported[data-full-datetime].show-full-datetime::after {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        .mobile-meta-row {
+            display: none;
+        }
+        .mobile-meta-spacer {
+            display: inline-block;
+            min-height: 24px;
+            min-width: 1px;
+        }
         .supplier-filter-link {
             color: inherit;
             text-decoration: none;
@@ -218,15 +391,107 @@
             border-bottom-color: #94a3b8;
         }
         @media (max-width: 991.98px) {
+            .list-kpis {
+                display: none;
+            }
+            .filters.filters-products {
+                padding: 10px;
+                border-radius: 12px;
+            }
             .filters.filters-products .search-inline-row {
-                top: 64px;
-                z-index: 1040;
-                padding-top: 10px;
-                margin-top: -10px;
+                position: static;
+                top: auto;
+                z-index: auto;
+                padding: 0;
+                margin: 0;
+                border-bottom: 0;
+                gap: 8px;
             }
             .filters.filters-products .search-inline-row.is-pinned {
-                border-radius: 10px;
-                padding: 8px 10px;
+                position: static !important;
+                left: auto !important;
+                right: auto !important;
+                border: 0;
+                border-radius: 0;
+                padding: 0;
+                margin: 0;
+                box-shadow: none;
+            }
+            .search-input-wrap input {
+                min-height: 46px;
+                border-radius: 13px;
+                padding-left: 14px;
+                padding-right: 48px;
+                background: #f6f9ff;
+            }
+            .search-clear-text {
+                right: 9px;
+                width: 26px;
+                height: 26px;
+                font-size: 0.95rem;
+                background: #eff4ff;
+                border-color: #c9d8f0;
+            }
+            .filter-icon-btn {
+                width: 42px;
+                height: 42px;
+                border-radius: 12px;
+            }
+            .products-mobile .cell-supplier {
+                font-size: 0.95rem;
+                font-weight: 700;
+                padding: 6px 14px;
+                border-color: rgba(148, 163, 184, 0.35);
+                background: rgba(255, 255, 255, 0.78);
+                color: #0f172a;
+                min-height: 36px;
+                line-height: 1.1;
+                box-shadow: 0 1px 0 rgba(15, 23, 42, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+            }
+            .products-mobile .cell-imported {
+                font-size: 0.70rem;
+                color: #64748b;
+                letter-spacing: 0.01em;
+            }
+            .products-mobile td[data-field="last_imported_at"] {
+                display: none !important;
+            }
+            .products-mobile .price-delta-wrap {
+                display: none !important;
+            }
+            .products-mobile .mobile-meta-row {
+                position: static;
+                display: flex !important;
+                align-items: center;
+                justify-content: flex-start;
+                gap: 8px;
+                margin-top: 8px;
+                min-height: 24px;
+                width: 100% !important;
+                min-width: 100% !important;
+                padding-right: 0;
+                box-sizing: border-box;
+                position: relative;
+                z-index: 2;
+            }
+            .products-mobile .mobile-meta-row .price-delta-badge,
+            .products-mobile .mobile-meta-row .mobile-meta-spacer {
+                display: inline-flex;
+                align-items: center;
+            }
+            .products-mobile .mobile-meta-row .cell-imported {
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                height: 24px;
+                min-height: 24px;
+                padding: 3px 9px;
+                line-height: 1;
+                border-radius: 999px;
+                border: 1px solid var(--app-border);
+                background: #f8fafc;
+                position: static;
+                margin-left: auto !important;
             }
         }
     </style>
@@ -236,6 +501,10 @@
             <div>
                 <h1 class="page-title">{{ list_title }}</h1>
                 <p class="page-subtitle">Total: {{ total_count }}</p>
+                <div class="list-kpis">
+                    <span class="list-kpi"><span class="dot"></span>Live Prices</span>
+                    <span class="list-kpi">Updated in Moscow Time</span>
+                </div>
             </div>
             <div class="d-flex flex-wrap gap-2">
                 {% if show_create and create_url_name %}
@@ -321,8 +590,8 @@
                         <label for="live-search">Search</label>
                         <div class="search-inline-row">
                             <div class="search-input-wrap">
-                                <input id="live-search" type="text" value="{{ current_q|default:'' }}" placeholder="Search products..." data-sort="{{ current_sort|default:'current_price' }}" data-dir="{{ current_dir|default:'asc' }}"{% if link_detail %} data-detail-base="/products/"{% endif %}{% if show_bulk_delete %} data-bulk="1"{% endif %}{% if update_url_name %} data-edit-pattern="{% url update_url_name 0 %}"{% endif %}{% if delete_url_name %} data-delete-pattern="{% url delete_url_name 0 %}"{% endif %}>
-                                <button id="clear-search-btn" class="search-clear-text{% if not current_q %} is-hidden{% endif %}" type="button">Clear</button>
+                                <input id="live-search" type="text" value="{{ current_q|default:'' }}" placeholder="Search perfume or SKU..." data-sort="{{ current_sort|default:'current_price' }}" data-dir="{{ current_dir|default:'asc' }}"{% if link_detail %} data-detail-base="{{ detail_base_url|default:'' }}"{% endif %} data-search-url="{{ search_url|default:'' }}"{% if show_bulk_delete %} data-bulk="1"{% endif %}{% if update_url_name %} data-edit-pattern="{% url update_url_name 0 %}"{% endif %}{% if delete_url_name %} data-delete-pattern="{% url delete_url_name 0 %}"{% endif %}>
+                                <button id="clear-search-btn" class="search-clear-text{% if not current_q %} is-hidden{% endif %}" type="button" aria-label="Clear search" title="Clear search">&times;</button>
                             </div>
                             <button class="button secondary icon filter-icon-btn" type="button" data-bs-toggle="offcanvas" data-bs-target="#product-filters-sidebar" aria-controls="product-filters-sidebar" title="Filters" aria-label="Filters">
                                 <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -400,8 +669,8 @@
                         <label for="live-search">Search</label>
                         <div class="search-inline-row">
                             <div class="search-input-wrap">
-                                <input id="live-search" type="text" value="{{ current_q|default:'' }}" placeholder="Search products..." data-sort="{{ current_sort|default:'current_price' }}" data-dir="{{ current_dir|default:'asc' }}"{% if link_detail %} data-detail-base="/products/" data-server-search="1"{% endif %}{% if show_bulk_delete %} data-bulk="1"{% endif %}{% if update_url_name %} data-edit-pattern="{% url update_url_name 0 %}"{% endif %}{% if delete_url_name %} data-delete-pattern="{% url delete_url_name 0 %}"{% endif %}>
-                                <button id="clear-search-btn" class="search-clear-text{% if not current_q %} is-hidden{% endif %}" type="button">Clear</button>
+                                <input id="live-search" type="text" value="{{ current_q|default:'' }}" placeholder="Search perfume or SKU..." data-sort="{{ current_sort|default:'current_price' }}" data-dir="{{ current_dir|default:'asc' }}"{% if link_detail %} data-detail-base="{{ detail_base_url|default:'' }}" data-server-search="1"{% endif %} data-search-url="{{ search_url|default:'' }}"{% if show_bulk_delete %} data-bulk="1"{% endif %}{% if update_url_name %} data-edit-pattern="{% url update_url_name 0 %}"{% endif %}{% if delete_url_name %} data-delete-pattern="{% url delete_url_name 0 %}"{% endif %}>
+                                <button id="clear-search-btn" class="search-clear-text{% if not current_q %} is-hidden{% endif %}" type="button" aria-label="Clear search" title="Clear search">&times;</button>
                             </div>
                         </div>
                         <span id="search-count" class="muted" style="margin-left: 8px;"></span>
@@ -450,7 +719,7 @@
     <div class="card p-2 p-md-3">
         {% if object_list %}
             <div class="table-wrap table-responsive">
-                <table class="table table-sm table-hover align-middle mb-0 table-mobile{% if list_title == 'Suppliers Products' or list_title == 'Supplier Products' %} products-mobile{% endif %}">
+                <table class="table table-sm table-hover align-middle mb-0 table-mobile products-grid{% if list_title == 'Suppliers Products' or list_title == 'Supplier Products' %} products-mobile{% endif %}">
                 <thead>
                     <tr>
                         {% if show_bulk_delete %}
@@ -509,44 +778,78 @@
                                 {% endif %}
                                 {% for field in list_display %}
                                     {% if field == "last_imported_at" %}
-                                        <td data-field="{{ field }}" data-label="Last imported">{{ obj.last_imported_at|date:"d/m/Y H:i" }}</td>
+                                        <td data-field="{{ field }}" data-label="Last imported"><span class="cell-imported {{ obj.last_imported_at|imported_age_class }}" title="{{ obj.last_imported_at|date:'d/m/Y H:i' }}" data-full-datetime="{{ obj.last_imported_at|date:'d/m/Y H:i' }}">{{ obj.last_imported_at|relative_time_short }}</span></td>
                                     {% elif field == "current_price" %}
                                         {% if obj.display_price %}
                                             <td data-field="{{ field }}" data-label="Price">
-                                                <div>{{ obj.display_price|floatformat:2 }} {{ obj.display_currency|currency_symbol }}</div>
+                                                <div class="cell-price-main">{{ obj.display_price|floatformat:2 }} {{ obj.display_currency|currency_symbol }}</div>
                                                 {% if obj.price_delta_direction %}
                                                     <div class="price-delta-wrap">
                                                         <span class="price-delta-badge {{ obj.price_delta_direction }}">
-                                                            {% if obj.price_delta_direction == "down" %}↓{% else %}↑{% endif %}
+                                                            {% if obj.price_delta_direction == "down" %}&darr;{% else %}&uarr;{% endif %}
                                                             {{ obj.price_delta_value|floatformat:2 }} {{ obj.display_currency|currency_symbol }}
                                                             {% if obj.price_delta_percent %}({{ obj.price_delta_percent|floatformat:2 }}%){% endif %}
                                                         </span>
                                                     </div>
+                                                {% else %}
+                                                    <div class="price-delta-wrap">
+                                                        <span class="price-delta-badge neutral">No change</span>
+                                                    </div>
                                                 {% endif %}
+                                                <div class="mobile-meta-row">
+                                                    {% if obj.price_delta_direction %}
+                                                        <span class="price-delta-badge {{ obj.price_delta_direction }}">
+                                                            {% if obj.price_delta_direction == "down" %}&darr;{% else %}&uarr;{% endif %}
+                                                            {{ obj.price_delta_value|floatformat:2 }} {{ obj.display_currency|currency_symbol }}
+                                                            {% if obj.price_delta_percent %}({{ obj.price_delta_percent|floatformat:2 }}%){% endif %}
+                                                        </span>
+                                                    {% else %}
+                                                        <span class="price-delta-badge neutral">No change</span>
+                                                    {% endif %}
+                                                    <span class="cell-imported {{ obj.last_imported_at|imported_age_class }}" title="{{ obj.last_imported_at|date:'d/m/Y H:i' }}" data-full-datetime="{{ obj.last_imported_at|date:'d/m/Y H:i' }}">{{ obj.last_imported_at|relative_time_short }}</span>
+                                                </div>
                                             </td>
                                         {% else %}
                                             <td data-field="{{ field }}" data-label="Price">
-                                                <div>{{ obj.current_price|default_if_none:"-" }}{% if obj.current_price|default_if_none:'' != '' %} {{ obj.currency|currency_symbol }}{% endif %}</div>
+                                                <div class="cell-price-main">{{ obj.current_price|default_if_none:"-" }}{% if obj.current_price|default_if_none:'' != '' %} {{ obj.currency|currency_symbol }}{% endif %}</div>
                                                 {% if obj.price_delta_direction %}
                                                     <div class="price-delta-wrap">
                                                         <span class="price-delta-badge {{ obj.price_delta_direction }}">
-                                                            {% if obj.price_delta_direction == "down" %}↓{% else %}↑{% endif %}
+                                                            {% if obj.price_delta_direction == "down" %}&darr;{% else %}&uarr;{% endif %}
                                                             {{ obj.price_delta_value|floatformat:2 }} {{ obj.display_currency|currency_symbol }}
                                                             {% if obj.price_delta_percent %}({{ obj.price_delta_percent|floatformat:2 }}%){% endif %}
                                                         </span>
                                                     </div>
+                                                {% else %}
+                                                    <div class="price-delta-wrap">
+                                                        <span class="price-delta-badge neutral">No change</span>
+                                                    </div>
                                                 {% endif %}
+                                                <div class="mobile-meta-row">
+                                                    {% if obj.price_delta_direction %}
+                                                        <span class="price-delta-badge {{ obj.price_delta_direction }}">
+                                                            {% if obj.price_delta_direction == "down" %}&darr;{% else %}&uarr;{% endif %}
+                                                            {{ obj.price_delta_value|floatformat:2 }} {{ obj.display_currency|currency_symbol }}
+                                                            {% if obj.price_delta_percent %}({{ obj.price_delta_percent|floatformat:2 }}%){% endif %}
+                                                        </span>
+                                                    {% else %}
+                                                        <span class="price-delta-badge neutral">No change</span>
+                                                    {% endif %}
+                                                    <span class="cell-imported {{ obj.last_imported_at|imported_age_class }}" title="{{ obj.last_imported_at|date:'d/m/Y H:i' }}" data-full-datetime="{{ obj.last_imported_at|date:'d/m/Y H:i' }}">{{ obj.last_imported_at|relative_time_short }}</span>
+                                                </div>
                                             </td>
                                         {% endif %}
                                     {% else %}
                                         <td data-field="{{ field }}"
                                             data-label="{% if field == 'supplier' %}Supplier{% elif field == 'supplier_sku' %}SKU{% elif field == 'name' %}Name{% else %}{{ field|capfirst }}{% endif %}">
                                             {% if link_detail and detail_url_name and field == "name" %}
-                                                <a href="{% url detail_url_name obj.pk %}?next={{ request.get_full_path|urlencode }}&from={{ obj.pk }}">{{ obj|get_attr:field }}</a>
+                                                <a class="cell-name" href="{% url detail_url_name obj.pk %}?next={{ request.get_full_path|urlencode }}&from={{ obj.pk }}">{{ obj|get_attr:field }}</a>
                                             {% elif field == "supplier" and obj.supplier_id %}
-                                                <a href="?supplier={{ obj.supplier_id }}" class="supplier-filter-link" data-supplier-id="{{ obj.supplier_id }}">{{ obj|get_attr:field }}</a>
+                                                <a href="?supplier={{ obj.supplier_id }}" class="supplier-filter-link cell-supplier" data-supplier-id="{{ obj.supplier_id }}">{{ obj|get_attr:field }}</a>
                                             {% elif field == "name" %}
-                                                <span>{{ obj|get_attr:field }}</span>
+                                                <span class="cell-name">{{ obj|get_attr:field }}</span>
+                                            {% elif field == "supplier_sku" %}
+                                                <span class="cell-sku">{{ obj|get_attr:field }}</span>
                                             {% else %}
                                                 {{ obj|get_attr:field }}
                                             {% endif %}
@@ -1070,23 +1373,36 @@
                         var sku = escapeHtml(item.supplier_sku);
                         var rawName = String(item.name || "");
                         var escapedName = escapeHtml(rawName);
-                        var name = escapedName;
+                        var name = "<span class='cell-name'>" + escapedName + "</span>";
                         var price = escapeHtml(item.current_price);
                         var deltaDirection = item.price_delta_direction || "";
                         var deltaValue = escapeHtml(item.price_delta_value || "");
                         var deltaPercent = escapeHtml(item.price_delta_percent || "");
-                        var priceHtml = "<div>" + price + "</div>";
+                        var priceHtml = "<div class='cell-price-main'>" + price + "</div>";
                         if (deltaDirection && deltaValue) {
                             var arrow = deltaDirection === "down" ? "↓" : "↑";
                             var deltaTail = deltaPercent ? " (" + deltaPercent + ")" : "";
                             priceHtml += "<div class='price-delta-wrap'><span class='price-delta-badge " +
                                 escapeHtml(deltaDirection) + "'>" + arrow + " " + deltaValue + deltaTail +
                                 "</span></div>";
+                        } else {
+                            priceHtml += "<div class='price-delta-wrap'><span class='price-delta-badge neutral'>No change</span></div>";
                         }
-                        var imported = escapeHtml(item.last_imported_at);
+                        var importedTitle = escapeHtml(item.last_imported_at_full || "");
+                        var importedAgeClass = escapeHtml(item.last_imported_age_class || "");
+                        var imported = "<span class='cell-imported " + importedAgeClass + "'" + (importedTitle ? " title='" + importedTitle + "' data-full-datetime='" + importedTitle + "'" : "") + ">" + escapeHtml(item.last_imported_at) + "</span>";
+                        var mobileDelta = "";
+                        if (deltaDirection && deltaValue) {
+                            var mobileArrow = deltaDirection === "down" ? "↓" : "↑";
+                            var mobileDeltaTail = deltaPercent ? " (" + deltaPercent + ")" : "";
+                            mobileDelta = "<span class='price-delta-badge " + escapeHtml(deltaDirection) + "'>" + mobileArrow + " " + deltaValue + mobileDeltaTail + "</span>";
+                        } else {
+                            mobileDelta = "<span class='price-delta-badge neutral'>No change</span>";
+                        }
+                        priceHtml += "<div class='mobile-meta-row'>" + mobileDelta + imported + "</div>";
 
                         if (detailBase && item.id) {
-                            name = "<a href='" + detailBase + item.id + "/?next=" + encodeURIComponent(nextValue) + "&from=" + item.id + "'>" + escapedName + "</a>";
+                            name = "<a class='cell-name' href='" + detailBase + item.id + "/?next=" + encodeURIComponent(nextValue) + "&from=" + item.id + "'>" + escapedName + "</a>";
                         }
 
                         var checkboxCell = bulkEnabled
@@ -1137,10 +1453,10 @@
 
                         rows += "<tr data-product-id='" + item.id + "'" + rowClass + ">" +
                             checkboxCell +
-                            "<td data-field='supplier_sku' data-label='SKU'>" + sku + "</td>" +
+                            "<td data-field='supplier_sku' data-label='SKU'><span class='cell-sku'>" + sku + "</span></td>" +
                             "<td data-field='name' data-label='Name'>" + name + "</td>" +
                             "<td data-field='current_price' data-label='Price'>" + priceHtml + "</td>" +
-                            "<td data-field='supplier' data-label='Supplier'><a href='?supplier=" + encodeURIComponent(String(item.supplier_id || "")) + "' class='supplier-filter-link' data-supplier-id='" + escapeHtml(String(item.supplier_id || "")) + "'>" + supplier + "</a></td>" +
+                            "<td data-field='supplier' data-label='Supplier'><a href='?supplier=" + encodeURIComponent(String(item.supplier_id || "")) + "' class='supplier-filter-link cell-supplier' data-supplier-id='" + escapeHtml(String(item.supplier_id || "")) + "'>" + supplier + "</a></td>" +
                             "<td data-field='last_imported_at' data-label='Last imported'>" + imported + "</td>" +
                             actionsCell +
                         "</tr>";
@@ -1153,7 +1469,29 @@
                     }
                     tbody.innerHTML = rows;
                     decorateButtons(tbody);
+                    bindImportedDatetimeTooltips(tbody);
                     applyLastViewedHighlight();
+                }
+
+                function bindImportedDatetimeTooltips(container) {
+                    if (!container) return;
+                    var chips = container.querySelectorAll(".cell-imported[data-full-datetime]");
+                    chips.forEach(function (chip) {
+                        if (chip.dataset.tooltipBound === "1") return;
+                        chip.dataset.tooltipBound = "1";
+                        chip.addEventListener("click", function (event) {
+                            event.preventDefault();
+                            chips.forEach(function (item) {
+                                if (item !== chip) item.classList.remove("show-full-datetime");
+                            });
+                            chip.classList.toggle("show-full-datetime");
+                            if (chip.classList.contains("show-full-datetime")) {
+                                window.setTimeout(function () {
+                                    chip.classList.remove("show-full-datetime");
+                                }, 1800);
+                            }
+                        });
+                    });
                 }
 
                 function runAjaxSearch(query, page, force) {
@@ -1185,7 +1523,8 @@
                         activeController.abort();
                         activeController = null;
                     }
-                    var url = "/products/search/?q=" + encodeURIComponent(query);
+                    var searchBase = input.getAttribute("data-search-url") || "/products/search/";
+                    var url = searchBase + "?q=" + encodeURIComponent(query);
                     var sort = input.getAttribute("data-sort");
                     var dir = input.getAttribute("data-dir");
                     if (sort) url += "&sort=" + encodeURIComponent(sort);
@@ -1492,6 +1831,7 @@
                     syncPinnedSearchGeometry();
                 });
                 applyLastViewedHighlight();
+                bindImportedDatetimeTooltips(document);
                 var serverSearchOnLoad = input.getAttribute("data-server-search") === "1";
                 syncClearSearchVisibility();
                 if (input.value.trim() && !serverSearchOnLoad) {
@@ -1577,4 +1917,5 @@
         </script>
     {% endif %}
 {% endblock %}
+
 

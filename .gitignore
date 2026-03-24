@@ -21,3 +21,6 @@ local_settings.py
 # OS
 .DS_Store
 Thumbs.db
+
+# Local sync config (contains server details/secrets)
+scripts/db_sync.config.cmd

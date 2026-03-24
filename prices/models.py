@@ -430,6 +430,7 @@ class UserPreference(models.Model):
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="price_prefs"
     )
     supplier_exclude_terms = models.TextField(blank=True, default="")
+    supplier_front_filters = models.JSONField(blank=True, default=dict)
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self) -> str:
