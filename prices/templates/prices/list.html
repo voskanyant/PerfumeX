@@ -111,6 +111,24 @@
             width: 100%;
             padding-right: 56px;
         }
+        .search-input-wrap.is-loading input {
+            background-image: linear-gradient(
+                90deg,
+                rgba(74, 222, 128, 0.08) 0%,
+                rgba(74, 222, 128, 0.18) 35%,
+                rgba(74, 222, 128, 0.08) 70%
+            );
+            background-size: 220% 100%;
+            animation: searchInputLoading 1.15s ease-in-out infinite;
+        }
+        @keyframes searchInputLoading {
+            0% {
+                background-position: 100% 0;
+            }
+            100% {
+                background-position: -100% 0;
+            }
+        }
         .search-clear-text {
             position: absolute;
             top: 50%;
@@ -659,6 +677,7 @@
                 var requestId = 0;
                 var lastRequestSignature = "";
                 var currentAjaxPage = 1;
+                var lastAppliedSearch = (input.value || "").trim();
                 var supplierOptions = supplierOptionSource
                     ? Array.from(supplierOptionSource.options).map(function (opt) {
                         return { id: String(opt.value || ""), name: String(opt.text || "") };
@@ -667,6 +686,7 @@
                 var selectedSupplierIds = [];
                 var lastViewedKey = "products_last_viewed_id";
                 var stickySearchItem = input.closest(".search-inline-row") || input.closest(".filter-item.search-full-width");
+                var searchInputWrap = input.closest(".search-input-wrap");
                 var stickyPlaceholder = null;
                 var isPinnedSearch = false;
                 var tableCard = document.querySelector(".card.p-2.p-md-3");
@@ -905,6 +925,15 @@
                         clearSearchBtn.classList.remove("is-hidden");
                     } else {
                         clearSearchBtn.classList.add("is-hidden");
+                    }
+                }
+
+                function setSearchLoading(isLoading) {
+                    if (!searchInputWrap) return;
+                    if (isLoading) {
+                        searchInputWrap.classList.add("is-loading");
+                    } else {
+                        searchInputWrap.classList.remove("is-loading");
                     }
                 }
 
@@ -1150,6 +1179,7 @@
                     updateSearchParamInUrl(query, safePage);
                     requestId += 1;
                     var currentRequestId = requestId;
+                    setSearchLoading(true);
 
                     if (activeController) {
                         activeController.abort();
@@ -1203,13 +1233,16 @@
                         .finally(function () {
                             if (currentRequestId === requestId) {
                                 activeController = null;
+                                setSearchLoading(false);
                             }
                         });
                 }
 
                 function applySearchNow(query) {
+                    query = (query || "").trim();
                     var useServerSearch = input.getAttribute("data-server-search") === "1";
                     if (useServerSearch) {
+                        setSearchLoading(true);
                         var navUrl = new URL(window.location.href);
                         if (query) {
                             navUrl.searchParams.set("q", query);
@@ -1221,9 +1254,11 @@
                         if (navUrl.toString() !== window.location.href) {
                             window.location.assign(navUrl.toString());
                         }
+                        lastAppliedSearch = query;
                         return;
                     }
                     if (!query) {
+                        setSearchLoading(false);
                         tbody.innerHTML = originalRows;
                         decorateButtons(tbody);
                         decorateInputs(tbody);
@@ -1236,20 +1271,31 @@
                         updateSearchParamInUrl("", 1);
                         applyLastViewedHighlight();
                         if (countEl) countEl.textContent = "";
+                        lastAppliedSearch = "";
                         return;
                     }
                     runAjaxSearch(query, 1, false);
+                    lastAppliedSearch = query;
                 }
 
                 input.addEventListener("keydown", function (event) {
                     if (event.key === "Enter") {
                         event.preventDefault();
                         applySearchNow(input.value.trim());
+                        input.blur();
                     }
                 });
 
                 input.addEventListener("input", function () {
                     syncClearSearchVisibility();
+                });
+                input.addEventListener("blur", function () {
+                    setTimeout(function () {
+                        var currentValue = (input.value || "").trim();
+                        if (currentValue !== lastAppliedSearch) {
+                            applySearchNow(currentValue);
+                        }
+                    }, 0);
                 });
                 if (clearSearchBtn) {
                     clearSearchBtn.addEventListener("click", function () {
