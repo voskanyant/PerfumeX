@@ -26,6 +26,12 @@ def _parse_decimal(value) -> Decimal | None:
         return None
     if isinstance(value, Decimal):
         return value
+    if isinstance(value, int):
+        return Decimal(value)
+    if isinstance(value, float):
+        # Keep true numeric spreadsheet values (e.g. 13.1999) as-is.
+        # Heuristic string parsing below is for localized text input.
+        return Decimal(str(value))
     text = str(value).strip()
     if not text:
         return None
