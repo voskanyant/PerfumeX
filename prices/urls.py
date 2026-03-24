@@ -49,6 +49,7 @@ urlpatterns = [
     path("suppliers/<int:pk>/import-email/backfill/", views.SupplierEmailBackfillView.as_view(), name="supplier_import_email_backfill"),
     path("suppliers/import-email/backfill/", views.SupplierEmailBackfillBulkView.as_view(), name="supplier_import_email_backfill_bulk"),
     path("suppliers/rates/recalculate/", views.SupplierRatesRecalculateView.as_view(), name="supplier_rates_recalculate"),
+    path("suppliers/reimport-prices/", views.SupplierPriceReimportAllView.as_view(), name="supplier_reimport_all_prices"),
     path("suppliers/import-email/", views.SupplierEmailImportAllView.as_view(), name="supplier_import_email_all"),
     path("suppliers/<int:pk>/import-email/cancel/", views.SupplierEmailImportCancelView.as_view(), name="supplier_import_email_cancel"),
     path("suppliers/<int:pk>/import-email/status/", views.SupplierEmailImportStatusView.as_view(), name="supplier_import_email_status"),

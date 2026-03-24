@@ -6,6 +6,7 @@ import os
 import stat
 import subprocess
 from pathlib import Path
+import logging
 
 from django.utils import timezone
 from django.conf import settings
@@ -60,6 +61,7 @@ from .services.cbr_rates import upsert_cbr_markup_rates, upsert_cbr_markup_rates
 
 CRON_MARKER = "PERFUMEX_IMPORT_CRON"
 PRODUCT_REMOVED_EVENT_PREFIX = "SYSTEM_DEACTIVATE:"
+logger = logging.getLogger(__name__)
 
 
 def _normalize_exclude_terms(raw: str) -> str:
@@ -1493,6 +1495,24 @@ class SupplierEmailImportAllView(LoginRequiredMixin, View):
 
         thread = threading.Thread(target=_run_all, daemon=True)
         thread.start()
+        return redirect("prices:supplier_overview")
+
+
+class SupplierPriceReimportAllView(LoginRequiredMixin, View):
+    def post(self, request):
+        def _run_reimport():
+            close_old_connections()
+            try:
+                call_command("repair_supplier_price_imports", all_suppliers=True)
+            except Exception:
+                logger.exception("Bulk reimport of all price files failed.")
+
+        thread = threading.Thread(target=_run_reimport, daemon=True)
+        thread.start()
+        messages.success(
+            request,
+            "Reimport of all processed price files started in background.",
+        )
         return redirect("prices:supplier_overview")
 
 
