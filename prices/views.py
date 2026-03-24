@@ -1003,11 +1003,16 @@ class SupplierProductSearchView(LoginRequiredMixin, View):
             queryset = queryset.order_by("-is_active", ordering, "id")
         else:
             queryset = queryset.order_by(ordering, "id")
-        paginator = Paginator(queryset, page_size)
-        page_number = request.GET.get("page", "1")
-        page_obj = paginator.get_page(page_number)
-        visible_products = page_obj.object_list
-        total_count = paginator.count
+        page_raw = request.GET.get("page", "1")
+        try:
+            page_number = max(int(page_raw), 1)
+        except (TypeError, ValueError):
+            page_number = 1
+        offset = (page_number - 1) * page_size
+        rows = list(queryset[offset : offset + page_size + 1])
+        has_next = len(rows) > page_size
+        visible_products = rows[:page_size]
+        has_previous = page_number > 1
         items = []
         rates = _get_latest_rates()
         for product in visible_products:
@@ -1058,14 +1063,19 @@ class SupplierProductSearchView(LoginRequiredMixin, View):
 
         return JsonResponse(
             {
-                "count": total_count,
+                "count": None,
+                "count_display": (
+                    f"{offset + len(items)}+"
+                    if has_next
+                    else str(offset + len(items))
+                ),
                 "shown": len(items),
-                "page": page_obj.number,
-                "num_pages": paginator.num_pages,
-                "has_next": page_obj.has_next(),
-                "has_previous": page_obj.has_previous(),
-                "next_page": page_obj.next_page_number() if page_obj.has_next() else None,
-                "previous_page": page_obj.previous_page_number() if page_obj.has_previous() else None,
+                "page": page_number,
+                "num_pages": None,
+                "has_next": has_next,
+                "has_previous": has_previous,
+                "next_page": page_number + 1 if has_next else None,
+                "previous_page": page_number - 1 if has_previous else None,
                 "items": items,
             }
         )

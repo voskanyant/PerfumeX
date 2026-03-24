@@ -837,29 +837,45 @@
 
                 function renderSearchPagination(data, query) {
                     if (!pagination) return;
-                    var totalPages = Number(data.num_pages || 1);
                     var page = Number(data.page || 1);
-                    if (totalPages <= 1) {
-                        pagination.style.display = "none";
-                        return;
-                    }
-                    var start = Math.max(1, page - 2);
-                    var end = Math.min(totalPages, page + 2);
+                    var hasKnownTotal = data.num_pages !== null && data.num_pages !== undefined;
                     var html = "<nav class='mt-3' aria-label='Pagination'><ul class='pagination flex-wrap mb-0'>";
-                    if (data.has_previous) {
-                        html += "<li class='page-item'><a class='page-link' href='#' data-page='" + data.previous_page + "'>Previous</a></li>";
-                    }
-                    for (var p = start; p <= end; p += 1) {
-                        if (p === page) {
-                            html += "<li class='page-item active'><span class='page-link'>" + p + "</span></li>";
-                        } else {
-                            html += "<li class='page-item'><a class='page-link' href='#' data-page='" + p + "'>" + p + "</a></li>";
+                    if (hasKnownTotal) {
+                        var totalPages = Number(data.num_pages || 1);
+                        if (totalPages <= 1) {
+                            pagination.style.display = "none";
+                            return;
                         }
+                        var start = Math.max(1, page - 2);
+                        var end = Math.min(totalPages, page + 2);
+                        if (data.has_previous) {
+                            html += "<li class='page-item'><a class='page-link' href='#' data-page='" + data.previous_page + "'>Previous</a></li>";
+                        }
+                        for (var p = start; p <= end; p += 1) {
+                            if (p === page) {
+                                html += "<li class='page-item active'><span class='page-link'>" + p + "</span></li>";
+                            } else {
+                                html += "<li class='page-item'><a class='page-link' href='#' data-page='" + p + "'>" + p + "</a></li>";
+                            }
+                        }
+                        if (data.has_next) {
+                            html += "<li class='page-item'><a class='page-link' href='#' data-page='" + data.next_page + "'>Next</a></li>";
+                        }
+                        html += "</ul><div class='muted mt-2'>Page " + page + " of " + totalPages + "</div></nav>";
+                    } else {
+                        if (!data.has_previous && !data.has_next) {
+                            pagination.style.display = "none";
+                            return;
+                        }
+                        if (data.has_previous) {
+                            html += "<li class='page-item'><a class='page-link' href='#' data-page='" + data.previous_page + "'>Previous</a></li>";
+                        }
+                        html += "<li class='page-item active'><span class='page-link'>" + page + "</span></li>";
+                        if (data.has_next) {
+                            html += "<li class='page-item'><a class='page-link' href='#' data-page='" + data.next_page + "'>Next</a></li>";
+                        }
+                        html += "</ul><div class='muted mt-2'>Page " + page + "</div></nav>";
                     }
-                    if (data.has_next) {
-                        html += "<li class='page-item'><a class='page-link' href='#' data-page='" + data.next_page + "'>Next</a></li>";
-                    }
-                    html += "</ul><div class='muted mt-2'>Page " + page + " of " + totalPages + "</div></nav>";
                     pagination.innerHTML = html;
                     pagination.style.display = "";
                     pagination.querySelectorAll("a[data-page]").forEach(function (link) {
@@ -1174,7 +1190,11 @@
                             renderRows(data.items || []);
                             renderSearchPagination(data, query);
                             if (countEl) {
-                                countEl.textContent = "Found: " + data.count;
+                                var countValue = data.count;
+                                if (countValue === null || countValue === undefined || countValue === "") {
+                                    countValue = data.count_display || data.shown || 0;
+                                }
+                                countEl.textContent = "Found: " + countValue;
                             }
                         })
                         .catch(function (error) {
