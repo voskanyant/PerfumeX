@@ -1332,6 +1332,9 @@
                     if (!excludeFilter) return;
                     var url = new URL(window.location.href);
                     setCommonFilters(url);
+                    // Preserve explicit "clear" action so backend can store empty preference
+                    // instead of falling back to previously saved exclude terms.
+                    url.searchParams.set("exclude", excludeFilter.value.trim());
                     url.searchParams.delete("page");
                     window.location.href = url.toString();
                 }
