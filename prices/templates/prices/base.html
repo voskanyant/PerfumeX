@@ -476,14 +476,33 @@
                 }
                 .products-mobile tr {
                     display: grid;
-                    grid-template-columns: minmax(0, 1fr) auto;
+                    grid-template-columns: minmax(0, 1fr) 142px;
                     grid-template-rows: auto auto auto;
-                    gap: 4px 8px;
+                    gap: 6px 10px;
                     position: relative;
                     -webkit-tap-highlight-color: transparent;
                     margin-bottom: 12px;
-                    padding: 10px 12px 11px;
-                    border-radius: 12px;
+                    padding: 12px 14px 12px 16px;
+                    border-radius: 22px;
+                    border: 1px solid #dedfd8;
+                    background: #ffffff;
+                    box-shadow: 0 1px 0 rgba(15, 23, 42, 0.02);
+                }
+                .products-mobile tr::before {
+                    content: "";
+                    position: absolute;
+                    left: 8px;
+                    top: 16px;
+                    bottom: 16px;
+                    width: 4px;
+                    border-radius: 999px;
+                    background: #2f5a96;
+                }
+                .products-mobile tr:nth-child(3n)::before {
+                    background: #84681b;
+                }
+                .products-mobile tr:nth-child(5n)::before {
+                    background: #6f3d8f;
                 }
                 .products-mobile td {
                     padding: 1px 0;
@@ -503,15 +522,15 @@
                     display: flex;
                     align-items: flex-start;
                     gap: 2px;
-                    padding-bottom: 4px;
+                    padding-bottom: 2px;
                     justify-content: flex-start;
                     padding-right: 28px;
                     line-height: 1.18;
                 }
                 .products-mobile td[data-field="name"] .cell-name,
                 .products-mobile td[data-field="name"] a.cell-name {
-                    font-size: 0.99rem;
-                    font-weight: 600;
+                    font-size: 1rem;
+                    font-weight: 500;
                     line-height: 1.18;
                     display: -webkit-box;
                     -webkit-line-clamp: 2;
@@ -529,17 +548,20 @@
                 .products-mobile td[data-field="supplier"] {
                     order: 3;
                     font-weight: 500;
-                    color: #334155;
-                    padding-top: 0;
-                    padding-bottom: 4px;
+                    color: #2f5f45;
+                    padding-top: 4px;
+                    padding-bottom: 0;
                     display: flex;
                     justify-content: flex-end;
-                    align-items: flex-start;
+                    align-items: center;
                     grid-column: 2;
                     grid-row: 2;
-                    align-self: start;
+                    align-self: center;
                     position: relative;
                     z-index: 1;
+                    width: 142px;
+                    text-align: right;
+                    min-height: 0;
                 }
                 .products-mobile td[data-field="current_price"] {
                     order: 2;
@@ -557,12 +579,14 @@
                     box-sizing: border-box;
                 }
                 .products-mobile td[data-field="current_price"] .cell-price-main {
-                    font-size: 1.3rem;
-                    line-height: 1.08;
-                    font-weight: 800;
+                    font-size: 1.72rem;
+                    line-height: 1;
+                    font-weight: 700;
+                    font-family: "Cormorant Garamond", "Georgia", "Times New Roman", serif;
                     justify-content: flex-start;
                     max-width: calc(100% - 132px);
                     white-space: nowrap;
+                    margin-top: 0;
                 }
                 .products-mobile td[data-field="current_price"] .price-delta-wrap {
                     margin-top: 0;
