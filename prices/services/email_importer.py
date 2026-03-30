@@ -725,8 +725,14 @@ def run_import(
 
                 batch_by_supplier = {}
                 processed_any = False
+                first_attachment_selected = False
                 for part in message.walk():
                     check_timeout("processing attachments")
+                    if first_attachment_selected:
+                        _log_line(
+                            f"{mailbox.name}: processed first attachment in message {msg_id.decode(errors='ignore')}; skipping remaining attachments."
+                        )
+                        break
                     if run_id:
                         run = models.EmailImportRun.objects.filter(id=run_id).first()
                         if run and run.status == models.EmailImportStatus.CANCELED:
@@ -749,6 +755,7 @@ def run_import(
                             )
                             continue
                     summary["attachments_seen"] += 1
+                    first_attachment_selected = True
                     lowered_filename = filename.lower()
                     if blacklist_terms and any(term in lowered_filename for term in blacklist_terms):
                         summary["skipped_blacklist"] += 1

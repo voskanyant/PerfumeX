@@ -220,6 +220,25 @@
         .product-filters-offcanvas .extra-filters-grid {
             grid-template-columns: 1fr;
         }
+        .inactive-switch-wrap {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            min-height: 40px;
+            margin-top: 2px;
+        }
+        .inactive-switch-wrap .form-check-input {
+            width: 2.25rem;
+            height: 1.25rem;
+            margin-top: 0;
+            cursor: pointer;
+        }
+        .inactive-switch-label {
+            font-size: 0.95rem;
+            color: #334155;
+            user-select: none;
+            cursor: pointer;
+        }
         #supplier-bulk-root.bulk-mode-off .bulk-actions-inline {
             display: none !important;
         }
@@ -401,6 +420,23 @@
             display: inline !important;
             height: auto !important;
             line-height: 1.2 !important;
+        }
+        .price-delta-badge.up,
+        .price-delta-badge.down,
+        .price-delta-badge.neutral {
+            background: transparent !important;
+            border: 0 !important;
+            box-shadow: none !important;
+        }
+        .products-mobile td[data-field="current_price"] .mobile-meta-row .price-delta-badge,
+        .products-mobile td[data-field="current_price"] .mobile-meta-row .price-delta-badge.up,
+        .products-mobile td[data-field="current_price"] .mobile-meta-row .price-delta-badge.down,
+        .products-mobile td[data-field="current_price"] .mobile-meta-row .price-delta-badge.neutral {
+            background: transparent !important;
+            border: 0 !important;
+            border-radius: 0 !important;
+            box-shadow: none !important;
+            padding: 0 !important;
         }
         .mobile-meta-row {
             display: none;
@@ -825,12 +861,11 @@
                             {% endif %}
                             {% if status_options %}
                                 <div class="filter-item">
-                                    <label for="status-filter">Status</label>
-                                    <select id="status-filter">
-                                        {% for value, label in status_options %}
-                                            <option value="{{ value }}"{% if status_filter == value %} selected{% endif %}>{{ label }}</option>
-                                        {% endfor %}
-                                    </select>
+                                    <label for="show-inactive-switch">Inactive products</label>
+                                    <div class="form-check form-switch inactive-switch-wrap">
+                                        <input class="form-check-input" id="show-inactive-switch" type="checkbox" role="switch"{% if status_filter != 'active' %} checked{% endif %}>
+                                        <label class="form-check-label inactive-switch-label" for="show-inactive-switch">Show inactive</label>
+                                    </div>
                                 </div>
                             {% endif %}
                             <div class="filter-item">
@@ -892,12 +927,11 @@
                 {% endif %}
                 {% if status_options %}
                     <div class="filter-item">
-                        <label for="status-filter">Status</label>
-                        <select id="status-filter">
-                            {% for value, label in status_options %}
-                                <option value="{{ value }}"{% if status_filter == value %} selected{% endif %}>{{ label }}</option>
-                            {% endfor %}
-                        </select>
+                        <label for="show-inactive-switch">Inactive products</label>
+                        <div class="form-check form-switch inactive-switch-wrap">
+                            <input class="form-check-input" id="show-inactive-switch" type="checkbox" role="switch"{% if status_filter != 'active' %} checked{% endif %}>
+                            <label class="form-check-label inactive-switch-label" for="show-inactive-switch">Show inactive</label>
+                        </div>
                     </div>
                 {% endif %}
             {% endif %}
@@ -1152,6 +1186,7 @@
                 var supplierSelectedChips = document.getElementById("supplier-selected-chips");
                 var clearSupplierFilterBtn = document.getElementById("clear-supplier-filter-btn");
                 var statusFilter = document.getElementById("status-filter");
+                var showInactiveSwitch = document.getElementById("show-inactive-switch");
                 var excludeFilter = document.getElementById("exclude-filter");
                 var excludeApplyBtn = document.getElementById("exclude-apply-btn");
                 var priceMinFilter = document.getElementById("price-min-filter");
@@ -1299,12 +1334,11 @@
                             url.searchParams.delete("supplier");
                         }
                     }
-                    if (statusFilter) {
-                        if (statusFilter.value && statusFilter.value !== "all") {
-                            url.searchParams.set("status", statusFilter.value);
-                        } else {
-                            url.searchParams.delete("status");
-                        }
+                    var statusValue = getStatusFilterValue();
+                    if (statusValue && statusValue !== "all") {
+                        url.searchParams.set("status", statusValue);
+                    } else {
+                        url.searchParams.delete("status");
                     }
                     if (excludeFilter) {
                         var excludeRaw = excludeFilter.value.trim();
@@ -1444,6 +1478,16 @@
                         return prefix[0].id;
                     }
                     return "";
+                }
+
+                function getStatusFilterValue() {
+                    if (showInactiveSwitch) {
+                        return showInactiveSwitch.checked ? "all" : "active";
+                    }
+                    if (statusFilter && statusFilter.value) {
+                        return String(statusFilter.value);
+                    }
+                    return "all";
                 }
 
                 function parseSupplierIds(raw) {
@@ -1688,7 +1732,7 @@
                         query,
                         currencyFilter ? currencyFilter.value : "",
                         supplierFilter ? supplierFilter.value : "",
-                        statusFilter ? statusFilter.value : "",
+                        getStatusFilterValue(),
                         excludeFilter ? excludeFilter.value.trim() : "",
                         getPriceMinValue(),
                         getPriceMaxValue(),
@@ -1722,8 +1766,9 @@
                     if (supplierFilter && supplierFilter.value) {
                         url += "&supplier=" + encodeURIComponent(supplierFilter.value);
                     }
-                    if (statusFilter && statusFilter.value) {
-                        url += "&status=" + encodeURIComponent(statusFilter.value);
+                    var statusValue = getStatusFilterValue();
+                    if (statusValue && statusValue !== "all") {
+                        url += "&status=" + encodeURIComponent(statusValue);
                     }
                     if (excludeFilter && excludeFilter.value.trim()) {
                         url += "&exclude=" + encodeURIComponent(excludeFilter.value.trim());
@@ -1784,6 +1829,19 @@
                         return;
                     }
                     if (!query) {
+                        var resetUrl = new URL(window.location.href);
+                        if (resetUrl.searchParams.has("q")) {
+                            setSearchLoading(true);
+                            resetUrl.searchParams.delete("q");
+                            resetUrl.searchParams.delete("page");
+                            setCommonFilters(resetUrl);
+                            if (resetUrl.toString() !== window.location.href) {
+                                window.location.assign(resetUrl.toString());
+                                lastAppliedSearch = "";
+                                return;
+                            }
+                            setSearchLoading(false);
+                        }
                         setSearchLoading(false);
                         tbody.innerHTML = originalRows;
                         decorateButtons(tbody);
@@ -1814,6 +1872,9 @@
 
                 input.addEventListener("input", function () {
                     syncClearSearchVisibility();
+                    if (!(input.value || "").trim() && lastAppliedSearch) {
+                        applySearchNow("");
+                    }
                 });
                 input.addEventListener("blur", function () {
                     setTimeout(function () {
@@ -1901,6 +1962,14 @@
                 }
                 if (statusFilter) {
                     statusFilter.addEventListener("change", function () {
+                        var url = new URL(window.location.href);
+                        setCommonFilters(url);
+                        url.searchParams.delete("page");
+                        window.location.href = url.toString();
+                    });
+                }
+                if (showInactiveSwitch) {
+                    showInactiveSwitch.addEventListener("change", function () {
                         var url = new URL(window.location.href);
                         setCommonFilters(url);
                         url.searchParams.delete("page");
