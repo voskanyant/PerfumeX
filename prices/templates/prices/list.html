@@ -1195,9 +1195,7 @@
                 if (!input) return;
                 var table = document.querySelector("table");
                 var tbody = table ? table.querySelector("tbody") : null;
-                var originalRows = tbody ? tbody.innerHTML : "";
                 var pagination = document.getElementById("pagination-controls");
-                var originalPagination = pagination ? pagination.innerHTML : "";
                 var activeController = null;
                 var requestId = 0;
                 var lastRequestSignature = "";
@@ -1829,32 +1827,7 @@
                         return;
                     }
                     if (!query) {
-                        var resetUrl = new URL(window.location.href);
-                        if (resetUrl.searchParams.has("q")) {
-                            setSearchLoading(true);
-                            resetUrl.searchParams.delete("q");
-                            resetUrl.searchParams.delete("page");
-                            setCommonFilters(resetUrl);
-                            if (resetUrl.toString() !== window.location.href) {
-                                window.location.assign(resetUrl.toString());
-                                lastAppliedSearch = "";
-                                return;
-                            }
-                            setSearchLoading(false);
-                        }
-                        setSearchLoading(false);
-                        tbody.innerHTML = originalRows;
-                        decorateButtons(tbody);
-                        decorateInputs(tbody);
-                        if (pagination) {
-                            pagination.innerHTML = originalPagination;
-                            pagination.style.display = "";
-                        }
-                        lastRequestSignature = "";
-                        currentAjaxPage = 1;
-                        updateSearchParamInUrl("", 1);
-                        applyLastViewedHighlight();
-                        if (countEl) countEl.textContent = "";
+                        runAjaxSearch("", 1, true);
                         lastAppliedSearch = "";
                         return;
                     }
