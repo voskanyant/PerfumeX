@@ -1379,6 +1379,7 @@ class SupplierEmailBackfillView(LoginRequiredMixin, View):
                 from_filter=supplier.from_address_pattern or None,
                 subject_filter=supplier.price_subject_pattern or None,
                 dedupe_same_day_only=True,
+                dedupe_day_window=3,
             )
 
         thread = threading.Thread(target=_run, daemon=True)
@@ -1461,6 +1462,7 @@ class SupplierEmailBackfillBulkView(LoginRequiredMixin, View):
                         from_filter=supplier.from_address_pattern or None,
                         subject_filter=supplier.price_subject_pattern or None,
                         dedupe_same_day_only=True,
+                        dedupe_day_window=3,
                     )
                 except Exception as exc:
                     models.EmailImportRun.objects.filter(id=run.id).update(

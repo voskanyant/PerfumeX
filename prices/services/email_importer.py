@@ -79,6 +79,21 @@ def _local_day_bounds(dt):
     return day_start_local.astimezone(dt_timezone.utc), day_end_local.astimezone(dt_timezone.utc)
 
 
+def _local_day_window_bounds(dt, window_days=0):
+    """Return UTC bounds for local day expanded by +/- window_days."""
+    if not dt:
+        return None, None
+    safe_window = max(int(window_days or 0), 0)
+    local_dt = timezone.localtime(dt)
+    day_start_local = local_dt.replace(hour=0, minute=0, second=0, microsecond=0)
+    window_start_local = day_start_local - timezone.timedelta(days=safe_window)
+    window_end_local = day_start_local + timezone.timedelta(days=safe_window + 1)
+    return (
+        window_start_local.astimezone(dt_timezone.utc),
+        window_end_local.astimezone(dt_timezone.utc),
+    )
+
+
 def _match_pattern(value, pattern):
     if not pattern:
         return True
@@ -339,6 +354,7 @@ def run_import(
     from_filter=None,
     subject_filter=None,
     dedupe_same_day_only=False,
+    dedupe_day_window=0,
     min_received_at=None,
     use_uid_cursor=False,
 ):
@@ -855,8 +871,10 @@ def run_import(
 
                     content_hash = hashlib.sha256(payload).hexdigest()
                     if dedupe_same_day_only and received_at:
-                        day_start_utc, day_end_utc = _local_day_bounds(received_at)
-                        # Deduplicate within the same supplier + local day across all
+                        day_start_utc, day_end_utc = _local_day_window_bounds(
+                            received_at, dedupe_day_window
+                        )
+                        # Deduplicate within supplier + local day window across all
                         # mailboxes so the same attachment hash is imported once.
                         # Include pending files too so repeated attachments in the same run
                         # are skipped immediately.
