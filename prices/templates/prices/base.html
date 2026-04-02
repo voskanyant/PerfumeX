@@ -11,23 +11,23 @@
         <style>
             :root {
                 color-scheme: light;
-                --app-bg: #eef2f7;
+                --app-bg: #f2f2f2;
                 --app-surface: #ffffff;
-                --app-surface-soft: #f9fbff;
-                --app-border: #dce3ef;
-                --app-muted: #64748b;
-                --app-text: #0f172a;
-                --app-accent: #2563eb;
-                --app-accent-soft: #eaf1ff;
-                --app-shadow: 0 14px 32px rgba(15, 23, 42, 0.07);
-                --app-soft: rgba(37, 99, 235, 0.06);
+                --app-surface-soft: #f7f7f7;
+                --app-border: #d4d4d4;
+                --app-muted: #666666;
+                --app-text: #111111;
+                --app-accent: #111111;
+                --app-accent-soft: #f0f0f0;
+                --app-shadow: 0 12px 28px rgba(0, 0, 0, 0.06);
+                --app-soft: rgba(17, 17, 17, 0.06);
             }
             body {
                 font-family: "Manrope", "Segoe UI", Tahoma, Arial, sans-serif;
                 background:
                     radial-gradient(1200px 400px at 10% -8%, #ffffff 0%, rgba(255, 255, 255, 0) 70%),
-                    radial-gradient(1000px 380px at 95% -10%, #f6fbff 0%, rgba(246, 251, 255, 0) 68%),
-                    linear-gradient(180deg, #f7f9fc 0%, var(--app-bg) 58%, #ebf1f8 100%);
+                    radial-gradient(1000px 380px at 95% -10%, #f7f7f7 0%, rgba(247, 247, 247, 0) 68%),
+                    linear-gradient(180deg, #f8f8f8 0%, var(--app-bg) 58%, #ededed 100%);
                 color: var(--app-text);
             }
             .app-shell {
@@ -64,7 +64,7 @@
             .sidebar .nav-link:hover,
             .sidebar .nav-link.active {
                 background: var(--app-soft);
-                color: #0b3ea8;
+                color: #111111;
             }
             .nav-section-title {
                 margin: 18px 12px 8px;
@@ -157,10 +157,10 @@
                 width: 100%;
             }
             .status-dot.active {
-                background: #16a34a;
+                background: #111111;
             }
             .status-dot.inactive {
-                background: #dc2626;
+                background: #8a8a8a;
             }
             .btn-icon {
                 width: 34px;
@@ -195,21 +195,21 @@
             }
             .form-control:focus,
             .form-select:focus {
-                border-color: #9ebcf8;
-                box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+                border-color: #9a9a9a;
+                box-shadow: 0 0 0 3px rgba(17, 17, 17, 0.1);
             }
             .btn.btn-primary {
-                background: linear-gradient(180deg, #3b82f6 0%, #2563eb 100%);
-                border-color: #2563eb;
+                background: linear-gradient(180deg, #2b2b2b 0%, #111111 100%);
+                border-color: #111111;
             }
             .btn.btn-outline-secondary {
-                border-color: #c8d4e8;
-                color: #334155;
+                border-color: #c2c2c2;
+                color: #3a3a3a;
             }
             .btn.btn-outline-secondary:hover {
-                background: #eff4ff;
-                border-color: #b8c9e5;
-                color: #1e3a8a;
+                background: #efefef;
+                border-color: #adadad;
+                color: #111111;
             }
             .table-wrap {
                 border-radius: 14px;
@@ -224,14 +224,14 @@
                 position: sticky;
                 top: 0;
                 z-index: 2;
-                background: linear-gradient(180deg, #f9fbff 0%, #f4f8ff 100%);
-                border-bottom-color: #d7e1f1;
+                background: linear-gradient(180deg, #f7f7f7 0%, #f1f1f1 100%);
+                border-bottom-color: #d6d6d6;
             }
             .table tbody tr {
                 transition: background-color 0.16s ease;
             }
             .table tbody tr:hover {
-                background: #f8fbff;
+                background: #f7f7f7;
             }
             .files-summary {
                 display: -webkit-box;
@@ -359,10 +359,10 @@
                 box-shadow: none;
             }
             .price-delta-badge.up {
-                color: #b91c1c;
+                color: #555555;
             }
             .price-delta-badge.down {
-                color: #166534;
+                color: #111111;
             }
             .price-delta-badge.neutral {
                 color: #64748b;
@@ -495,7 +495,7 @@
                     bottom: 16px;
                     width: 4px;
                     border-radius: 999px;
-                    background: #2f5a96;
+                    background: #111111;
                 }
                 .products-mobile tr:nth-child(3n)::before {
                     background: #84681b;
@@ -547,7 +547,7 @@
                 .products-mobile td[data-field="supplier"] {
                     order: 3;
                     font-weight: 500;
-                    color: #2f5f45;
+                    color: #111111;
                     padding-top: 4px;
                     padding-bottom: 0;
                     display: flex;
@@ -608,14 +608,14 @@
                     border: 1px solid transparent;
                 }
                 .products-mobile td[data-field="current_price"] .price-delta-badge.up {
-                    color: #b91c1c !important;
-                    background: #fff1f2 !important;
-                    border-color: #fecdd3;
+                    color: #555555 !important;
+                    background: #f8f8f8 !important;
+                    border-color: #dcdcdc;
                 }
                 .products-mobile td[data-field="current_price"] .price-delta-badge.down {
-                    color: #166534 !important;
-                    background: #f0fdf4 !important;
-                    border-color: #bbf7d0;
+                    color: #111111 !important;
+                    background: #f8f8f8 !important;
+                    border-color: #dcdcdc;
                 }
                 .products-mobile td[data-field="current_price"] .price-delta-badge.neutral {
                     color: #64748b !important;

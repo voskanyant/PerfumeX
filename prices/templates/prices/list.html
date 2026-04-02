@@ -5,30 +5,6 @@
 
 {% block content %}
     <style>
-        .list-kpis {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
-            margin-top: 10px;
-        }
-        .list-kpi {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            padding: 5px 10px;
-            border: 1px solid var(--app-border);
-            border-radius: 999px;
-            background: var(--app-surface-soft);
-            font-size: 12px;
-            font-weight: 700;
-            color: #334155;
-        }
-        .list-kpi .dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 999px;
-            background: var(--app-accent);
-        }
         .supplier-filter-wrap {
             position: relative;
         }
@@ -289,18 +265,18 @@
             border-bottom: 1px solid #edf2fb !important;
         }
         .products-grid tbody tr:nth-child(even):not(.inactive-divider-row):not(.inactive-product-row) td {
-            background: #fbfdff;
+            background: #fafafa;
         }
         .products-grid tbody tr:hover td {
-            background: #eef5ff !important;
+            background: #f2f2f2 !important;
         }
         .products-grid td[data-field="current_price"] {
             font-weight: 700;
             color: #0f172a;
         }
         .products-grid td[data-field="supplier"] a {
-            color: #1e3a8a;
-            border-bottom-color: #bfdbfe;
+            color: #111111;
+            border-bottom-color: #b8b8b8;
         }
         .products-grid td[data-field="name"] a {
             color: #0b1220;
@@ -343,7 +319,7 @@
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
-            color: #2f5f45;
+            color: #111111;
             box-shadow: none;
         }
         .cell-imported {
@@ -353,13 +329,13 @@
             white-space: nowrap;
         }
         .cell-imported.age-fresh {
-            color: #15803d !important;
+            color: #111111 !important;
         }
         .cell-imported.age-warn {
-            color: #b45309 !important;
+            color: #555555 !important;
         }
         .cell-imported.age-stale {
-            color: #b91c1c !important;
+            color: #888888 !important;
         }
         .cell-imported[data-full-datetime] {
             position: relative;
@@ -402,13 +378,13 @@
             font-weight: 600 !important;
         }
         .products-grid .price-delta-badge.down {
-            color: #2d5a3d !important;
+            color: #111111 !important;
         }
         .products-grid .price-delta-badge.up {
-            color: #b04a2e !important;
+            color: #555555 !important;
         }
         .products-grid .price-delta-badge.neutral {
-            color: #a3a3a3 !important;
+            color: #8a8a8a !important;
         }
         /* Force plain-text delta style everywhere in this list view */
         .price-delta-badge {
@@ -463,38 +439,39 @@
                 border-radius: 12px;
             }
             .filters.filters-products .search-inline-row {
-                position: static;
-                top: auto;
-                z-index: auto;
-                padding: 0;
-                margin: 0;
-                border-bottom: 0;
+                position: sticky;
+                top: 64px;
+                z-index: 30;
+                padding: 6px 0 8px;
+                margin: -6px 0 4px;
+                border-bottom: 1px solid var(--app-border);
                 gap: 8px;
             }
             .filters.filters-products .search-inline-row.is-pinned {
-                position: static !important;
-                left: auto !important;
+                position: fixed !important;
+                left: 0 !important;
                 right: auto !important;
-                border: 0;
-                border-radius: 0;
-                padding: 0;
+                z-index: 1045;
+                border: 1px solid var(--app-border);
+                border-radius: 12px;
+                padding: 10px 12px;
                 margin: 0;
-                box-shadow: none;
+                box-shadow: var(--app-shadow);
             }
             .search-input-wrap input {
                 min-height: 46px;
                 border-radius: 13px;
                 padding-left: 14px;
                 padding-right: 48px;
-                background: #f6f9ff;
+                background: #f5f5f5;
             }
             .search-clear-text {
                 right: 9px;
                 width: 26px;
                 height: 26px;
                 font-size: 0.95rem;
-                background: #eff4ff;
-                border-color: #c9d8f0;
+                background: #f1f1f1;
+                border-color: #d2d2d2;
             }
             .filter-icon-btn {
                 width: 42px;
@@ -507,7 +484,7 @@
                 padding: 0;
                 border-color: transparent;
                 background: transparent;
-                color: #2f5f45;
+                color: #111111;
                 min-height: 0;
                 line-height: 1.2;
                 box-shadow: none;
@@ -528,7 +505,7 @@
             }
             .products-mobile .cell-imported {
                 font-size: 0.8rem;
-                color: #9ca3af;
+                color: #7a7a7a;
                 letter-spacing: 0.01em;
             }
             .products-mobile td[data-field="last_imported_at"] {
@@ -572,7 +549,7 @@
             .products-mobile .mobile-meta-row .price-delta-badge.neutral {
                 background: transparent !important;
                 border: 0 !important;
-                color: #a3a3a3 !important;
+                color: #8a8a8a !important;
                 padding-left: 0;
                 padding-right: 0;
             }
@@ -652,7 +629,7 @@
             .products-mobile .cell-supplier {
                 font-size: 13px !important;
                 font-weight: 600 !important;
-                color: #2d5a3d !important;
+                color: #111111 !important;
                 line-height: 1.2 !important;
             }
 
@@ -673,13 +650,13 @@
                 background: transparent !important;
             }
             .products-mobile .mobile-meta-row .price-delta-badge.up {
-                color: #b04a2e !important;
+                color: #555555 !important;
             }
             .products-mobile .mobile-meta-row .price-delta-badge.down {
-                color: #2d5a3d !important;
+                color: #111111 !important;
             }
             .products-mobile .mobile-meta-row .price-delta-badge.neutral {
-                color: #b0aa9e !important;
+                color: #8a8a8a !important;
                 background: transparent !important;
                 border: 0 !important;
                 padding-left: 0 !important;
@@ -688,18 +665,18 @@
             .products-mobile .mobile-meta-row .cell-imported {
                 font-size: 11px !important;
                 font-weight: 400 !important;
-                color: #b0aa9e !important;
+                color: #8a8a8a !important;
                 margin-left: auto !important;
                 line-height: 1.1 !important;
             }
             .products-mobile .mobile-meta-row .cell-imported.age-fresh {
-                color: #2d5a3d !important;
+                color: #111111 !important;
             }
             .products-mobile .mobile-meta-row .cell-imported.age-warn {
-                color: #b45309 !important;
+                color: #555555 !important;
             }
             .products-mobile .mobile-meta-row .cell-imported.age-stale {
-                color: #b91c1c !important;
+                color: #8a8a8a !important;
             }
 
             .products-mobile td.actions {
@@ -724,10 +701,6 @@
             <div>
                 <h1 class="page-title">{{ list_title }}</h1>
                 <p class="page-subtitle">Total: {{ total_count }}</p>
-                <div class="list-kpis">
-                    <span class="list-kpi"><span class="dot"></span>Live Prices</span>
-                    <span class="list-kpi">Updated in Moscow Time</span>
-                </div>
             </div>
             <div class="d-flex flex-wrap gap-2">
                 {% if show_create and create_url_name %}
