@@ -1186,6 +1186,7 @@
                 var stickyPlaceholder = null;
                 var isPinnedSearch = false;
                 var tableCard = document.querySelector(".card.p-2.p-md-3");
+                var useServerSearch = input.getAttribute("data-server-search") === "1";
 
                 function getStickyTopOffset() {
                     return window.matchMedia("(max-width: 991.98px)").matches ? 64 : 72;
@@ -1334,19 +1335,12 @@
                 }
 
                 function updateSearchParamInUrl(query, page) {
+                    if (useServerSearch) return;
                     var url = new URL(window.location.href);
                     setCommonFilters(url);
-                    if (query) {
-                        url.searchParams.set("q", query);
-                        if (page && Number(page) > 1) {
-                            url.searchParams.set("page", String(page));
-                        } else {
-                            url.searchParams.delete("page");
-                        }
-                    } else {
-                        url.searchParams.delete("q");
-                        url.searchParams.delete("page");
-                    }
+                    // Keep AJAX search term out of URL to avoid sticky/stacked q links.
+                    url.searchParams.delete("q");
+                    url.searchParams.delete("page");
                     window.history.replaceState({}, "", url.toString());
                 }
 
@@ -1782,7 +1776,6 @@
 
                 function applySearchNow(query) {
                     query = (query || "").trim();
-                    var useServerSearch = input.getAttribute("data-server-search") === "1";
                     if (useServerSearch) {
                         setSearchLoading(true);
                         var navUrl = new URL(window.location.href);
@@ -2036,6 +2029,14 @@
                 bindImportedDatetimeTooltips(document);
                 var serverSearchOnLoad = input.getAttribute("data-server-search") === "1";
                 syncClearSearchVisibility();
+                if (!serverSearchOnLoad) {
+                    var cleanUrl = new URL(window.location.href);
+                    if (cleanUrl.searchParams.has("q")) {
+                        cleanUrl.searchParams.delete("q");
+                        cleanUrl.searchParams.delete("page");
+                        window.history.replaceState({}, "", cleanUrl.toString());
+                    }
+                }
                 if (input.value.trim() && !serverSearchOnLoad) {
                     var initialPage = Number(new URL(window.location.href).searchParams.get("page") || "1");
                     runAjaxSearch(input.value.trim(), initialPage, true);
