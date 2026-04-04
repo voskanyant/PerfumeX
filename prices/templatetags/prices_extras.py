@@ -77,7 +77,12 @@ def _short_relative_time(value) -> str:
         return f"{total_seconds // 604800}w ago"
     if total_seconds < 31536000:
         return f"{total_seconds // 2592000}mo ago"
-    return f"{total_seconds // 31536000}y ago"
+    years = total_seconds // 31536000
+    remaining = total_seconds - (years * 31536000)
+    months = remaining // 2592000
+    if months > 0:
+        return f"{years}y {months}mo ago"
+    return f"{years}y ago"
 
 
 @register.filter
