@@ -600,7 +600,7 @@
     .workspace-hero-products {
         border-radius: 20px;
         padding: 14px !important;
-        background: linear-gradient(180deg, rgba(255, 255, 255, 0.92) 0%, rgba(250, 247, 241, 0.98) 100%);
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(244, 244, 242, 0.98) 100%);
     }
 
     .workspace-hero-products::before {
@@ -624,6 +624,7 @@
     .workspace-table-shell-products {
         padding: 10px !important;
         border-radius: 18px;
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(244, 244, 242, 0.98) 100%);
     }
 
     .products-mobile td::before,
@@ -635,6 +636,7 @@
     .filters.filters-products {
         padding: 10px;
         border-radius: 12px;
+        background: #ffffff;
     }
 
     .filters.filters-products .search-inline-row {
@@ -643,6 +645,7 @@
         margin: -6px 0 4px;
         border-bottom: 1px solid var(--app-border);
         gap: 8px;
+        background: #ffffff;
     }
 
     .filters.filters-products .search-inline-row.is-pinned {
@@ -657,15 +660,15 @@
         border-radius: 13px;
         padding-left: 14px;
         padding-right: 48px;
-        background: #f4f4f2;
+        background: #ffffff;
     }
 
     .search-clear-text {
         right: 9px;
         width: 26px;
         height: 26px;
-        background: #efefec;
-        border-color: #d2d2ce;
+        background: #fafafa;
+        border-color: #d7d7d3;
     }
 
     .filter-icon-btn {
@@ -695,7 +698,7 @@
         margin-bottom: 12px !important;
         padding: 14px 16px 14px 18px !important;
         border-radius: 16px !important;
-        border: 1px solid #dddcd7 !important;
+        border: 1px solid #d7d7d3 !important;
         background: #ffffff !important;
         box-shadow: none !important;
     }
@@ -847,8 +850,8 @@
         width: 22px !important;
         height: 22px !important;
         border-radius: 999px !important;
-        border: 1px solid #dbdbd7 !important;
-        background: #f6f6f3 !important;
+        border: 1px solid #d8d8d4 !important;
+        background: #fafafa !important;
         color: #666 !important;
         font-size: 14px !important;
         line-height: 1 !important;

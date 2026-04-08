@@ -760,6 +760,22 @@ label {
 }
 
 @media (max-width: 991.98px) {
+    body {
+        background: linear-gradient(180deg, #f7f7f5 0%, #efefed 100%);
+        background-size: auto;
+    }
+
+    .navbar.navbar-light {
+        background: rgba(255, 255, 255, 0.96) !important;
+        border-bottom-color: rgba(17, 17, 17, 0.1);
+    }
+
+    .offcanvas,
+    .dropdown-menu,
+    .modal-content {
+        background: #ffffff;
+    }
+
     .sidebar {
         display: none;
     }
@@ -776,6 +792,7 @@ label {
     .card {
         border-radius: 18px;
         padding: 14px;
+        background: #ffffff;
         box-shadow: var(--app-shadow-soft);
     }
 
@@ -801,6 +818,7 @@ label {
     }
 
     .table-wrap {
+        background: #ffffff;
         overflow: visible;
     }
 
@@ -845,5 +863,13 @@ label {
     .table-mobile th.select-col,
     .table-mobile td.select-col {
         display: none;
+    }
+
+    .surface-subtle,
+    .kpi-item,
+    .badge,
+    .pill,
+    .chip {
+        background: #ffffff;
     }
 }
