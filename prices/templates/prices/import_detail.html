@@ -2,6 +2,7 @@
 {% load tz %}
 
 {% block title %}Import {{ object.pk }}{% endblock %}
+{% block body_data %}data-page="import-detail"{% endblock %}
 
 {% block content %}
     <div class="card mb-3">
@@ -51,7 +52,7 @@
                                 Manual upload / Backfill
                             {% endif %}
                         </td>
-                        <td data-label="Message ID" style="word-break: break-all;">{{ object.message_id|default:"-" }}</td>
+                        <td data-label="Message ID" class="word-break-all">{{ object.message_id|default:"-" }}</td>
                         <td data-label="Error">{{ object.error_message|default:"-" }}</td>
                     </tr>
                 </tbody>

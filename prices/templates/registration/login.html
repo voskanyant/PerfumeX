@@ -1,14 +1,16 @@
 {% extends "prices/base.html" %}
 
 {% block title %}Login{% endblock %}
+{% block body_data %}data-page="login"{% endblock %}
 
 {% block content %}
-    <div class="card" style="max-width: 420px;">
-        <h1>Login</h1>
+    <div class="card login-shell form-shell">
+        <h1 class="page-title">Login</h1>
+        <p class="page-subtitle">Sign in to continue.</p>
         <form method="post">
             {% csrf_token %}
             {{ form.as_p }}
-            <div class="actions">
+            <div class="form-actions">
                 <button class="button" type="submit">Login</button>
             </div>
         </form>

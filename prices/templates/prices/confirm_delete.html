@@ -1,4 +1,5 @@
 {% extends "prices/base.html" %}
+{% block body_data %}data-page="confirm-delete"{% endblock %}
 
 {% block content %}
     <div class="card">
@@ -6,7 +7,7 @@
         <p class="muted">This action cannot be undone.</p>
         <form method="post">
             {% csrf_token %}
-            <div class="actions">
+            <div class="form-actions">
                 <button class="button" type="submit">Confirm delete</button>
                 <a class="button ghost" href="javascript:history.back()">Cancel</a>
             </div>

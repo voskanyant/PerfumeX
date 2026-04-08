@@ -1,0 +1,229 @@
+﻿.import-mega-nav,
+.import-tabs {
+    border: 1px solid var(--app-border);
+    border-radius: var(--app-radius-lg);
+    background: linear-gradient(180deg, #ffffff 0%, #f9f9f7 100%);
+    padding: 0 18px;
+    margin-bottom: 14px;
+}
+
+.import-mega-nav-inner,
+.import-tabs__inner {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 24px;
+    border-bottom: 1px solid var(--app-border);
+}
+
+.import-mega-link,
+.import-tabs__link {
+    display: inline-flex;
+    align-items: center;
+    height: 52px;
+    color: var(--app-muted);
+    text-decoration: none;
+    font-weight: 700;
+    border-bottom: 3px solid transparent;
+    margin-bottom: -1px;
+    transition: color 0.15s ease;
+}
+
+.import-mega-link:hover,
+.import-tabs__link:hover {
+    color: var(--app-text);
+}
+
+.import-mega-link.active,
+.import-tabs__link.is-active {
+    color: var(--app-text);
+    border-bottom-color: #111111;
+}
+
+.import-overview-header .button {
+    min-height: 34px;
+}
+
+#bulk-backfill-form,
+#bulk-rates-form {
+    background: linear-gradient(180deg, #ffffff 0%, #fbfbf9 100%);
+    border: 1px solid var(--app-border);
+    border-radius: var(--app-radius-md);
+    padding: 12px;
+}
+
+.supplier-import-table thead th {
+    background: linear-gradient(180deg, #f8f8f6 0%, #f1f1ef 100%);
+}
+
+.run-log-card {
+    border: 1px solid var(--app-border);
+    border-radius: var(--app-radius-md);
+    background: #fff;
+    padding: 12px;
+}
+
+.run-log-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 8px;
+}
+
+.run-log-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    font-size: 13px;
+    color: var(--app-muted);
+}
+
+.run-log-status {
+    font-weight: 700;
+    text-transform: lowercase;
+}
+
+.run-log-status.running {
+    color: #1d4ed8;
+}
+
+.run-log-status.finished {
+    color: #15803d;
+}
+
+.run-log-status.failed {
+    color: #b91c1c;
+}
+
+.run-log-status.canceled {
+    color: #9a3412;
+}
+
+.run-log-pre {
+    margin: 0;
+    background: #f8f8f6;
+    border: 1px solid #e1e1dd;
+    border-radius: 10px;
+    padding: 10px 12px;
+    max-height: 360px;
+    overflow: auto;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    font-size: 13px;
+    line-height: 1.45;
+    white-space: pre-wrap;
+    word-break: break-word;
+    color: #181818;
+}
+
+.run-log-empty {
+    margin: 0;
+    background: #f8f8f6;
+    border: 1px dashed #dbdbd6;
+    border-radius: 12px;
+    padding: 12px;
+    color: #666661;
+    font-size: 14px;
+}
+
+.run-log-summary {
+    margin-top: 8px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    font-size: 13px;
+    color: #2f2f2f;
+}
+
+@media (max-width: 991.98px) {
+    .import-mega-nav,
+    .import-tabs {
+        padding: 0 12px;
+    }
+
+    .import-mega-nav-inner,
+    .import-tabs__inner {
+        gap: 14px;
+    }
+
+    .import-mega-link,
+    .import-tabs__link {
+        height: 46px;
+    }
+
+    .import-overview-header {
+        gap: 12px;
+    }
+
+    .import-overview-header .button {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .supplier-import-table.table-mobile tr {
+        padding: 12px;
+        border-radius: 14px;
+    }
+
+    .supplier-import-table.table-mobile td {
+        display: block;
+        padding: 4px 0;
+    }
+
+    .supplier-import-table.table-mobile td::before {
+        display: block;
+        min-width: 0;
+        margin-bottom: 4px;
+    }
+
+    .supplier-import-table.table-mobile td.import-col-select::before {
+        display: none;
+    }
+
+    .supplier-import-table.table-mobile td.import-col-select {
+        padding-bottom: 2px;
+    }
+
+    .supplier-import-table.table-mobile td.import-col-supplier {
+        font-size: 18px;
+        font-weight: 700;
+        padding-bottom: 6px;
+        border-bottom: 1px dashed var(--app-border);
+        margin-bottom: 6px;
+    }
+
+    .supplier-import-table.table-mobile td.import-col-last {
+        font-size: 14px;
+    }
+
+    .supplier-import-table.table-mobile td.import-col-email {
+        background: rgba(17, 17, 17, 0.03);
+        border: 1px solid var(--app-border);
+        border-radius: 10px;
+        padding: 8px;
+        margin-top: 6px;
+    }
+
+    .supplier-import-table.table-mobile td.import-col-actions {
+        margin-top: 8px;
+    }
+
+    .supplier-import-table.table-mobile td.import-col-actions .d-inline-flex {
+        display: grid !important;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+        width: 100%;
+    }
+
+    .supplier-import-table.table-mobile td.import-col-actions .button {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .supplier-import-table.table-mobile td.import-col-actions form {
+        margin: 0;
+    }
+
+    .supplier-import-table.table-mobile td.import-col-actions .button.icon {
+        grid-column: span 2;
+    }
+}

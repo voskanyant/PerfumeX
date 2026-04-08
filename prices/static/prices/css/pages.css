@@ -1,0 +1,259 @@
+/* Shared secondary page styling */
+
+.page-stack {
+    display: grid;
+    gap: 14px;
+}
+
+.page-hero {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 14px;
+}
+
+.page-actions,
+.inline-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.section-title {
+    margin: 0;
+    font-size: clamp(1.06rem, 1.8vw, 1.24rem);
+    line-height: 1.2;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+}
+
+.section-subtitle {
+    margin: 4px 0 0;
+    color: var(--app-muted);
+    font-size: 0.92rem;
+    font-weight: 500;
+}
+
+.surface-card {
+    border: 1px solid var(--app-border);
+    border-radius: var(--app-radius-md);
+    background: linear-gradient(180deg, #ffffff 0%, #fbfbf9 100%);
+    padding: 12px;
+}
+
+.surface-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 10px;
+}
+
+.surface-meta {
+    border: 1px solid var(--app-border);
+    border-radius: var(--app-radius-sm);
+    background: #f9f9f7;
+    padding: 10px 12px;
+}
+
+.surface-meta .label {
+    font-size: 0.74rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--app-muted);
+    font-weight: 700;
+}
+
+.surface-meta .value {
+    margin-top: 4px;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #171717;
+}
+
+.form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 12px;
+}
+
+.form-grid > div {
+    min-width: 0;
+}
+
+.form-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 2px;
+}
+
+.form-shell form p {
+    margin-bottom: 12px;
+}
+
+.form-shell form p > label {
+    display: block;
+    margin-bottom: 6px;
+    font-size: 0.86rem;
+    font-weight: 700;
+    color: #262626;
+}
+
+.kpi-link-card {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.kpi-link-card .kpi-link-title {
+    font-size: 1.02rem;
+    font-weight: 800;
+}
+
+.kpi-link-card .kpi-link-text {
+    font-size: 0.92rem;
+    color: var(--app-muted);
+}
+
+.docs-content {
+    display: grid;
+    gap: 10px;
+}
+
+.docs-content pre {
+    border: 1px solid var(--app-border);
+    border-radius: 12px;
+    background: #fbfbfa;
+    padding: 10px 12px;
+    margin: 0;
+}
+
+.docs-content code {
+    color: #131313;
+}
+
+.login-shell {
+    width: min(460px, 100%);
+}
+
+.login-shell .page-title {
+    margin-bottom: 4px;
+}
+
+.login-shell .page-subtitle {
+    margin-bottom: 10px;
+}
+
+.import-wizard-fieldset {
+    border: 0;
+    padding: 0;
+    margin: 0 0 12px;
+}
+
+.import-wizard-legend {
+    font-weight: 700;
+    margin-bottom: 8px;
+}
+
+.word-break-all {
+    word-break: break-all;
+}
+
+.table-scroll-lg {
+    max-height: 420px;
+}
+
+.table-scroll-md {
+    max-height: 360px;
+}
+
+.row-selectable {
+    cursor: pointer;
+}
+
+.is-hidden {
+    display: none !important;
+}
+
+.preview-th {
+    cursor: pointer;
+    background: #f3f4f3;
+}
+
+.preview-td {
+    white-space: nowrap;
+}
+
+.progress-thin {
+    height: 6px;
+}
+
+.log-pre {
+    max-height: 240px;
+    overflow: auto;
+}
+
+.chart-wrap {
+    position: relative;
+    width: 100%;
+    min-height: 320px;
+    height: 320px;
+}
+
+.chart-canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+.chart-empty {
+    display: none;
+    position: absolute;
+    inset: 0;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 16px;
+}
+
+.chart-tools {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    z-index: 3;
+}
+
+.chart-ranges {
+    position: absolute;
+    right: 10px;
+    bottom: 10px;
+    z-index: 3;
+}
+
+@media (max-width: 991.98px) {
+    .page-stack {
+        gap: 10px;
+    }
+
+    .page-actions,
+    .inline-actions,
+    .form-actions {
+        width: 100%;
+    }
+
+    .page-actions .button,
+    .inline-actions .button,
+    .form-actions .button {
+        flex: 1 1 100%;
+        justify-content: center;
+    }
+
+    .surface-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .table-scroll-lg,
+    .table-scroll-md {
+        max-height: none;
+    }
+}

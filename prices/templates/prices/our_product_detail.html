@@ -2,6 +2,7 @@
 {% load prices_extras %}
 
 {% block title %}{{ object.name|fix_text }}{% endblock %}
+{% block body_data %}data-page="our-product-detail"{% endblock %}
 
 {% block content %}
     <div class="card mb-3">
@@ -56,5 +57,3 @@
         {% endif %}
     </div>
 {% endblock %}
-
-

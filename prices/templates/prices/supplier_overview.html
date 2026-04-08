@@ -1,141 +1,15 @@
-{% extends "prices/base.html" %}
-{% load tz %}
+﻿{% extends "prices/base.html" %}
+{% load static tz %}
 
 {% block title %}Import Prices{% endblock %}
+{% block body_data %}data-page="supplier-overview"{% endblock %}
+
+{% block extra_head %}
+    <link href="{% static 'prices/css/imports.css' %}" rel="stylesheet">
+{% endblock %}
 
 {% block content %}
-    <style>
-        .import-mega-nav {
-            border: 1px solid var(--app-border);
-            border-radius: 18px;
-            background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
-            padding: 0 18px;
-            margin-bottom: 14px;
-        }
-        .import-mega-nav-inner {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 24px;
-            border-bottom: 1px solid var(--app-border);
-        }
-        .import-mega-link {
-            display: inline-flex;
-            align-items: center;
-            height: 52px;
-            color: var(--app-muted);
-            text-decoration: none;
-            font-weight: 700;
-            border-bottom: 3px solid transparent;
-            margin-bottom: -1px;
-            transition: color 0.15s ease;
-        }
-        .import-mega-link:hover {
-            color: var(--app-text);
-        }
-        .import-mega-link.active {
-            color: var(--app-text);
-            border-bottom-color: #2563eb;
-        }
-        .import-overview-header .button {
-            min-height: 34px;
-        }
-        #bulk-backfill-form,
-        #bulk-rates-form {
-            background: linear-gradient(180deg, #ffffff 0%, #fbfcff 100%);
-            border: 1px solid var(--app-border);
-            border-radius: 14px;
-            padding: 12px;
-        }
-        .supplier-import-table thead th {
-            background: linear-gradient(180deg, #f9fbff 0%, #f3f8ff 100%);
-        }
-        @media (max-width: 991.98px) {
-            .import-mega-nav {
-                padding: 0 12px;
-            }
-            .import-mega-nav-inner {
-                gap: 14px;
-            }
-            .import-mega-link {
-                height: 46px;
-            }
-            .import-overview-header {
-                gap: 12px;
-            }
-            .import-overview-header .button {
-                width: 100%;
-                justify-content: center;
-            }
-            .supplier-import-table.table-mobile tr {
-                padding: 12px;
-                border-radius: 14px;
-            }
-            .supplier-import-table.table-mobile td {
-                display: block;
-                padding: 4px 0;
-            }
-            .supplier-import-table.table-mobile td::before {
-                display: block;
-                min-width: 0;
-                margin-bottom: 4px;
-            }
-            .supplier-import-table.table-mobile td.import-col-select::before {
-                display: none;
-            }
-            .supplier-import-table.table-mobile td.import-col-select {
-                padding-bottom: 2px;
-            }
-            .supplier-import-table.table-mobile td.import-col-supplier {
-                font-size: 18px;
-                font-weight: 700;
-                padding-bottom: 6px;
-                border-bottom: 1px dashed var(--app-border);
-                margin-bottom: 6px;
-            }
-            .supplier-import-table.table-mobile td.import-col-last {
-                font-size: 14px;
-            }
-            .supplier-import-table.table-mobile td.import-col-email {
-                background: rgba(15, 23, 42, 0.04);
-                border: 1px solid var(--app-border);
-                border-radius: 10px;
-                padding: 8px;
-                margin-top: 6px;
-            }
-            .supplier-import-table.table-mobile td.import-col-actions {
-                margin-top: 8px;
-            }
-            .supplier-import-table.table-mobile td.import-col-actions .d-inline-flex {
-                display: grid !important;
-                grid-template-columns: 1fr 1fr;
-                gap: 8px;
-                width: 100%;
-            }
-            .supplier-import-table.table-mobile td.import-col-actions .button {
-                width: 100%;
-                justify-content: center;
-            }
-            .supplier-import-table.table-mobile td.import-col-actions form {
-                margin: 0;
-            }
-            .supplier-import-table.table-mobile td.import-col-actions .button.icon {
-                grid-column: span 2;
-            }
-        }
-    </style>
-    <div class="import-mega-nav">
-        <div class="import-mega-nav-inner">
-            <a class="import-mega-link {% if import_section == 'overview' %}active{% endif %}" href="{{ overview_url }}">
-                Suppliers
-            </a>
-            <a class="import-mega-link {% if import_section == 'detailed_logs' %}active{% endif %}" href="{{ detailed_logs_url }}">
-                Detailed logs
-            </a>
-            <a class="import-mega-link {% if import_section == 'settings' %}active{% endif %}" href="{% url 'prices:import_settings' %}">
-                Import settings
-            </a>
-        </div>
-    </div>
+    {% include "prices/_import_tabs.html" %}
     <div class="card mb-3">
         <div class="d-flex flex-wrap align-items-start justify-content-between gap-3 import-overview-header">
             <div>
@@ -213,6 +87,12 @@
     </div>
     <script>
         (function () {
+            document.querySelectorAll("[data-email-progress][data-progress-value]").forEach(function (bar) {
+                var initial = Number(bar.getAttribute("data-progress-value") || "");
+                if (!isNaN(initial)) {
+                    bar.style.width = initial + "%";
+                }
+            });
             function updateAll() {
                 fetch("{% url 'prices:supplier_import_email_status_all' %}")
                     .then(function (res) { return res.json(); })
@@ -252,7 +132,7 @@
                             }
                             if (messageEl && run.last_message) {
                                 var fullMessage = String(run.last_message);
-                                messageEl.textContent = fullMessage.length > 180 ? (fullMessage.slice(0, 179) + "…") : fullMessage;
+                                messageEl.textContent = fullMessage.length > 180 ? (fullMessage.slice(0, 179) + "...") : fullMessage;
                                 messageEl.title = fullMessage;
                             }
                             if (logEl && run.detailed_log !== undefined) {
@@ -315,8 +195,8 @@
                                     <span data-email-status>{{ row.latest_run.status }}</span>
                                     {% if row.latest_run.status == "running" %}
                                         {% if row.latest_run_progress is not None %}
-                                            <div class="progress mt-2" style="height:6px;">
-                                                <div class="progress-bar" data-email-progress role="progressbar" style="width: {{ row.latest_run_progress }}%;"></div>
+                                            <div class="progress mt-2 progress-thin">
+                                                <div class="progress-bar" data-email-progress role="progressbar" data-progress-value="{{ row.latest_run_progress }}"></div>
                                             </div>
                                             <div class="muted small">{{ row.latest_run_progress }}%</div>
                                         {% endif %}
@@ -331,14 +211,14 @@
                                     {% if row.latest_run.detailed_log %}
                                         <details class="mt-1">
                                             <summary class="muted small">Detailed log</summary>
-                                            <pre class="small mt-1 mb-0" style="max-height: 240px; overflow: auto;" data-email-log>{{ row.latest_run.detailed_log }}</pre>
+                                            <pre class="small mt-1 mb-0 log-pre" data-email-log>{{ row.latest_run.detailed_log }}</pre>
                                         </details>
                                     {% else %}
-                                        <pre class="small mt-1 mb-0 d-none" style="max-height: 240px; overflow: auto;" data-email-log></pre>
+                                        <pre class="small mt-1 mb-0 d-none log-pre" data-email-log></pre>
                                     {% endif %}
                                 {% else %}
                                     <span data-email-status>-</span>
-                                    <pre class="small mt-1 mb-0 d-none" style="max-height: 240px; overflow: auto;" data-email-log></pre>
+                                    <pre class="small mt-1 mb-0 d-none log-pre" data-email-log></pre>
                                 {% endif %}
                             </td>
                             <td class="actions import-col-actions" data-label="Actions">
@@ -354,7 +234,7 @@
                                         {% csrf_token %}
                                         <button class="button" type="submit" data-email-update{% if row.is_running %} disabled{% endif %}>Update from email</button>
                                     </form>
-                                    <form action="{% url 'prices:supplier_import_email_cancel' row.supplier.pk %}" method="post" style="{% if not row.is_running %} display:none;{% endif %}">
+                                    <form action="{% url 'prices:supplier_import_email_cancel' row.supplier.pk %}" method="post" class="{% if not row.is_running %}is-hidden{% endif %}">
                                         {% csrf_token %}
                                         <button class="button secondary" type="submit" data-email-cancel>Cancel</button>
                                     </form>
@@ -469,7 +349,7 @@
                                                 <div class="files-summary">
                                                     {{ first.file_kind }}: {{ first.filename|truncatechars:40 }} ({{ first.status }})
                                                     {% if first.error_message %}
-                                                        — {{ first.error_message|truncatechars:80 }}
+                                                        - {{ first.error_message|truncatechars:80 }}
                                                     {% endif %}
                                                     {% if files|length > 1 %}
                                                         <span class="muted">(+{{ files|length|add:"-1" }} more)</span>
@@ -483,7 +363,7 @@
                                                                 <div>
                                                                     {{ file.file_kind }}: {{ file.filename }} ({{ file.status }})
                                                                     {% if file.error_message %}
-                                                                        — {{ file.error_message }}
+                                                                        - {{ file.error_message }}
                                                                     {% endif %}
                                                                 </div>
                                                             {% endfor %}
@@ -623,3 +503,4 @@
         })();
     </script>
 {% endblock %}
+

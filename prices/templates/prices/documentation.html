@@ -1,8 +1,10 @@
 ﻿{% extends "prices/base.html" %}
 
 {% block title %}Documentation{% endblock %}
+{% block body_data %}data-page="documentation"{% endblock %}
 
 {% block content %}
+    <div class="docs-content">
     <div class="card p-3 p-md-4 mb-3">
         <h1 class="page-title">Technical Documentation</h1>
         <p class="page-subtitle mb-2">PerfumeX Prices knowledge base for developers, operators, and AI agents.</p>
@@ -161,4 +163,7 @@ crontab -l</code></pre>
             <li>After UI changes, validate both desktop and mobile templates and run <code>python manage.py check</code>.</li>
         </ul>
     </div>
+    </div>
 {% endblock %}
+
+

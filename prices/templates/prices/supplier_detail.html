@@ -2,6 +2,7 @@
 {% load prices_extras %}
 
 {% block title %}{{ object.name|fix_text }}{% endblock %}
+{% block body_data %}data-page="supplier-detail"{% endblock %}
 
 {% block content %}
     <div class="card mb-3">
@@ -17,45 +18,31 @@
                 </svg>
             </a>
         </div>
-        <div class="row g-3 mt-1">
-            <div class="col-12 col-md-6">
-                <div class="p-3 rounded-3 border bg-light">
-                    <div class="small muted">Code</div>
-                    <div class="fw-semibold">{{ object.code|default:"-" }}</div>
-                </div>
+        <div class="surface-grid mt-2">
+            <div class="surface-meta">
+                <div class="label">Code</div>
+                <div class="value">{{ object.code|default:"-" }}</div>
             </div>
-            <div class="col-12 col-md-6">
-                <div class="p-3 rounded-3 border bg-light">
-                    <div class="small muted">Default currency</div>
-                    <div class="fw-semibold">{{ object.default_currency }}</div>
-                </div>
+            <div class="surface-meta">
+                <div class="label">Default currency</div>
+                <div class="value">{{ object.default_currency }}</div>
             </div>
-            <div class="col-12 col-md-6">
-                <div class="p-3 rounded-3 border bg-light">
-                    <div class="small muted">Active</div>
-                    <div class="fw-semibold">{{ object.is_active }}</div>
-                </div>
+            <div class="surface-meta">
+                <div class="label">Active</div>
+                <div class="value">{{ object.is_active }}</div>
             </div>
-            <div class="col-12 col-md-6">
-                <div class="p-3 rounded-3 border bg-light">
-                    <div class="small muted">From address pattern</div>
-                    <div class="fw-semibold">{{ object.from_address_pattern|default:"-" }}</div>
-                </div>
+            <div class="surface-meta">
+                <div class="label">From address pattern</div>
+                <div class="value">{{ object.from_address_pattern|default:"-" }}</div>
             </div>
-            <div class="col-12 col-md-6">
-                <div class="p-3 rounded-3 border bg-light">
-                    <div class="small muted">Price subject pattern</div>
-                    <div class="fw-semibold">{{ object.price_subject_pattern|default:"-" }}</div>
-                </div>
+            <div class="surface-meta">
+                <div class="label">Price subject pattern</div>
+                <div class="value">{{ object.price_subject_pattern|default:"-" }}</div>
             </div>
-            <div class="col-12 col-md-6">
-                <div class="p-3 rounded-3 border bg-light">
-                    <div class="small muted">Price filename pattern</div>
-                    <div class="fw-semibold">{{ object.price_filename_pattern|default:"-" }}</div>
-                </div>
+            <div class="surface-meta">
+                <div class="label">Price filename pattern</div>
+                <div class="value">{{ object.price_filename_pattern|default:"-" }}</div>
             </div>
         </div>
     </div>
 {% endblock %}
-
-

@@ -1,10 +1,11 @@
 {% extends "prices/base.html" %}
 
 {% block title %}Dashboard{% endblock %}
+{% block body_data %}data-page="dashboard"{% endblock %}
 
 {% block content %}
     <div class="card mb-3">
-        <div class="d-flex flex-wrap align-items-start justify-content-between gap-3">
+        <div class="page-hero">
             <div>
                 <h1 class="page-title">Dashboard</h1>
                 <p class="page-subtitle">Quick access to imports and product data.</p>
@@ -13,23 +14,23 @@
     </div>
     <div class="row g-3">
         <div class="col-12 col-md-4">
-            <div class="card h-100">
-                <h5 class="fw-semibold">Import Prices</h5>
-                <p class="muted mb-3">Check supplier status and update from email.</p>
+            <div class="card h-100 kpi-link-card">
+                <h5 class="kpi-link-title">Import Prices</h5>
+                <p class="kpi-link-text mb-0">Check supplier status and update from email.</p>
                 <a class="button" href="{% url 'prices:supplier_overview' %}">Open Import Center</a>
             </div>
         </div>
         <div class="col-12 col-md-4">
-            <div class="card h-100">
-                <h5 class="fw-semibold">Suppliers</h5>
-                <p class="muted mb-3">Manage mappings and email rules.</p>
+            <div class="card h-100 kpi-link-card">
+                <h5 class="kpi-link-title">Suppliers</h5>
+                <p class="kpi-link-text mb-0">Manage mappings and email rules.</p>
                 <a class="button secondary" href="{% url 'prices:supplier_list' %}">Manage Suppliers</a>
             </div>
         </div>
         <div class="col-12 col-md-4">
-            <div class="card h-100">
-                <h5 class="fw-semibold">Our Products</h5>
-                <p class="muted mb-3">Manage your catalog and supplier offers.</p>
+            <div class="card h-100 kpi-link-card">
+                <h5 class="kpi-link-title">Our Products</h5>
+                <p class="kpi-link-text mb-0">Manage your catalog and supplier offers.</p>
                 <a class="button secondary" href="{% url 'prices:our_product_list' %}">View Our Products</a>
             </div>
         </div>
