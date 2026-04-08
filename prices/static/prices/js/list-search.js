@@ -407,6 +407,7 @@
         var inactiveDividerInserted = false;
         items.forEach(function (item) {
             var supplier = escapeHtml(item.supplier);
+            var supplierId = escapeHtml(String(item.supplier_id || ""));
             var sku = escapeHtml(item.supplier_sku);
             var rawName = String(item.name || "");
             var escapedName = escapeHtml(rawName);
@@ -415,15 +416,15 @@
             var deltaDirection = item.price_delta_direction || "";
             var deltaValue = escapeHtml(item.price_delta_value || "");
             var deltaPercent = escapeHtml(item.price_delta_percent || "");
-            var priceHtml = "<div class='cell-price-main'>" + price + "</div>";
+            var desktopPriceHtml = "<div class='cell-price-main'>" + price + "</div>";
             if (deltaDirection && deltaValue) {
                 var arrow = deltaDirection === "down" ? "↓" : "↑";
                 var deltaTail = deltaPercent ? " (" + deltaPercent + ")" : "";
-                priceHtml += "<div class='price-delta-wrap'><span class='price-delta-badge " +
+                desktopPriceHtml += "<div class='price-delta-wrap'><span class='price-delta-badge " +
                     escapeHtml(deltaDirection) + "'>" + arrow + " " + deltaValue + deltaTail +
                     "</span></div>";
             } else {
-                priceHtml += "<div class='price-delta-wrap'><span class='price-delta-badge neutral'>- No change</span></div>";
+                desktopPriceHtml += "<div class='price-delta-wrap'><span class='price-delta-badge neutral'>- No change</span></div>";
             }
             var importedTitle = escapeHtml(item.last_imported_at_full || "");
             var importedAgeClass = escapeHtml(item.last_imported_age_class || "");
@@ -436,7 +437,19 @@
             } else {
                 mobileDelta = "<span class='price-delta-badge neutral'>- No change</span>";
             }
-            priceHtml += "<div class='mobile-meta-row'>" + mobileDelta + imported + "</div>";
+            var mobileSupplier = supplierId
+                ? "<a href='?supplier=" + encodeURIComponent(String(item.supplier_id || "")) + "' class='supplier-filter-link cell-supplier' data-supplier-id='" + supplierId + "'>" + supplier + "</a>"
+                : "<span class='cell-supplier'>" + supplier + "</span>";
+            var mobilePanel =
+                "<div class='mobile-card-panel'>" +
+                    "<div class='mobile-card-price'><div class='cell-price-main'>" + price + "</div></div>" +
+                    "<div class='mobile-card-supplier-wrap'>" + mobileSupplier + "</div>" +
+                    "<div class='mobile-meta-row'>" + mobileDelta + "</div>" +
+                    "<span class='cell-imported mobile-card-date " + importedAgeClass + "'" +
+                        (importedTitle ? " title='" + importedTitle + "' data-full-datetime='" + importedTitle + "'" : "") +
+                    ">" + escapeHtml(item.last_imported_at) + "</span>" +
+                "</div>";
+            var priceHtml = "<div class='desktop-price-stack'>" + desktopPriceHtml + "</div>" + mobilePanel;
 
             if (detailBase && item.id) {
                 name = "<a class='cell-name' href='" + detailBase + item.id + "/?next=" + encodeURIComponent(nextValue) + "&from=" + item.id + "'>" + escapedName + "</a>";
@@ -493,7 +506,7 @@
                 "<td data-field='supplier_sku' data-label='SKU'><span class='cell-sku'>" + sku + "</span></td>" +
                 "<td data-field='name' data-label='Name'>" + name + "</td>" +
                 "<td data-field='current_price' data-label='Price'>" + priceHtml + "</td>" +
-                "<td data-field='supplier' data-label='Supplier'><a href='?supplier=" + encodeURIComponent(String(item.supplier_id || "")) + "' class='supplier-filter-link cell-supplier' data-supplier-id='" + escapeHtml(String(item.supplier_id || "")) + "'>" + supplier + "</a></td>" +
+                "<td data-field='supplier' data-label='Supplier'>" + mobileSupplier + "</td>" +
                 "<td data-field='last_imported_at' data-label='Last imported'>" + imported + "</td>" +
                 actionsCell +
             "</tr>";
