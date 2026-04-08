@@ -4,34 +4,44 @@
 {% block body_data %}data-page="dashboard"{% endblock %}
 
 {% block content %}
-    <div class="card mb-3">
-        <div class="page-hero">
-            <div>
-                <h1 class="page-title">Dashboard</h1>
-                <p class="page-subtitle">Quick access to imports and product data.</p>
+    <div class="page-stack">
+        <div class="card">
+            <div class="page-hero">
+                <div>
+                    <span class="page-kicker">Control center</span>
+                    <h1 class="page-title">Dashboard</h1>
+                    <p class="page-subtitle">Bootstrap-based admin shell for imports, suppliers, and catalog operations.</p>
+                </div>
+                <div class="page-actions">
+                    <a class="button" href="{% url 'prices:supplier_overview' %}">Open imports</a>
+                    <a class="button secondary" href="{% url 'prices:product_list' %}">Open supplier prices</a>
+                </div>
             </div>
         </div>
-    </div>
-    <div class="row g-3">
-        <div class="col-12 col-md-4">
-            <div class="card h-100 kpi-link-card">
-                <h5 class="kpi-link-title">Import Prices</h5>
-                <p class="kpi-link-text mb-0">Check supplier status and update from email.</p>
-                <a class="button" href="{% url 'prices:supplier_overview' %}">Open Import Center</a>
+        <div class="row row-cols-1 row-cols-lg-3 g-3">
+            <div class="col">
+                <div class="card h-100 kpi-link-card">
+                    <span class="page-kicker">Supply</span>
+                    <h5 class="kpi-link-title">Import Prices</h5>
+                    <p class="kpi-link-text mb-0">Check supplier status, email sync health, and historical backfill tools.</p>
+                    <a class="button" href="{% url 'prices:supplier_overview' %}">Open Import Center</a>
+                </div>
             </div>
-        </div>
-        <div class="col-12 col-md-4">
-            <div class="card h-100 kpi-link-card">
-                <h5 class="kpi-link-title">Suppliers</h5>
-                <p class="kpi-link-text mb-0">Manage mappings and email rules.</p>
-                <a class="button secondary" href="{% url 'prices:supplier_list' %}">Manage Suppliers</a>
+            <div class="col">
+                <div class="card h-100 kpi-link-card">
+                    <span class="page-kicker">Directory</span>
+                    <h5 class="kpi-link-title">Suppliers</h5>
+                    <p class="kpi-link-text mb-0">Manage supplier mappings, identifiers, email sources, and import rules.</p>
+                    <a class="button secondary" href="{% url 'prices:supplier_list' %}">Manage Suppliers</a>
+                </div>
             </div>
-        </div>
-        <div class="col-12 col-md-4">
-            <div class="card h-100 kpi-link-card">
-                <h5 class="kpi-link-title">Our Products</h5>
-                <p class="kpi-link-text mb-0">Manage your catalog and supplier offers.</p>
-                <a class="button secondary" href="{% url 'prices:our_product_list' %}">View Our Products</a>
+            <div class="col">
+                <div class="card h-100 kpi-link-card">
+                    <span class="page-kicker">Catalog</span>
+                    <h5 class="kpi-link-title">Our Products</h5>
+                    <p class="kpi-link-text mb-0">Review internal catalog items, linked supplier offers, and price coverage.</p>
+                    <a class="button secondary" href="{% url 'prices:our_product_list' %}">View Our Products</a>
+                </div>
             </div>
         </div>
     </div>

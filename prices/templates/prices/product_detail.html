@@ -9,9 +9,11 @@
 {% endblock %}
 
 {% block content %}
+    <div class="page-stack">
     <div class="card mb-3">
         <div class="d-flex flex-wrap align-items-start justify-content-between gap-3">
             <div>
+                <span class="page-kicker">Supplier offer</span>
                 <h1 class="page-title">{{ object.name|fix_text }}</h1>
                 <p class="page-subtitle">{{ object.supplier.name|fix_text }} &middot; {{ object.supplier_sku|fix_text }}</p>
             </div>
@@ -54,6 +56,7 @@
     <div class="card mb-3">
         <div class="d-flex flex-wrap align-items-start justify-content-between gap-3">
             <div>
+                <span class="page-kicker">History</span>
                 <h2 class="page-title">Price history</h2>
                 <p class="page-subtitle">Latest daily price snapshots.</p>
             </div>
@@ -175,6 +178,7 @@
     {{ chart_currency_symbol|json_script:"chart-currency-symbol" }}
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <script src="{% static 'prices/js/product-detail.js' %}"></script>
+    </div>
 {% endblock %}
 
 

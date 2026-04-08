@@ -82,7 +82,7 @@
     border-radius: 28px;
     padding: 28px 30px 24px !important;
     background:
-        linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(247, 243, 235, 0.92) 100%);
+        linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(244, 244, 242, 0.96) 100%);
 }
 
 .workspace-hero-products::before {
@@ -134,7 +134,7 @@
     border: 0;
     border-radius: 20px;
     background:
-        linear-gradient(180deg, rgba(255, 255, 255, 0.88) 0%, rgba(249, 246, 239, 0.98) 100%);
+        linear-gradient(180deg, rgba(255, 255, 255, 0.94) 0%, rgba(246, 246, 244, 0.98) 100%);
     padding: 16px;
 }
 
@@ -182,14 +182,14 @@
     padding: 16px !important;
     border-radius: 26px;
     background:
-        linear-gradient(180deg, rgba(255, 255, 255, 0.84) 0%, rgba(249, 246, 239, 0.96) 100%);
+        linear-gradient(180deg, rgba(255, 255, 255, 0.88) 0%, rgba(245, 245, 243, 0.97) 100%);
 }
 
 .workspace-table-shell-products .workspace-table-wrap {
     border-radius: 22px;
     border-color: rgba(17, 17, 17, 0.08);
     background:
-        linear-gradient(180deg, rgba(255, 255, 255, 0.94) 0%, rgba(251, 249, 244, 0.98) 100%);
+        linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(248, 248, 246, 0.99) 100%);
 }
 
 .workspace-table-shell-products .products-grid thead th {
@@ -568,6 +568,14 @@
     display: none;
 }
 
+.desktop-price-stack {
+    display: block;
+}
+
+.mobile-card-panel {
+    display: none;
+}
+
 .mobile-meta-spacer {
     display: inline-block;
     min-height: 24px;
@@ -674,21 +682,17 @@
         border-bottom: 0 !important;
     }
 
-    .products-mobile td[data-field="last_imported_at"] {
-        display: none !important;
-    }
-
-    .products-mobile .price-delta-wrap {
+    .products-mobile td[data-field="last_imported_at"],
+    .products-mobile td[data-field="supplier"] {
         display: none !important;
     }
 
     /* Keep existing card structure, fix only alignment/spacing */
     .products-mobile tr {
-        --products-mobile-side-col: 112px;
         grid-template-columns: minmax(0, 1fr) auto !important;
-        grid-template-rows: auto auto auto !important;
-        gap: 8px 10px !important;
-        margin-bottom: 10px !important;
+        grid-template-rows: auto auto !important;
+        gap: 10px 12px !important;
+        margin-bottom: 12px !important;
         padding: 14px 16px 14px 18px !important;
         border-radius: 16px !important;
         border: 1px solid #dddcd7 !important;
@@ -739,47 +743,68 @@
 
     .products-mobile td[data-field="current_price"] {
         grid-column: 1 / -1 !important;
-        grid-row: 2 / span 2 !important;
-        margin: 0 !important;
-    }
-
-    .products-mobile td[data-field="current_price"] .cell-price-main {
-        font-family: var(--font-display) !important;
-        font-size: 2rem !important;
-        line-height: 1 !important;
-        letter-spacing: -0.3px !important;
-        font-weight: 700 !important;
-        max-width: calc(100% - 132px) !important;
-        margin: 0 !important;
-    }
-
-    .products-mobile td[data-field="supplier"] {
-        display: flex !important;
-        grid-column: 2 !important;
         grid-row: 2 !important;
-        min-width: var(--products-mobile-side-col) !important;
-        align-self: center !important;
-        justify-content: flex-end !important;
-        text-align: right !important;
-        transform: none !important;
-        padding: 0 !important;
+        margin: 0 !important;
+        width: 100% !important;
     }
 
-    .products-mobile .cell-supplier {
-        min-width: var(--products-mobile-side-col) !important;
-        text-align: right !important;
+    .products-mobile .desktop-price-stack {
+        display: none !important;
+    }
+
+    .products-mobile .mobile-card-panel {
+        display: grid !important;
+        grid-template-columns: minmax(0, 1fr) auto;
+        grid-template-areas:
+            "price supplier"
+            "meta date";
+        align-items: center !important;
+        column-gap: 14px !important;
+        row-gap: 8px !important;
+        width: 100% !important;
+    }
+
+    .products-mobile .mobile-card-price {
+        grid-area: price;
+        min-width: 0;
+    }
+
+    .products-mobile .mobile-card-price .cell-price-main {
+        font-family: var(--font-display) !important;
+        font-size: 1.88rem !important;
+        line-height: 0.94 !important;
+        letter-spacing: -0.02em !important;
+        font-weight: 700 !important;
+        margin: 0 !important;
+        white-space: nowrap;
+    }
+
+    .products-mobile .mobile-card-supplier-wrap {
+        grid-area: supplier;
+        justify-self: end;
+        text-align: right;
+        min-width: 0;
+        max-width: 42vw;
+    }
+
+    .products-mobile .mobile-card-supplier-wrap .cell-supplier {
+        display: block !important;
         font-size: 13px !important;
         font-weight: 700 !important;
+        line-height: 1.25 !important;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
         color: #141414 !important;
-        line-height: 1.2 !important;
     }
 
     .products-mobile .mobile-meta-row {
+        grid-area: meta;
         display: flex !important;
         align-items: center !important;
         gap: 8px !important;
-        margin-top: 4px !important;
-        min-height: 22px !important;
+        min-height: 18px !important;
+        margin: 0 !important;
         width: 100% !important;
     }
 
@@ -792,22 +817,19 @@
         line-height: 1.1 !important;
     }
 
-    .products-mobile .mobile-meta-row .cell-imported {
-        min-width: var(--products-mobile-side-col) !important;
-        margin-left: auto !important;
+    .products-mobile .mobile-card-date {
+        grid-area: date;
+        justify-self: end;
+        align-self: center;
         font-size: 11px !important;
         font-weight: 600 !important;
         line-height: 1.1 !important;
         padding: 0 !important;
+        margin: 0 !important;
         border: 0 !important;
         background: transparent !important;
         border-radius: 0 !important;
-        min-height: 0;
-        height: auto;
-        display: inline-flex;
-        align-items: center;
-        justify-content: flex-end;
-        text-align: right !important;
+        white-space: nowrap;
     }
 
     .products-mobile td[data-field="supplier"] .supplier-filter-link {

@@ -4,7 +4,7 @@
     border-radius: 28px;
     background:
         linear-gradient(90deg, rgba(17, 17, 17, 0.94) 0, rgba(17, 17, 17, 0.94) 110px, transparent 110px),
-        linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(249, 246, 239, 0.94) 100%);
+        linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(245, 245, 243, 0.96) 100%);
     padding: 0 22px 0 130px;
     margin-bottom: 18px;
     box-shadow: var(--app-shadow-card);
@@ -64,7 +64,7 @@
     overflow: hidden;
     border-radius: 30px;
     padding: 28px 30px !important;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(247, 243, 235, 0.94) 100%);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(245, 245, 243, 0.96) 100%);
 }
 
 .import-overview-hero::before {
@@ -101,7 +101,7 @@
 .import-control-panel {
     border-radius: 26px;
     padding: 22px !important;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.94) 0%, rgba(250, 247, 240, 0.96) 100%);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(246, 246, 243, 0.98) 100%);
 }
 
 #bulk-backfill-form,
@@ -139,7 +139,7 @@
 .run-log-card {
     border: 1px solid rgba(17, 17, 17, 0.08);
     border-radius: 20px;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(249, 246, 239, 0.92) 100%);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(246, 246, 243, 0.95) 100%);
     padding: 16px;
 }
 
@@ -219,7 +219,7 @@
     .import-mega-nav,
     .import-tabs {
         padding: 0 14px;
-        background: linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(249, 246, 239, 0.94) 100%);
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(245, 245, 243, 0.96) 100%);
         border-radius: 18px;
     }
 
