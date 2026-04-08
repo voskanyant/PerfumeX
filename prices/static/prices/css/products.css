@@ -684,7 +684,8 @@
 
     /* Keep existing card structure, fix only alignment/spacing */
     .products-mobile tr {
-        grid-template-columns: minmax(0, 1fr) auto !important;
+        --products-mobile-side-col: 112px;
+        grid-template-columns: minmax(0, 1fr) var(--products-mobile-side-col) !important;
         grid-template-rows: auto auto auto !important;
         gap: 8px 10px !important;
         margin-bottom: 10px !important;
@@ -739,16 +740,24 @@
     .products-mobile td[data-field="current_price"] {
         grid-column: 1 / -1 !important;
         grid-row: 2 / span 2 !important;
+        display: grid !important;
+        grid-template-columns: minmax(0, 1fr) var(--products-mobile-side-col) !important;
+        grid-template-rows: auto auto !important;
+        column-gap: 10px !important;
+        row-gap: 4px !important;
+        align-items: center !important;
         margin: 0 !important;
     }
 
     .products-mobile td[data-field="current_price"] .cell-price-main {
+        grid-column: 1 !important;
+        grid-row: 1 !important;
         font-family: var(--font-display) !important;
         font-size: 2rem !important;
         line-height: 1 !important;
         letter-spacing: -0.3px !important;
         font-weight: 700 !important;
-        max-width: calc(100% - 132px) !important;
+        max-width: none !important;
         margin: 0 !important;
     }
 
@@ -756,6 +765,7 @@
         display: flex !important;
         grid-column: 2 !important;
         grid-row: 2 !important;
+        width: var(--products-mobile-side-col) !important;
         align-self: center !important;
         justify-content: flex-end !important;
         text-align: right !important;
@@ -764,6 +774,9 @@
     }
 
     .products-mobile .cell-supplier {
+        display: block !important;
+        width: 100% !important;
+        text-align: right !important;
         font-size: 13px !important;
         font-weight: 700 !important;
         color: #141414 !important;
@@ -772,8 +785,12 @@
 
     .products-mobile .mobile-meta-row {
         display: flex !important;
+        grid-column: 1 / -1 !important;
+        grid-row: 2 !important;
+        display: grid !important;
+        grid-template-columns: minmax(0, 1fr) var(--products-mobile-side-col) !important;
         align-items: center !important;
-        gap: 8px !important;
+        column-gap: 10px !important;
         margin-top: 4px !important;
         min-height: 22px !important;
         width: 100% !important;
@@ -783,13 +800,16 @@
     .products-mobile .mobile-meta-row .mobile-meta-spacer {
         display: inline-flex;
         align-items: center;
+        justify-self: start;
         font-size: 11px !important;
         font-weight: 600 !important;
         line-height: 1.1 !important;
     }
 
     .products-mobile .mobile-meta-row .cell-imported {
-        margin-left: auto !important;
+        grid-column: 2 !important;
+        justify-self: end !important;
+        width: 100% !important;
         font-size: 11px !important;
         font-weight: 600 !important;
         line-height: 1.1 !important;
@@ -802,6 +822,7 @@
         display: inline-flex;
         align-items: center;
         justify-content: flex-end;
+        text-align: right !important;
     }
 
     .products-mobile td[data-field="supplier"] .supplier-filter-link {
