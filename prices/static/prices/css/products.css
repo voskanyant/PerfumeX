@@ -852,6 +852,14 @@
         z-index: 3 !important;
     }
 
+    .products-mobile td.actions .actions-desktop {
+        display: none !important;
+    }
+
+    .products-mobile td.actions .actions-mobile {
+        display: block !important;
+    }
+
     .products-mobile td.actions .mobile-actions-menu summary {
         width: 22px !important;
         height: 22px !important;
