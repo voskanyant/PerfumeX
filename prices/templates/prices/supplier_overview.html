@@ -9,12 +9,14 @@
 {% endblock %}
 
 {% block content %}
+    <div class="page-stack import-workspace">
     {% include "prices/_import_tabs.html" %}
-    <div class="card mb-3">
+    <div class="card mb-3 import-overview-hero">
         <div class="d-flex flex-wrap align-items-start justify-content-between gap-3 import-overview-header">
             <div>
+                <span class="page-kicker">Import control</span>
                 <h1 class="page-title">Import Prices</h1>
-                <p class="page-subtitle">Manage imports per supplier.</p>
+                <p class="page-subtitle">Operational workspace for supplier sync, historical backfill, and rate repair.</p>
             </div>
             <div class="d-flex flex-wrap gap-2">
                 <a class="button secondary" href="{% url 'prices:import_settings' %}">Import settings</a>
@@ -34,12 +36,12 @@
         </div>
     </div>
 
-    <div class="card mb-3">
-        <div class="d-flex flex-wrap align-items-start justify-content-between gap-3">
-            <div>
-                <h2 class="page-title">Bulk backfill</h2>
-                <p class="page-subtitle">Run history import for selected suppliers.</p>
-            </div>
+    <div class="import-control-grid">
+    <div class="card mb-3 import-control-panel">
+        <div>
+            <span class="page-kicker">History</span>
+            <h2 class="page-title">Bulk backfill</h2>
+            <p class="page-subtitle">Run history import for selected suppliers.</p>
         </div>
         <form id="bulk-backfill-form" method="post" action="{% url 'prices:supplier_import_email_backfill_bulk' %}" class="mt-3">
             {% csrf_token %}
@@ -60,12 +62,11 @@
         </form>
     </div>
 
-    <div class="card mb-3">
-        <div class="d-flex flex-wrap align-items-start justify-content-between gap-3">
-            <div>
-                <h2 class="page-title">Recalculate rates from imports</h2>
-                <p class="page-subtitle">Fill USD/RUB CBR rates for dates that exist in processed imports.</p>
-            </div>
+    <div class="card mb-3 import-control-panel">
+        <div>
+            <span class="page-kicker">Repair</span>
+            <h2 class="page-title">Recalculate rates from imports</h2>
+            <p class="page-subtitle">Fill USD/RUB CBR rates for dates that exist in processed imports.</p>
         </div>
         <form id="bulk-rates-form" method="post" action="{% url 'prices:supplier_rates_recalculate' %}" class="mt-3">
             {% csrf_token %}
@@ -84,6 +85,7 @@
             </div>
             <div id="bulk-rates-selected"></div>
         </form>
+    </div>
     </div>
     <script>
         (function () {
@@ -165,7 +167,14 @@
         })();
     </script>
 
-    <div class="card mb-3">
+    <div class="card mb-3 import-board">
+        <div class="import-board__head">
+            <div>
+                <span class="page-kicker">Suppliers</span>
+                <h2 class="page-title">Supplier import board</h2>
+                <p class="page-subtitle">Per-supplier status, last import, and direct import actions.</p>
+            </div>
+        </div>
         {% if rows %}
             <div class="table-wrap table-responsive">
                 <table class="table table-sm table-hover align-middle mb-0 table-mobile supplier-import-table">
@@ -250,9 +259,10 @@
         {% endif %}
     </div>
 
-    <div class="card">
+    <div class="card import-log-surface">
         <div class="d-flex flex-wrap align-items-start justify-content-between gap-3">
             <div>
+                <span class="page-kicker">Audit</span>
                 <h2 class="page-title">Import Log</h2>
                 <p class="page-subtitle">Trace each file and batch status.</p>
             </div>
@@ -434,6 +444,7 @@
         {% else %}
             <p class="muted mt-3">No imports yet.</p>
         {% endif %}
+    </div>
     </div>
 {% endblock %}
 {% block extra_scripts %}
