@@ -384,6 +384,12 @@
         display: none;
     }
 
+    .products-mobile td::before,
+    .products-mobile td.actions::before {
+        content: none !important;
+        display: none !important;
+    }
+
     .filters.filters-products {
         padding: 10px;
         border-radius: 12px;
@@ -470,9 +476,15 @@
     }
 
     .products-mobile td {
+        display: block !important;
+        width: auto !important;
         padding: 0 !important;
         line-height: 1.2 !important;
         border: 0 !important;
+    }
+
+    .products-mobile td[data-field="supplier_sku"] {
+        display: none !important;
     }
 
     .products-mobile td[data-field="name"] {
@@ -507,6 +519,7 @@
     }
 
     .products-mobile td[data-field="supplier"] {
+        display: flex !important;
         grid-column: 2 !important;
         grid-row: 2 !important;
         align-self: center !important;
@@ -563,6 +576,7 @@
     }
 
     .products-mobile td.actions {
+        display: block !important;
         top: 10px !important;
         right: 10px !important;
     }
