@@ -73,27 +73,35 @@
 
 .workspace-list-products {
     display: grid;
-    gap: 18px;
+    gap: 22px;
 }
 
 .workspace-hero-products {
     position: relative;
     overflow: hidden;
-    border-radius: 28px;
-    padding: 28px 30px 24px !important;
-    background:
-        linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(244, 244, 242, 0.96) 100%);
+    border-radius: 30px;
+    padding: 30px 32px 26px !important;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.995) 0%, rgba(246, 246, 244, 0.98) 100%);
 }
 
 .workspace-hero-products::before {
     content: "";
     position: absolute;
-    inset: 0 0 auto 0;
-    height: 132px;
+    inset: 0 auto 0 0;
+    width: 188px;
     background:
-        linear-gradient(90deg, rgba(17, 17, 17, 0.96) 0, rgba(17, 17, 17, 0.96) 88px, transparent 88px),
-        linear-gradient(90deg, rgba(17, 17, 17, 0.08) 0, rgba(17, 17, 17, 0.08) 1px, transparent 1px, transparent 124px);
-    background-size: auto, 124px 100%;
+        linear-gradient(180deg, rgba(17, 17, 17, 0.98) 0%, rgba(36, 36, 36, 0.9) 100%);
+    pointer-events: none;
+}
+
+.workspace-hero-products::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 188px;
+    right: 0;
+    height: 1px;
+    background: rgba(17, 17, 17, 0.08);
     pointer-events: none;
 }
 
@@ -105,62 +113,130 @@
 .workspace-hero-products .page-kicker,
 .workspace-hero-products .page-title,
 .workspace-hero-products .page-subtitle {
-    max-width: 720px;
+    max-width: 760px;
 }
 
 .workspace-hero-products .page-title {
-    font-size: clamp(2.05rem, 3vw, 3.35rem);
+    font-size: clamp(2.4rem, 3.7vw, 4rem);
     letter-spacing: -0.05em;
+    line-height: 0.95;
 }
 
 .workspace-hero-products .page-subtitle {
     font-size: 0.98rem;
-    max-width: 560px;
+    max-width: 500px;
 }
 
 .workspace-hero__head {
     padding-left: 72px;
 }
 
+.workspace-hero__head-products {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) 320px;
+    align-items: end;
+    gap: 26px !important;
+    padding-left: 136px;
+}
+
 .workspace-hero__actions {
     align-self: flex-start;
 }
 
-.workspace-hero-products .workspace-hero__actions {
-    margin-top: 2px;
+.workspace-hero__actions-products {
+    display: grid !important;
+    align-self: stretch;
+    justify-content: stretch;
+    gap: 10px !important;
+    padding: 16px;
+    border: 1px solid rgba(17, 17, 17, 0.1);
+    border-radius: 22px;
+    background: linear-gradient(180deg, rgba(250, 250, 248, 0.98) 0%, rgba(243, 243, 241, 0.98) 100%);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+.workspace-hero__actions-products > * {
+    min-width: 0;
+}
+
+.workspace-hero__actions-products .button,
+.workspace-hero__actions-products form,
+.workspace-hero__actions-products .active-supplier-chip {
+    width: 100%;
+}
+
+.workspace-hero__actions-products form .button {
+    width: 100%;
+    justify-content: space-between;
+}
+
+.products-signal-bar {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+    margin-top: 22px;
+    padding-left: 136px;
+}
+
+.products-signal {
+    padding: 16px 18px 14px;
+    border-radius: 20px;
+    border: 1px solid rgba(17, 17, 17, 0.09);
+    background: rgba(255, 255, 255, 0.84);
+}
+
+.products-signal__label {
+    display: block;
+    margin-bottom: 8px;
+    font-size: 0.7rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: #6a6a65;
+    font-weight: 800;
+}
+
+.products-signal__value {
+    display: block;
+    font-size: 1.05rem;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    color: #141414;
 }
 
 .workspace-filters.filters-products {
-    border: 0;
-    border-radius: 20px;
-    background:
-        linear-gradient(180deg, rgba(255, 255, 255, 0.94) 0%, rgba(246, 246, 244, 0.98) 100%);
-    padding: 16px;
+    position: relative;
+    border: 1px solid rgba(17, 17, 17, 0.09);
+    border-radius: 24px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(247, 247, 245, 0.98) 100%);
+    padding: 18px;
 }
 
 .workspace-hero-products .filter-item > label {
-    font-size: 0.76rem;
-    letter-spacing: 0.14em;
+    font-size: 0.7rem;
+    letter-spacing: 0.16em;
     text-transform: uppercase;
     color: var(--app-muted);
+    font-weight: 800;
 }
 
 .workspace-hero-products .search-input-wrap input {
-    min-height: 58px;
-    border-radius: 18px;
-    padding-left: 18px;
-    font-size: 1.05rem;
-    background: rgba(255, 255, 255, 0.92);
+    min-height: 68px;
+    border-radius: 22px;
+    padding-left: 22px;
+    font-size: 1.2rem;
+    background: rgba(255, 255, 255, 0.98);
 }
 
 .workspace-hero-products .filter-icon-btn {
-    width: 52px;
-    height: 52px;
-    border-radius: 16px;
+    width: 58px;
+    height: 58px;
+    border-radius: 20px;
 }
 
 .workspace-hero-products .search-count {
-    margin-top: 8px;
+    margin-top: 12px;
     margin-left: 0;
     display: inline-flex;
     align-items: center;
@@ -179,29 +255,60 @@
 }
 
 .workspace-table-shell-products {
-    padding: 16px !important;
-    border-radius: 26px;
-    background:
-        linear-gradient(180deg, rgba(255, 255, 255, 0.88) 0%, rgba(245, 245, 243, 0.97) 100%);
+    padding: 20px !important;
+    border-radius: 30px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(245, 245, 243, 0.98) 100%);
 }
 
 .workspace-table-shell-products .workspace-table-wrap {
-    border-radius: 22px;
+    border-radius: 24px;
     border-color: rgba(17, 17, 17, 0.08);
-    background:
-        linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(248, 248, 246, 0.99) 100%);
+    background: #ffffff;
+}
+
+.workspace-table-intro {
+    align-items: end;
+    justify-content: space-between;
+    gap: 24px;
+    margin-bottom: 18px;
+    padding: 0 6px;
+}
+
+.workspace-table-kicker {
+    display: inline-block;
+    margin-bottom: 6px;
+    font-size: 0.72rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: #666662;
+    font-weight: 800;
+}
+
+.workspace-table-title {
+    margin: 0;
+    font-size: clamp(1.6rem, 2.6vw, 2.4rem);
+    line-height: 0.98;
+    letter-spacing: -0.05em;
+    font-weight: 800;
+}
+
+.workspace-table-note {
+    max-width: 280px;
+    font-size: 0.9rem;
+    line-height: 1.45;
+    color: #666662;
+    text-align: right;
 }
 
 .workspace-table-shell-products .products-grid thead th {
     top: 0;
-    background:
-        linear-gradient(180deg, rgba(17, 17, 17, 0.92) 0%, rgba(29, 29, 29, 0.9) 100%) !important;
-    color: #f4efe6;
-    border-bottom: 0 !important;
+    background: #ffffff !important;
+    color: #63635d;
+    border-bottom: 1px solid rgba(17, 17, 17, 0.09) !important;
     font-size: 0.72rem;
-    letter-spacing: 0.16em;
-    padding-top: 14px;
-    padding-bottom: 14px;
+    letter-spacing: 0.17em;
+    padding-top: 16px;
+    padding-bottom: 16px;
 }
 
 .workspace-table-shell-products .products-grid thead th a {
@@ -210,32 +317,36 @@
 }
 
 .workspace-table-shell-products .products-grid tbody tr td {
-    padding-top: 16px;
-    padding-bottom: 16px;
+    padding-top: 18px;
+    padding-bottom: 18px;
     background: transparent;
+    border-bottom-color: rgba(17, 17, 17, 0.08) !important;
 }
 
 .workspace-table-shell-products .products-grid tbody tr:nth-child(even):not(.inactive-divider-row):not(.inactive-product-row) td {
-    background: rgba(17, 17, 17, 0.018);
+    background: rgba(17, 17, 17, 0.012);
 }
 
 .workspace-table-shell-products .products-grid tbody tr:hover td {
-    background: rgba(17, 17, 17, 0.048) !important;
+    background: rgba(17, 17, 17, 0.032) !important;
 }
 
 .workspace-table-shell-products .products-grid td[data-field="name"] {
-    width: 42%;
+    width: 46%;
 }
 
 .workspace-table-shell-products .cell-name {
-    font-size: 1rem;
+    font-size: 1.02rem;
     font-weight: 700;
     color: #121212;
+    text-decoration: none;
 }
 
 .workspace-table-shell-products .cell-sku {
     font-size: 12px;
-    color: #6d685f;
+    color: #7a7a74;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
 }
 
 .workspace-table-shell-products td[data-field="current_price"] {
@@ -244,24 +355,26 @@
 
 .workspace-table-shell-products .cell-price-main {
     font-family: var(--font-display);
-    font-size: 2.05rem;
-    letter-spacing: -0.04em;
+    font-size: 2.2rem;
+    letter-spacing: -0.055em;
     font-weight: 700;
+    line-height: 0.95;
 }
 
 .workspace-table-shell-products .price-delta-wrap {
-    margin-top: 2px;
-    font-size: 0.83rem;
+    margin-top: 4px;
+    font-size: 0.84rem;
 }
 
 .workspace-table-shell-products .cell-supplier {
-    font-size: 1rem;
+    font-size: 1.02rem;
     font-weight: 800;
+    letter-spacing: -0.02em;
 }
 
 .workspace-table-shell-products .cell-imported {
-    font-size: 0.82rem;
-    letter-spacing: 0.02em;
+    font-size: 0.84rem;
+    letter-spacing: 0.01em;
 }
 
 .workspace-pagination {

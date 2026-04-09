@@ -11,7 +11,7 @@
 {% block content %}
     <div id="supplier-bulk-root" class="{% if list_title == 'Suppliers Products' or list_title == 'Supplier Products' %}bulk-mode-off {% endif %}workspace-list{% if list_title == 'Suppliers Products' or list_title == 'Supplier Products' %} workspace-list-products{% endif %}">
     <div class="card p-3 p-md-4 mb-3 workspace-hero{% if list_title == 'Suppliers Products' or list_title == 'Supplier Products' %} workspace-hero-products{% endif %}">
-        <div class="d-flex flex-wrap align-items-start justify-content-between gap-3 workspace-hero__head">
+        <div class="d-flex flex-wrap align-items-start justify-content-between gap-3 workspace-hero__head{% if list_title == 'Suppliers Products' or list_title == 'Supplier Products' %} workspace-hero__head-products{% endif %}">
             <div>
                 {% if list_title == 'Suppliers Products' or list_title == 'Supplier Products' %}
                     <span class="page-kicker">Live supplier index</span>
@@ -27,7 +27,7 @@
                     {% endif %}
                 </p>
             </div>
-            <div class="d-flex flex-wrap gap-2 workspace-hero__actions">
+            <div class="d-flex flex-wrap gap-2 workspace-hero__actions{% if list_title == 'Suppliers Products' or list_title == 'Supplier Products' %} workspace-hero__actions-products{% endif %}">
                 {% if show_create and create_url_name %}
                     <a class="button" href="{% url create_url_name %}">Add new</a>
                 {% endif %}
@@ -104,6 +104,26 @@
                 {% endif %}
             </div>
         </div>
+        {% if list_title == 'Suppliers Products' or list_title == 'Supplier Products' %}
+            <div class="products-signal-bar d-none d-lg-grid" aria-label="Workspace summary">
+                <div class="products-signal">
+                    <span class="products-signal__label">Offers</span>
+                    <strong class="products-signal__value">{{ total_count }}</strong>
+                </div>
+                <div class="products-signal">
+                    <span class="products-signal__label">Currency</span>
+                    <strong class="products-signal__value">{% if currency_filter %}{{ currency_filter }}{% else %}Original{% endif %}</strong>
+                </div>
+                <div class="products-signal">
+                    <span class="products-signal__label">Suppliers</span>
+                    <strong class="products-signal__value">{% if supplier_filter_names %}{{ supplier_filter_names|length }} selected{% else %}All market{% endif %}</strong>
+                </div>
+                <div class="products-signal">
+                    <span class="products-signal__label">Status</span>
+                    <strong class="products-signal__value">{{ status_filter|default:"all"|capfirst }}</strong>
+                </div>
+            </div>
+        {% endif %}
         <div class="filters mt-3 workspace-filters{% if list_title == 'Suppliers Products' or list_title == 'Supplier Products' %} filters-products{% endif %}">
             {% if list_title == 'Suppliers Products' or list_title == 'Supplier Products' %}
                 {% if show_search %}
@@ -236,6 +256,15 @@
         </div>
     </div>
     <div class="card p-2 p-md-3 workspace-table-shell{% if list_title == 'Suppliers Products' or list_title == 'Supplier Products' %} workspace-table-shell-products{% endif %}">
+        {% if list_title == 'Suppliers Products' or list_title == 'Supplier Products' %}
+            <div class="workspace-table-intro d-none d-lg-flex">
+                <div>
+                    <span class="workspace-table-kicker">Market sheet</span>
+                    <h2 class="workspace-table-title">Supplier price matrix</h2>
+                </div>
+                <p class="workspace-table-note mb-0">Scan prices first, supplier second, last update third.</p>
+            </div>
+        {% endif %}
         {% if object_list %}
             <div class="table-wrap table-responsive workspace-table-wrap">
                 <table class="table table-sm table-hover align-middle mb-0 table-mobile products-grid{% if list_title == 'Suppliers Products' or list_title == 'Supplier Products' %} products-mobile{% endif %}">
