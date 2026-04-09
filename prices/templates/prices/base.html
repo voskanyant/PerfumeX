@@ -58,7 +58,7 @@
                             <a class="nav-link" href="{% url 'user_profile' %}">Profile</a>
                             <form action="{% url 'logout' %}" method="post" class="mt-3">
                                 {% csrf_token %}
-                                <button type="submit" class="btn btn-outline-light w-100 text-start">Logout</button>
+                                <button type="submit" class="btn btn-outline-secondary w-100 text-start">Logout</button>
                             </form>
                         </nav>
                     </aside>

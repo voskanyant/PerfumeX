@@ -1,58 +1,50 @@
 .import-mega-nav,
 .import-tabs {
-    border: 0;
-    border-radius: 28px;
-    background:
-        linear-gradient(90deg, rgba(17, 17, 17, 0.94) 0, rgba(17, 17, 17, 0.94) 110px, transparent 110px),
-        linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(245, 245, 243, 0.96) 100%);
-    padding: 0 22px 0 130px;
+    border: 1px solid rgba(255, 255, 255, 0.72);
+    border-radius: 26px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(248, 247, 243, 0.95) 100%);
+    padding: 10px 12px;
     margin-bottom: 18px;
-    box-shadow: var(--app-shadow-card);
+    box-shadow: var(--app-shadow-soft);
 }
 
 .import-mega-nav-inner,
 .import-tabs__inner {
     display: flex;
     flex-wrap: wrap;
-    gap: 28px;
+    gap: 10px;
     align-items: center;
-    min-height: 74px;
+    min-height: 44px;
 }
 
 .import-mega-link,
 .import-tabs__link {
     display: inline-flex;
     align-items: center;
-    height: 74px;
+    justify-content: center;
+    min-height: 40px;
+    padding: 0 14px;
     color: var(--app-muted);
     text-decoration: none;
     font-weight: 700;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    font-size: 0.74rem;
-    transition: color 0.15s ease, opacity 0.15s ease;
+    letter-spacing: 0.01em;
+    font-size: 0.85rem;
+    border: 1px solid transparent;
+    border-radius: 12px;
+    transition: color 0.15s ease, background-color 0.15s ease, border-color 0.15s ease;
 }
 
 .import-mega-link:hover,
 .import-tabs__link:hover {
     color: var(--app-text);
+    background: #f6f4ee;
 }
 
 .import-mega-link.active,
 .import-tabs__link.is-active {
     color: var(--app-text);
-    position: relative;
-}
-
-.import-mega-link.active::after,
-.import-tabs__link.is-active::after {
-    content: "";
-    position: absolute;
-    left: 0;
-    bottom: 16px;
-    width: 100%;
-    height: 2px;
-    background: #111111;
+    background: #f1efe8;
+    border-color: var(--app-border);
 }
 
 .import-workspace {
@@ -60,36 +52,21 @@
 }
 
 .import-overview-hero {
-    position: relative;
-    overflow: hidden;
     border-radius: 30px;
-    padding: 28px 30px !important;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(245, 245, 243, 0.96) 100%);
-}
-
-.import-overview-hero::before {
-    content: "";
-    position: absolute;
-    inset: 0 auto 0 0;
-    width: 96px;
-    background: linear-gradient(180deg, rgba(17, 17, 17, 0.98) 0%, rgba(36, 36, 36, 0.92) 100%);
-}
-
-.import-overview-hero > * {
-    position: relative;
-    z-index: 1;
+    padding: 26px 28px !important;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.97) 0%, rgba(248, 247, 243, 0.95) 100%);
 }
 
 .import-overview-header {
-    padding-left: 72px;
+    gap: 18px;
+}
+
+.import-overview-header .page-title {
+    font-size: clamp(2rem, 3.1vw, 2.8rem);
 }
 
 .import-overview-header .button {
-    min-height: 36px;
-}
-
-.import-overview-hero .page-title {
-    font-size: clamp(2rem, 3vw, 3rem);
+    min-height: 40px;
 }
 
 .import-control-grid {
@@ -99,47 +76,48 @@
 }
 
 .import-control-panel {
-    border-radius: 26px;
-    padding: 22px !important;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(246, 246, 243, 0.98) 100%);
+    border-radius: 28px;
+    padding: 24px !important;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(248, 247, 243, 0.95) 100%);
 }
 
 #bulk-backfill-form,
 #bulk-rates-form {
-    background: linear-gradient(180deg, rgba(17, 17, 17, 0.02) 0%, rgba(17, 17, 17, 0.04) 100%);
-    border: 1px solid rgba(17, 17, 17, 0.08);
+    background: #fcfbf8;
+    border: 1px solid var(--app-border);
     border-radius: 20px;
     padding: 16px;
 }
 
 .import-board,
 .import-log-surface {
-    border-radius: 28px;
+    border-radius: 30px;
     padding: 18px !important;
 }
 
 .import-board__head {
-    margin-bottom: 14px;
+    margin-bottom: 16px;
 }
 
 .import-board .table-wrap,
 .import-log-surface .table-wrap {
-    border-radius: 22px;
-    border-color: rgba(17, 17, 17, 0.08);
+    border-radius: 24px;
+    border-color: rgba(229, 226, 217, 0.96);
+    background: #ffffff;
 }
 
 .supplier-import-table thead th {
-    background: linear-gradient(180deg, rgba(17, 17, 17, 0.94) 0%, rgba(34, 34, 34, 0.92) 100%);
-    color: #f4efe6;
-    border-bottom: 0;
-    letter-spacing: 0.16em;
+    background: linear-gradient(180deg, #faf9f6 0%, #f3f1ec 100%);
+    color: #63635b;
+    border-bottom: 1px solid var(--app-divider);
+    letter-spacing: 0.14em;
     font-size: 0.72rem;
 }
 
 .run-log-card {
-    border: 1px solid rgba(17, 17, 17, 0.08);
+    border: 1px solid var(--app-border);
     border-radius: 20px;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(246, 246, 243, 0.95) 100%);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(249, 247, 242, 0.95) 100%);
     padding: 16px;
 }
 
@@ -182,10 +160,10 @@
 
 .run-log-pre {
     margin: 0;
-    background: #f8f8f6;
-    border: 1px solid #e1e1dd;
-    border-radius: 12px;
-    padding: 10px 12px;
+    background: #fbfaf7;
+    border: 1px solid var(--app-border);
+    border-radius: 14px;
+    padding: 12px 14px;
     max-height: 360px;
     overflow: auto;
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
@@ -198,9 +176,9 @@
 
 .run-log-empty {
     margin: 0;
-    background: #f8f8f6;
+    background: #fbfaf7;
     border: 1px dashed #dbdbd6;
-    border-radius: 12px;
+    border-radius: 14px;
     padding: 12px;
     color: #666661;
     font-size: 14px;
@@ -218,30 +196,22 @@
 @media (max-width: 991.98px) {
     .import-mega-nav,
     .import-tabs {
-        padding: 0 14px;
-        background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(245, 245, 243, 0.96) 100%);
+        padding: 10px;
         border-radius: 18px;
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(247, 246, 242, 0.96) 100%);
     }
 
     .import-mega-nav-inner,
     .import-tabs__inner {
-        gap: 14px;
-        min-height: 52px;
+        gap: 8px;
+        min-height: auto;
     }
 
     .import-mega-link,
     .import-tabs__link {
-        height: 52px;
-        font-size: 0.76rem;
-    }
-
-    .import-overview-hero::before {
-        display: none;
-    }
-
-    .import-overview-header {
-        padding-left: 0;
-        gap: 12px;
+        min-height: 38px;
+        font-size: 0.8rem;
+        flex: 1 1 auto;
     }
 
     .import-control-grid {
@@ -256,68 +226,5 @@
     .supplier-import-table.table-mobile tr {
         padding: 12px;
         border-radius: 14px;
-    }
-
-    .supplier-import-table.table-mobile td {
-        display: block;
-        padding: 4px 0;
-    }
-
-    .supplier-import-table.table-mobile td::before {
-        display: block;
-        min-width: 0;
-        margin-bottom: 4px;
-    }
-
-    .supplier-import-table.table-mobile td.import-col-select::before {
-        display: none;
-    }
-
-    .supplier-import-table.table-mobile td.import-col-select {
-        padding-bottom: 2px;
-    }
-
-    .supplier-import-table.table-mobile td.import-col-supplier {
-        font-size: 18px;
-        font-weight: 700;
-        padding-bottom: 6px;
-        border-bottom: 1px dashed var(--app-border);
-        margin-bottom: 6px;
-    }
-
-    .supplier-import-table.table-mobile td.import-col-last {
-        font-size: 14px;
-    }
-
-    .supplier-import-table.table-mobile td.import-col-email {
-        background: rgba(17, 17, 17, 0.03);
-        border: 1px solid var(--app-border);
-        border-radius: 10px;
-        padding: 8px;
-        margin-top: 6px;
-    }
-
-    .supplier-import-table.table-mobile td.import-col-actions {
-        margin-top: 8px;
-    }
-
-    .supplier-import-table.table-mobile td.import-col-actions .d-inline-flex {
-        display: grid !important;
-        grid-template-columns: 1fr 1fr;
-        gap: 8px;
-        width: 100%;
-    }
-
-    .supplier-import-table.table-mobile td.import-col-actions .button {
-        width: 100%;
-        justify-content: center;
-    }
-
-    .supplier-import-table.table-mobile td.import-col-actions form {
-        margin: 0;
-    }
-
-    .supplier-import-table.table-mobile td.import-col-actions .button.icon {
-        grid-column: span 2;
     }
 }
