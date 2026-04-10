@@ -73,49 +73,51 @@
 
 .workspace-list-products {
     display: grid;
-    gap: 8px;
+    gap: 14px;
 }
 
 .products-desktop-shell {
     display: grid;
-    gap: 0;
+    gap: 12px;
 }
 
-.products-apple-shell {
-    display: grid;
-    gap: 18px;
-    padding: 12px 0 0;
+.products-workspace-shell {
+    padding: 18px !important;
+    border-radius: 22px;
+    background: #fbfaf7;
+    border: 1px solid rgba(31, 27, 20, 0.06) !important;
+    box-shadow: none;
 }
 
-.products-apple-header {
+.products-command-top {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
     align-items: end;
-    gap: 18px;
-    padding: 0 6px 4px;
+    gap: 10px 16px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid rgba(22, 22, 20, 0.06);
 }
 
-.products-apple-heading {
+.products-heading-copy {
     min-width: 0;
 }
 
-.products-apple-eyebrow {
-    display: inline-block;
-    margin-bottom: 10px;
-    font-size: 0.69rem;
-    font-weight: 700;
-    letter-spacing: 0.18em;
-    text-transform: uppercase;
-    color: #8b877d;
+.products-heading-copy .page-title,
+.products-heading-copy .page-subtitle {
+    max-width: 720px;
 }
 
-.products-apple-title {
-    margin: 0;
-    font-size: clamp(2.8rem, 4.1vw, 4.5rem);
-    line-height: 0.93;
-    letter-spacing: -0.075em;
-    font-weight: 700;
-    color: #161614;
+.products-heading-copy .page-title {
+    font-size: clamp(1.7rem, 2vw, 2.1rem);
+    letter-spacing: -0.06em;
+    line-height: 0.98;
+    margin-bottom: 2px;
+}
+
+.products-heading-copy .page-subtitle {
+    max-width: 620px;
+    font-size: 0.86rem;
+    color: #7a776f;
 }
 
 .products-command-tools {
@@ -136,34 +138,13 @@
 }
 
 .products-command-band {
+    margin-top: 10px;
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    align-items: center;
-    gap: 18px;
-    padding: 14px 6px 18px;
-    border-top: 1px solid rgba(16, 16, 16, 0.08);
-    border-bottom: 1px solid rgba(16, 16, 16, 0.08);
-}
-
-.products-apple-summary,
-.products-apple-meta {
-    display: inline-flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 8px;
-    font-size: 0.81rem;
-    font-weight: 600;
-    color: #747067;
-    letter-spacing: -0.01em;
-}
-
-.products-apple-meta-sep {
-    color: #b8b3a7;
+    gap: 10px;
 }
 
 .workspace-filters.filters-products {
     position: relative;
-    min-width: 0;
     border: 0;
     border-radius: 0;
     background: transparent;
@@ -180,41 +161,38 @@
 }
 
 .filters-products .search-input-wrap input {
-    min-height: 52px;
-    border-radius: 999px;
-    padding-left: 18px;
-    font-size: 1rem;
-    background: rgba(255, 255, 255, 0.94);
-    border-color: rgba(24, 24, 22, 0.1);
+    min-height: 46px;
+    border-radius: 14px;
+    padding-left: 14px;
+    font-size: 0.95rem;
+    background: #fff;
 }
 
 .filters-products .filter-icon-btn {
-    width: 52px;
-    height: 52px;
-    border-radius: 999px;
-    background: rgba(255, 255, 255, 0.94);
-    border-color: rgba(24, 24, 22, 0.1);
+    width: 42px;
+    height: 42px;
+    border-radius: 12px;
 }
 
 .filters-products .search-count {
-    display: none;
+    margin-top: 6px;
+    margin-left: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 0;
+    font-size: 0.8rem;
+    letter-spacing: 0;
+    text-transform: none;
+    color: #7b786f;
 }
 
 .workspace-table-shell-products {
     padding: 0 !important;
-    margin-top: 24px;
-    border-radius: 28px;
-    border: 1px solid rgba(27, 23, 18, 0.06);
-    background: rgba(255, 255, 255, 0.95);
+    border-radius: 18px;
+    border: 1px solid rgba(27, 23, 18, 0.07);
+    background: #fff;
     box-shadow: none;
     overflow: hidden;
-}
-
-.products-ledger-shell::before {
-    content: "";
-    display: block;
-    height: 1px;
-    background: rgba(27, 23, 18, 0.05);
 }
 
 .workspace-table-shell-products .workspace-table-wrap,
@@ -236,13 +214,13 @@
 
 .workspace-table-shell-products .products-grid thead th {
     top: 0;
-    background: rgba(250, 249, 245, 0.95) !important;
-    color: #787469;
+    background: #fbfaf7 !important;
+    color: #6d6a63;
     border-bottom: 1px solid rgba(17, 17, 17, 0.08) !important;
-    font-size: 0.67rem;
-    letter-spacing: 0.16em;
-    padding-top: 13px;
-    padding-bottom: 13px;
+    font-size: 0.63rem;
+    letter-spacing: 0.14em;
+    padding-top: 11px;
+    padding-bottom: 11px;
 }
 
 .workspace-table-shell-products .products-grid thead th a {
@@ -251,33 +229,36 @@
 }
 
 .workspace-table-shell-products .products-grid tbody tr td {
-    padding-top: 18px;
-    padding-bottom: 18px;
+    padding-top: 12px;
+    padding-bottom: 12px;
     background: transparent;
     border-bottom-color: rgba(17, 17, 17, 0.07) !important;
 }
 
+.workspace-table-shell-products .products-grid tbody tr:nth-child(even):not(.inactive-divider-row):not(.inactive-product-row) td {
+    background: rgba(17, 17, 17, 0.008);
+}
+
 .workspace-table-shell-products .products-grid tbody tr:hover td {
-    background: rgba(17, 17, 17, 0.014) !important;
+    background: rgba(17, 17, 17, 0.016) !important;
 }
 
 .workspace-table-shell-products .products-grid td[data-field="name"] {
-    width: 54%;
+    width: 50%;
 }
 
 .workspace-table-shell-products .cell-name {
-    font-size: 0.98rem;
+    font-size: 0.94rem;
     font-weight: 600;
     color: #121212;
     text-decoration: none;
-    letter-spacing: -0.015em;
 }
 
 .workspace-table-shell-products .cell-sku {
-    font-size: 0.76rem;
-    color: #888378;
+    font-size: 12px;
+    color: #7a7a74;
     text-transform: uppercase;
-    letter-spacing: 0.1em;
+    letter-spacing: 0.08em;
 }
 
 .workspace-table-shell-products td[data-field="current_price"] {
@@ -286,25 +267,25 @@
 
 .workspace-table-shell-products .cell-price-main {
     font-family: var(--font-display);
-    font-size: 1.44rem;
-    letter-spacing: -0.05em;
-    font-weight: 600;
+    font-size: 1.26rem;
+    letter-spacing: -0.055em;
+    font-weight: 700;
     line-height: 0.95;
 }
 
 .workspace-table-shell-products .price-delta-wrap {
-    margin-top: 3px;
-    font-size: 0.76rem;
+    margin-top: 2px;
+    font-size: 0.74rem;
 }
 
 .workspace-table-shell-products .cell-supplier {
-    font-size: 0.97rem;
-    font-weight: 600;
+    font-size: 0.9rem;
+    font-weight: 700;
     letter-spacing: -0.02em;
 }
 
 .workspace-table-shell-products .cell-imported {
-    font-size: 0.83rem;
+    font-size: 0.76rem;
     letter-spacing: 0.01em;
 }
 
@@ -329,7 +310,7 @@
     top: var(--search-top-desktop);
     z-index: 30;
     background: transparent;
-    padding: 0;
+    padding: 0 0 6px;
     margin: 0;
     border-bottom: 0;
 }

@@ -12,11 +12,11 @@
     <div id="supplier-bulk-root" class="{% if list_title == 'Suppliers Products' or list_title == 'Supplier Products' %}bulk-mode-off {% endif %}workspace-list{% if list_title == 'Suppliers Products' or list_title == 'Supplier Products' %} workspace-list-products{% endif %}">
     {% if list_title == 'Suppliers Products' or list_title == 'Supplier Products' %}
     <div class="products-desktop-shell">
-    <section class="products-apple-shell">
-        <header class="products-apple-header">
-            <div class="products-apple-heading">
-                <span class="products-apple-eyebrow">Supplier index</span>
-                <h1 class="products-apple-title">{{ list_title }}</h1>
+    <div class="card products-workspace-shell">
+        <div class="products-command-top">
+            <div class="products-heading-copy">
+                <h1 class="page-title">{{ list_title }}</h1>
+                <p class="page-subtitle">{{ total_count }} offers</p>
             </div>
             <div class="products-command-tools">
                 {% if supplier_filter_names %}
@@ -48,17 +48,8 @@
                     </div>
                 {% endif %}
             </div>
-        </header>
+        </div>
         <div class="products-command-band">
-            <div class="products-apple-summary">
-                <span>{{ total_count }} offers</span>
-                <span class="products-apple-meta-sep">&middot;</span>
-                <span>{% if currency_filter %}{{ currency_filter }}{% else %}Original{% endif %}</span>
-                <span class="products-apple-meta-sep">&middot;</span>
-                <span>{% if supplier_filter_names %}{{ supplier_filter_names|length }} suppliers{% else %}All suppliers{% endif %}</span>
-                <span class="products-apple-meta-sep">&middot;</span>
-                <span>{{ status_filter|default:"all"|capfirst }}</span>
-            </div>
             <div class="filters workspace-filters filters-products">
             {% if list_title == 'Suppliers Products' or list_title == 'Supplier Products' %}
                 {% if show_search %}
@@ -190,7 +181,8 @@
             {% endif %}
             </div>
         </div>
-        <div class="workspace-table-shell workspace-table-shell-products products-ledger-shell">
+        <div class="products-sheet"></div>
+        <div class="workspace-table-shell workspace-table-shell-products">
     {% else %}
     <div class="card p-3 p-md-4 mb-3 workspace-hero">
         <div class="d-flex flex-wrap align-items-start justify-content-between gap-3 workspace-hero__head">
