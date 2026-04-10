@@ -15,9 +15,8 @@
     <div class="card products-workspace-shell">
         <div class="products-command-top">
             <div class="products-heading-copy">
-                <span class="page-kicker">Live supplier index</span>
                 <h1 class="page-title">{{ list_title }}</h1>
-                <p class="page-subtitle">{{ total_count }} live offers arranged for fast price scanning.</p>
+                <p class="page-subtitle">{{ total_count }} offers</p>
             </div>
             <div class="products-command-tools">
                 {% if supplier_filter_names %}
@@ -51,29 +50,11 @@
             </div>
         </div>
         <div class="products-command-band">
-            <div class="products-command-context d-none d-lg-flex" aria-label="Workspace summary">
-                <div class="products-command-context__item">
-                    <span class="products-command-context__label">Offers</span>
-                    <strong class="products-command-context__value">{{ total_count }}</strong>
-                </div>
-                <div class="products-command-context__item">
-                    <span class="products-command-context__label">Currency</span>
-                    <strong class="products-command-context__value">{% if currency_filter %}{{ currency_filter }}{% else %}Original{% endif %}</strong>
-                </div>
-                <div class="products-command-context__item">
-                    <span class="products-command-context__label">Suppliers</span>
-                    <strong class="products-command-context__value">{% if supplier_filter_names %}{{ supplier_filter_names|length }} selected{% else %}All market{% endif %}</strong>
-                </div>
-                <div class="products-command-context__item">
-                    <span class="products-command-context__label">Status</span>
-                    <strong class="products-command-context__value">{{ status_filter|default:"all"|capfirst }}</strong>
-                </div>
-            </div>
             <div class="filters workspace-filters filters-products">
             {% if list_title == 'Suppliers Products' or list_title == 'Supplier Products' %}
                 {% if show_search %}
                     <div class="filter-item search-full-width">
-                        <label for="live-search">Search</label>
+                        <label for="live-search" class="visually-hidden">Search</label>
                         <div class="search-inline-row">
                             <div class="search-input-wrap">
                                 <input id="live-search" type="text" value="{{ current_q|default:'' }}" placeholder="Search perfume or SKU..." data-sort="{{ current_sort|default:'current_price' }}" data-dir="{{ current_dir|default:'asc' }}"{% if link_detail %} data-detail-base="{{ detail_base_url|default:'' }}"{% endif %} data-search-url="{{ search_url|default:'' }}"{% if show_bulk_delete %} data-bulk="1"{% endif %}{% if update_url_name %} data-edit-pattern="{% url update_url_name 0 %}"{% endif %}{% if delete_url_name %} data-delete-pattern="{% url delete_url_name 0 %}"{% endif %}>
@@ -200,22 +181,7 @@
             {% endif %}
             </div>
         </div>
-        <div class="products-sheet">
-            <div class="workspace-table-intro d-none d-lg-flex">
-                <div class="workspace-table-intro__copy">
-                    <span class="workspace-table-kicker">Market ledger</span>
-                    <h2 class="workspace-table-title">Supplier price sheet</h2>
-                    <p class="workspace-table-caption mb-0">A live ledger for scanning price, supplier, and freshness in one pass.</p>
-                </div>
-                <div class="workspace-table-intro__meta">
-                    <div class="products-sheet-facts">
-                        <span class="products-sheet-fact">Price first</span>
-                        <span class="products-sheet-fact">Supplier second</span>
-                        <span class="products-sheet-fact">Freshness third</span>
-                    </div>
-                </div>
-            </div>
-        </div>
+        <div class="products-sheet"></div>
         <div class="workspace-table-shell workspace-table-shell-products">
     {% else %}
     <div class="card p-3 p-md-4 mb-3 workspace-hero">
