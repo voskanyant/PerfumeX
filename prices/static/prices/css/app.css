@@ -102,11 +102,11 @@ main {
 .sidebar {
     width: 248px;
     flex: 0 0 248px;
-    background: #fbfaf7;
-    border: 1px solid rgba(29, 25, 18, 0.06);
-    box-shadow: 0 8px 24px rgba(19, 19, 17, 0.035);
-    border-radius: 24px;
-    padding: 18px 14px 16px;
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+    border-radius: 0;
+    padding: 10px 8px 12px;
     position: sticky;
     top: 16px;
     height: calc(100vh - 32px);
@@ -116,8 +116,9 @@ main {
     display: flex;
     align-items: center;
     gap: 10px;
-    padding: 4px 8px 14px;
-    margin-bottom: 6px;
+    padding: 4px 8px 12px;
+    margin-bottom: 10px;
+    border-bottom: 1px solid rgba(29, 25, 18, 0.07);
 }
 
 .shell-brand-mark {
@@ -144,28 +145,54 @@ main {
 
 .sidebar .nav-link,
 .offcanvas .nav-link {
+    position: relative;
     color: #2f2f2b;
-    font-weight: 600;
-    border-radius: 12px;
-    padding: 9px 12px;
-    margin-bottom: 2px;
+    font-weight: 500;
+    border-radius: 0;
+    padding: 7px 8px 7px 14px;
+    margin-bottom: 0;
+    background: transparent !important;
 }
 
 .sidebar .nav-link:hover,
 .sidebar .nav-link.active,
 .offcanvas .nav-link:hover,
 .offcanvas .nav-link.active {
-    background: #f2efe8;
     color: #141412;
 }
 
+.sidebar .nav-link::before,
+.offcanvas .nav-link::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 50%;
+    width: 4px;
+    height: 4px;
+    border-radius: 999px;
+    background: transparent;
+    transform: translateY(-50%);
+    transition: background-color 0.12s ease, height 0.12s ease;
+}
+
+.sidebar .nav-link.active::before,
+.offcanvas .nav-link.active::before {
+    background: #171715;
+    height: 18px;
+}
+
 .nav-section-title {
-    margin: 14px 12px 6px;
+    margin: 14px 8px 4px;
     font-size: 0.62rem;
     letter-spacing: 0.14em;
     text-transform: uppercase;
     color: #939187;
     font-weight: 800;
+}
+
+.sidebar form .btn,
+.offcanvas form .btn {
+    justify-content: flex-start;
 }
 
 .navbar.navbar-light {
