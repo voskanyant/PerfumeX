@@ -52,9 +52,8 @@ body {
     font-family: var(--font-ui);
     color: var(--app-text);
     background:
-        radial-gradient(920px 420px at 8% -10%, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0) 70%),
-        radial-gradient(860px 380px at 100% 0%, rgba(245, 244, 239, 0.9) 0%, rgba(245, 244, 239, 0) 72%),
-        linear-gradient(180deg, #fbfaf6 0%, var(--app-bg) 58%, #ebe9e2 100%);
+        radial-gradient(900px 420px at 10% -10%, rgba(255, 255, 255, 0.96) 0%, rgba(255, 255, 255, 0) 74%),
+        linear-gradient(180deg, #faf9f5 0%, #f3f1eb 100%);
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
 }
@@ -78,9 +77,9 @@ a:hover {
 .app-body {
     flex: 1;
     display: flex;
-    gap: 18px;
+    gap: 28px;
     min-height: calc(100vh - 56px);
-    padding: 16px;
+    padding: 22px 24px;
     position: relative;
 }
 
@@ -100,24 +99,25 @@ main {
 }
 
 .sidebar {
-    width: 248px;
-    flex: 0 0 248px;
+    width: 216px;
+    flex: 0 0 216px;
     background: transparent;
     border: 0;
     box-shadow: none;
     border-radius: 0;
-    padding: 10px 8px 12px;
+    padding: 2px 10px 12px 0;
     position: sticky;
-    top: 16px;
-    height: calc(100vh - 32px);
+    top: 22px;
+    height: calc(100vh - 44px);
+    border-right: 1px solid rgba(29, 25, 18, 0.08);
 }
 
 .shell-brand {
     display: flex;
     align-items: center;
     gap: 10px;
-    padding: 4px 8px 12px;
-    margin-bottom: 10px;
+    padding: 4px 0 16px;
+    margin: 0 16px 14px 0;
     border-bottom: 1px solid rgba(29, 25, 18, 0.07);
 }
 
@@ -133,7 +133,7 @@ main {
 }
 
 .shell-brand-title {
-    font-size: 1.1rem;
+    font-size: 1.04rem;
     font-weight: 800;
     letter-spacing: -0.04em;
     color: #171715;
@@ -149,7 +149,7 @@ main {
     color: #2f2f2b;
     font-weight: 500;
     border-radius: 0;
-    padding: 7px 8px 7px 14px;
+    padding: 8px 6px 8px 16px;
     margin-bottom: 0;
     background: transparent !important;
 }
@@ -182,7 +182,7 @@ main {
 }
 
 .nav-section-title {
-    margin: 14px 8px 4px;
+    margin: 18px 0 6px 16px;
     font-size: 0.62rem;
     letter-spacing: 0.14em;
     text-transform: uppercase;
@@ -209,9 +209,9 @@ main {
 
 .card {
     border: 1px solid rgba(29, 25, 18, 0.06);
-    border-radius: 22px;
+    border-radius: 24px;
     background: #fff;
-    box-shadow: 0 8px 24px rgba(19, 19, 17, 0.03);
+    box-shadow: 0 10px 26px rgba(19, 19, 17, 0.025);
     padding: 20px;
 }
 
