@@ -10,77 +10,23 @@
 
 {% block content %}
     <div id="supplier-bulk-root" class="{% if list_title == 'Suppliers Products' or list_title == 'Supplier Products' %}bulk-mode-off {% endif %}workspace-list{% if list_title == 'Suppliers Products' or list_title == 'Supplier Products' %} workspace-list-products{% endif %}">
-    <div class="card p-3 p-md-4 mb-3 workspace-hero{% if list_title == 'Suppliers Products' or list_title == 'Supplier Products' %} workspace-hero-products{% endif %}">
-        <div class="d-flex flex-wrap align-items-start justify-content-between gap-3 workspace-hero__head{% if list_title == 'Suppliers Products' or list_title == 'Supplier Products' %} workspace-hero__head-products{% endif %}">
-            <div>
-                {% if list_title == 'Suppliers Products' or list_title == 'Supplier Products' %}
-                    <span class="page-kicker">Live supplier index</span>
-                {% else %}
-                    <span class="page-kicker">Operations</span>
-                {% endif %}
+    {% if list_title == 'Suppliers Products' or list_title == 'Supplier Products' %}
+    <div class="products-desktop-shell">
+    <div class="card p-3 p-md-4 mb-3 workspace-hero workspace-hero-products">
+        <div class="products-command-top">
+            <div class="products-heading-copy">
+                <span class="page-kicker">Live supplier index</span>
                 <h1 class="page-title">{{ list_title }}</h1>
-                <p class="page-subtitle">
-                    {% if list_title == 'Suppliers Products' or list_title == 'Supplier Products' %}
-                        {{ total_count }} live offers arranged for fast price scanning.
-                    {% else %}
-                        Total: {{ total_count }}
-                    {% endif %}
-                </p>
+                <p class="page-subtitle">{{ total_count }} live offers arranged for fast price scanning.</p>
             </div>
-            <div class="d-flex flex-wrap gap-2 workspace-hero__actions{% if list_title == 'Suppliers Products' or list_title == 'Supplier Products' %} workspace-hero__actions-products{% endif %}">
-                {% if show_create and create_url_name %}
-                    <a class="button" href="{% url create_url_name %}">Add new</a>
-                {% endif %}
-                {% if show_cleanup and list_title != 'Suppliers Products' and list_title != 'Supplier Products' %}
-                    <form action="{% url 'prices:product_cleanup' %}" method="post">
-                        {% csrf_token %}
-                        <button class="button secondary" type="submit">
-                            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                                <path d="M3 6h18"/>
-                                <path d="M8 6V4h8v2"/>
-                                <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
-                                <path d="M10 11v6"/>
-                                <path d="M14 11v6"/>
-                            </svg>
-                            Delete orphan products
-                        </button>
-                    </form>
-                    <form action="{% url 'prices:product_cleanup_inactive' %}" method="post">
-                        {% csrf_token %}
-                        {% if supplier_filter %}
-                            <input type="hidden" name="supplier" value="{{ supplier_filter }}">
-                        {% endif %}
-                        <button class="button secondary" type="submit">
-                            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                                <path d="M3 6h18"/>
-                                <path d="M8 6V4h8v2"/>
-                                <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
-                                <path d="M10 11v6"/>
-                                <path d="M14 11v6"/>
-                            </svg>
-                            Delete inactive products
-                        </button>
-                    </form>
-                {% endif %}
-                {% if show_bulk_delete and list_title != 'Suppliers Products' and list_title != 'Supplier Products' %}
-                    <button class="button danger" type="button" id="bulk-delete-btn">
-                        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                            <path d="M3 6h18"/>
-                            <path d="M8 6V4h8v2"/>
-                            <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
-                            <path d="M10 11v6"/>
-                            <path d="M14 11v6"/>
-                        </svg>
-                        Delete selected
-                    </button>
-                {% endif %}
+            <div class="products-command-tools">
                 {% if supplier_filter_names %}
                     <div class="active-supplier-chip" title="Supplier filter is active">
                         <span>{{ supplier_filter_names|length }} supplier{{ supplier_filter_names|length|pluralize }} selected</span>
                         <button type="button" id="clear-supplier-filter-btn" aria-label="Clear supplier filter">&times;</button>
                     </div>
                 {% endif %}
-                {% if show_bulk_delete and list_title == 'Suppliers Products' or show_bulk_delete and list_title == 'Supplier Products' %}
+                {% if show_bulk_delete %}
                     <button class="button secondary bulk-gear-btn" type="button" id="bulk-mode-toggle" title="Bulk tools" aria-label="Bulk tools">
                         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                             <circle cx="12" cy="12" r="3"></circle>
@@ -104,27 +50,25 @@
                 {% endif %}
             </div>
         </div>
-        {% if list_title == 'Suppliers Products' or list_title == 'Supplier Products' %}
-            <div class="products-signal-bar d-none d-lg-grid" aria-label="Workspace summary">
-                <div class="products-signal">
-                    <span class="products-signal__label">Offers</span>
-                    <strong class="products-signal__value">{{ total_count }}</strong>
-                </div>
-                <div class="products-signal">
-                    <span class="products-signal__label">Currency</span>
-                    <strong class="products-signal__value">{% if currency_filter %}{{ currency_filter }}{% else %}Original{% endif %}</strong>
-                </div>
-                <div class="products-signal">
-                    <span class="products-signal__label">Suppliers</span>
-                    <strong class="products-signal__value">{% if supplier_filter_names %}{{ supplier_filter_names|length }} selected{% else %}All market{% endif %}</strong>
-                </div>
-                <div class="products-signal">
-                    <span class="products-signal__label">Status</span>
-                    <strong class="products-signal__value">{{ status_filter|default:"all"|capfirst }}</strong>
-                </div>
+        <div class="products-summary-row d-none d-lg-grid" aria-label="Workspace summary">
+            <div class="products-summary-item">
+                <span class="products-summary-item__label">Offers</span>
+                <strong class="products-summary-item__value">{{ total_count }}</strong>
             </div>
-        {% endif %}
-        <div class="filters mt-3 workspace-filters{% if list_title == 'Suppliers Products' or list_title == 'Supplier Products' %} filters-products{% endif %}">
+            <div class="products-summary-item">
+                <span class="products-summary-item__label">Currency</span>
+                <strong class="products-summary-item__value">{% if currency_filter %}{{ currency_filter }}{% else %}Original{% endif %}</strong>
+            </div>
+            <div class="products-summary-item">
+                <span class="products-summary-item__label">Suppliers</span>
+                <strong class="products-summary-item__value">{% if supplier_filter_names %}{{ supplier_filter_names|length }} selected{% else %}All market{% endif %}</strong>
+            </div>
+            <div class="products-summary-item">
+                <span class="products-summary-item__label">Status</span>
+                <strong class="products-summary-item__value">{{ status_filter|default:"all"|capfirst }}</strong>
+            </div>
+        </div>
+        <div class="filters mt-3 workspace-filters filters-products">
             {% if list_title == 'Suppliers Products' or list_title == 'Supplier Products' %}
                 {% if show_search %}
                     <div class="filter-item search-full-width">
@@ -255,16 +199,126 @@
             {% endif %}
         </div>
     </div>
-    <div class="card p-2 p-md-3 workspace-table-shell{% if list_title == 'Suppliers Products' or list_title == 'Supplier Products' %} workspace-table-shell-products{% endif %}">
-        {% if list_title == 'Suppliers Products' or list_title == 'Supplier Products' %}
-            <div class="workspace-table-intro d-none d-lg-flex">
-                <div>
-                    <span class="workspace-table-kicker">Market sheet</span>
-                    <h2 class="workspace-table-title">Supplier price matrix</h2>
-                </div>
+    <div class="card p-2 p-md-3 workspace-table-shell workspace-table-shell-products">
+        <div class="workspace-table-intro d-none d-lg-flex">
+            <div class="workspace-table-intro__copy">
+                <span class="workspace-table-kicker">Live offers</span>
+                <h2 class="workspace-table-title">Supplier price matrix</h2>
+            </div>
+            <div class="workspace-table-intro__meta">
                 <p class="workspace-table-note mb-0">Scan prices first, supplier second, last update third.</p>
             </div>
-        {% endif %}
+        </div>
+    {% else %}
+    <div class="card p-3 p-md-4 mb-3 workspace-hero">
+        <div class="d-flex flex-wrap align-items-start justify-content-between gap-3 workspace-hero__head">
+            <div>
+                <span class="page-kicker">Operations</span>
+                <h1 class="page-title">{{ list_title }}</h1>
+                <p class="page-subtitle">Total: {{ total_count }}</p>
+            </div>
+            <div class="d-flex flex-wrap gap-2 workspace-hero__actions">
+                {% if show_create and create_url_name %}
+                    <a class="button" href="{% url create_url_name %}">Add new</a>
+                {% endif %}
+                {% if show_cleanup %}
+                    <form action="{% url 'prices:product_cleanup' %}" method="post">
+                        {% csrf_token %}
+                        <button class="button secondary" type="submit">
+                            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="M3 6h18"/>
+                                <path d="M8 6V4h8v2"/>
+                                <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+                                <path d="M10 11v6"/>
+                                <path d="M14 11v6"/>
+                            </svg>
+                            Delete orphan products
+                        </button>
+                    </form>
+                    <form action="{% url 'prices:product_cleanup_inactive' %}" method="post">
+                        {% csrf_token %}
+                        {% if supplier_filter %}
+                            <input type="hidden" name="supplier" value="{{ supplier_filter }}">
+                        {% endif %}
+                        <button class="button secondary" type="submit">
+                            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="M3 6h18"/>
+                                <path d="M8 6V4h8v2"/>
+                                <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+                                <path d="M10 11v6"/>
+                                <path d="M14 11v6"/>
+                            </svg>
+                            Delete inactive products
+                        </button>
+                    </form>
+                {% endif %}
+                {% if show_bulk_delete %}
+                    <button class="button danger" type="button" id="bulk-delete-btn">
+                        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M3 6h18"/>
+                            <path d="M8 6V4h8v2"/>
+                            <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+                            <path d="M10 11v6"/>
+                            <path d="M14 11v6"/>
+                        </svg>
+                        Delete selected
+                    </button>
+                {% endif %}
+            </div>
+        </div>
+        <div class="filters mt-3 workspace-filters">
+            {% if show_search %}
+                <div class="filter-item">
+                    <label for="live-search">Search</label>
+                    <div class="search-inline-row">
+                        <div class="search-input-wrap">
+                            <input id="live-search" type="text" value="{{ current_q|default:'' }}" placeholder="Search perfume or SKU..." data-sort="{{ current_sort|default:'current_price' }}" data-dir="{{ current_dir|default:'asc' }}"{% if link_detail %} data-detail-base="{{ detail_base_url|default:'' }}" data-server-search="1"{% endif %} data-search-url="{{ search_url|default:'' }}"{% if show_bulk_delete %} data-bulk="1"{% endif %}{% if update_url_name %} data-edit-pattern="{% url update_url_name 0 %}"{% endif %}{% if delete_url_name %} data-delete-pattern="{% url delete_url_name 0 %}"{% endif %}>
+                            <button id="clear-search-btn" class="search-clear-text{% if not current_q %} is-hidden{% endif %}" type="button" aria-label="Clear search" title="Clear search">&times;</button>
+                        </div>
+                    </div>
+                    <span id="search-count" class="muted search-count"></span>
+                </div>
+            {% endif %}
+            {% if show_currency_filter %}
+                <div class="filter-item">
+                    <label for="currency-filter">Currency</label>
+                    <select id="currency-filter">
+                        <option value="">Original</option>
+                        {% for code in currency_options %}
+                            <option value="{{ code }}"{% if currency_filter == code %} selected{% endif %}>{{ code }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            {% endif %}
+            {% if supplier_options %}
+                <div class="filter-item">
+                    <label for="supplier-filter-search">Supplier</label>
+                    <div class="supplier-filter-wrap">
+                        <input id="supplier-filter-search" type="text" placeholder="Type supplier and press Enter..." autocomplete="off">
+                        <div id="supplier-suggest" class="supplier-suggest"></div>
+                    </div>
+                    <div id="supplier-selected-chips" class="supplier-selected-chips"></div>
+                    <select id="supplier-option-source" hidden>
+                        {% for supplier in supplier_options %}
+                            <option value="{{ supplier.id }}">{{ supplier.name }}</option>
+                        {% endfor %}
+                    </select>
+                    <input type="hidden" id="supplier-filter" value="{{ supplier_filter }}">
+                </div>
+            {% endif %}
+            {% if status_options %}
+                <div class="filter-item">
+                    <label for="show-inactive-switch">Inactive products</label>
+                    <div class="form-check form-switch inactive-switch-wrap">
+                        <input class="form-check-input" id="show-inactive-switch" type="checkbox" role="switch"{% if status_filter != 'active' %} checked{% endif %}>
+                        <label class="form-check-label inactive-switch-label" for="show-inactive-switch">Show inactive</label>
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+    <div class="card p-2 p-md-3 workspace-table-shell">
+    {% endif %}
         {% if object_list %}
             <div class="table-wrap table-responsive workspace-table-wrap">
                 <table class="table table-sm table-hover align-middle mb-0 table-mobile products-grid{% if list_title == 'Suppliers Products' or list_title == 'Supplier Products' %} products-mobile{% endif %}">
