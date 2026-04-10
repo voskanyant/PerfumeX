@@ -12,7 +12,7 @@
     <div id="supplier-bulk-root" class="{% if list_title == 'Suppliers Products' or list_title == 'Supplier Products' %}bulk-mode-off {% endif %}workspace-list{% if list_title == 'Suppliers Products' or list_title == 'Supplier Products' %} workspace-list-products{% endif %}">
     {% if list_title == 'Suppliers Products' or list_title == 'Supplier Products' %}
     <div class="products-desktop-shell">
-    <div class="card p-3 p-md-4 mb-3 workspace-hero workspace-hero-products">
+    <div class="card products-workspace-shell">
         <div class="products-command-top">
             <div class="products-heading-copy">
                 <span class="page-kicker">Live supplier index</span>
@@ -50,25 +50,26 @@
                 {% endif %}
             </div>
         </div>
-        <div class="products-summary-row d-none d-lg-grid" aria-label="Workspace summary">
-            <div class="products-summary-item">
-                <span class="products-summary-item__label">Offers</span>
-                <strong class="products-summary-item__value">{{ total_count }}</strong>
+        <div class="products-command-band">
+            <div class="products-command-context d-none d-lg-flex" aria-label="Workspace summary">
+                <div class="products-command-context__item">
+                    <span class="products-command-context__label">Offers</span>
+                    <strong class="products-command-context__value">{{ total_count }}</strong>
+                </div>
+                <div class="products-command-context__item">
+                    <span class="products-command-context__label">Currency</span>
+                    <strong class="products-command-context__value">{% if currency_filter %}{{ currency_filter }}{% else %}Original{% endif %}</strong>
+                </div>
+                <div class="products-command-context__item">
+                    <span class="products-command-context__label">Suppliers</span>
+                    <strong class="products-command-context__value">{% if supplier_filter_names %}{{ supplier_filter_names|length }} selected{% else %}All market{% endif %}</strong>
+                </div>
+                <div class="products-command-context__item">
+                    <span class="products-command-context__label">Status</span>
+                    <strong class="products-command-context__value">{{ status_filter|default:"all"|capfirst }}</strong>
+                </div>
             </div>
-            <div class="products-summary-item">
-                <span class="products-summary-item__label">Currency</span>
-                <strong class="products-summary-item__value">{% if currency_filter %}{{ currency_filter }}{% else %}Original{% endif %}</strong>
-            </div>
-            <div class="products-summary-item">
-                <span class="products-summary-item__label">Suppliers</span>
-                <strong class="products-summary-item__value">{% if supplier_filter_names %}{{ supplier_filter_names|length }} selected{% else %}All market{% endif %}</strong>
-            </div>
-            <div class="products-summary-item">
-                <span class="products-summary-item__label">Status</span>
-                <strong class="products-summary-item__value">{{ status_filter|default:"all"|capfirst }}</strong>
-            </div>
-        </div>
-        <div class="filters mt-3 workspace-filters filters-products">
+            <div class="filters workspace-filters filters-products">
             {% if list_title == 'Suppliers Products' or list_title == 'Supplier Products' %}
                 {% if show_search %}
                     <div class="filter-item search-full-width">
@@ -197,18 +198,25 @@
                     </div>
                 {% endif %}
             {% endif %}
-        </div>
-    </div>
-    <div class="card p-2 p-md-3 workspace-table-shell workspace-table-shell-products">
-        <div class="workspace-table-intro d-none d-lg-flex">
-            <div class="workspace-table-intro__copy">
-                <span class="workspace-table-kicker">Live offers</span>
-                <h2 class="workspace-table-title">Supplier price matrix</h2>
-            </div>
-            <div class="workspace-table-intro__meta">
-                <p class="workspace-table-note mb-0">Scan prices first, supplier second, last update third.</p>
             </div>
         </div>
+        <div class="products-sheet">
+            <div class="workspace-table-intro d-none d-lg-flex">
+                <div class="workspace-table-intro__copy">
+                    <span class="workspace-table-kicker">Market ledger</span>
+                    <h2 class="workspace-table-title">Supplier price sheet</h2>
+                    <p class="workspace-table-caption mb-0">A live ledger for scanning price, supplier, and freshness in one pass.</p>
+                </div>
+                <div class="workspace-table-intro__meta">
+                    <div class="products-sheet-facts">
+                        <span class="products-sheet-fact">Price first</span>
+                        <span class="products-sheet-fact">Supplier second</span>
+                        <span class="products-sheet-fact">Freshness third</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="workspace-table-shell workspace-table-shell-products">
     {% else %}
     <div class="card p-3 p-md-4 mb-3 workspace-hero">
         <div class="d-flex flex-wrap align-items-start justify-content-between gap-3 workspace-hero__head">
