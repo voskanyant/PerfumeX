@@ -78,15 +78,15 @@ a:hover {
 .app-body {
     flex: 1;
     display: flex;
-    gap: 22px;
+    gap: 18px;
     min-height: calc(100vh - 56px);
-    padding: 20px;
+    padding: 16px;
     position: relative;
 }
 
 main {
     flex: 1;
-    width: min(1480px, 100%);
+    width: min(1520px, 100%);
     padding: 0;
 }
 
@@ -99,44 +99,32 @@ main {
     z-index: 1;
 }
 
-.app-main::before {
-    content: "";
-    position: absolute;
-    inset: 0;
-    border: 1px solid rgba(255, 255, 255, 0.58);
-    border-radius: 34px;
-    pointer-events: none;
-    z-index: 0;
-}
-
 .sidebar {
-    width: 286px;
-    flex: 0 0 286px;
-    background: rgba(255, 255, 255, 0.82);
-    border: 1px solid rgba(255, 255, 255, 0.7);
-    box-shadow: var(--app-shadow-card);
-    backdrop-filter: blur(18px);
-    border-radius: 30px;
-    padding: 20px 16px 18px;
+    width: 248px;
+    flex: 0 0 248px;
+    background: #fbfaf7;
+    border: 1px solid rgba(29, 25, 18, 0.06);
+    box-shadow: 0 8px 24px rgba(19, 19, 17, 0.035);
+    border-radius: 24px;
+    padding: 18px 14px 16px;
     position: sticky;
-    top: 20px;
-    height: calc(100vh - 40px);
+    top: 16px;
+    height: calc(100vh - 32px);
 }
 
 .shell-brand {
     display: flex;
     align-items: center;
-    gap: 12px;
-    padding: 6px 8px 18px;
-    margin-bottom: 8px;
+    gap: 10px;
+    padding: 4px 8px 14px;
+    margin-bottom: 6px;
 }
 
 .shell-brand-mark {
-    width: 18px;
-    height: 42px;
+    width: 10px;
+    height: 30px;
     border-radius: 999px;
-    background: linear-gradient(180deg, #1f1f1c 0%, #808078 100%);
-    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.28);
+    background: #1f1f1c;
 }
 
 .shell-brand-copy {
@@ -144,27 +132,22 @@ main {
 }
 
 .shell-brand-title {
-    font-size: 1.22rem;
+    font-size: 1.1rem;
     font-weight: 800;
     letter-spacing: -0.04em;
     color: #171715;
 }
 
 .shell-brand-subtitle {
-    margin-top: 3px;
-    font-size: 0.68rem;
-    letter-spacing: 0.16em;
-    text-transform: uppercase;
-    color: #7d7c73;
-    font-weight: 700;
+    display: none;
 }
 
 .sidebar .nav-link,
 .offcanvas .nav-link {
-    color: #35352f;
+    color: #2f2f2b;
     font-weight: 600;
-    border-radius: 14px;
-    padding: 10px 12px;
+    border-radius: 12px;
+    padding: 9px 12px;
     margin-bottom: 2px;
 }
 
@@ -172,13 +155,13 @@ main {
 .sidebar .nav-link.active,
 .offcanvas .nav-link:hover,
 .offcanvas .nav-link.active {
-    background: #f3f1eb;
+    background: #f2efe8;
     color: #141412;
 }
 
 .nav-section-title {
-    margin: 16px 12px 8px;
-    font-size: 0.66rem;
+    margin: 14px 12px 6px;
+    font-size: 0.62rem;
     letter-spacing: 0.14em;
     text-transform: uppercase;
     color: #939187;
@@ -198,11 +181,11 @@ main {
 }
 
 .card {
-    border: 1px solid rgba(255, 255, 255, 0.76);
-    border-radius: var(--app-radius-lg);
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(251, 250, 247, 0.94) 100%);
-    box-shadow: var(--app-shadow-card);
-    padding: 24px;
+    border: 1px solid rgba(29, 25, 18, 0.06);
+    border-radius: 22px;
+    background: #fff;
+    box-shadow: 0 8px 24px rgba(19, 19, 17, 0.03);
+    padding: 20px;
 }
 
 .offcanvas,
