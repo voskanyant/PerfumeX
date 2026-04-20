@@ -2,23 +2,19 @@
 {% block body_data %}data-page="generic-form"{% endblock %}
 
 {% block content %}
-<div class="page-stack">
-    <section class="card form-shell">
-        <div class="workspace-header">
-            <div class="workspace-header-main">
-                <span class="page-kicker">Editor</span>
-                <h1 class="page-title">{{ object_name }}</h1>
-                <p class="page-subtitle">Update the record and save when you are ready.</p>
-            </div>
+    <div class="page-stack">
+        <div class="card form-shell">
+            <span class="page-kicker">Editor</span>
+            <h1 class="page-title">{{ object_name }}</h1>
+            <p class="page-subtitle">Update values and save changes to continue.</p>
+            <form method="post"{% if form.is_multipart %} enctype="multipart/form-data"{% endif %} class="mt-3">
+                {% csrf_token %}
+                {{ form.as_p }}
+                <div class="form-actions">
+                    <button class="button" type="submit">Save</button>
+                    <a class="button ghost" href="javascript:history.back()">Cancel</a>
+                </div>
+            </form>
         </div>
-        <form method="post"{% if form.is_multipart %} enctype="multipart/form-data"{% endif %} class="mt-3">
-            {% csrf_token %}
-            {{ form.as_p }}
-            <div class="form-actions">
-                <button class="button" type="submit">Save changes</button>
-                <a class="button ghost" href="javascript:history.back()">Cancel</a>
-            </div>
-        </form>
-    </section>
-</div>
+    </div>
 {% endblock %}

@@ -12,12 +12,11 @@
     <div id="supplier-bulk-root" class="{% if list_title == 'Suppliers Products' or list_title == 'Supplier Products' %}bulk-mode-off {% endif %}workspace-list{% if list_title == 'Suppliers Products' or list_title == 'Supplier Products' %} workspace-list-products{% endif %}">
     {% if list_title == 'Suppliers Products' or list_title == 'Supplier Products' %}
     <div class="products-desktop-shell">
-    <section class="products-workspace-shell">
+    <div class="card products-workspace-shell">
         <div class="products-command-top">
             <div class="products-heading-copy">
-                <span class="page-kicker">Market index</span>
                 <h1 class="page-title">{{ list_title }}</h1>
-                <p class="page-subtitle">Monitor supplier offers, scan price movement, and work from a single market ledger.</p>
+                <p class="page-subtitle">{{ total_count }} offers</p>
             </div>
             <div class="products-command-tools">
                 {% if supplier_filter_names %}
@@ -51,26 +50,6 @@
             </div>
         </div>
         <div class="products-command-band">
-            <div class="products-summary-line">
-                <span class="meta-token"><strong>{{ total_count }}</strong> offers</span>
-                {% if currency_filter %}
-                    <span class="meta-token"><strong>{{ currency_filter }}</strong> view currency</span>
-                {% else %}
-                    <span class="meta-token"><strong>Original</strong> source currency</span>
-                {% endif %}
-                {% if supplier_filter_names %}
-                    <span class="meta-token"><strong>{{ supplier_filter_names|length }}</strong> supplier{{ supplier_filter_names|length|pluralize }}</span>
-                {% else %}
-                    <span class="meta-token"><strong>All</strong> suppliers</span>
-                {% endif %}
-                {% if status_filter == 'active' %}
-                    <span class="meta-token"><strong>Active</strong> products only</span>
-                {% elif status_filter == 'inactive' %}
-                    <span class="meta-token"><strong>Inactive</strong> products only</span>
-                {% else %}
-                    <span class="meta-token"><strong>All</strong> statuses</span>
-                {% endif %}
-            </div>
             <div class="filters workspace-filters filters-products">
             {% if list_title == 'Suppliers Products' or list_title == 'Supplier Products' %}
                 {% if show_search %}
@@ -202,17 +181,8 @@
             {% endif %}
             </div>
         </div>
+        <div class="products-sheet"></div>
         <div class="workspace-table-shell workspace-table-shell-products">
-            <div class="workspace-table-intro">
-                <div>
-                    <div class="workspace-table-kicker">Live offers</div>
-                    <h2 class="workspace-table-title">Supplier price matrix</h2>
-                    <p class="workspace-table-caption">Price first, supplier second, audit details always one step away.</p>
-                </div>
-                <div class="workspace-table-intro__meta">
-                    Search, filters, sort order, and pagination all stay in the same operational flow.
-                </div>
-            </div>
     {% else %}
     <div class="card p-3 p-md-4 mb-3 workspace-hero">
         <div class="d-flex flex-wrap align-items-start justify-content-between gap-3 workspace-hero__head">
@@ -583,7 +553,7 @@
         {% else %}
             <p class="muted">No records yet.</p>
         {% endif %}
-    </section>
+    </div>
     </div>
     {% if show_search %}
         <script src="{% static 'prices/js/list-search.js' %}"></script>

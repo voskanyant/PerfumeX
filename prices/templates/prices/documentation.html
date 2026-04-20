@@ -1,71 +1,169 @@
-{% extends "prices/base.html" %}
+﻿{% extends "prices/base.html" %}
 
 {% block title %}Documentation{% endblock %}
 {% block body_data %}data-page="documentation"{% endblock %}
 
 {% block content %}
-<div class="docs-content">
-    <section class="section-panel">
-        <span class="page-kicker">Reference</span>
-        <h1 class="page-title">Technical documentation</h1>
-        <p class="page-subtitle">Operational notes for developers, operators, and automation flows inside PerfumeX Prices.</p>
-    </section>
-
-    <div class="workspace-grid two-col">
-        <section class="section-panel">
-            <h2 class="section-title mb-3">System overview</h2>
-            <ul class="mb-0">
-                <li>Framework: Django with server-rendered templates and JSON endpoints for live search.</li>
-                <li>App process: Gunicorn via <code>perfumex.service</code>.</li>
-                <li>Web server: Nginx reverse proxy.</li>
-                <li>Database: PostgreSQL in production, SQLite optionally used locally.</li>
-                <li>Email ingest: IMAP mailboxes with attachment parsing.</li>
-                <li>Scheduler: cron calling <code>python manage.py import_emails</code>.</li>
-            </ul>
-        </section>
-        <section class="section-panel">
-            <h2 class="section-title mb-3">Core model</h2>
-            <ul class="mb-0">
-                <li><code>Supplier</code>, <code>Mailbox</code>, <code>SupplierMailboxRule</code></li>
-                <li><code>ImportBatch</code>, <code>ImportFile</code>, <code>EmailImportRun</code></li>
-                <li><code>SupplierProduct</code>, <code>PriceSnapshot</code>, <code>ExchangeRate</code></li>
-                <li><code>ImportSettings</code>, <code>UserPreference</code></li>
-            </ul>
-        </section>
+    <div class="docs-content">
+    <div class="card p-3 p-md-4 mb-3">
+        <h1 class="page-title">Technical Documentation</h1>
+        <p class="page-subtitle mb-2">PerfumeX Prices knowledge base for developers, operators, and AI agents.</p>
+        <p class="mb-0 text-muted">This page documents current mechanics from the codebase (Django app), not only UI behavior.</p>
     </div>
 
-    <section class="section-panel">
-        <h2 class="section-title mb-3">Import pipeline</h2>
-        <div class="workspace-grid two-col">
-            <div>
-                <h3 class="section-title mb-2">Manual upload</h3>
-                <ul>
-                    <li>Upload creates an <code>ImportBatch</code> and <code>ImportFile</code>.</li>
-                    <li>Supplier mapping determines how the file is parsed.</li>
-                    <li>Successful processing writes current supplier prices and history snapshots.</li>
-                </ul>
-            </div>
-            <div>
-                <h3 class="section-title mb-2">Email import</h3>
-                <ul>
-                    <li>Recovers stale pending rows from interrupted runs.</li>
-                    <li>Applies interval rules unless forced.</li>
-                    <li>Synchronizes daily CBR rates when needed.</li>
-                    <li>Runs mailbox search and attachment dedupe by hash.</li>
-                </ul>
-            </div>
-        </div>
-    </section>
+    <div class="card p-3 p-md-4 mb-3">
+        <h2 class="h4 mb-3">1) System Overview</h2>
+        <ul class="mb-0">
+            <li>Framework: Django (server-rendered templates + JSON endpoints for live search).</li>
+            <li>App process: Gunicorn via <code>perfumex.service</code>.</li>
+            <li>Web server: Nginx reverse proxy.</li>
+            <li>Database: PostgreSQL (production), SQLite may be used locally.</li>
+            <li>Email ingest: IMAP mailboxes + attachment parsing pipeline.</li>
+            <li>Scheduler: cron calling <code>python manage.py import_emails</code> through runner script.</li>
+        </ul>
+    </div>
 
-    <section class="section-panel">
-        <h2 class="section-title mb-3">Useful commands</h2>
-        <pre><code>cd /opt/perfumex/PerfumeX
+    <div class="card p-3 p-md-4 mb-3">
+        <h2 class="h4 mb-3">2) Core Data Model</h2>
+        <ul class="mb-2">
+            <li><code>Supplier</code>: supplier identity, matching patterns, defaults, per-supplier diagnostics.</li>
+            <li><code>Mailbox</code>: IMAP credentials and host/port.</li>
+            <li><code>SupplierMailboxRule</code>: mailbox-specific matching override (from/subject/filename).</li>
+            <li><code>ImportBatch</code>: one email/manual import event for one supplier.</li>
+            <li><code>ImportFile</code>: each imported attachment, parse status, hash, errors.</li>
+            <li><code>SupplierFileMapping</code>: column mapping/profile per supplier + file kind.</li>
+            <li><code>SupplierProduct</code>: current supplier catalog row (price, activity, linkage).</li>
+            <li><code>PriceSnapshot</code>: historical point-in-time product price.</li>
+            <li><code>ExchangeRate</code>: currency rates by date and pair.</li>
+            <li><code>ImportSettings</code>: global import and scheduler settings.</li>
+            <li><code>EmailImportRun</code>: run telemetry (counts, status, detailed log).</li>
+            <li><code>UserPreference</code>: per-user UI settings (for example exclude terms).</li>
+        </ul>
+        <p class="mb-0 text-muted">Main relation path for traceability: <code>PriceSnapshot -> ImportBatch -> ImportFile</code>.</p>
+    </div>
+
+    <div class="card p-3 p-md-4 mb-3">
+        <h2 class="h4 mb-3">3) Import Pipelines</h2>
+
+        <h3 class="h6 mt-1">3.1 Manual Upload</h3>
+        <ul>
+            <li>Upload creates an <code>ImportBatch</code> + <code>ImportFile</code>.</li>
+            <li>File is parsed with active supplier mapping for selected file kind.</li>
+            <li>If parsing succeeds: file and batch become <code>processed</code>.</li>
+            <li>If parsing fails: file and batch become <code>failed</code> with error message.</li>
+            <li>Price snapshots are written during parse pipeline processing.</li>
+        </ul>
+
+        <h3 class="h6 mt-3">3.2 Email Import Command (<code>manage.py import_emails</code>)</h3>
+        <ol class="mb-2">
+            <li>Recovers stale <code>pending</code> rows from interrupted old runs (auto-fail + optional retry from stored file).</li>
+            <li>Checks import interval and enabled flag (unless <code>--force</code>).</li>
+            <li>Syncs daily CBR USD/RUB rate if needed.</li>
+            <li>Builds search window (<code>since_date</code>) from settings + last run rules.</li>
+            <li>Runs <code>run_import(...)</code> across active mailboxes.</li>
+            <li>Writes summary counters and updates <code>ImportSettings.last_run_at</code>.</li>
+        </ol>
+
+        <h3 class="h6 mt-3">3.3 Message and Attachment Matching</h3>
+        <ul>
+            <li>Search criteria can include <code>FROM</code>, <code>SUBJECT</code>, and date bounds.</li>
+            <li>For Gmail, importer can merge INBOX with All Mail folder for reliability.</li>
+            <li>Supplier matching priority: mailbox rule first, then supplier fallback patterns.</li>
+            <li>Attachment filename may be inferred from content-type when missing.</li>
+            <li>Blacklist terms skip files by filename (Import Settings).</li>
+            <li>Only supported price extensions are parsed: <code>.xls</code>, <code>.xlsx</code>, <code>.csv</code>.</li>
+        </ul>
+
+        <h3 class="h6 mt-3">3.4 Duplicate Detection</h3>
+        <ul class="mb-0">
+            <li>Content hash: SHA-256 of attachment payload.</li>
+            <li>Email import uses same-day dedupe mode: supplier + local day + hash.</li>
+            <li>Dedupe check is cross-mailbox for same supplier/day to prevent duplicates from multiple inboxes.</li>
+            <li>Both <code>pending</code> and <code>processed</code> are considered for same-day dedupe in one run.</li>
+        </ul>
+    </div>
+
+    <div class="card p-3 p-md-4 mb-3">
+        <h2 class="h4 mb-3">4) Scheduler and Operations</h2>
+        <ul>
+            <li>UI path: <strong>Settings -> Import Settings</strong>.</li>
+            <li><strong>Install scheduler</strong> writes runner script and cron entry with marker <code>PERFUMEX_IMPORT_CRON</code>.</li>
+            <li>Cron executes every 5 minutes, with <code>flock</code> lock and <code>timeout</code> guard.</li>
+            <li>Command itself respects configured interval (<code>interval_minutes</code>) and may skip if too recent.</li>
+            <li><strong>Run now</strong> triggers a background forced run from the web app process.</li>
+            <li><strong>Remove scheduler</strong> removes only marked cron line, keeps other cron entries untouched.</li>
+        </ul>
+
+        <p class="mb-1"><strong>Runner script location:</strong> <code>/opt/perfumex/run_import_emails.sh</code></p>
+        <p class="mb-0"><strong>Main runtime log:</strong> <code>/var/log/perfumex_email_import.log</code></p>
+    </div>
+
+    <div class="card p-3 p-md-4 mb-3">
+        <h2 class="h4 mb-3">5) Search and Product List Mechanics</h2>
+        <ul>
+            <li>Supplier Products page defaults: <strong>status=active</strong>, <strong>currency=USD</strong>.</li>
+            <li>Query tokenizer matches by product name and supplier name tokens.</li>
+            <li>Per-user exclude terms are stored in <code>UserPreference.supplier_exclude_terms</code>.</li>
+            <li>Server list pagination is 100 items per page.</li>
+            <li>Live search endpoint returns paginated results and preserves current filters.</li>
+            <li>Currency conversion for list display uses latest available rates.</li>
+        </ul>
+    </div>
+
+    <div class="card p-3 p-md-4 mb-3">
+        <h2 class="h4 mb-3">6) Product Detail, History, and Currencies</h2>
+        <ul>
+            <li>Detail page uses latest snapshot per local calendar day to build history series.</li>
+            <li>Chart supports views: <strong>original</strong>, <strong>USD</strong>, <strong>RUB</strong>.</li>
+            <li>Historical conversion uses rates for snapshot date (or nearest prior available date by service logic).</li>
+            <li>Table columns include original price and computed RUB/USD display values.</li>
+            <li>Each snapshot row links back to related import batch details for auditability.</li>
+        </ul>
+    </div>
+
+    <div class="card p-3 p-md-4 mb-3">
+        <h2 class="h4 mb-3">7) Import Log and Traceability</h2>
+        <ul>
+            <li>Import Log can be filtered by supplier/status and sorted by date/updated/supplier/status/mailbox.</li>
+            <li>Detail page shows received timestamp, updated timestamp, supplier, mailbox, message ID, and file list.</li>
+            <li>Manual upload/backfill rows may have mailbox/message ID unavailable.</li>
+            <li>Message ID is the best key for cross-checking a specific email in mailbox diagnostics.</li>
+        </ul>
+    </div>
+
+    <div class="card p-3 p-md-4 mb-3">
+        <h2 class="h4 mb-3">8) Failure Modes and Fast Debug Checklist</h2>
+        <ol class="mb-2">
+            <li>Confirm app DB context: engine and DB name loaded from <code>.env</code>.</li>
+            <li>Check migrations after deploy: schema mismatch causes <code>no such column/table</code>.</li>
+            <li>Run force import once manually and inspect summary counters.</li>
+            <li>Open import log details for failing batch and verify message ID and file status/error.</li>
+            <li>Verify supplier match patterns: sender/subject/filename and mailbox rules.</li>
+            <li>Verify cron installed and marker present in root crontab.</li>
+            <li>Check timeout/lock behavior in runner logs.</li>
+        </ol>
+
+        <p class="mb-1"><strong>Useful commands</strong></p>
+        <pre class="mb-0"><code>cd /opt/perfumex/PerfumeX
 source .venv/bin/activate
 set -a; source .env; set +a
 python manage.py migrate
 python manage.py import_emails --force
 tail -n 200 /var/log/perfumex_email_import.log
 crontab -l</code></pre>
-    </section>
-</div>
+    </div>
+
+    <div class="card p-3 p-md-4">
+        <h2 class="h4 mb-3">9) Development Rules for Safe Changes</h2>
+        <ul class="mb-0">
+            <li>Do not change import dedupe semantics without documenting migration impact on history.</li>
+            <li>Any search/list change must keep pagination and current filter state stable.</li>
+            <li>Any scheduler change must preserve lock + timeout to avoid overlapping runs.</li>
+            <li>Any currency conversion change must clearly separate latest-rate display vs historical-rate replay.</li>
+            <li>After UI changes, validate both desktop and mobile templates and run <code>python manage.py check</code>.</li>
+        </ul>
+    </div>
+    </div>
 {% endblock %}
+
+
