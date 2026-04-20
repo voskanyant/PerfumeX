@@ -1,4 +1,4 @@
-﻿{% extends "prices/base.html" %}
+{% extends "prices/base.html" %}
 {% load static tz %}
 
 {% block title %}Import Prices{% endblock %}
@@ -9,338 +9,256 @@
 {% endblock %}
 
 {% block content %}
-    <div class="page-stack import-workspace">
+<div class="page-stack import-workspace">
     {% include "prices/_import_tabs.html" %}
-    <div class="card mb-3 import-overview-hero">
-        <div class="d-flex flex-wrap align-items-start justify-content-between gap-3 import-overview-header">
-            <div>
-                <span class="page-kicker">Import control</span>
-                <h1 class="page-title">Import Prices</h1>
-                <p class="page-subtitle">Operational workspace for supplier sync, historical backfill, and rate repair.</p>
-            </div>
-            <div class="d-flex flex-wrap gap-2">
-                <a class="button secondary" href="{% url 'prices:import_settings' %}">Import settings</a>
-                <form action="{% url 'prices:supplier_reimport_all_prices' %}" method="post">
-                    {% csrf_token %}
-                    <button class="button secondary" type="submit">
-                        Reimport all prices
-                    </button>
-                </form>
-                <form action="{% url 'prices:supplier_import_email_all' %}" method="post">
-                    {% csrf_token %}
-                    <button class="button" type="submit" data-email-update-all{% if any_running %} disabled{% endif %}>
-                        Update all from email
-                    </button>
-                </form>
-            </div>
+
+    <section class="workspace-header">
+        <div class="workspace-header-main">
+            <span class="page-kicker">Import workspace</span>
+            <h1 class="page-title">Import Prices</h1>
+            <p class="page-subtitle">Run supplier sync, backfill history, repair conversion data, and inspect operational status from one surface.</p>
         </div>
-    </div>
-
-    <div class="import-control-grid">
-    <div class="card mb-3 import-control-panel">
-        <div>
-            <span class="page-kicker">History</span>
-            <h2 class="page-title">Bulk backfill</h2>
-            <p class="page-subtitle">Run history import for selected suppliers.</p>
+        <div class="workspace-actions">
+            <a class="button secondary" href="{% url 'prices:import_settings' %}">Import settings</a>
+            <form action="{% url 'prices:supplier_reimport_all_prices' %}" method="post">
+                {% csrf_token %}
+                <button class="button secondary" type="submit">Reimport all prices</button>
+            </form>
+            <form action="{% url 'prices:supplier_import_email_all' %}" method="post">
+                {% csrf_token %}
+                <button class="button" type="submit" data-email-update-all{% if any_running %} disabled{% endif %}>Update all from email</button>
+            </form>
         </div>
-        <form id="bulk-backfill-form" method="post" action="{% url 'prices:supplier_import_email_backfill_bulk' %}" class="mt-3">
-            {% csrf_token %}
-            <div class="row g-3 align-items-end">
-                <div class="col-12 col-md-4">
-                    <label for="bulk-backfill-start" class="form-label">Start date</label>
-                    <input id="bulk-backfill-start" name="start_date" type="date" required>
-                </div>
-                <div class="col-12 col-md-4">
-                    <label for="bulk-backfill-end" class="form-label">End date</label>
-                    <input id="bulk-backfill-end" name="end_date" type="date">
-                </div>
-                <div class="col-12 col-md-4">
-                    <button class="button w-100" type="submit">Run backfill for selected</button>
+    </section>
+
+    <section class="import-control-grid">
+        <article class="section-panel import-control-panel">
+            <div class="section-head">
+                <div>
+                    <span class="page-kicker">History</span>
+                    <h2 class="section-title">Bulk backfill</h2>
+                    <p class="section-subtitle mb-0">Import historical supplier files into the timeline for selected suppliers.</p>
                 </div>
             </div>
-            <div id="bulk-backfill-selected"></div>
-        </form>
-    </div>
+            <form id="bulk-backfill-form" method="post" action="{% url 'prices:supplier_import_email_backfill_bulk' %}">
+                {% csrf_token %}
+                <div class="row g-3 align-items-end">
+                    <div class="col-12 col-md-4">
+                        <label for="bulk-backfill-start" class="form-label">Start date</label>
+                        <input id="bulk-backfill-start" name="start_date" type="date" required>
+                    </div>
+                    <div class="col-12 col-md-4">
+                        <label for="bulk-backfill-end" class="form-label">End date</label>
+                        <input id="bulk-backfill-end" name="end_date" type="date">
+                    </div>
+                    <div class="col-12 col-md-4">
+                        <button class="button w-100" type="submit">Run backfill</button>
+                    </div>
+                </div>
+                <div id="bulk-backfill-selected"></div>
+            </form>
+        </article>
 
-    <div class="card mb-3 import-control-panel">
-        <div>
-            <span class="page-kicker">Repair</span>
-            <h2 class="page-title">Recalculate rates from imports</h2>
-            <p class="page-subtitle">Fill USD/RUB CBR rates for dates that exist in processed imports.</p>
-        </div>
-        <form id="bulk-rates-form" method="post" action="{% url 'prices:supplier_rates_recalculate' %}" class="mt-3">
-            {% csrf_token %}
-            <div class="row g-3 align-items-end">
-                <div class="col-12 col-md-4">
-                    <label for="bulk-rates-start" class="form-label">Start date (optional)</label>
-                    <input id="bulk-rates-start" name="start_date" type="date">
-                </div>
-                <div class="col-12 col-md-4">
-                    <label for="bulk-rates-end" class="form-label">End date (optional)</label>
-                    <input id="bulk-rates-end" name="end_date" type="date">
-                </div>
-                <div class="col-12 col-md-4">
-                    <button class="button secondary w-100" type="submit">Recalculate rates for selected</button>
+        <article class="section-panel import-control-panel">
+            <div class="section-head">
+                <div>
+                    <span class="page-kicker">Repair</span>
+                    <h2 class="section-title">Recalculate rates</h2>
+                    <p class="section-subtitle mb-0">Restore missing USD/RUB rates for processed imports over a selected period.</p>
                 </div>
             </div>
-            <div id="bulk-rates-selected"></div>
-        </form>
-    </div>
-    </div>
-    <script>
-        (function () {
-            document.querySelectorAll("[data-email-progress][data-progress-value]").forEach(function (bar) {
-                var initial = Number(bar.getAttribute("data-progress-value") || "");
-                if (!isNaN(initial)) {
-                    bar.style.width = initial + "%";
-                }
-            });
-            function updateAll() {
-                fetch("{% url 'prices:supplier_import_email_status_all' %}")
-                    .then(function (res) { return res.json(); })
-                    .then(function (data) {
-                        var runs = data.runs || {};
-                        var anyRunning = false;
-                        document.querySelectorAll("[data-supplier-id]").forEach(function (row) {
-                            var supplierId = row.getAttribute("data-supplier-id");
-                            var run = runs[supplierId];
-                            var statusEl = row.querySelector("[data-email-status]");
-                            var progressEl = row.querySelector("[data-email-progress]");
-                            var messageEl = row.querySelector("[data-email-message]");
-                            var logEl = row.querySelector("[data-email-log]");
-                            var updateBtn = row.querySelector("[data-email-update]");
-                            var cancelBtn = row.querySelector("[data-email-cancel]");
+            <form id="bulk-rates-form" method="post" action="{% url 'prices:supplier_rates_recalculate' %}">
+                {% csrf_token %}
+                <div class="row g-3 align-items-end">
+                    <div class="col-12 col-md-4">
+                        <label for="bulk-rates-start" class="form-label">Start date</label>
+                        <input id="bulk-rates-start" name="start_date" type="date">
+                    </div>
+                    <div class="col-12 col-md-4">
+                        <label for="bulk-rates-end" class="form-label">End date</label>
+                        <input id="bulk-rates-end" name="end_date" type="date">
+                    </div>
+                    <div class="col-12 col-md-4">
+                        <button class="button secondary w-100" type="submit">Recalculate</button>
+                    </div>
+                </div>
+                <div id="bulk-rates-selected"></div>
+            </form>
+        </article>
+    </section>
 
-                            if (!run) {
-                                if (statusEl) statusEl.textContent = "-";
-                                if (progressEl) progressEl.parentElement.style.display = "none";
-                                if (messageEl) messageEl.textContent = "";
-                                if (logEl) logEl.textContent = "";
-                                if (updateBtn) updateBtn.disabled = false;
-                                if (cancelBtn) cancelBtn.style.display = "none";
-                                row.setAttribute("data-email-running", "0");
-                                return;
-                            }
-
-                            if (statusEl) statusEl.textContent = run.status || "-";
-                            if (progressEl) {
-                                if (run.progress !== null && run.progress !== undefined) {
-                                    progressEl.style.width = run.progress + "%";
-                                    progressEl.parentElement.style.display = "";
-                                    progressEl.parentElement.nextElementSibling.textContent = run.progress + "%";
-                                } else {
-                                    progressEl.parentElement.style.display = "none";
-                                }
-                            }
-                            if (messageEl && run.last_message) {
-                                var fullMessage = String(run.last_message);
-                                messageEl.textContent = fullMessage.length > 180 ? (fullMessage.slice(0, 179) + "...") : fullMessage;
-                                messageEl.title = fullMessage;
-                            }
-                            if (logEl && run.detailed_log !== undefined) {
-                                logEl.textContent = run.detailed_log || "";
-                                if (run.detailed_log) {
-                                    logEl.classList.remove("d-none");
-                                }
-                            }
-                            if (run.status === "running") {
-                                anyRunning = true;
-                                if (updateBtn) updateBtn.disabled = true;
-                                if (cancelBtn) cancelBtn.style.display = "";
-                                row.setAttribute("data-email-running", "1");
-                            } else {
-                                if (updateBtn) updateBtn.disabled = false;
-                                if (cancelBtn) cancelBtn.style.display = "none";
-                                row.setAttribute("data-email-running", "0");
-                            }
-                        });
-                        var updateAllBtn = document.querySelector("[data-email-update-all]");
-                        if (updateAllBtn) updateAllBtn.disabled = anyRunning;
-                        if (!anyRunning && intervalId) {
-                            clearInterval(intervalId);
-                            intervalId = null;
-                        }
-                    });
-            }
-            var intervalId = setInterval(updateAll, 3000);
-            updateAll();
-        })();
-    </script>
-
-    <div class="card mb-3 import-board">
-        <div class="import-board__head">
+    <section class="section-panel import-board">
+        <div class="section-head import-board__head">
             <div>
                 <span class="page-kicker">Suppliers</span>
-                <h2 class="page-title">Supplier import board</h2>
-                <p class="page-subtitle">Per-supplier status, last import, and direct import actions.</p>
+                <h2 class="section-title">Supplier import board</h2>
+                <p class="section-subtitle mb-0">Status, latest run details, and immediate import actions per supplier.</p>
             </div>
         </div>
         {% if rows %}
             <div class="table-wrap table-responsive">
                 <table class="table table-sm table-hover align-middle mb-0 table-mobile supplier-import-table">
-                <thead>
-                    <tr>
-                        <th><input type="checkbox" id="supplier-select-all"></th>
-                        <th>Supplier</th>
-                        <th>Last import</th>
-                        <th>Email import</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for row in rows %}
-                        <tr data-supplier-id="{{ row.supplier.pk }}" data-email-running="{% if row.is_running %}1{% else %}0{% endif %}">
-                            <td class="import-col-select" data-label="Select"><input type="checkbox" class="supplier-select" value="{{ row.supplier.pk }}"></td>
-                            <td class="import-col-supplier" data-label="Supplier">{{ row.supplier.name }}</td>
-                            <td class="import-col-last" data-label="Last import">
-                                {% if row.latest_import %}
-                                    {{ row.latest_import.received_at|default:row.latest_import.created_at|timezone:"Europe/Moscow"|date:"d/m/Y H:i" }}
-                                {% else %}
-                                    -
-                                {% endif %}
-                            </td>
-                            <td class="import-col-email" data-label="Email import">
-                                {% if row.latest_run %}
-                                    <span data-email-status>{{ row.latest_run.status }}</span>
-                                    {% if row.latest_run.status == "running" %}
-                                        {% if row.latest_run_progress is not None %}
-                                            <div class="progress mt-2 progress-thin">
-                                                <div class="progress-bar" data-email-progress role="progressbar" data-progress-value="{{ row.latest_run_progress }}"></div>
-                                            </div>
-                                            <div class="muted small">{{ row.latest_run_progress }}%</div>
+                    <thead>
+                        <tr>
+                            <th><input type="checkbox" id="supplier-select-all"></th>
+                            <th>Supplier</th>
+                            <th>Last import</th>
+                            <th>Email import</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in rows %}
+                            <tr data-supplier-id="{{ row.supplier.pk }}" data-email-running="{% if row.is_running %}1{% else %}0{% endif %}">
+                                <td class="import-col-select" data-label="Select"><input type="checkbox" class="supplier-select" value="{{ row.supplier.pk }}"></td>
+                                <td class="import-col-supplier" data-label="Supplier">{{ row.supplier.name }}</td>
+                                <td class="import-col-last" data-label="Last import">
+                                    {% if row.latest_import %}
+                                        {{ row.latest_import.received_at|default:row.latest_import.created_at|timezone:"Europe/Moscow"|date:"d/m/Y H:i" }}
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
+                                <td class="import-col-email" data-label="Email import">
+                                    {% if row.latest_run %}
+                                        <span data-email-status>{{ row.latest_run.status }}</span>
+                                        {% if row.latest_run.status == "running" %}
+                                            {% if row.latest_run_progress is not None %}
+                                                <div class="progress mt-2 progress-thin"><div class="progress-bar" data-email-progress role="progressbar" data-progress-value="{{ row.latest_run_progress }}"></div></div>
+                                                <div class="muted small">{{ row.latest_run_progress }}%</div>
+                                            {% endif %}
+                                        {% else %}
+                                            <div class="muted small">{{ row.latest_run.processed_files }} files, {{ row.latest_run.errors }} errors</div>
+                                        {% endif %}
+                                        {% if row.latest_run.last_message %}
+                                            <div class="muted small" data-email-message title="{{ row.latest_run.last_message }}">{{ row.latest_run.last_message|truncatechars:180 }}</div>
+                                        {% endif %}
+                                        {% if row.latest_run.detailed_log %}
+                                            <details class="mt-1"><summary class="muted small">Detailed log</summary><pre class="small mt-1 mb-0 log-pre" data-email-log>{{ row.latest_run.detailed_log }}</pre></details>
+                                        {% else %}
+                                            <pre class="small mt-1 mb-0 d-none log-pre" data-email-log></pre>
                                         {% endif %}
                                     {% else %}
-                                        <div class="muted small">
-                                            {{ row.latest_run.processed_files }} files, {{ row.latest_run.errors }} errors
-                                        </div>
-                                    {% endif %}
-                                    {% if row.latest_run.last_message %}
-                                        <div class="muted small" data-email-message title="{{ row.latest_run.last_message }}">{{ row.latest_run.last_message|truncatechars:180 }}</div>
-                                    {% endif %}
-                                    {% if row.latest_run.detailed_log %}
-                                        <details class="mt-1">
-                                            <summary class="muted small">Detailed log</summary>
-                                            <pre class="small mt-1 mb-0 log-pre" data-email-log>{{ row.latest_run.detailed_log }}</pre>
-                                        </details>
-                                    {% else %}
+                                        <span data-email-status>-</span>
                                         <pre class="small mt-1 mb-0 d-none log-pre" data-email-log></pre>
                                     {% endif %}
-                                {% else %}
-                                    <span data-email-status>-</span>
-                                    <pre class="small mt-1 mb-0 d-none log-pre" data-email-log></pre>
-                                {% endif %}
-                            </td>
-                            <td class="actions import-col-actions" data-label="Actions">
-                                <div class="d-inline-flex flex-wrap gap-2">
-                                    <a class="button secondary icon" href="{% url 'prices:supplier_import' row.supplier.pk %}" title="Edit mapping" aria-label="Edit mapping">
-                                        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                                            <path d="M12 20h9"/>
-                                            <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/>
-                                        </svg>
-                                    </a>
-                                    <a class="button" href="{% url 'prices:supplier_import' row.supplier.pk %}">Quick upload</a>
-                                    <form action="{% url 'prices:supplier_import_email' row.supplier.pk %}" method="post">
-                                        {% csrf_token %}
-                                        <button class="button" type="submit" data-email-update{% if row.is_running %} disabled{% endif %}>Update from email</button>
-                                    </form>
-                                    <form action="{% url 'prices:supplier_import_email_cancel' row.supplier.pk %}" method="post" class="{% if not row.is_running %}is-hidden{% endif %}">
-                                        {% csrf_token %}
-                                        <button class="button secondary" type="submit" data-email-cancel>Cancel</button>
-                                    </form>
-                                </div>
-                            </td>
-                        </tr>
-                    {% endfor %}
-                </tbody>
+                                </td>
+                                <td class="actions import-col-actions" data-label="Actions">
+                                    <div class="d-inline-flex flex-wrap gap-2">
+                                        <a class="button secondary icon" href="{% url 'prices:supplier_import' row.supplier.pk %}" title="Edit mapping" aria-label="Edit mapping">
+                                            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
+                                        </a>
+                                        <a class="button secondary" href="{% url 'prices:supplier_import' row.supplier.pk %}">Quick upload</a>
+                                        <form action="{% url 'prices:supplier_import_email' row.supplier.pk %}" method="post">{% csrf_token %}<button class="button" type="submit" data-email-update{% if row.is_running %} disabled{% endif %}>Update from email</button></form>
+                                        <form action="{% url 'prices:supplier_import_email_cancel' row.supplier.pk %}" method="post" class="{% if not row.is_running %}is-hidden{% endif %}">{% csrf_token %}<button class="button secondary" type="submit" data-email-cancel>Cancel</button></form>
+                                    </div>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
                 </table>
             </div>
         {% else %}
-            <p class="muted">No suppliers yet.</p>
+            <div class="empty-state"><div class="empty-state-title">No suppliers yet</div><div class="empty-state-copy">Create suppliers first to access import status and run actions from this board.</div></div>
         {% endif %}
-    </div>
+    </section>
+</div>
+<script>
+    (function () {
+        document.querySelectorAll("[data-email-progress][data-progress-value]").forEach(function (bar) {
+            var initial = Number(bar.getAttribute("data-progress-value") || "");
+            if (!isNaN(initial)) { bar.style.width = initial + "%"; }
+        });
+        function updateAll() {
+            fetch("{% url 'prices:supplier_import_email_status_all' %}")
+                .then(function (res) { return res.json(); })
+                .then(function (data) {
+                    var runs = data.runs || {};
+                    var anyRunning = false;
+                    document.querySelectorAll("[data-supplier-id]").forEach(function (row) {
+                        var supplierId = row.getAttribute("data-supplier-id");
+                        var run = runs[supplierId];
+                        var statusEl = row.querySelector("[data-email-status]");
+                        var progressEl = row.querySelector("[data-email-progress]");
+                        var messageEl = row.querySelector("[data-email-message]");
+                        var logEl = row.querySelector("[data-email-log]");
+                        var updateBtn = row.querySelector("[data-email-update]");
+                        var cancelBtn = row.querySelector("[data-email-cancel]");
+                        if (!run) {
+                            if (statusEl) statusEl.textContent = "-";
+                            if (progressEl) progressEl.parentElement.style.display = "none";
+                            if (messageEl) messageEl.textContent = "";
+                            if (logEl) logEl.textContent = "";
+                            if (updateBtn) updateBtn.disabled = false;
+                            if (cancelBtn) cancelBtn.style.display = "none";
+                            row.setAttribute("data-email-running", "0");
+                            return;
+                        }
+                        if (statusEl) statusEl.textContent = run.status || "-";
+                        if (progressEl) {
+                            if (run.progress !== null && run.progress !== undefined) {
+                                progressEl.style.width = run.progress + "%";
+                                progressEl.parentElement.style.display = "";
+                                progressEl.parentElement.nextElementSibling.textContent = run.progress + "%";
+                            } else {
+                                progressEl.parentElement.style.display = "none";
+                            }
+                        }
+                        if (messageEl && run.last_message) {
+                            var fullMessage = String(run.last_message);
+                            messageEl.textContent = fullMessage.length > 180 ? (fullMessage.slice(0, 179) + "...") : fullMessage;
+                            messageEl.title = fullMessage;
+                        }
+                        if (logEl && run.detailed_log !== undefined) {
+                            logEl.textContent = run.detailed_log || "";
+                            if (run.detailed_log) { logEl.classList.remove("d-none"); }
+                        }
+                        if (run.status === "running") {
+                            anyRunning = true;
+                            if (updateBtn) updateBtn.disabled = true;
+                            if (cancelBtn) cancelBtn.style.display = "";
+                            row.setAttribute("data-email-running", "1");
+                        } else {
+                            if (updateBtn) updateBtn.disabled = false;
+                            if (cancelBtn) cancelBtn.style.display = "none";
+                            row.setAttribute("data-email-running", "0");
+                        }
+                    });
+                    var updateAllBtn = document.querySelector("[data-email-update-all]");
+                    if (updateAllBtn) updateAllBtn.disabled = anyRunning;
+                    if (!anyRunning && intervalId) { clearInterval(intervalId); intervalId = null; }
+                });
+        }
+        var intervalId = setInterval(updateAll, 3000);
+        updateAll();
+    })();
+</script>
 
-    <div class="card import-log-surface">
-        <div class="d-flex flex-wrap align-items-start justify-content-between gap-3">
-            <div>
-                <span class="page-kicker">Audit</span>
-                <h2 class="page-title">Import Log</h2>
-                <p class="page-subtitle">Trace each file and batch status.</p>
-            </div>
+<div class="section-panel import-log-surface mt-0">
+    <div class="section-head">
+        <div>
+            <span class="page-kicker">Audit</span>
+            <h2 class="section-title">Import log</h2>
+            <p class="section-subtitle mb-0">Filter historical import events and trace imported files back to their source batches.</p>
         </div>
-        <form method="get" class="row g-3 align-items-end mt-2">
-            <input type="hidden" name="log_sort" value="{{ log_sort }}">
-            <input type="hidden" name="log_dir" value="{{ log_dir }}">
-            <div class="col-12 col-md-4">
-                <label for="import-supplier-filter" class="form-label">Supplier</label>
-                <select id="import-supplier-filter" name="supplier">
-                    <option value="">All</option>
-                    {% for supplier in supplier_options %}
-                        <option value="{{ supplier.id }}"{% if supplier_filter == supplier.id|stringformat:"s" %} selected{% endif %}>
-                            {{ supplier.name }}
-                        </option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="col-12 col-md-4">
-                <label for="import-status-filter" class="form-label">Status</label>
-                <select id="import-status-filter" name="status">
-                    <option value="">All</option>
-                    {% for value, label in status_options %}
-                        <option value="{{ value }}"{% if status_filter == value %} selected{% endif %}>{{ label }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="col-12 col-md-4">
-                <button class="button secondary w-100" type="submit">Filter</button>
-            </div>
-        </form>
-        {% if import_batches %}
-            <form method="post" action="{% url 'prices:import_delete_bulk' %}" class="mt-3">
-                {% csrf_token %}
-                <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
-                    <button class="button danger" type="submit">
-                        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                            <path d="M3 6h18"/>
-                            <path d="M8 6V4h8v2"/>
-                            <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
-                            <path d="M10 11v6"/>
-                            <path d="M14 11v6"/>
-                        </svg>
-                        Delete selected
-                    </button>
-                </div>
-                <div class="table-wrap table-responsive">
-                    <table class="table table-sm table-hover align-middle mb-0 table-mobile">
+    </div>
+    <form method="get" class="row g-3 align-items-end mb-3">
+        <input type="hidden" name="log_sort" value="{{ log_sort }}">
+        <input type="hidden" name="log_dir" value="{{ log_dir }}">
+        <div class="col-12 col-md-4"><label for="import-supplier-filter" class="form-label">Supplier</label><select id="import-supplier-filter" name="supplier"><option value="">All</option>{% for supplier in supplier_options %}<option value="{{ supplier.id }}"{% if supplier_filter == supplier.id|stringformat:"s" %} selected{% endif %}>{{ supplier.name }}</option>{% endfor %}</select></div>
+        <div class="col-12 col-md-4"><label for="import-status-filter" class="form-label">Status</label><select id="import-status-filter" name="status"><option value="">All</option>{% for value, label in status_options %}<option value="{{ value }}"{% if status_filter == value %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
+        <div class="col-12 col-md-4"><button class="button secondary w-100" type="submit">Filter log</button></div>
+    </form>
+    {% if import_batches %}
+        <form method="post" action="{% url 'prices:import_delete_bulk' %}">
+            {% csrf_token %}
+            <div class="d-flex flex-wrap align-items-center gap-2 mb-3"><button class="button danger" type="submit">Delete selected</button></div>
+            <div class="table-wrap table-responsive">
+                <table class="table table-sm table-hover align-middle mb-0 table-mobile">
                     <thead>
                         <tr>
                             <th><input type="checkbox" id="import-select-all"></th>
-                            <th>
-                                <a href="?log_sort=date&log_dir={% if log_sort == 'date' and log_dir == 'desc' %}asc{% else %}desc{% endif %}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}">
-                                    Date{% if log_sort == 'date' %}{% if log_dir == 'asc' %} ▲{% else %} ▼{% endif %}{% endif %}
-                                </a>
-                            </th>
-                            <th>
-                                <a href="?log_sort=updated&log_dir={% if log_sort == 'updated' and log_dir == 'desc' %}asc{% else %}desc{% endif %}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}">
-                                    Updated at{% if log_sort == 'updated' %}{% if log_dir == 'asc' %} ▲{% else %} ▼{% endif %}{% endif %}
-                                </a>
-                            </th>
-                            <th>
-                                <a href="?log_sort=supplier&log_dir={% if log_sort == 'supplier' and log_dir == 'desc' %}asc{% else %}desc{% endif %}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}">
-                                    Supplier{% if log_sort == 'supplier' %}{% if log_dir == 'asc' %} ▲{% else %} ▼{% endif %}{% endif %}
-                                </a>
-                            </th>
-                            <th>
-                                <a href="?log_sort=status&log_dir={% if log_sort == 'status' and log_dir == 'desc' %}asc{% else %}desc{% endif %}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}">
-                                    Status{% if log_sort == 'status' %}{% if log_dir == 'asc' %} ▲{% else %} ▼{% endif %}{% endif %}
-                                </a>
-                            </th>
-                            <th>
-                                <a href="?log_sort=mailbox&log_dir={% if log_sort == 'mailbox' and log_dir == 'desc' %}asc{% else %}desc{% endif %}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}">
-                                    Mailbox{% if log_sort == 'mailbox' %}{% if log_dir == 'asc' %} ▲{% else %} ▼{% endif %}{% endif %}
-                                </a>
-                            </th>
-                            <th>Files</th>
-                            <th>Actions</th>
+                            <th>Date</th><th>Updated</th><th>Supplier</th><th>Status</th><th>Mailbox</th><th>Files</th><th>Actions</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -348,7 +266,7 @@
                             <tr class="{{ batch.row_class }}">
                                 <td data-label="Select"><input type="checkbox" name="import_ids" value="{{ batch.pk }}"></td>
                                 <td data-label="Date">{{ batch.received_at|default:batch.created_at|timezone:"Europe/Moscow"|date:"d/m/Y H:i" }}</td>
-                                <td data-label="Updated at">{{ batch.updated_at|default:batch.created_at|timezone:"Europe/Moscow"|date:"d/m/Y H:i" }}</td>
+                                <td data-label="Updated">{{ batch.updated_at|default:batch.created_at|timezone:"Europe/Moscow"|date:"d/m/Y H:i" }}</td>
                                 <td data-label="Supplier">{{ batch.supplier.name }}</td>
                                 <td data-label="Status">{{ batch.display_status }}</td>
                                 <td data-label="Mailbox">{{ batch.mailbox|default:"-" }}</td>
@@ -356,162 +274,61 @@
                                     {% with files=batch.importfile_set.all %}
                                         {% if files %}
                                             {% with first=files|first %}
-                                                <div class="files-summary">
-                                                    {{ first.file_kind }}: {{ first.filename|truncatechars:40 }} ({{ first.status }})
-                                                    {% if first.error_message %}
-                                                        - {{ first.error_message|truncatechars:80 }}
-                                                    {% endif %}
-                                                    {% if files|length > 1 %}
-                                                        <span class="muted">(+{{ files|length|add:"-1" }} more)</span>
-                                                    {% endif %}
-                                                </div>
+                                                <div class="files-summary">{{ first.file_kind }}: {{ first.filename|truncatechars:40 }} ({{ first.status }}){% if first.error_message %} - {{ first.error_message|truncatechars:80 }}{% endif %}{% if files|length > 1 %}<span class="muted"> (+{{ files|length|add:"-1" }} more)</span>{% endif %}</div>
                                                 {% if files|length > 1 or first.error_message %}
-                                                    <details class="files-details">
-                                                        <summary>Show details</summary>
-                                                        <div class="files-details-list">
-                                                            {% for file in files %}
-                                                                <div>
-                                                                    {{ file.file_kind }}: {{ file.filename }} ({{ file.status }})
-                                                                    {% if file.error_message %}
-                                                                        - {{ file.error_message }}
-                                                                    {% endif %}
-                                                                </div>
-                                                            {% endfor %}
-                                                        </div>
-                                                    </details>
+                                                    <details class="files-details"><summary>Show details</summary><div class="files-details-list">{% for file in files %}<div>{{ file.file_kind }}: {{ file.filename }} ({{ file.status }}){% if file.error_message %} - {{ file.error_message }}{% endif %}</div>{% endfor %}</div></details>
                                                 {% endif %}
                                             {% endwith %}
                                         {% else %}
-                                            {% if batch.error_message %}
-                                                <div class="files-summary">{{ batch.error_message|truncatechars:120 }}</div>
-                                                <details class="files-details">
-                                                    <summary>Show details</summary>
-                                                    <div class="files-details-list">
-                                                        <div>{{ batch.error_message }}</div>
-                                                    </div>
-                                                </details>
-                                            {% else %}
-                                                -
-                                            {% endif %}
+                                            {% if batch.error_message %}<div class="files-summary">{{ batch.error_message|truncatechars:120 }}</div><details class="files-details"><summary>Show details</summary><div class="files-details-list"><div>{{ batch.error_message }}</div></div></details>{% else %}-{% endif %}
                                         {% endif %}
                                     {% endwith %}
                                 </td>
                                 <td class="actions" data-label="Actions">
-                                    <details class="actions-menu-desktop">
-                                        <summary aria-label="More actions">...</summary>
-                                        <div class="actions-menu-pop d-flex flex-column gap-2">
-                                            <a class="button secondary" href="{% url 'prices:import_detail' batch.pk %}?next={{ request.get_full_path|urlencode }}">
-                                                Details
-                                            </a>
-                                            <button class="button danger" type="submit" formaction="{% url 'prices:import_delete' batch.pk %}" formmethod="post">
-                                                Delete
-                                            </button>
-                                        </div>
-                                    </details>
+                                    <details class="actions-menu-desktop"><summary aria-label="More actions">...</summary><div class="actions-menu-pop d-flex flex-column gap-2"><a class="button secondary" href="{% url 'prices:import_detail' batch.pk %}?next={{ request.get_full_path|urlencode }}">Details</a><button class="button danger" type="submit" formaction="{% url 'prices:import_delete' batch.pk %}" formmethod="post">Delete</button></div></details>
                                 </td>
                             </tr>
                         {% endfor %}
                     </tbody>
-                    </table>
-                </div>
-                {% if import_log_page and import_log_page.paginator.num_pages > 1 %}
-                    <nav class="mt-3" aria-label="Import log pagination">
-                        <ul class="pagination flex-wrap mb-0">
-                            {% if import_log_page.has_previous %}
-                                <li class="page-item">
-                                    <a class="page-link" href="?log_page={{ import_log_page.previous_page_number }}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}&log_sort={{ log_sort }}&log_dir={{ log_dir }}">Previous</a>
-                                </li>
-                            {% endif %}
-                            {% for page_num in import_log_page.paginator.page_range %}
-                                {% if page_num == import_log_page.number %}
-                                    <li class="page-item active"><span class="page-link">{{ page_num }}</span></li>
-                                {% elif page_num > import_log_page.number|add:-3 and page_num < import_log_page.number|add:3 %}
-                                    <li class="page-item">
-                                        <a class="page-link" href="?log_page={{ page_num }}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}&log_sort={{ log_sort }}&log_dir={{ log_dir }}">{{ page_num }}</a>
-                                    </li>
-                                {% endif %}
-                            {% endfor %}
-                            {% if import_log_page.has_next %}
-                                <li class="page-item">
-                                    <a class="page-link" href="?log_page={{ import_log_page.next_page_number }}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}&log_sort={{ log_sort }}&log_dir={{ log_dir }}">Next</a>
-                                </li>
-                            {% endif %}
-                        </ul>
-                        <div class="muted mt-2">Page {{ import_log_page.number }} of {{ import_log_page.paginator.num_pages }}</div>
-                    </nav>
-                {% endif %}
-            </form>
-        {% else %}
-            <p class="muted mt-3">No imports yet.</p>
-        {% endif %}
-    </div>
-    </div>
+                </table>
+            </div>
+            {% if import_log_page and import_log_page.paginator.num_pages > 1 %}
+                <nav class="mt-3" aria-label="Import log pagination"><ul class="pagination flex-wrap mb-0">{% if import_log_page.has_previous %}<li class="page-item"><a class="page-link" href="?log_page={{ import_log_page.previous_page_number }}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}&log_sort={{ log_sort }}&log_dir={{ log_dir }}">Previous</a></li>{% endif %}{% for page_num in import_log_page.paginator.page_range %}{% if page_num == import_log_page.number %}<li class="page-item active"><span class="page-link">{{ page_num }}</span></li>{% elif page_num > import_log_page.number|add:-3 and page_num < import_log_page.number|add:3 %}<li class="page-item"><a class="page-link" href="?log_page={{ page_num }}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}&log_sort={{ log_sort }}&log_dir={{ log_dir }}">{{ page_num }}</a></li>{% endif %}{% endfor %}{% if import_log_page.has_next %}<li class="page-item"><a class="page-link" href="?log_page={{ import_log_page.next_page_number }}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}&log_sort={{ log_sort }}&log_dir={{ log_dir }}">Next</a></li>{% endif %}</ul><div class="muted mt-2">Page {{ import_log_page.number }} of {{ import_log_page.paginator.num_pages }}</div></nav>
+            {% endif %}
+        </form>
+    {% else %}
+        <div class="empty-state"><div class="empty-state-title">No import history yet</div><div class="empty-state-copy">Once imports run, this log will show status, file details, and direct links back to each batch.</div></div>
+    {% endif %}
+</div>
 {% endblock %}
 {% block extra_scripts %}
-    <script>
-        (function () {
-            var supplierSelectAll = document.getElementById("supplier-select-all");
-            var supplierBoxes = Array.from(document.querySelectorAll(".supplier-select"));
-            var bulkForm = document.getElementById("bulk-backfill-form");
-            var bulkSelected = document.getElementById("bulk-backfill-selected");
-            var bulkRatesForm = document.getElementById("bulk-rates-form");
-            var bulkRatesSelected = document.getElementById("bulk-rates-selected");
-
-            function syncBulkHidden() {
-                if (!bulkSelected) return;
-                bulkSelected.innerHTML = "";
+<script>
+    (function () {
+        var supplierSelectAll = document.getElementById("supplier-select-all");
+        var supplierBoxes = Array.from(document.querySelectorAll(".supplier-select"));
+        var bulkForm = document.getElementById("bulk-backfill-form");
+        var bulkSelected = document.getElementById("bulk-backfill-selected");
+        var bulkRatesForm = document.getElementById("bulk-rates-form");
+        var bulkRatesSelected = document.getElementById("bulk-rates-selected");
+        function syncBulkHidden() {
+            if (!bulkSelected) return;
+            bulkSelected.innerHTML = "";
+            if (bulkRatesSelected) bulkRatesSelected.innerHTML = "";
+            supplierBoxes.filter(function (box) { return box.checked; }).forEach(function (box) {
+                var input = document.createElement("input");
+                input.type = "hidden"; input.name = "supplier_ids"; input.value = box.value; bulkSelected.appendChild(input);
                 if (bulkRatesSelected) {
-                    bulkRatesSelected.innerHTML = "";
+                    var input2 = document.createElement("input");
+                    input2.type = "hidden"; input2.name = "supplier_ids"; input2.value = box.value; bulkRatesSelected.appendChild(input2);
                 }
-                supplierBoxes.filter(function (box) { return box.checked; }).forEach(function (box) {
-                    var input = document.createElement("input");
-                    input.type = "hidden";
-                    input.name = "supplier_ids";
-                    input.value = box.value;
-                    bulkSelected.appendChild(input);
-                    if (bulkRatesSelected) {
-                        var input2 = document.createElement("input");
-                        input2.type = "hidden";
-                        input2.name = "supplier_ids";
-                        input2.value = box.value;
-                        bulkRatesSelected.appendChild(input2);
-                    }
-                });
-            }
-
-            if (supplierSelectAll) {
-                supplierSelectAll.addEventListener("change", function () {
-                    var checked = supplierSelectAll.checked;
-                    supplierBoxes.forEach(function (box) { box.checked = checked; });
-                    syncBulkHidden();
-                });
-            }
-            supplierBoxes.forEach(function (box) {
-                box.addEventListener("change", function () {
-                    syncBulkHidden();
-                });
             });
-            if (bulkForm) {
-                bulkForm.addEventListener("submit", function () {
-                    syncBulkHidden();
-                });
-            }
-            if (bulkRatesForm) {
-                bulkRatesForm.addEventListener("submit", function () {
-                    syncBulkHidden();
-                });
-            }
-
-            var importSelectAll = document.getElementById("import-select-all");
-            if (importSelectAll) {
-                importSelectAll.addEventListener("change", function () {
-                    var checked = importSelectAll.checked;
-                    document.querySelectorAll("input[name='import_ids']").forEach(function (box) {
-                        box.checked = checked;
-                    });
-                });
-            }
-        })();
-    </script>
+        }
+        if (supplierSelectAll) supplierSelectAll.addEventListener("change", function () { var checked = supplierSelectAll.checked; supplierBoxes.forEach(function (box) { box.checked = checked; }); syncBulkHidden(); });
+        supplierBoxes.forEach(function (box) { box.addEventListener("change", syncBulkHidden); });
+        if (bulkForm) bulkForm.addEventListener("submit", syncBulkHidden);
+        if (bulkRatesForm) bulkRatesForm.addEventListener("submit", syncBulkHidden);
+        var importSelectAll = document.getElementById("import-select-all");
+        if (importSelectAll) importSelectAll.addEventListener("change", function () { var checked = importSelectAll.checked; document.querySelectorAll("input[name='import_ids']").forEach(function (box) { box.checked = checked; }); });
+    })();
+</script>
 {% endblock %}
-

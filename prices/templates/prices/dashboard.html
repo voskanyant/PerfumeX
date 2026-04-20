@@ -4,45 +4,71 @@
 {% block body_data %}data-page="dashboard"{% endblock %}
 
 {% block content %}
-    <div class="page-stack">
-        <div class="card">
-            <div class="page-hero">
-                <div>
-                    <span class="page-kicker">Control center</span>
-                    <h1 class="page-title">Dashboard</h1>
-                    <p class="page-subtitle">Bootstrap-based admin shell for imports, suppliers, and catalog operations.</p>
-                </div>
-                <div class="page-actions">
-                    <a class="button" href="{% url 'prices:supplier_overview' %}">Open imports</a>
-                    <a class="button secondary" href="{% url 'prices:product_list' %}">Open supplier prices</a>
-                </div>
+<div class="page-stack">
+    <section class="workspace-header">
+        <div class="workspace-header-main">
+            <span class="page-kicker">Overview</span>
+            <h1 class="page-title">Dashboard</h1>
+            <p class="page-subtitle">A single operational surface for supplier imports, catalog maintenance, and price management.</p>
+        </div>
+        <div class="workspace-actions">
+            <a class="button" href="{% url 'prices:supplier_overview' %}">Open imports</a>
+            <a class="button secondary" href="{% url 'prices:product_list' %}">Open supplier prices</a>
+        </div>
+    </section>
+
+    <section class="workspace-grid three-up">
+        <article class="metric-card">
+            <div class="metric-label">Imports</div>
+            <div class="metric-value">Import Prices</div>
+            <div class="metric-copy">Monitor supplier email sync, run backfills, and repair conversion history.</div>
+            <div class="mt-3"><a class="button secondary" href="{% url 'prices:supplier_overview' %}">Open import center</a></div>
+        </article>
+        <article class="metric-card">
+            <div class="metric-label">Suppliers</div>
+            <div class="metric-value">Supplier directory</div>
+            <div class="metric-copy">Maintain supplier identities, rules, mappings, and import settings.</div>
+            <div class="mt-3"><a class="button secondary" href="{% url 'prices:supplier_list' %}">Manage suppliers</a></div>
+        </article>
+        <article class="metric-card">
+            <div class="metric-label">Catalog</div>
+            <div class="metric-value">Products</div>
+            <div class="metric-copy">Audit market offers, internal products, and the linking layer between them.</div>
+            <div class="mt-3 d-flex flex-wrap gap-2">
+                <a class="button secondary" href="{% url 'prices:our_product_list' %}">Our products</a>
+                <a class="button secondary" href="{% url 'prices:product_linking' %}">Product linking</a>
+            </div>
+        </article>
+    </section>
+
+    <section class="section-panel">
+        <div class="section-head">
+            <div>
+                <span class="page-kicker">Shortcuts</span>
+                <h2 class="section-title">Common operations</h2>
+                <p class="section-subtitle mb-0">Jump directly into the surfaces used most often by operators.</p>
             </div>
         </div>
-        <div class="row row-cols-1 row-cols-lg-3 g-3">
-            <div class="col">
-                <div class="card h-100 kpi-link-card">
-                    <span class="page-kicker">Supply</span>
-                    <h5 class="kpi-link-title">Import Prices</h5>
-                    <p class="kpi-link-text mb-0">Check supplier status, email sync health, and historical backfill tools.</p>
-                    <a class="button" href="{% url 'prices:supplier_overview' %}">Open Import Center</a>
-                </div>
+        <div class="workspace-grid three-up">
+            <div class="form-card">
+                <div class="metric-label">Data</div>
+                <div class="section-title mt-2">Suppliers Products</div>
+                <p class="section-subtitle">Search live offers, inspect prices, and work with supplier filters.</p>
+                <a class="button secondary mt-3" href="{% url 'prices:product_list' %}">Open</a>
             </div>
-            <div class="col">
-                <div class="card h-100 kpi-link-card">
-                    <span class="page-kicker">Directory</span>
-                    <h5 class="kpi-link-title">Suppliers</h5>
-                    <p class="kpi-link-text mb-0">Manage supplier mappings, identifiers, email sources, and import rules.</p>
-                    <a class="button secondary" href="{% url 'prices:supplier_list' %}">Manage Suppliers</a>
-                </div>
+            <div class="form-card">
+                <div class="metric-label">Settings</div>
+                <div class="section-title mt-2">Currencies</div>
+                <p class="section-subtitle">Adjust manual rates and sync CBR-based currency values.</p>
+                <a class="button secondary mt-3" href="{% url 'prices:currency_rates' %}">Open</a>
             </div>
-            <div class="col">
-                <div class="card h-100 kpi-link-card">
-                    <span class="page-kicker">Catalog</span>
-                    <h5 class="kpi-link-title">Our Products</h5>
-                    <p class="kpi-link-text mb-0">Review internal catalog items, linked supplier offers, and price coverage.</p>
-                    <a class="button secondary" href="{% url 'prices:our_product_list' %}">View Our Products</a>
-                </div>
+            <div class="form-card">
+                <div class="metric-label">Reference</div>
+                <div class="section-title mt-2">Documentation</div>
+                <p class="section-subtitle">Review operating rules, model relations, and import pipeline notes.</p>
+                <a class="button secondary mt-3" href="{% url 'prices:documentation' %}">Open</a>
             </div>
         </div>
-    </div>
+    </section>
+</div>
 {% endblock %}
