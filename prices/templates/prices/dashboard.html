@@ -5,43 +5,36 @@
 
 {% block content %}
     <div class="page-stack">
-        <div class="card">
-            <div class="page-hero">
-                <div>
-                    <span class="page-kicker">Control center</span>
-                    <h1 class="page-title">Dashboard</h1>
-                    <p class="page-subtitle">Bootstrap-based admin shell for imports, suppliers, and catalog operations.</p>
-                </div>
-                <div class="page-actions">
-                    <a class="button" href="{% url 'prices:supplier_overview' %}">Open imports</a>
-                    <a class="button secondary" href="{% url 'prices:product_list' %}">Open supplier prices</a>
-                </div>
+        <div class="page-header">
+            <div>
+                <span class="page-kicker">Overview</span>
+                <h1 class="page-title">Admin workspace</h1>
+                <div class="page-meta">Manage imports, supplier data, catalog cleanup, and system configuration.</div>
+            </div>
+            <div>
+                <a class="button secondary" href="{% url 'prices:supplier_overview' %}">Import Prices</a>
+                <a class="button" href="{% url 'prices:product_list' %}">Suppliers Products</a>
             </div>
         </div>
-        <div class="row row-cols-1 row-cols-lg-3 g-3">
-            <div class="col">
-                <div class="card h-100 kpi-link-card">
-                    <span class="page-kicker">Supply</span>
-                    <h5 class="kpi-link-title">Import Prices</h5>
-                    <p class="kpi-link-text mb-0">Check supplier status, email sync health, and historical backfill tools.</p>
-                    <a class="button" href="{% url 'prices:supplier_overview' %}">Open Import Center</a>
-                </div>
+
+        <div class="cards-grid">
+            <div class="card kpi-link-card">
+                <span class="card-label">Supplies</span>
+                <h2 class="card-title">Import control</h2>
+                <p class="card-desc">Review supplier sync status, run historical backfill, and repair rates from processed imports.</p>
+                <a class="button" href="{% url 'prices:supplier_overview' %}">Open Import Prices</a>
             </div>
-            <div class="col">
-                <div class="card h-100 kpi-link-card">
-                    <span class="page-kicker">Directory</span>
-                    <h5 class="kpi-link-title">Suppliers</h5>
-                    <p class="kpi-link-text mb-0">Manage supplier mappings, identifiers, email sources, and import rules.</p>
-                    <a class="button secondary" href="{% url 'prices:supplier_list' %}">Manage Suppliers</a>
-                </div>
+            <div class="card kpi-link-card">
+                <span class="card-label">Directory</span>
+                <h2 class="card-title">Suppliers</h2>
+                <p class="card-desc">Edit supplier configuration, mailboxes, mappings, and import rules without leaving the admin shell.</p>
+                <a class="button secondary" href="{% url 'prices:supplier_list' %}">Manage suppliers</a>
             </div>
-            <div class="col">
-                <div class="card h-100 kpi-link-card">
-                    <span class="page-kicker">Catalog</span>
-                    <h5 class="kpi-link-title">Our Products</h5>
-                    <p class="kpi-link-text mb-0">Review internal catalog items, linked supplier offers, and price coverage.</p>
-                    <a class="button secondary" href="{% url 'prices:our_product_list' %}">View Our Products</a>
-                </div>
+            <div class="card kpi-link-card">
+                <span class="card-label">Warehouse</span>
+                <h2 class="card-title">Our Products</h2>
+                <p class="card-desc">Inspect internal catalog coverage, linked supplier offers, and pricing relationships.</p>
+                <a class="button secondary" href="{% url 'prices:our_product_list' %}">View catalog</a>
             </div>
         </div>
     </div>

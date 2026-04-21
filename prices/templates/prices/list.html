@@ -1,4 +1,4 @@
-﻿{% extends "prices/base.html" %}
+{% extends "prices/base.html" %}
 {% load static prices_extras %}
 
 {% block title %}{{ list_title }}{% endblock %}
@@ -9,66 +9,172 @@
 {% endblock %}
 
 {% block content %}
-    <div id="supplier-bulk-root" class="{% if list_title == 'Suppliers Products' or list_title == 'Supplier Products' %}bulk-mode-off {% endif %}workspace-list{% if list_title == 'Suppliers Products' or list_title == 'Supplier Products' %} workspace-list-products{% endif %}">
+    <div id="supplier-bulk-root" class="{% if list_title == 'Suppliers Products' or list_title == 'Supplier Products' %}bulk-mode-off products-page{% else %}generic-list-page{% endif %}">
     {% if list_title == 'Suppliers Products' or list_title == 'Supplier Products' %}
-    <div class="products-desktop-shell">
-    <div class="card products-workspace-shell">
-        <div class="products-command-top">
-            <div class="products-heading-copy">
+        <div class="products-page-header">
+            <div>
                 <h1 class="page-title">{{ list_title }}</h1>
-                <p class="page-subtitle">{{ total_count }} offers</p>
+                <div class="page-meta">{{ total_count }} offers</div>
             </div>
-            <div class="products-command-tools">
-                {% if supplier_filter_names %}
-                    <div class="active-supplier-chip" title="Supplier filter is active">
-                        <span>{{ supplier_filter_names|length }} supplier{{ supplier_filter_names|length|pluralize }} selected</span>
-                        <button type="button" id="clear-supplier-filter-btn" aria-label="Clear supplier filter">&times;</button>
-                    </div>
-                {% endif %}
+            <div class="products-page-actions">
                 {% if show_bulk_delete %}
-                    <button class="button secondary bulk-gear-btn" type="button" id="bulk-mode-toggle" title="Bulk tools" aria-label="Bulk tools">
+                    <button class="button secondary" type="button" id="bulk-mode-toggle" title="Bulk tools" aria-label="Bulk tools">
                         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                             <circle cx="12" cy="12" r="3"></circle>
                             <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33h0A1.65 1.65 0 0 0 10 3.09V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h0a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v0A1.65 1.65 0 0 0 20.91 10H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
                         </svg>
+                        Tools
                     </button>
-                    <div class="bulk-actions-inline gap-2 align-items-center" id="bulk-actions-inline">
+                    <div class="bulk-actions-inline" id="bulk-actions-inline">
                         <button class="button secondary" type="button" id="bulk-change-btn">Bulk change</button>
-                        <button class="button danger" type="button" id="bulk-delete-btn">
-                            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                                <path d="M3 6h18"/>
-                                <path d="M8 6V4h8v2"/>
-                                <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
-                                <path d="M10 11v6"/>
-                                <path d="M14 11v6"/>
-                            </svg>
-                            Delete selected
-                        </button>
+                        <button class="button danger" type="button" id="bulk-delete-btn">Delete selected</button>
                         <button class="button ghost" type="button" id="bulk-mode-cancel">Cancel</button>
                     </div>
                 {% endif %}
             </div>
         </div>
-        <div class="products-command-band">
-            <div class="filters workspace-filters filters-products">
-            {% if list_title == 'Suppliers Products' or list_title == 'Supplier Products' %}
-                {% if show_search %}
-                    <div class="filter-item search-full-width">
-                        <label for="live-search" class="visually-hidden">Search</label>
-                        <div class="search-inline-row">
-                            <div class="search-input-wrap">
-                                <input id="live-search" type="text" value="{{ current_q|default:'' }}" placeholder="Search perfume or SKU..." data-sort="{{ current_sort|default:'current_price' }}" data-dir="{{ current_dir|default:'asc' }}"{% if link_detail %} data-detail-base="{{ detail_base_url|default:'' }}"{% endif %} data-search-url="{{ search_url|default:'' }}"{% if show_bulk_delete %} data-bulk="1"{% endif %}{% if update_url_name %} data-edit-pattern="{% url update_url_name 0 %}"{% endif %}{% if delete_url_name %} data-delete-pattern="{% url delete_url_name 0 %}"{% endif %}>
-                                <button id="clear-search-btn" class="search-clear-text{% if not current_q %} is-hidden{% endif %}" type="button" aria-label="Clear search" title="Clear search">&times;</button>
+
+        <div class="search-wrap filters-products">
+            {% if show_search %}
+                <div class="search-strip">
+                    <label for="live-search" class="visually-hidden">Search</label>
+                    <div class="search-inline-row">
+                        <div class="search-input-wrap search-wrap-inner">
+                            <svg class="search-icon" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="7" cy="7" r="5"/><path d="M11 11l3 3"/></svg>
+                            <input id="live-search" type="text" value="{{ current_q|default:'' }}" placeholder="Search perfume or SKU..." data-sort="{{ current_sort|default:'current_price' }}" data-dir="{{ current_dir|default:'asc' }}"{% if link_detail %} data-detail-base="{{ detail_base_url|default:'' }}"{% endif %} data-search-url="{{ search_url|default:'' }}"{% if show_bulk_delete %} data-bulk="1"{% endif %}{% if update_url_name %} data-edit-pattern="{% url update_url_name 0 %}"{% endif %}{% if delete_url_name %} data-delete-pattern="{% url delete_url_name 0 %}"{% endif %}>
+                            <button id="clear-search-btn" class="search-clear-text{% if not current_q %} is-hidden{% endif %}" type="button" aria-label="Clear search" title="Clear search">&times;</button>
+                        </div>
+                        <button class="button secondary icon filter-icon-btn" type="button" data-bs-toggle="offcanvas" data-bs-target="#product-filters-sidebar" aria-controls="product-filters-sidebar" title="Filters" aria-label="Filters">
+                            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="products-filter-summary">
+                        <span id="search-count" class="muted search-count"></span>
+                        {% if supplier_filter_names %}
+                            <div class="active-supplier-chip" title="Supplier filter is active">
+                                <span>{{ supplier_filter_names|length }} supplier{{ supplier_filter_names|length|pluralize }} selected</span>
+                                <button type="button" id="clear-supplier-filter-btn" aria-label="Clear supplier filter">&times;</button>
                             </div>
+                        {% endif %}
+                    </div>
+                </div>
+            {% endif %}
+
+            <div class="offcanvas offcanvas-end product-filters-offcanvas" tabindex="-1" id="product-filters-sidebar" aria-labelledby="product-filters-sidebar-label">
+                <div class="offcanvas-header">
+                    <h5 class="offcanvas-title" id="product-filters-sidebar-label">Filters</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+                </div>
+                <div class="offcanvas-body">
+                    <div class="extra-filters-grid">
+                        {% if show_currency_filter %}
+                            <div class="filter-item">
+                                <label for="currency-filter">Currency</label>
+                                <select id="currency-filter">
+                                    <option value="">Original</option>
+                                    {% for code in currency_options %}
+                                        <option value="{{ code }}"{% if currency_filter == code %} selected{% endif %}>{{ code }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        {% endif %}
+                        {% if supplier_options %}
+                            <div class="filter-item">
+                                <label for="supplier-filter-search">Supplier</label>
+                                <div class="supplier-filter-wrap">
+                                    <input id="supplier-filter-search" type="text" placeholder="Type supplier and press Enter..." autocomplete="off">
+                                    <div id="supplier-suggest" class="supplier-suggest"></div>
+                                </div>
+                                <div id="supplier-selected-chips" class="supplier-selected-chips"></div>
+                                <select id="supplier-option-source" hidden>
+                                    {% for supplier in supplier_options %}
+                                        <option value="{{ supplier.id }}">{{ supplier.name }}</option>
+                                    {% endfor %}
+                                </select>
+                                <input type="hidden" id="supplier-filter" value="{{ supplier_filter }}">
+                            </div>
+                        {% endif %}
+                        {% if status_options %}
+                            <div class="filter-item">
+                                <label for="show-inactive-switch">Inactive products</label>
+                                <div class="form-check form-switch inactive-switch-wrap">
+                                    <input class="form-check-input" id="show-inactive-switch" type="checkbox" role="switch"{% if status_filter != 'active' %} checked{% endif %}>
+                                    <label class="form-check-label inactive-switch-label" for="show-inactive-switch">Show inactive</label>
+                                </div>
+                            </div>
+                        {% endif %}
+                        <div class="filter-item">
+                            <label for="price-min-filter">Min price</label>
+                            <input id="price-min-filter" type="text" value="{{ price_min|default:'' }}" placeholder="e.g. 100">
+                        </div>
+                        <div class="filter-item">
+                            <label for="price-max-filter">Max price</label>
+                            <input id="price-max-filter" type="text" value="{{ price_max|default:'' }}" placeholder="e.g. 500">
+                            <button class="button secondary w-100 mt-2" type="button" id="price-apply-btn">Apply price</button>
+                        </div>
+                        <div class="filter-item">
+                            <label for="exclude-filter">Exclude words in name</label>
+                            <textarea id="exclude-filter" rows="3" placeholder="One word per line (or comma-separated)">{{ exclude_terms|default:'' }}</textarea>
+                            <button class="button secondary w-100 mt-2" type="button" id="exclude-apply-btn">Apply exclusion</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    {% else %}
+        <div class="generic-list-header">
+            <div>
+                <h1 class="page-title">{{ list_title }}</h1>
+                <div class="page-meta">Total {{ total_count }}</div>
+            </div>
+            <div class="generic-list-actions">
+                {% if show_create and create_url_name %}
+                    <a class="button" href="{% url create_url_name %}">Add new</a>
+                {% endif %}
+                {% if show_cleanup %}
+                    <form action="{% url 'prices:product_cleanup' %}" method="post">
+                        {% csrf_token %}
+                        <button class="button secondary" type="submit">Delete orphan products</button>
+                    </form>
+                    <form action="{% url 'prices:product_cleanup_inactive' %}" method="post">
+                        {% csrf_token %}
+                        {% if supplier_filter %}
+                            <input type="hidden" name="supplier" value="{{ supplier_filter }}">
+                        {% endif %}
+                        <button class="button secondary" type="submit">Delete inactive products</button>
+                    </form>
+                {% endif %}
+                {% if show_bulk_delete %}
+                    <button class="button danger" type="button" id="bulk-delete-btn">Delete selected</button>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="search-wrap generic-list-surface">
+            {% if show_search %}
+                <div class="search-strip">
+                    <label for="live-search" class="visually-hidden">Search</label>
+                    <div class="search-inline-row">
+                        <div class="search-input-wrap search-wrap-inner">
+                            <svg class="search-icon" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="7" cy="7" r="5"/><path d="M11 11l3 3"/></svg>
+                            <input id="live-search" type="text" value="{{ current_q|default:'' }}" placeholder="Search perfume or SKU..." data-sort="{{ current_sort|default:'current_price' }}" data-dir="{{ current_dir|default:'asc' }}"{% if link_detail %} data-detail-base="{{ detail_base_url|default:'' }}" data-server-search="1"{% endif %} data-search-url="{{ search_url|default:'' }}"{% if show_bulk_delete %} data-bulk="1"{% endif %}{% if update_url_name %} data-edit-pattern="{% url update_url_name 0 %}"{% endif %}{% if delete_url_name %} data-delete-pattern="{% url delete_url_name 0 %}"{% endif %}>
+                            <button id="clear-search-btn" class="search-clear-text{% if not current_q %} is-hidden{% endif %}" type="button" aria-label="Clear search" title="Clear search">&times;</button>
+                        </div>
+                        {% if show_currency_filter or supplier_options or status_options %}
                             <button class="button secondary icon filter-icon-btn" type="button" data-bs-toggle="offcanvas" data-bs-target="#product-filters-sidebar" aria-controls="product-filters-sidebar" title="Filters" aria-label="Filters">
                                 <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                                     <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
                                 </svg>
                             </button>
-                        </div>
-                        <span id="search-count" class="muted search-count"></span>
+                        {% endif %}
                     </div>
-                {% endif %}
+                    <span id="search-count" class="muted search-count"></span>
+                </div>
+            {% endif %}
+
+            {% if show_currency_filter or supplier_options or status_options %}
                 <div class="offcanvas offcanvas-end product-filters-offcanvas" tabindex="-1" id="product-filters-sidebar" aria-labelledby="product-filters-sidebar-label">
                     <div class="offcanvas-header">
                         <h5 class="offcanvas-title" id="product-filters-sidebar-label">Filters</h5>
@@ -112,187 +218,13 @@
                                     </div>
                                 </div>
                             {% endif %}
-                            <div class="filter-item">
-                                <label for="price-min-filter">Min price</label>
-                                <input id="price-min-filter" type="text" value="{{ price_min|default:'' }}" placeholder="e.g. 100">
-                            </div>
-                            <div class="filter-item">
-                                <label for="price-max-filter">Max price</label>
-                                <input id="price-max-filter" type="text" value="{{ price_max|default:'' }}" placeholder="e.g. 500">
-                                <button class="button secondary w-100 mt-2" type="button" id="price-apply-btn">Apply price</button>
-                            </div>
-                            <div class="filter-item">
-                                <label for="exclude-filter">Exclude words in name</label>
-                                <textarea id="exclude-filter" rows="3" placeholder="One word per line (or comma-separated)">{{ exclude_terms|default:'' }}</textarea>
-                                <button class="button secondary w-100 mt-2" type="button" id="exclude-apply-btn">Apply exclusion</button>
-                            </div>
                         </div>
-                    </div>
-                </div>
-            {% else %}
-                {% if show_search %}
-                    <div class="filter-item">
-                        <label for="live-search">Search</label>
-                        <div class="search-inline-row">
-                            <div class="search-input-wrap">
-                                <input id="live-search" type="text" value="{{ current_q|default:'' }}" placeholder="Search perfume or SKU..." data-sort="{{ current_sort|default:'current_price' }}" data-dir="{{ current_dir|default:'asc' }}"{% if link_detail %} data-detail-base="{{ detail_base_url|default:'' }}" data-server-search="1"{% endif %} data-search-url="{{ search_url|default:'' }}"{% if show_bulk_delete %} data-bulk="1"{% endif %}{% if update_url_name %} data-edit-pattern="{% url update_url_name 0 %}"{% endif %}{% if delete_url_name %} data-delete-pattern="{% url delete_url_name 0 %}"{% endif %}>
-                                <button id="clear-search-btn" class="search-clear-text{% if not current_q %} is-hidden{% endif %}" type="button" aria-label="Clear search" title="Clear search">&times;</button>
-                            </div>
-                        </div>
-                        <span id="search-count" class="muted search-count"></span>
-                    </div>
-                {% endif %}
-                {% if show_currency_filter %}
-                    <div class="filter-item">
-                        <label for="currency-filter">Currency</label>
-                        <select id="currency-filter">
-                            <option value="">Original</option>
-                            {% for code in currency_options %}
-                                <option value="{{ code }}"{% if currency_filter == code %} selected{% endif %}>{{ code }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                {% endif %}
-                {% if supplier_options %}
-                    <div class="filter-item">
-                        <label for="supplier-filter-search">Supplier</label>
-                        <div class="supplier-filter-wrap">
-                            <input id="supplier-filter-search" type="text" placeholder="Type supplier and press Enter..." autocomplete="off">
-                            <div id="supplier-suggest" class="supplier-suggest"></div>
-                        </div>
-                        <div id="supplier-selected-chips" class="supplier-selected-chips"></div>
-                        <select id="supplier-option-source" hidden>
-                            {% for supplier in supplier_options %}
-                                <option value="{{ supplier.id }}">{{ supplier.name }}</option>
-                            {% endfor %}
-                        </select>
-                        <input type="hidden" id="supplier-filter" value="{{ supplier_filter }}">
-                    </div>
-                {% endif %}
-                {% if status_options %}
-                    <div class="filter-item">
-                        <label for="show-inactive-switch">Inactive products</label>
-                        <div class="form-check form-switch inactive-switch-wrap">
-                            <input class="form-check-input" id="show-inactive-switch" type="checkbox" role="switch"{% if status_filter != 'active' %} checked{% endif %}>
-                            <label class="form-check-label inactive-switch-label" for="show-inactive-switch">Show inactive</label>
-                        </div>
-                    </div>
-                {% endif %}
-            {% endif %}
-            </div>
-        </div>
-        <div class="products-sheet"></div>
-        <div class="workspace-table-shell workspace-table-shell-products">
-    {% else %}
-    <div class="card p-3 p-md-4 mb-3 workspace-hero">
-        <div class="d-flex flex-wrap align-items-start justify-content-between gap-3 workspace-hero__head">
-            <div>
-                <span class="page-kicker">Operations</span>
-                <h1 class="page-title">{{ list_title }}</h1>
-                <p class="page-subtitle">Total: {{ total_count }}</p>
-            </div>
-            <div class="d-flex flex-wrap gap-2 workspace-hero__actions">
-                {% if show_create and create_url_name %}
-                    <a class="button" href="{% url create_url_name %}">Add new</a>
-                {% endif %}
-                {% if show_cleanup %}
-                    <form action="{% url 'prices:product_cleanup' %}" method="post">
-                        {% csrf_token %}
-                        <button class="button secondary" type="submit">
-                            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                                <path d="M3 6h18"/>
-                                <path d="M8 6V4h8v2"/>
-                                <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
-                                <path d="M10 11v6"/>
-                                <path d="M14 11v6"/>
-                            </svg>
-                            Delete orphan products
-                        </button>
-                    </form>
-                    <form action="{% url 'prices:product_cleanup_inactive' %}" method="post">
-                        {% csrf_token %}
-                        {% if supplier_filter %}
-                            <input type="hidden" name="supplier" value="{{ supplier_filter }}">
-                        {% endif %}
-                        <button class="button secondary" type="submit">
-                            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                                <path d="M3 6h18"/>
-                                <path d="M8 6V4h8v2"/>
-                                <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
-                                <path d="M10 11v6"/>
-                                <path d="M14 11v6"/>
-                            </svg>
-                            Delete inactive products
-                        </button>
-                    </form>
-                {% endif %}
-                {% if show_bulk_delete %}
-                    <button class="button danger" type="button" id="bulk-delete-btn">
-                        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                            <path d="M3 6h18"/>
-                            <path d="M8 6V4h8v2"/>
-                            <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
-                            <path d="M10 11v6"/>
-                            <path d="M14 11v6"/>
-                        </svg>
-                        Delete selected
-                    </button>
-                {% endif %}
-            </div>
-        </div>
-        <div class="filters mt-3 workspace-filters">
-            {% if show_search %}
-                <div class="filter-item">
-                    <label for="live-search">Search</label>
-                    <div class="search-inline-row">
-                        <div class="search-input-wrap">
-                            <input id="live-search" type="text" value="{{ current_q|default:'' }}" placeholder="Search perfume or SKU..." data-sort="{{ current_sort|default:'current_price' }}" data-dir="{{ current_dir|default:'asc' }}"{% if link_detail %} data-detail-base="{{ detail_base_url|default:'' }}" data-server-search="1"{% endif %} data-search-url="{{ search_url|default:'' }}"{% if show_bulk_delete %} data-bulk="1"{% endif %}{% if update_url_name %} data-edit-pattern="{% url update_url_name 0 %}"{% endif %}{% if delete_url_name %} data-delete-pattern="{% url delete_url_name 0 %}"{% endif %}>
-                            <button id="clear-search-btn" class="search-clear-text{% if not current_q %} is-hidden{% endif %}" type="button" aria-label="Clear search" title="Clear search">&times;</button>
-                        </div>
-                    </div>
-                    <span id="search-count" class="muted search-count"></span>
-                </div>
-            {% endif %}
-            {% if show_currency_filter %}
-                <div class="filter-item">
-                    <label for="currency-filter">Currency</label>
-                    <select id="currency-filter">
-                        <option value="">Original</option>
-                        {% for code in currency_options %}
-                            <option value="{{ code }}"{% if currency_filter == code %} selected{% endif %}>{{ code }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-            {% endif %}
-            {% if supplier_options %}
-                <div class="filter-item">
-                    <label for="supplier-filter-search">Supplier</label>
-                    <div class="supplier-filter-wrap">
-                        <input id="supplier-filter-search" type="text" placeholder="Type supplier and press Enter..." autocomplete="off">
-                        <div id="supplier-suggest" class="supplier-suggest"></div>
-                    </div>
-                    <div id="supplier-selected-chips" class="supplier-selected-chips"></div>
-                    <select id="supplier-option-source" hidden>
-                        {% for supplier in supplier_options %}
-                            <option value="{{ supplier.id }}">{{ supplier.name }}</option>
-                        {% endfor %}
-                    </select>
-                    <input type="hidden" id="supplier-filter" value="{{ supplier_filter }}">
-                </div>
-            {% endif %}
-            {% if status_options %}
-                <div class="filter-item">
-                    <label for="show-inactive-switch">Inactive products</label>
-                    <div class="form-check form-switch inactive-switch-wrap">
-                        <input class="form-check-input" id="show-inactive-switch" type="checkbox" role="switch"{% if status_filter != 'active' %} checked{% endif %}>
-                        <label class="form-check-label inactive-switch-label" for="show-inactive-switch">Show inactive</label>
                     </div>
                 </div>
             {% endif %}
         </div>
-    </div>
-    <div class="card p-2 p-md-3 workspace-table-shell">
     {% endif %}
+
         {% if object_list %}
             <div class="table-wrap table-responsive workspace-table-wrap">
                 <table class="table table-sm table-hover align-middle mb-0 table-mobile products-grid{% if list_title == 'Suppliers Products' or list_title == 'Supplier Products' %} products-mobile{% endif %}">
@@ -525,7 +457,7 @@
                 </form>
             {% endif %}
             {% if is_paginated %}
-                <nav class="mt-3 workspace-pagination" aria-label="Pagination" id="pagination-controls">
+                <nav class="workspace-pagination" aria-label="Pagination" id="pagination-controls">
                     <ul class="pagination flex-wrap mb-0">
                         {% if page_obj.has_previous %}
                             <li class="page-item">
@@ -551,7 +483,7 @@
                 </nav>
             {% endif %}
         {% else %}
-            <p class="muted">No records yet.</p>
+            <div class="products-empty-state">No records yet.</div>
         {% endif %}
     </div>
     </div>
@@ -634,8 +566,3 @@
         </script>
     {% endif %}
 {% endblock %}
-
-
-
-
-

@@ -36,7 +36,7 @@
     var searchInputWrap = input.closest(".search-input-wrap");
     var stickyPlaceholder = null;
     var isPinnedSearch = false;
-    var tableCard = document.querySelector(".card.p-2.p-md-3");
+    var tableCard = document.querySelector(".products-table-shell, .generic-table-shell, .workspace-table-wrap, .card.p-2.p-md-3");
     var useServerSearch = input.getAttribute("data-server-search") === "1";
 
     function getStickyTopOffset() {
