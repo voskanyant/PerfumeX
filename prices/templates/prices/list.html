@@ -23,7 +23,6 @@
                             <circle cx="12" cy="12" r="3"></circle>
                             <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33h0A1.65 1.65 0 0 0 10 3.09V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h0a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v0A1.65 1.65 0 0 0 20.91 10H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
                         </svg>
-                        Tools
                     </button>
                     <div class="bulk-actions-inline" id="bulk-actions-inline">
                         <button class="button secondary" type="button" id="bulk-change-btn">Bulk change</button>
@@ -306,30 +305,6 @@
                                                         </div>
                                                     {% endif %}
                                                 </div>
-                                                <div class="mobile-card-panel">
-                                                    <div class="mobile-card-price">
-                                                        <div class="cell-price-main">{{ obj.display_price|floatformat:2 }} {{ obj.display_currency|currency_symbol }}</div>
-                                                    </div>
-                                                    <div class="mobile-card-supplier-wrap">
-                                                        {% if obj.supplier_id %}
-                                                            <a href="?supplier={{ obj.supplier_id }}" class="supplier-filter-link cell-supplier" data-supplier-id="{{ obj.supplier_id }}">{{ obj.supplier.name|default:obj.supplier }}</a>
-                                                        {% else %}
-                                                            <span class="cell-supplier">{{ obj.supplier|default:"-" }}</span>
-                                                        {% endif %}
-                                                    </div>
-                                                    <div class="mobile-meta-row">
-                                                        {% if obj.price_delta_direction %}
-                                                            <span class="price-delta-badge {{ obj.price_delta_direction }}">
-                                                                {% if obj.price_delta_direction == "down" %}&darr;{% else %}&uarr;{% endif %}
-                                                                {{ obj.price_delta_value|floatformat:2 }} {{ obj.display_currency|currency_symbol }}
-                                                                {% if obj.price_delta_percent %}({{ obj.price_delta_percent|floatformat:2 }}%){% endif %}
-                                                            </span>
-                                                        {% else %}
-                                                            <span class="price-delta-badge neutral">- No change</span>
-                                                        {% endif %}
-                                                    </div>
-                                                    <span class="cell-imported mobile-card-date {{ obj.last_imported_at|imported_age_class }}" title="{{ obj.last_imported_at|date:'d/m/Y H:i' }}" data-full-datetime="{{ obj.last_imported_at|date:'d/m/Y H:i' }}">{{ obj.last_imported_at|relative_time_short }}</span>
-                                                </div>
                                             </td>
                                         {% else %}
                                             <td data-field="{{ field }}" data-label="Price">
@@ -348,30 +323,6 @@
                                                             <span class="price-delta-badge neutral">- No change</span>
                                                         </div>
                                                     {% endif %}
-                                                </div>
-                                                <div class="mobile-card-panel">
-                                                    <div class="mobile-card-price">
-                                                        <div class="cell-price-main">{{ obj.current_price|default_if_none:"-" }}{% if obj.current_price|default_if_none:'' != '' %} {{ obj.currency|currency_symbol }}{% endif %}</div>
-                                                    </div>
-                                                    <div class="mobile-card-supplier-wrap">
-                                                        {% if obj.supplier_id %}
-                                                            <a href="?supplier={{ obj.supplier_id }}" class="supplier-filter-link cell-supplier" data-supplier-id="{{ obj.supplier_id }}">{{ obj.supplier.name|default:obj.supplier }}</a>
-                                                        {% else %}
-                                                            <span class="cell-supplier">{{ obj.supplier|default:"-" }}</span>
-                                                        {% endif %}
-                                                    </div>
-                                                    <div class="mobile-meta-row">
-                                                        {% if obj.price_delta_direction %}
-                                                            <span class="price-delta-badge {{ obj.price_delta_direction }}">
-                                                                {% if obj.price_delta_direction == "down" %}&darr;{% else %}&uarr;{% endif %}
-                                                                {{ obj.price_delta_value|floatformat:2 }} {{ obj.display_currency|currency_symbol }}
-                                                                {% if obj.price_delta_percent %}({{ obj.price_delta_percent|floatformat:2 }}%){% endif %}
-                                                            </span>
-                                                        {% else %}
-                                                            <span class="price-delta-badge neutral">- No change</span>
-                                                        {% endif %}
-                                                    </div>
-                                                    <span class="cell-imported mobile-card-date {{ obj.last_imported_at|imported_age_class }}" title="{{ obj.last_imported_at|date:'d/m/Y H:i' }}" data-full-datetime="{{ obj.last_imported_at|date:'d/m/Y H:i' }}">{{ obj.last_imported_at|relative_time_short }}</span>
                                                 </div>
                                             </td>
                                         {% endif %}
@@ -458,6 +409,7 @@
             {% endif %}
             {% if is_paginated %}
                 <nav class="workspace-pagination" aria-label="Pagination" id="pagination-controls">
+                    <div class="pagination-shell">
                     <ul class="pagination flex-wrap mb-0">
                         {% if page_obj.has_previous %}
                             <li class="page-item">
@@ -465,12 +417,14 @@
                             </li>
                         {% endif %}
                         {% for page_num in page_obj.paginator.page_range %}
+                            {% if page_num <= 5 or page_num > page_obj.paginator.num_pages|add:-3 %}
                             {% if page_num == page_obj.number %}
                                 <li class="page-item active"><span class="page-link">{{ page_num }}</span></li>
-                            {% elif page_num > page_obj.number|add:-3 and page_num < page_obj.number|add:3 %}
+                            {% else %}
                                 <li class="page-item">
                                     <a class="page-link" href="?page={{ page_num }}{% if current_sort %}&sort={{ current_sort }}{% endif %}{% if current_dir %}&dir={{ current_dir }}{% endif %}{% if current_q %}&q={{ current_q }}{% endif %}{% if currency_filter %}&currency={{ currency_filter }}{% endif %}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if exclude_terms %}&exclude={{ exclude_terms|urlencode }}{% endif %}{% if price_min %}&price_min={{ price_min|urlencode }}{% endif %}{% if price_max %}&price_max={{ price_max|urlencode }}{% endif %}">{{ page_num }}</a>
                                 </li>
+                            {% endif %}
                             {% endif %}
                         {% endfor %}
                         {% if page_obj.has_next %}
@@ -479,7 +433,22 @@
                             </li>
                         {% endif %}
                     </ul>
-                    <div class="muted mt-2">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</div>
+                    <form class="pagination-jump" method="get">
+                        <label for="page-jump-input">Page</label>
+                        <input id="page-jump-input" type="number" name="page" min="1" max="{{ page_obj.paginator.num_pages }}" value="{{ page_obj.number }}">
+                        {% if current_sort %}<input type="hidden" name="sort" value="{{ current_sort }}">{% endif %}
+                        {% if current_dir %}<input type="hidden" name="dir" value="{{ current_dir }}">{% endif %}
+                        {% if current_q %}<input type="hidden" name="q" value="{{ current_q }}">{% endif %}
+                        {% if currency_filter %}<input type="hidden" name="currency" value="{{ currency_filter }}">{% endif %}
+                        {% if supplier_filter %}<input type="hidden" name="supplier" value="{{ supplier_filter }}">{% endif %}
+                        {% if status_filter %}<input type="hidden" name="status" value="{{ status_filter }}">{% endif %}
+                        {% if exclude_terms %}<input type="hidden" name="exclude" value="{{ exclude_terms }}">{% endif %}
+                        {% if price_min %}<input type="hidden" name="price_min" value="{{ price_min }}">{% endif %}
+                        {% if price_max %}<input type="hidden" name="price_max" value="{{ price_max }}">{% endif %}
+                        <button class="button secondary" type="submit">Go</button>
+                    </form>
+                    <div class="pagination-summary">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</div>
+                    </div>
                 </nav>
             {% endif %}
         {% else %}

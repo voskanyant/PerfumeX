@@ -536,6 +536,7 @@ class BaseDeleteView(LoginRequiredMixin, DeleteView):
 
 class SupplierListView(BaseListView):
     model = models.Supplier
+    ordering = ("name",)
     list_display = (
         "name",
         "code",

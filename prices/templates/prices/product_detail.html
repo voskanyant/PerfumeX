@@ -153,20 +153,35 @@
                 </table>
             </div>
             {% if history_is_paginated %}
-                <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mt-3">
-                    <div class="small muted">
-                        Page {{ history_page_obj.number }} of {{ history_page_obj.paginator.num_pages }}
-                    </div>
+                <div class="pagination-shell mt-3">
                     <div class="d-flex flex-wrap gap-2">
                         {% if history_page_obj.has_previous %}
                             <a class="button secondary" href="{% if history_querystring %}?{{ history_querystring }}&history_page=1{% else %}?history_page=1{% endif %}">First</a>
                             <a class="button secondary" href="{% if history_querystring %}?{{ history_querystring }}&history_page={{ history_page_obj.previous_page_number }}{% else %}?history_page={{ history_page_obj.previous_page_number }}{% endif %}">Prev</a>
                         {% endif %}
+                        {% for page_num in history_page_obj.paginator.page_range %}
+                            {% if page_num <= 5 or page_num > history_page_obj.paginator.num_pages|add:-3 %}
+                                {% if page_num == history_page_obj.number %}
+                                    <span class="page-link">{{ page_num }}</span>
+                                {% else %}
+                                    <a class="page-link" href="{% if history_querystring %}?{{ history_querystring }}&history_page={{ page_num }}{% else %}?history_page={{ page_num }}{% endif %}">{{ page_num }}</a>
+                                {% endif %}
+                            {% endif %}
+                        {% endfor %}
                         {% if history_page_obj.has_next %}
                             <a class="button secondary" href="{% if history_querystring %}?{{ history_querystring }}&history_page={{ history_page_obj.next_page_number }}{% else %}?history_page={{ history_page_obj.next_page_number }}{% endif %}">Next</a>
                             <a class="button secondary" href="{% if history_querystring %}?{{ history_querystring }}&history_page={{ history_page_obj.paginator.num_pages }}{% else %}?history_page={{ history_page_obj.paginator.num_pages }}{% endif %}">Last</a>
                         {% endif %}
                     </div>
+                    <form class="pagination-jump" method="get">
+                        <label for="history-page-jump">Page</label>
+                        <input id="history-page-jump" type="number" name="history_page" min="1" max="{{ history_page_obj.paginator.num_pages }}" value="{{ history_page_obj.number }}">
+                        {% if chart_currency %}<input type="hidden" name="chart_currency" value="{{ chart_currency }}">{% endif %}
+                        {% if start_value %}<input type="hidden" name="start" value="{{ start_value }}">{% endif %}
+                        {% if end_value %}<input type="hidden" name="end" value="{{ end_value }}">{% endif %}
+                        <button class="button secondary" type="submit">Go</button>
+                    </form>
+                    <div class="pagination-summary">Page {{ history_page_obj.number }} of {{ history_page_obj.paginator.num_pages }}</div>
                 </div>
             {% endif %}
         {% else %}
