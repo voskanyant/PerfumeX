@@ -60,14 +60,32 @@
                     </table>
                 </div>
                 {% if supplier_products.paginator.num_pages > 1 %}
-                    <div class="d-flex flex-wrap align-items-center gap-2 mt-3">
-                        {% if supplier_products.has_previous %}
-                            <a class="button secondary" href="?sp_page={{ supplier_products.previous_page_number }}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if search_query %}&q={{ search_query }}{% endif %}">Previous</a>
-                        {% endif %}
-                        <span class="muted">Page {{ supplier_products.number }} of {{ supplier_products.paginator.num_pages }}</span>
-                        {% if supplier_products.has_next %}
-                            <a class="button secondary" href="?sp_page={{ supplier_products.next_page_number }}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if search_query %}&q={{ search_query }}{% endif %}">Next</a>
-                        {% endif %}
+                    <div class="pagination-shell mt-3">
+                        <div class="d-flex flex-wrap gap-2">
+                            {% if supplier_products.has_previous %}
+                                <a class="button secondary" href="?sp_page={{ supplier_products.previous_page_number }}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if search_query %}&q={{ search_query }}{% endif %}">Previous</a>
+                            {% endif %}
+                            {% for page_num in supplier_products.paginator.page_range %}
+                                {% if page_num <= 5 or page_num > supplier_products.paginator.num_pages|add:-3 %}
+                                    {% if page_num == supplier_products.number %}
+                                        <span class="page-link">{{ page_num }}</span>
+                                    {% else %}
+                                        <a class="page-link" href="?sp_page={{ page_num }}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if search_query %}&q={{ search_query }}{% endif %}">{{ page_num }}</a>
+                                    {% endif %}
+                                {% endif %}
+                            {% endfor %}
+                            {% if supplier_products.has_next %}
+                                <a class="button secondary" href="?sp_page={{ supplier_products.next_page_number }}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if search_query %}&q={{ search_query }}{% endif %}">Next</a>
+                            {% endif %}
+                        </div>
+                        <form class="pagination-jump" method="get">
+                            <label for="sp-page-jump">Page</label>
+                            <input id="sp-page-jump" type="number" name="sp_page" min="1" max="{{ supplier_products.paginator.num_pages }}" value="{{ supplier_products.number }}">
+                            {% if supplier_filter %}<input type="hidden" name="supplier" value="{{ supplier_filter }}">{% endif %}
+                            {% if search_query %}<input type="hidden" name="q" value="{{ search_query }}">{% endif %}
+                            <button class="button secondary" type="submit">Go</button>
+                        </form>
+                        <div class="pagination-summary">Page {{ supplier_products.number }} of {{ supplier_products.paginator.num_pages }}</div>
                     </div>
                 {% endif %}
             </div>

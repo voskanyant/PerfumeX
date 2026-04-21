@@ -35,7 +35,7 @@
   border: 1px solid var(--grey-200);
   border-radius: var(--radius-sm);
   padding: 14px 16px;
-  background: var(--grey-50);
+  background: var(--white);
 }
 
 .chart-summary-item .value {
@@ -69,4 +69,31 @@
   .chart-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .detail-stat .value { font-size: 20px; }
   .detail-stat.price .value { font-size: 30px; }
+}
+
+@media (max-width: 767.98px) {
+  .detail-stat {
+    padding: 16px 18px;
+  }
+
+  .detail-stat.price .value {
+    font-size: 28px;
+  }
+
+  .chart-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .chart-wrap {
+    padding: 14px;
+  }
+
+  .chart-canvas {
+    min-height: 240px;
+  }
+
+  .chart-tools,
+  .chart-ranges {
+    gap: 8px !important;
+  }
 }

@@ -43,7 +43,7 @@
 
 .progress-thin {
   height: 6px;
-  background: var(--grey-100);
+  background: var(--white);
   border-radius: 999px;
   overflow: hidden;
 }
@@ -71,7 +71,7 @@
 .settings-section-header {
   padding: 16px 24px;
   border-bottom: 1px solid var(--grey-200);
-  background: var(--grey-100);
+  background: var(--white);
 }
 
 .settings-section-title {
@@ -108,4 +108,35 @@
   .import-overview-header,
   .import-board__head,
   .settings-head { flex-direction: column; }
+}
+
+@media (max-width: 767.98px) {
+  .import-workspace {
+    gap: 20px;
+  }
+
+  .import-control-panel,
+  .import-board,
+  .settings-panel {
+    padding: 16px;
+  }
+
+  .settings-section-header {
+    padding: 14px 16px;
+  }
+
+  .settings-body {
+    padding: 16px;
+    gap: 16px;
+  }
+
+  .import-col-actions .d-inline-flex,
+  .import-col-actions .d-flex {
+    width: 100%;
+  }
+
+  .import-col-actions .button,
+  .import-col-actions .action-btn {
+    white-space: normal;
+  }
 }

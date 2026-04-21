@@ -94,7 +94,7 @@
   padding: 14px 16px;
   border: 1px solid var(--grey-200);
   border-radius: var(--radius-sm);
-  background: var(--grey-50);
+  background: var(--white);
   color: var(--grey-700);
   overflow: auto;
   font-size: 11px;
@@ -155,4 +155,34 @@
   .login-shell,
   .documentation-card { padding: 18px; }
   .run-log-head { flex-direction: column; }
+}
+
+@media (max-width: 767.98px) {
+  .metric-card,
+  .workspace-block,
+  .login-shell,
+  .documentation-card {
+    padding: 16px;
+  }
+
+  .metric-value {
+    font-size: 24px;
+  }
+
+  .documentation-card h2,
+  .documentation-card h3 {
+    font-size: 16px;
+  }
+
+  .run-log-meta,
+  .run-log-summary {
+    gap: 8px;
+    font-size: 11px;
+  }
+
+  .log-pre,
+  .run-log-pre {
+    padding: 12px 14px;
+    font-size: 10px;
+  }
 }
