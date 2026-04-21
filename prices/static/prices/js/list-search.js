@@ -398,6 +398,7 @@
     function renderRows(items) {
         var detailBase = input.getAttribute("data-detail-base") || "";
         var bulkEnabled = input.getAttribute("data-bulk") === "1";
+        var showActions = input.getAttribute("data-show-actions") === "1";
         var editPattern = input.getAttribute("data-edit-pattern") || "";
         var deletePattern = input.getAttribute("data-delete-pattern") || "";
         var csrfEl = document.querySelector("input[name='csrfmiddlewaretoken']");
@@ -429,27 +430,10 @@
             var importedTitle = escapeHtml(item.last_imported_at_full || "");
             var importedAgeClass = escapeHtml(item.last_imported_age_class || "");
             var imported = "<span class='cell-imported " + importedAgeClass + "'" + (importedTitle ? " title='" + importedTitle + "' data-full-datetime='" + importedTitle + "'" : "") + ">" + escapeHtml(item.last_imported_at) + "</span>";
-            var mobileDelta = "";
-            if (deltaDirection && deltaValue) {
-                var mobileArrow = deltaDirection === "down" ? "↓" : "↑";
-                var mobileDeltaTail = deltaPercent ? " (" + deltaPercent + ")" : "";
-                mobileDelta = "<span class='price-delta-badge " + escapeHtml(deltaDirection) + "'>" + mobileArrow + " " + deltaValue + mobileDeltaTail + "</span>";
-            } else {
-                mobileDelta = "<span class='price-delta-badge neutral'>- No change</span>";
-            }
             var mobileSupplier = supplierId
                 ? "<a href='?supplier=" + encodeURIComponent(String(item.supplier_id || "")) + "' class='supplier-filter-link cell-supplier' data-supplier-id='" + supplierId + "'>" + supplier + "</a>"
                 : "<span class='cell-supplier'>" + supplier + "</span>";
-            var mobilePanel =
-                "<div class='mobile-card-panel'>" +
-                    "<div class='mobile-card-price'><div class='cell-price-main'>" + price + "</div></div>" +
-                    "<div class='mobile-card-supplier-wrap'>" + mobileSupplier + "</div>" +
-                    "<div class='mobile-meta-row'>" + mobileDelta + "</div>" +
-                    "<span class='cell-imported mobile-card-date " + importedAgeClass + "'" +
-                        (importedTitle ? " title='" + importedTitle + "' data-full-datetime='" + importedTitle + "'" : "") +
-                    ">" + escapeHtml(item.last_imported_at) + "</span>" +
-                "</div>";
-            var priceHtml = "<div class='desktop-price-stack'>" + desktopPriceHtml + "</div>" + mobilePanel;
+            var priceHtml = "<div class='desktop-price-stack'>" + desktopPriceHtml + "</div>";
 
             if (detailBase && item.id) {
                 name = "<a class='cell-name' href='" + detailBase + item.id + "/?next=" + encodeURIComponent(nextValue) + "&from=" + item.id + "'>" + escapedName + "</a>";
@@ -460,7 +444,7 @@
                 : "";
 
             var actionsCell = "";
-            if (editPattern || deletePattern) {
+            if (showActions && (editPattern || deletePattern)) {
                 var editUrl = editPattern ? editPattern.replace("/0/", "/" + item.id + "/") : "";
                 var deleteUrl = deletePattern ? deletePattern.replace("/0/", "/" + item.id + "/") : "";
                 actionsCell = "<td class='actions' data-label='Actions'>" +
@@ -493,7 +477,7 @@
                 actionsCell += "</div></details></div></td>";
             }
 
-            var hasActions = !!(editPattern || deletePattern);
+            var hasActions = showActions && !!(editPattern || deletePattern);
             var colCount = bulkEnabled ? (hasActions ? 7 : 6) : (hasActions ? 6 : 5);
             var rowClass = item.is_active ? "" : " class='inactive-product-row'";
             if (item.is_active === false && !inactiveDividerInserted) {

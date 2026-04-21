@@ -369,6 +369,9 @@
   .products-page,
   .generic-list-page {
     gap: 8px;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
   }
 
   html,
@@ -377,6 +380,21 @@
   .content,
   #supplier-bulk-root {
     overflow-x: hidden;
+  }
+
+  .search-wrap,
+  .search-strip,
+  .search-inline-row,
+  .search-input-wrap,
+  .filters-products,
+  .generic-list-surface,
+  .workspace-table-wrap,
+  .products-grid,
+  .products-mobile,
+  .products-mobile tbody {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
   }
 
   .products-page-actions,
@@ -484,6 +502,8 @@
     border-radius: var(--radius-md) !important;
     background: var(--white) !important;
     box-shadow: none !important;
+    max-width: 100%;
+    overflow: hidden;
   }
 
   .products-mobile td {
