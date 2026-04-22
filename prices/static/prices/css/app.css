@@ -180,6 +180,8 @@ a:hover { color: inherit; }
 
 .main {
   flex: 1;
+  min-width: 0;
+  width: 100%;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -243,6 +245,7 @@ a:hover { color: inherit; }
 
 .content {
   flex: 1;
+  min-width: 0;
   overflow-y: auto;
   padding: 32px;
   animation: fadeUp 0.22s ease both;
@@ -798,8 +801,26 @@ pre, code {
 }
 
 @media (max-width: 767.98px) {
+  html,
+  body {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
   body {
     background: var(--white);
+  }
+
+  .layout,
+  .main,
+  .content,
+  .mobile-topbar,
+  .page-stack {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    overflow-x: hidden;
   }
 
   .main,
@@ -815,6 +836,10 @@ pre, code {
     background: var(--white);
     border-bottom: 1px solid var(--grey-200);
     backdrop-filter: none;
+  }
+
+  .mobile-topbar > * {
+    min-width: 0;
   }
 
   .mobile-topbar__brand {
