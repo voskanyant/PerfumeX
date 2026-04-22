@@ -290,7 +290,7 @@
                                         {% if obj.display_price %}
                                             <td data-field="{{ field }}" data-label="Price">
                                                 <div class="desktop-price-stack">
-                                                    <div class="cell-price-main">{{ obj.display_price|floatformat:2 }} {{ obj.display_currency|currency_symbol }}</div>
+                                                    <div class="cell-price-main"{% if obj.original_price_display %} title="Original: {{ obj.original_price_display }}"{% endif %}>{{ obj.display_price|floatformat:2 }} {{ obj.display_currency|currency_symbol }}</div>
                                                     {% if obj.price_delta_direction %}
                                                         <div class="price-delta-wrap">
                                                             <span class="price-delta-badge {{ obj.price_delta_direction }}">

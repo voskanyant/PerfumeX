@@ -428,10 +428,12 @@
             var escapedName = escapeHtml(rawName);
             var name = "<span class='cell-name'>" + escapedName + "</span>";
             var price = escapeHtml(item.current_price);
+            var originalPrice = escapeHtml(item.original_price || "");
             var deltaDirection = item.price_delta_direction || "";
             var deltaValue = escapeHtml(item.price_delta_value || "");
             var deltaPercent = escapeHtml(item.price_delta_percent || "");
-            var desktopPriceHtml = "<div class='cell-price-main'>" + price + "</div>";
+            var priceTitle = originalPrice ? " title='Original: " + originalPrice + "'" : "";
+            var desktopPriceHtml = "<div class='cell-price-main'" + priceTitle + ">" + price + "</div>";
             if (deltaDirection && deltaValue) {
                 var arrow = deltaDirection === "down" ? "↓" : "↑";
                 var deltaTail = deltaPercent ? " (" + deltaPercent + ")" : "";
