@@ -125,7 +125,7 @@
 
         <div class="mobile-topbar d-md-none">
             <div class="mobile-topbar__brand">PerfumeX</div>
-            <button class="btn btn-ghost mobile-menu-btn" type="button" data-bs-toggle="offcanvas" data-bs-target="#mobileNav" aria-controls="mobileNav">Menu</button>
+            <button class="btn btn-ghost mobile-menu-btn" type="button" data-drawer-toggle="mobile-nav" aria-controls="mobileNav" aria-expanded="false">Menu</button>
         </div>
 
         <div class="content">
@@ -148,12 +148,13 @@
     </div>
 </div>
 
-<div class="offcanvas offcanvas-start mobile-nav-drawer" tabindex="-1" id="mobileNav" aria-labelledby="mobileNavLabel">
-    <div class="offcanvas-header">
-        <h5 class="offcanvas-title" id="mobileNavLabel">PerfumeX</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+<div class="app-drawer-backdrop" data-drawer-backdrop hidden></div>
+<aside class="app-drawer app-drawer--start mobile-nav-drawer" id="mobileNav" data-drawer="mobile-nav" aria-hidden="true" aria-labelledby="mobileNavLabel">
+    <div class="drawer-header">
+        <h5 class="drawer-title" id="mobileNavLabel">PerfumeX</h5>
+        <button type="button" class="btn-close" data-drawer-close aria-label="Close"></button>
     </div>
-    <div class="offcanvas-body">
+    <div class="drawer-body">
         <nav class="mobile-nav">
             {% if user.is_staff and not viewer_mode %}
                 <div class="sidebar-section-label">Overview</div>
@@ -225,7 +226,7 @@
             </form>
         </nav>
     </div>
-</div>
+</aside>
 {% else %}
     </div>
 </div>

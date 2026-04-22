@@ -31,6 +31,10 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+body.drawer-open {
+  overflow: hidden;
+}
+
 a { color: inherit; text-decoration-thickness: 1px; text-underline-offset: 3px; }
 a:hover { color: inherit; }
 
@@ -756,37 +760,88 @@ tbody td,
   color: var(--white);
 }
 
-.offcanvas-backdrop {
+.app-drawer-backdrop {
+  position: fixed;
+  inset: 0;
   z-index: 1070;
+  background: rgba(10, 10, 10, 0.22);
+}
+
+.app-drawer-backdrop[hidden] {
+  display: none !important;
+}
+
+.app-drawer {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  z-index: 1070;
+  width: min(360px, calc(100vw - 20px));
+  max-width: calc(100vw - 20px);
+  background: var(--white);
+  box-shadow: 0 12px 30px rgba(10, 10, 10, 0.12);
+  transition: transform var(--transition);
+  display: flex;
+  flex-direction: column;
+}
+
+.app-drawer[aria-hidden="true"] {
+  pointer-events: none;
+}
+
+.app-drawer--start {
+  left: 0;
+  transform: translateX(-100%);
+}
+
+.app-drawer--end {
+  right: 0;
+  transform: translateX(100%);
+}
+
+.app-drawer.is-open {
+  transform: translateX(0);
+  pointer-events: auto;
 }
 
 .mobile-nav-drawer,
-.product-filters-offcanvas {
+.product-filters-drawer {
   z-index: 1080;
 }
 
 .mobile-nav-drawer {
-  --bs-offcanvas-width: min(360px, calc(100vw - 20px));
   border-right: 1px solid var(--grey-200);
 }
 
-.mobile-nav-drawer .offcanvas-header,
-.product-filters-offcanvas .offcanvas-header {
+.mobile-nav-drawer .drawer-header,
+.product-filters-drawer .drawer-header {
   border-bottom: 1px solid var(--grey-200);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
 }
 
-.mobile-nav-drawer .offcanvas-header {
+.mobile-nav-drawer .drawer-header,
+.product-filters-drawer .drawer-header {
   padding: 18px 18px 14px;
 }
 
-.mobile-nav-drawer .offcanvas-title {
+.drawer-title {
   font-family: 'Playfair Display', serif;
   font-size: 20px;
   font-weight: 500;
+  margin: 0;
 }
 
-.mobile-nav-drawer .offcanvas-body {
+.mobile-nav-drawer .drawer-body {
   padding: 10px 0 16px;
+  overflow-y: auto;
+}
+
+.product-filters-drawer .drawer-body {
+  padding: 18px 18px 20px;
+  overflow-y: auto;
 }
 
 .mobile-nav {

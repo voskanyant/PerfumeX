@@ -43,7 +43,7 @@
                             <input id="live-search" type="text" value="{{ current_q|default:'' }}" placeholder="Search perfume or SKU..." data-sort="{{ current_sort|default:'current_price' }}" data-dir="{{ current_dir|default:'asc' }}"{% if link_detail %} data-detail-base="{{ detail_base_url|default:'' }}"{% endif %} data-search-url="{{ search_url|default:'' }}"{% if show_bulk_delete %} data-bulk="1"{% endif %}{% if show_actions and update_url_name %} data-edit-pattern="{% url update_url_name 0 %}"{% endif %}{% if show_actions and delete_url_name %} data-delete-pattern="{% url delete_url_name 0 %}"{% endif %}{% if show_actions %} data-show-actions="1"{% endif %}>
                             <button id="clear-search-btn" class="search-clear-text{% if not current_q %} is-hidden{% endif %}" type="button" aria-label="Clear search" title="Clear search">&times;</button>
                         </div>
-                        <button class="button secondary icon filter-icon-btn" type="button" data-bs-toggle="offcanvas" data-bs-target="#product-filters-sidebar" aria-controls="product-filters-sidebar" title="Filters" aria-label="Filters">
+                        <button class="button secondary icon filter-icon-btn" type="button" data-drawer-toggle="product-filters" aria-controls="product-filters-sidebar" aria-expanded="false" title="Filters" aria-label="Filters">
                             <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                                 <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
                             </svg>
@@ -61,12 +61,12 @@
                 </div>
             {% endif %}
 
-            <div class="offcanvas offcanvas-end product-filters-offcanvas" tabindex="-1" id="product-filters-sidebar" aria-labelledby="product-filters-sidebar-label">
-                <div class="offcanvas-header">
-                    <h5 class="offcanvas-title" id="product-filters-sidebar-label">Filters</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+            <aside class="app-drawer app-drawer--end product-filters-drawer" id="product-filters-sidebar" data-drawer="product-filters" aria-hidden="true" aria-labelledby="product-filters-sidebar-label">
+                <div class="drawer-header">
+                    <h5 class="drawer-title" id="product-filters-sidebar-label">Filters</h5>
+                    <button type="button" class="btn-close" data-drawer-close aria-label="Close"></button>
                 </div>
-                <div class="offcanvas-body">
+                <div class="drawer-body">
                     <div class="extra-filters-grid">
                         {% if show_currency_filter %}
                             <div class="filter-item">
@@ -120,7 +120,7 @@
                         </div>
                     </div>
                 </div>
-            </div>
+            </aside>
         </div>
     {% else %}
         <div class="generic-list-header">
@@ -162,7 +162,7 @@
                             <button id="clear-search-btn" class="search-clear-text{% if not current_q %} is-hidden{% endif %}" type="button" aria-label="Clear search" title="Clear search">&times;</button>
                         </div>
                         {% if show_currency_filter or supplier_options or status_options %}
-                            <button class="button secondary icon filter-icon-btn" type="button" data-bs-toggle="offcanvas" data-bs-target="#product-filters-sidebar" aria-controls="product-filters-sidebar" title="Filters" aria-label="Filters">
+                            <button class="button secondary icon filter-icon-btn" type="button" data-drawer-toggle="product-filters" aria-controls="product-filters-sidebar" aria-expanded="false" title="Filters" aria-label="Filters">
                                 <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                                     <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
                                 </svg>
@@ -174,12 +174,12 @@
             {% endif %}
 
             {% if show_currency_filter or supplier_options or status_options %}
-                <div class="offcanvas offcanvas-end product-filters-offcanvas" tabindex="-1" id="product-filters-sidebar" aria-labelledby="product-filters-sidebar-label">
-                    <div class="offcanvas-header">
-                        <h5 class="offcanvas-title" id="product-filters-sidebar-label">Filters</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+                <aside class="app-drawer app-drawer--end product-filters-drawer" id="product-filters-sidebar" data-drawer="product-filters" aria-hidden="true" aria-labelledby="product-filters-sidebar-label">
+                    <div class="drawer-header">
+                        <h5 class="drawer-title" id="product-filters-sidebar-label">Filters</h5>
+                        <button type="button" class="btn-close" data-drawer-close aria-label="Close"></button>
                     </div>
-                    <div class="offcanvas-body">
+                    <div class="drawer-body">
                         <div class="extra-filters-grid">
                             {% if show_currency_filter %}
                                 <div class="filter-item">
@@ -219,7 +219,7 @@
                             {% endif %}
                         </div>
                     </div>
-                </div>
+                </aside>
             {% endif %}
         </div>
     {% endif %}

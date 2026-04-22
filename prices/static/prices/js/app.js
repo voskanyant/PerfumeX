@@ -51,17 +51,74 @@
         });
     });
 
-    if (window.bootstrap && window.bootstrap.Offcanvas) {
-        document.querySelectorAll(".offcanvas").forEach(function (panel) {
-            panel.addEventListener("show.bs.offcanvas", function () {
-                document.querySelectorAll(".offcanvas.show").forEach(function (openPanel) {
-                    if (openPanel === panel) return;
-                    var instance = window.bootstrap.Offcanvas.getInstance(openPanel);
-                    if (instance) {
-                        instance.hide();
-                    }
-                });
-            });
+    var drawerBackdrop = document.querySelector("[data-drawer-backdrop]");
+    var activeDrawer = null;
+
+    function syncDrawerTriggers(name, isOpen) {
+        document.querySelectorAll("[data-drawer-toggle='" + name + "']").forEach(function (trigger) {
+            trigger.setAttribute("aria-expanded", isOpen ? "true" : "false");
         });
     }
+
+    function closeDrawer(drawer) {
+        if (!drawer) return;
+        var name = drawer.getAttribute("data-drawer") || "";
+        drawer.classList.remove("is-open");
+        drawer.setAttribute("aria-hidden", "true");
+        syncDrawerTriggers(name, false);
+        if (activeDrawer === drawer) {
+            activeDrawer = null;
+            if (drawerBackdrop) {
+                drawerBackdrop.hidden = true;
+            }
+            document.body.classList.remove("drawer-open");
+        }
+    }
+
+    function openDrawer(drawer) {
+        if (!drawer) return;
+        if (activeDrawer && activeDrawer !== drawer) {
+            closeDrawer(activeDrawer);
+        }
+        var name = drawer.getAttribute("data-drawer") || "";
+        drawer.classList.add("is-open");
+        drawer.setAttribute("aria-hidden", "false");
+        syncDrawerTriggers(name, true);
+        activeDrawer = drawer;
+        if (drawerBackdrop) {
+            drawerBackdrop.hidden = false;
+        }
+        document.body.classList.add("drawer-open");
+    }
+
+    document.querySelectorAll("[data-drawer-toggle]").forEach(function (trigger) {
+        trigger.addEventListener("click", function () {
+            var name = trigger.getAttribute("data-drawer-toggle") || "";
+            var drawer = document.querySelector("[data-drawer='" + name + "']");
+            if (!drawer) return;
+            if (drawer === activeDrawer) {
+                closeDrawer(drawer);
+            } else {
+                openDrawer(drawer);
+            }
+        });
+    });
+
+    document.querySelectorAll("[data-drawer-close]").forEach(function (button) {
+        button.addEventListener("click", function () {
+            closeDrawer(button.closest("[data-drawer]"));
+        });
+    });
+
+    if (drawerBackdrop) {
+        drawerBackdrop.addEventListener("click", function () {
+            closeDrawer(activeDrawer);
+        });
+    }
+
+    document.addEventListener("keydown", function (event) {
+        if (event.key === "Escape" && activeDrawer) {
+            closeDrawer(activeDrawer);
+        }
+    });
 })();
