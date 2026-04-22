@@ -35,6 +35,12 @@
         }
     });
 
+    document.querySelectorAll(".product-filters-drawer[data-drawer]").forEach(function (drawer) {
+        if (drawer.parentElement !== document.body) {
+            document.body.appendChild(drawer);
+        }
+    });
+
     var path = window.location.pathname || "/";
     document.querySelectorAll(".sidebar .sidebar-link, #mobileNav .sidebar-link").forEach(function (link) {
         var href = link.getAttribute("href") || "";

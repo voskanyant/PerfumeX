@@ -57,6 +57,7 @@
 .search-strip {
   display: grid;
   gap: 8px;
+  position: relative;
 }
 
 .search-inline-row {
@@ -125,6 +126,10 @@
   align-items: center;
   gap: 8px;
   min-height: 0;
+  max-height: 96px;
+  opacity: 1;
+  overflow: hidden;
+  transition: opacity var(--transition), max-height var(--transition), margin var(--transition);
 }
 
 #search-count:empty {
@@ -299,6 +304,23 @@
   z-index: 1015;
   padding: 10px 0;
   border-bottom: 1px solid var(--grey-200);
+  box-shadow: 0 14px 32px rgba(10, 10, 10, 0.06);
+}
+
+.search-sticky-placeholder {
+  display: none;
+}
+
+.search-wrap.is-search-pinned .search-strip {
+  gap: 0;
+}
+
+.search-wrap.is-search-pinned .products-filter-summary,
+.search-wrap.is-search-pinned #search-count {
+  opacity: 0;
+  max-height: 0;
+  margin: 0;
+  pointer-events: none;
 }
 
 .actions-menu-desktop,
@@ -437,13 +459,22 @@
   }
 
   .filters-products .search-inline-row,
-  .generic-list-surface .search-inline-row,
+  .generic-list-surface .search-inline-row {
+    top: 64px;
+    z-index: 1020;
+    padding-bottom: 0;
+    border-bottom: 1px solid var(--grey-200);
+    background: var(--white);
+  }
+
   .filters-products .search-inline-row.is-pinned,
   .generic-list-surface .search-inline-row.is-pinned {
-    position: static;
-    padding: 0;
-    border-bottom: 0;
-    background: transparent;
+    position: fixed;
+    z-index: 1020;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--grey-200);
+    background: var(--white);
+    box-shadow: 0 10px 24px rgba(10, 10, 10, 0.08);
   }
 
   .products-page .search-strip,
