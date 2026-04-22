@@ -17,8 +17,10 @@
 <div class="layout">
     <aside class="sidebar d-none d-md-flex">
         <div class="sidebar-brand">
-            <div class="brand-name">PerfumeX</div>
-            <div class="brand-sub">{% if viewer_mode %}Prices Viewer{% else %}Prices Admin{% endif %}</div>
+            <a href="{% if viewer_mode %}{% url 'viewer_home' %}{% else %}{% url 'prices:dashboard' %}{% endif %}" class="sidebar-brand-link" aria-label="Go to {% if viewer_mode %}viewer home{% else %}dashboard{% endif %}">
+                <div class="brand-name">PerfumeX</div>
+                <div class="brand-sub">{% if viewer_mode %}Prices Viewer{% else %}Prices Admin{% endif %}</div>
+            </a>
         </div>
 
         <div class="sidebar-section">
@@ -123,7 +125,7 @@
         </div>
 
         <div class="mobile-topbar d-md-none">
-            <div class="mobile-topbar__brand">PerfumeX</div>
+            <a href="{% if viewer_mode %}{% url 'viewer_home' %}{% else %}{% url 'prices:dashboard' %}{% endif %}" class="mobile-topbar__brand mobile-topbar__brand-link">PerfumeX</a>
             <button class="btn btn-ghost mobile-menu-btn" type="button" data-drawer-toggle="mobile-nav" aria-controls="mobileNav" aria-expanded="false">Menu</button>
         </div>
 
@@ -148,13 +150,18 @@
 </div>
 
 {% if user.is_staff and not viewer_mode %}
-<nav class="quick-menu" aria-label="Quick navigation">
-    <a href="{% url 'prices:dashboard' %}" class="quick-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}">Dashboard</a>
-    <a href="{% url 'prices:supplier_list' %}" class="quick-link {% if request.resolver_match.url_name == 'supplier_list' or request.resolver_match.url_name == 'supplier_create' or request.resolver_match.url_name == 'supplier_update' or request.resolver_match.url_name == 'supplier_delete' %}active{% endif %}">Suppliers</a>
-    <a href="{% url 'prices:supplier_overview' %}" class="quick-link {% if request.resolver_match.url_name == 'supplier_overview' or request.resolver_match.url_name == 'supplier_import' or request.resolver_match.url_name == 'supplier_import_email' or request.resolver_match.url_name == 'supplier_import_email_backfill_bulk' or request.resolver_match.url_name == 'supplier_rates_recalculate' or request.resolver_match.url_name == 'import_detailed_logs' %}active{% endif %}">Import</a>
-    <a href="{% url 'prices:product_list' %}" class="quick-link {% if request.resolver_match.url_name == 'our_product_list' or request.resolver_match.url_name == 'our_product_detail' or request.resolver_match.url_name == 'our_product_create' or request.resolver_match.url_name == 'our_product_update' or request.resolver_match.url_name == 'product_list' or request.resolver_match.url_name == 'product_detail' or request.resolver_match.url_name == 'product_update' or request.resolver_match.url_name == 'product_linking' %}active{% endif %}">Products</a>
-    <a href="{% url 'prices:user_list' %}" class="quick-link {% if request.resolver_match.url_name == 'user_list' or request.resolver_match.url_name == 'user_create' or request.resolver_match.url_name == 'user_update' or request.resolver_match.url_name == 'user_group_list' or request.resolver_match.url_name == 'user_group_create' or request.resolver_match.url_name == 'user_group_update' %}active{% endif %}">Users</a>
-    <a href="{% url 'prices:import_settings' %}" class="quick-link {% if request.resolver_match.url_name == 'import_settings' or request.resolver_match.url_name == 'currency_rates' or request.resolver_match.url_name == 'currency_rate_update' or request.resolver_match.url_name == 'currency_rate_delete' or request.resolver_match.url_name == 'documentation' %}active{% endif %}">Settings</a>
+<nav class="quick-menu{% if request.resolver_match.url_name != 'dashboard' %} is-collapsible{% endif %}" aria-label="Quick navigation" data-quick-menu>
+    {% if request.resolver_match.url_name != 'dashboard' %}
+    <button class="quick-menu-toggle" type="button" aria-expanded="false" aria-controls="quickMenuLinks">Menu</button>
+    {% endif %}
+    <div class="quick-menu-links" id="quickMenuLinks">
+        <a href="{% url 'prices:dashboard' %}" class="quick-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}">Dashboard</a>
+        <a href="{% url 'prices:supplier_list' %}" class="quick-link {% if request.resolver_match.url_name == 'supplier_list' or request.resolver_match.url_name == 'supplier_create' or request.resolver_match.url_name == 'supplier_update' or request.resolver_match.url_name == 'supplier_delete' %}active{% endif %}">Suppliers</a>
+        <a href="{% url 'prices:supplier_overview' %}" class="quick-link {% if request.resolver_match.url_name == 'supplier_overview' or request.resolver_match.url_name == 'supplier_import' or request.resolver_match.url_name == 'supplier_import_email' or request.resolver_match.url_name == 'supplier_import_email_backfill_bulk' or request.resolver_match.url_name == 'supplier_rates_recalculate' or request.resolver_match.url_name == 'import_detailed_logs' %}active{% endif %}">Import</a>
+        <a href="{% url 'prices:product_list' %}" class="quick-link {% if request.resolver_match.url_name == 'our_product_list' or request.resolver_match.url_name == 'our_product_detail' or request.resolver_match.url_name == 'our_product_create' or request.resolver_match.url_name == 'our_product_update' or request.resolver_match.url_name == 'product_list' or request.resolver_match.url_name == 'product_detail' or request.resolver_match.url_name == 'product_update' or request.resolver_match.url_name == 'product_linking' %}active{% endif %}">Products</a>
+        <a href="{% url 'prices:user_list' %}" class="quick-link {% if request.resolver_match.url_name == 'user_list' or request.resolver_match.url_name == 'user_create' or request.resolver_match.url_name == 'user_update' or request.resolver_match.url_name == 'user_group_list' or request.resolver_match.url_name == 'user_group_create' or request.resolver_match.url_name == 'user_group_update' %}active{% endif %}">Users</a>
+        <a href="{% url 'prices:import_settings' %}" class="quick-link {% if request.resolver_match.url_name == 'import_settings' or request.resolver_match.url_name == 'currency_rates' or request.resolver_match.url_name == 'currency_rate_update' or request.resolver_match.url_name == 'currency_rate_delete' or request.resolver_match.url_name == 'documentation' %}active{% endif %}">Settings</a>
+    </div>
 </nav>
 {% endif %}
 

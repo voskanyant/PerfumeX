@@ -43,12 +43,32 @@
         }
     });
 
+    var quickMenu = document.querySelector("[data-quick-menu]");
+    var quickMenuToggle = quickMenu ? quickMenu.querySelector(".quick-menu-toggle") : null;
+
+    function setQuickMenuOpen(isOpen) {
+        if (!quickMenu || !quickMenu.classList.contains("is-collapsible")) return;
+        quickMenu.classList.toggle("is-open", isOpen);
+        if (quickMenuToggle) {
+            quickMenuToggle.setAttribute("aria-expanded", isOpen ? "true" : "false");
+        }
+    }
+
+    if (quickMenuToggle) {
+        quickMenuToggle.addEventListener("click", function () {
+            setQuickMenuOpen(!quickMenu.classList.contains("is-open"));
+        });
+    }
+
     document.addEventListener("click", function (event) {
         document.querySelectorAll("details.actions-menu-desktop[open], details.mobile-actions-menu[open]").forEach(function (details) {
             if (!details.contains(event.target)) {
                 details.removeAttribute("open");
             }
         });
+        if (quickMenu && quickMenu.classList.contains("is-collapsible") && !quickMenu.contains(event.target)) {
+            setQuickMenuOpen(false);
+        }
     });
 
     var drawerBackdrop = document.querySelector("[data-drawer-backdrop]");
@@ -119,6 +139,10 @@
     document.addEventListener("keydown", function (event) {
         if (event.key === "Escape" && activeDrawer) {
             closeDrawer(activeDrawer);
+            return;
+        }
+        if (event.key === "Escape" && quickMenu && quickMenu.classList.contains("is-open")) {
+            setQuickMenuOpen(false);
         }
     });
 })();

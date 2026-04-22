@@ -116,9 +116,9 @@
                         var label = item.name;
                         if (item.brand) label += " | " + item.brand;
                         if (item.size) label += " | " + item.size;
-                        row.innerHTML = "<td><input type='checkbox' data-target-select='our:" + item.id + "'></td>" +
-                            "<td>" + label + "<div class='small muted'>" + (item.reason || "") + "</div></td>" +
-                            "<td><span class='badge " + scoreBadge(item.score || 0) + "'>" + (item.score || 0) + "%</span></td>";
+                        row.innerHTML = "<td data-label='Select'><input type='checkbox' data-target-select='our:" + item.id + "'></td>" +
+                            "<td data-label='Our products'>" + label + "<div class='small muted'>" + (item.reason || "") + "</div></td>" +
+                            "<td data-label='Score'><span class='badge " + scoreBadge(item.score || 0) + "'>" + (item.score || 0) + "%</span></td>";
                         row.querySelector("input").addEventListener("change", function () {
                             setTarget("our", item.id);
                         });
@@ -130,9 +130,9 @@
                 } else {
                     data.supplier_products.forEach(function (item) {
                         var row = document.createElement("tr");
-                        row.innerHTML = "<td><input type='checkbox' data-target-select='supplier:" + item.id + "'></td>" +
-                            "<td>" + item.name + "<div class='small muted'>" + (item.supplier || "") + " " + (item.sku || "") + " | " + (item.reason || "") + "</div></td>" +
-                            "<td><span class='badge " + scoreBadge(item.score || 0) + "'>" + (item.score || 0) + "%</span></td>";
+                        row.innerHTML = "<td data-label='Select'><input type='checkbox' data-target-select='supplier:" + item.id + "'></td>" +
+                            "<td data-label='Supplier products'>" + item.name + "<div class='small muted'>" + (item.supplier || "") + " " + (item.sku || "") + " | " + (item.reason || "") + "</div></td>" +
+                            "<td data-label='Score'><span class='badge " + scoreBadge(item.score || 0) + "'>" + (item.score || 0) + "%</span></td>";
                         row.querySelector("input").addEventListener("change", function () {
                             setTarget("supplier", item.id);
                         });

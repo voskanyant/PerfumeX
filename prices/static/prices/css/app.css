@@ -61,6 +61,12 @@ a:hover { color: inherit; }
   border-bottom: 1px solid #1e1e1e;
 }
 
+.sidebar-brand-link {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+}
+
 .brand-name {
   font-family: 'Playfair Display', serif;
   font-size: 17px;
@@ -209,6 +215,11 @@ a:hover { color: inherit; }
   font-weight: 500;
 }
 
+.mobile-topbar__brand-link {
+  color: inherit;
+  text-decoration: none;
+}
+
 .topbar-breadcrumb {
   font-family: 'DM Mono', monospace;
   font-size: 10px;
@@ -239,9 +250,10 @@ a:hover { color: inherit; }
 .content {
   flex: 1;
   min-width: 0;
+  overflow-x: hidden;
   overflow-y: auto;
   padding: 32px;
-  animation: fadeUp 0.22s ease both;
+  animation: fadeIn 0.22s ease both;
 }
 
 body.admin-mode .content {
@@ -265,6 +277,37 @@ body.admin-mode .content {
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.28);
   backdrop-filter: blur(16px);
   overflow-x: auto;
+  transition: transform var(--transition), opacity var(--transition);
+}
+
+.quick-menu-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 52px;
+  padding: 0 18px;
+  border: 1px solid #2a2a2a;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--white);
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: border-color var(--transition), background var(--transition);
+}
+
+.quick-menu-toggle:hover,
+.quick-menu.is-open .quick-menu-toggle {
+  border-color: rgba(255, 255, 255, 0.24);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.quick-menu-links {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .quick-link {
@@ -299,6 +342,56 @@ body.admin-mode .content {
 
 .quick-link.active {
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+.quick-menu.is-collapsible {
+  left: auto;
+  right: 32px;
+  transform: none;
+  max-width: 96px;
+  padding: 10px;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.quick-menu.is-collapsible .quick-menu-links {
+  max-width: 0;
+  gap: 0;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+  transition: max-width var(--transition), opacity var(--transition);
+}
+
+.quick-menu.is-collapsible .quick-link {
+  opacity: 0;
+}
+
+.quick-menu.is-collapsible.is-open {
+  max-width: calc(100vw - 48px);
+  padding: 12px;
+  border-radius: 22px;
+}
+
+.quick-menu.is-collapsible.is-open .quick-menu-links {
+  max-width: 900px;
+  gap: 10px;
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.quick-menu.is-collapsible.is-open .quick-link {
+  opacity: 1;
+}
+
+body.drawer-open .quick-menu {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-50%) translateY(16px);
+}
+
+body.drawer-open .quick-menu.is-collapsible {
+  transform: translateY(16px);
 }
 
 .visually-hidden {
@@ -1037,7 +1130,8 @@ tbody td,
 .app-drawer {
   position: fixed;
   top: 0;
-  bottom: 0;
+  height: 100dvh;
+  max-height: 100dvh;
   z-index: 2000;
   width: min(360px, calc(100vw - 20px));
   max-width: calc(100vw - 20px);
@@ -1049,6 +1143,7 @@ tbody td,
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
+  overflow: hidden;
 }
 
 .app-drawer[aria-hidden="true"] {
@@ -1132,9 +1227,9 @@ pre, code {
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--grey-200); border-radius: 4px; }
 
-@keyframes fadeUp {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 @media (max-width: 991.98px) {

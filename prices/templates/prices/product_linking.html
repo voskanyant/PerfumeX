@@ -40,7 +40,7 @@
                 <h2 class="page-title">Supplier products</h2>
                 <p class="page-subtitle">Click a row to select.</p>
                 <div class="table-wrap table-responsive table-scroll-lg">
-                    <table id="supplier-products-table" class="table table-sm table-hover align-middle mb-0">
+                    <table id="supplier-products-table" class="table table-mobile table-sm table-hover align-middle mb-0">
                         <thead>
                             <tr>
                                 <th>Supplier</th>
@@ -51,9 +51,9 @@
                         <tbody>
                             {% for product in supplier_products %}
                                 <tr data-id="{{ product.id }}" data-name="{{ product.name|fix_text }}" class="row-selectable">
-                                    <td>{{ product.supplier.name|fix_text }}</td>
-                                    <td>{{ product.supplier_sku|fix_text }}</td>
-                                    <td>{{ product.name|fix_text }}</td>
+                                    <td data-label="Supplier">{{ product.supplier.name|fix_text }}</td>
+                                    <td data-label="SKU">{{ product.supplier_sku|fix_text }}</td>
+                                    <td data-label="Name">{{ product.name|fix_text }}</td>
                                 </tr>
                             {% endfor %}
                         </tbody>
@@ -109,7 +109,7 @@
                 <h2 class="page-title">Matches</h2>
                 <p class="page-subtitle">Select a target to link.</p>
                 <div class="table-wrap table-responsive table-scroll-md">
-                    <table class="table table-sm table-hover align-middle mb-0">
+                    <table class="table table-mobile table-sm table-hover align-middle mb-0">
                         <thead>
                             <tr>
                                 <th></th>
@@ -123,7 +123,7 @@
                     </table>
                 </div>
                 <div class="table-wrap table-responsive table-scroll-md mt-3">
-                    <table class="table table-sm table-hover align-middle mb-0">
+                    <table class="table table-mobile table-sm table-hover align-middle mb-0">
                         <thead>
                             <tr>
                                 <th></th>
