@@ -275,6 +275,8 @@
     function setSearchLoading(isLoading) {
         if (!searchInputWrap) return;
         if (isLoading) {
+            searchInputWrap.classList.remove("is-loading");
+            void searchInputWrap.offsetWidth;
             searchInputWrap.classList.add("is-loading");
         } else {
             searchInputWrap.classList.remove("is-loading");
