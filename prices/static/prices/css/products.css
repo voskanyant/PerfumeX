@@ -134,6 +134,7 @@
 .product-filters-offcanvas .offcanvas-body {
   display: grid;
   gap: 16px;
+  padding: 18px 18px 20px;
 }
 
 .extra-filters-grid {
@@ -296,7 +297,7 @@
 .filters-products .search-inline-row.is-pinned,
 .generic-list-surface .search-inline-row.is-pinned {
   position: fixed;
-  z-index: 1045;
+  z-index: 1015;
   padding: 10px 0;
   border-bottom: 1px solid var(--grey-200);
 }
@@ -466,7 +467,8 @@
   }
 
   .product-filters-offcanvas {
-    width: min(320px, 100vw);
+    --bs-offcanvas-width: min(320px, calc(100vw - 20px));
+    width: min(320px, calc(100vw - 20px));
     max-width: 100vw;
   }
 

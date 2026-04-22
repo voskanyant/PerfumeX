@@ -36,7 +36,7 @@
     });
 
     var path = window.location.pathname || "/";
-    document.querySelectorAll(".sidebar .nav-link, .offcanvas .nav-link").forEach(function (link) {
+    document.querySelectorAll(".sidebar .sidebar-link, #mobileNav .sidebar-link").forEach(function (link) {
         var href = link.getAttribute("href") || "";
         if (href && path.startsWith(href)) {
             link.classList.add("active");
@@ -50,4 +50,18 @@
             }
         });
     });
+
+    if (window.bootstrap && window.bootstrap.Offcanvas) {
+        document.querySelectorAll(".offcanvas").forEach(function (panel) {
+            panel.addEventListener("show.bs.offcanvas", function () {
+                document.querySelectorAll(".offcanvas.show").forEach(function (openPanel) {
+                    if (openPanel === panel) return;
+                    var instance = window.bootstrap.Offcanvas.getInstance(openPanel);
+                    if (instance) {
+                        instance.hide();
+                    }
+                });
+            });
+        });
+    }
 })();
