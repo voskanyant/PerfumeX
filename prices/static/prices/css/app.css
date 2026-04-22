@@ -969,7 +969,7 @@ tbody td,
 .app-drawer-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 1070;
+  z-index: 1990;
   background: rgba(10, 10, 10, 0.22);
 }
 
@@ -981,14 +981,17 @@ tbody td,
   position: fixed;
   top: 0;
   bottom: 0;
-  z-index: 1070;
+  z-index: 2000;
   width: min(360px, calc(100vw - 20px));
   max-width: calc(100vw - 20px);
   background: var(--white);
   box-shadow: 0 12px 30px rgba(10, 10, 10, 0.12);
-  transition: transform var(--transition);
+  transition: transform var(--transition), opacity var(--transition);
   display: flex;
   flex-direction: column;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
 }
 
 .app-drawer[aria-hidden="true"] {
@@ -1007,12 +1010,13 @@ tbody td,
 
 .app-drawer.is-open {
   transform: translateX(0);
+  opacity: 1;
+  visibility: visible;
   pointer-events: auto;
 }
 
-.mobile-nav-drawer,
-.product-filters-drawer {
-  z-index: 1080;
+.app-drawer.is-open * {
+  pointer-events: auto;
 }
 
 .mobile-nav-drawer {
