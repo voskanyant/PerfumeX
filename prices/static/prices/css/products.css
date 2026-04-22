@@ -458,6 +458,7 @@
 
   .products-page .search-wrap-inner input {
     padding-left: 34px !important;
+    font-size: 16px !important;
   }
 
   .products-page .search-wrap-inner .search-icon {
