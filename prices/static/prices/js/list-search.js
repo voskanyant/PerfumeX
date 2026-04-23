@@ -410,20 +410,25 @@
     }
 
     function buildSparkline(values, deltaDir) {
-        if (!values || values.length < 2) return "";
+        var w = 200, h = 32, pad = 3;
+        var color = deltaDir === "down" ? "#22c55e" : deltaDir === "up" ? "#ef4444" : "#c8c8c8";
+        var svgOpen = "<svg class=\"product-sparkline\" width=\"100%\" height=\"" + h +
+            "\" viewBox=\"0 0 " + w + " " + h + "\" preserveAspectRatio=\"none\" fill=\"none\" aria-hidden=\"true\">";
+        // No data or single point — flat grey line
+        if (!values || values.length < 2) {
+            var mid = (h / 2).toFixed(1);
+            return svgOpen + "<line x1=\"0\" y1=\"" + mid + "\" x2=\"" + w + "\" y2=\"" + mid +
+                "\" stroke=\"#e2e2e2\" stroke-width=\"1.5\"/></svg>";
+        }
         var min = Math.min.apply(null, values);
         var max = Math.max.apply(null, values);
         var range = max - min || 1;
-        var w = 56, h = 22, pad = 2;
         var pts = values.map(function(v, i) {
             var x = pad + (i / (values.length - 1)) * (w - pad * 2);
             var y = (h - pad) - ((v - min) / range) * (h - pad * 2);
             return x.toFixed(1) + "," + y.toFixed(1);
         }).join(" ");
-        var color = deltaDir === "down" ? "#22c55e" : deltaDir === "up" ? "#ef4444" : "#c0c0c0";
-        return "<svg class=\"product-sparkline\" viewBox=\"0 0 " + w + " " + h +
-            "\" preserveAspectRatio=\"none\" fill=\"none\" aria-hidden=\"true\">" +
-            "<polyline points=\"" + pts + "\" stroke=\"" + color +
+        return svgOpen + "<polyline points=\"" + pts + "\" stroke=\"" + color +
             "\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg>";
     }
 
