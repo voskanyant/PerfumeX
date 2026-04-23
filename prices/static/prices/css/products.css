@@ -47,6 +47,15 @@
   display: inline-flex;
 }
 
+/* Hide checkbox columns when bulk mode is off */
+.bulk-mode-off .bulk-col {
+  display: none;
+}
+
+.bulk-mode-on .bulk-col {
+  display: table-cell;
+}
+
 .products-command-surface,
 .generic-list-surface,
 .products-search-row,
@@ -364,13 +373,55 @@
   font-size: 12px;
 }
 
-.inactive-divider-row td {
-  background: var(--white);
+/* ── Inactive product section divider ── */
+.inactive-divider-row > td {
+  background: var(--grey-100) !important;
+  padding: 7px 16px !important;
+  border-top: 1px solid var(--grey-200) !important;
+  border-bottom: 1px solid var(--grey-200) !important;
   font-family: 'DM Mono', monospace;
-  font-size: 10px;
-  letter-spacing: 0.08em;
+  font-size: 9px;
+  letter-spacing: 0.2em;
   text-transform: uppercase;
   color: var(--grey-500);
+  position: relative;
+}
+
+.inactive-divider-row > td::before {
+  content: '';
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--grey-400);
+  margin-right: 8px;
+  vertical-align: middle;
+  position: relative;
+  top: -1px;
+}
+
+/* ── Inactive product rows ── */
+.inactive-product-row > td {
+  background: var(--grey-50) !important;
+  color: var(--grey-400) !important;
+}
+
+.inactive-product-row > td .cell-price-main,
+.inactive-product-row > td .price-delta-badge,
+.inactive-product-row > td .cell-imported,
+.inactive-product-row > td a {
+  color: var(--grey-400) !important;
+  opacity: 0.8;
+}
+
+.inactive-product-row:hover > td {
+  background: var(--grey-100) !important;
+}
+
+/* Strikethrough on the product name in inactive rows */
+.inactive-product-row > td:nth-child(2) {
+  text-decoration: line-through;
+  text-decoration-color: var(--grey-300);
 }
 
 @media (max-width: 991.98px) {
