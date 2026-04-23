@@ -225,7 +225,6 @@
         </div>
     {% endif %}
 
-        {% if object_list %}
             <div class="table-wrap table-scroll-x workspace-table-wrap">
                 <table class="table table-sm table-hover space-bottom-none table-mobile products-grid{% if list_title == 'Suppliers Products' or list_title == 'Supplier Products' %} products-mobile{% endif %}">
                 <thead>
@@ -264,23 +263,25 @@
                                 {% endif %}
                             </th>
                         {% endfor %}
+                        <th data-field="sparkline"></th>
                         {% if show_actions %}
                             <th>Actions</th>
                         {% endif %}
                     </tr>
                 </thead>
                 <tbody>
+                    {% if object_list %}
                         {% for obj in object_list %}
                             {% ifchanged obj.is_active %}
                                 {% if not obj.is_active and not forloop.first %}
                                     <tr class="inactive-divider-row">
-                                        <td colspan="{% if show_bulk_delete %}{% if show_actions %}{{ list_display|length|add:'2' }}{% else %}{{ list_display|length|add:'1' }}{% endif %}{% else %}{% if show_actions %}{{ list_display|length|add:'1' }}{% else %}{{ list_display|length }}{% endif %}{% endif %}">
+                                        <td colspan="{% if show_bulk_delete %}{% if show_actions %}{{ list_display|length|add:'3' }}{% else %}{{ list_display|length|add:'2' }}{% endif %}{% else %}{% if show_actions %}{{ list_display|length|add:'2' }}{% else %}{{ list_display|length|add:'1' }}{% endif %}{% endif %}">
                                             Inactive products
                                         </td>
                                     </tr>
                                 {% endif %}
                             {% endifchanged %}
-                            <tr data-product-id="{{ obj.pk }}"{% if not obj.is_active %} class="inactive-product-row"{% endif %}>
+                            <tr data-product-id="{{ obj.pk }}"{% if not obj.is_active %} class="inactive-product-row"{% endif %}{% if obj.price_delta_direction %} data-delta="{{ obj.price_delta_direction }}"{% endif %}>
                                 {% if show_bulk_delete %}
                                     <td class="select-col bulk-col"><input type="checkbox" name="product_ids" value="{{ obj.pk }}"></td>
                                 {% endif %}
@@ -344,6 +345,7 @@
                                         </td>
                                     {% endif %}
                                 {% endfor %}
+                                <td data-field="sparkline" class="sparkline-cell">{{ obj.sparkline_svg }}</td>
                             {% if show_actions %}
                                 <td class="actions" data-label="Actions">
                                     {% if show_action_menu %}
@@ -398,7 +400,12 @@
                                 </td>
                             {% endif %}
                         </tr>
-                    {% endfor %}
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="{% if show_bulk_delete %}{% if show_actions %}{{ list_display|length|add:'3' }}{% else %}{{ list_display|length|add:'2' }}{% endif %}{% else %}{% if show_actions %}{{ list_display|length|add:'2' }}{% else %}{{ list_display|length|add:'1' }}{% endif %}{% endif %}" class="products-empty-state">No records yet.</td>
+                        </tr>
+                    {% endif %}
                 </tbody>
                 </table>
             </div>
@@ -455,9 +462,6 @@
                     </div>
                 </nav>
             {% endif %}
-        {% else %}
-            <div class="products-empty-state">No records yet.</div>
-        {% endif %}
     </div>
     {% if show_search %}
         <script src="{% static 'prices/js/list-search.js' %}"></script>

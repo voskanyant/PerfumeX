@@ -27,6 +27,7 @@ from django.http import JsonResponse
 from django.core.paginator import Paginator
 from django.core.management import call_command
 from django.utils.http import url_has_allowed_host_and_scheme
+from django.utils.safestring import mark_safe
 from django.views.decorators.http import require_POST
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
@@ -232,6 +233,68 @@ def _display_price_expression_for_currency(currency: str):
         ),
         default=F("current_price"),
         output_field=output_field,
+    )
+
+
+def _build_supplier_product_sparklines(products) -> dict[int, list[float]]:
+    from datetime import timedelta
+    from collections import defaultdict
+
+    product_ids = [product.id for product in products if getattr(product, "id", None)]
+    if not product_ids:
+        return {}
+
+    six_months_ago = timezone.now() - timedelta(days=180)
+    raw_snaps = list(
+        models.PriceSnapshot.objects
+        .filter(supplier_product_id__in=product_ids, recorded_at__gte=six_months_ago)
+        .values("supplier_product_id", "price", "recorded_at")
+        .order_by("supplier_product_id", "recorded_at")
+    )
+    product_day_prices: dict = defaultdict(dict)
+    for snap in raw_snaps:
+        pid = snap["supplier_product_id"]
+        day = snap["recorded_at"].date()
+        product_day_prices[pid][day] = float(snap["price"])
+    return {
+        pid: [value for _, value in sorted(days.items())]
+        for pid, days in product_day_prices.items()
+    }
+
+
+def _render_product_sparkline_svg(values, delta_dir: str | None = None) -> str:
+    width = 200
+    height = 32
+    pad = 3
+    color = "#c8c8c8"
+    if delta_dir == "down":
+        color = "#22c55e"
+    elif delta_dir == "up":
+        color = "#ef4444"
+    svg_open = (
+        f'<svg class="product-sparkline" width="100%" height="{height}" '
+        f'viewBox="0 0 {width} {height}" preserveAspectRatio="none" fill="none" aria-hidden="true">'
+    )
+    if not values or len(values) < 2:
+        mid = f"{height / 2:.1f}"
+        return mark_safe(
+            svg_open
+            + f'<line x1="0" y1="{mid}" x2="{width}" y2="{mid}" stroke="#e2e2e2" stroke-width="1.5"/></svg>'
+        )
+
+    min_value = min(values)
+    max_value = max(values)
+    value_range = max_value - min_value or 1
+    points = []
+    for index, value in enumerate(values):
+        x = pad + (index / (len(values) - 1)) * (width - pad * 2)
+        y = (height - pad) - ((value - min_value) / value_range) * (height - pad * 2)
+        points.append(f"{x:.1f},{y:.1f}")
+    polyline = " ".join(points)
+    return mark_safe(
+        svg_open
+        + f'<polyline points="{polyline}" stroke="{color}" stroke-width="1.5" '
+          'stroke-linecap="round" stroke-linejoin="round"/></svg>'
     )
 
 
@@ -1142,26 +1205,7 @@ class SupplierProductSearchView(LoginRequiredMixin, View):
             product.display_currency = display_currency
         _attach_previous_price_deltas(visible_products, currency, rates)
 
-        # Build 6-month sparkline data for each visible product (one query)
-        from datetime import timedelta
-        from collections import defaultdict
-        six_months_ago = timezone.now() - timedelta(days=180)
-        product_ids = [p.id for p in visible_products]
-        raw_snaps = list(
-            models.PriceSnapshot.objects
-            .filter(supplier_product_id__in=product_ids, recorded_at__gte=six_months_ago)
-            .values("supplier_product_id", "price", "recorded_at")
-            .order_by("supplier_product_id", "recorded_at")
-        )
-        product_day_prices: dict = defaultdict(dict)
-        for snap in raw_snaps:
-            pid = snap["supplier_product_id"]
-            day = snap["recorded_at"].date()
-            product_day_prices[pid][day] = float(snap["price"])
-        sparklines: dict = {
-            pid: [v for _, v in sorted(days.items())]
-            for pid, days in product_day_prices.items()
-        }
+        sparklines = _build_supplier_product_sparklines(visible_products)
 
         for product in visible_products:
             imported_at = _short_relative_datetime(product.last_imported_at)
@@ -2330,11 +2374,16 @@ class SupplierProductListView(BaseListView):
                     product.current_price, product.currency, currency, rates
                 )
             _attach_previous_price_deltas(context["object_list"], currency, rates)
+        sparklines = _build_supplier_product_sparklines(context["object_list"])
         for product in context["object_list"]:
             product.original_price_display = (
                 _format_price(product.current_price, product.currency)
                 if product.current_price is not None
                 else ""
+            )
+            product.sparkline_svg = _render_product_sparkline_svg(
+                sparklines.get(product.id, []),
+                getattr(product, "price_delta_direction", ""),
             )
         return context
 
