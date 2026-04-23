@@ -1,0 +1,112 @@
+﻿(function () {
+    var config = document.getElementById("supplier-import-config");
+    var fileInput = document.getElementById("id_file");
+    var sheetRow = document.getElementById("sheet-row");
+    var sheetSelect = document.getElementById("sheet-select");
+    var preview = document.getElementById("preview-table");
+    var mode = "sku";
+    var supplierId = config ? String(config.getAttribute("data-supplier-id") || "") : "";
+    var modeStatus = document.getElementById("mode-status");
+    if (!fileInput || !supplierId) return;
+
+    function setMode(next) {
+        mode = next;
+        if (modeStatus) {
+            modeStatus.textContent = "Mode: " + next.replace("_", " ").toUpperCase();
+        }
+    }
+    document.getElementById("mode-sku").addEventListener("click", function () { setMode("sku"); });
+    document.getElementById("mode-name").addEventListener("click", function () { setMode("name"); });
+    document.getElementById("mode-name-add").addEventListener("click", function () { setMode("name_add"); });
+    document.getElementById("mode-price").addEventListener("click", function () { setMode("price"); });
+    document.getElementById("mode-currency").addEventListener("click", function () { setMode("currency"); });
+
+    function updateField(fieldId, value, append) {
+        var input = document.getElementById(fieldId);
+        if (!input) return;
+        if (!append) {
+            input.value = value;
+            return;
+        }
+        var existing = input.value ? input.value.split(",").map(function (v) { return v.trim(); }) : [];
+        if (existing.indexOf(value) === -1) {
+            existing.push(value);
+        }
+        input.value = existing.join(",");
+    }
+
+    function renderTable(rows, maxCols, colOffset) {
+        if (!rows.length) {
+            preview.innerHTML = "<p class='muted'>No preview rows.</p>";
+            return;
+        }
+        var header = "<tr>";
+        for (var i = 1; i <= maxCols; i++) {
+            var displayIndex = i + (colOffset || 0);
+            header += "<th data-col='" + i + "' class='preview-th'>" + displayIndex + "</th>";
+        }
+        header += "</tr>";
+        var body = rows.map(function (row) {
+            var cells = "";
+            for (var i = 0; i < maxCols; i++) {
+                var val = row[i] || "";
+                cells += "<td class='preview-td'>" + val + "</td>";
+            }
+            return "<tr>" + cells + "</tr>";
+        }).join("");
+        preview.innerHTML = "<table class='table table-sm table-hover space-bottom-none'>" + header + body + "</table>";
+        preview.querySelectorAll("th[data-col]").forEach(function (th) {
+            th.addEventListener("click", function () {
+                var col = th.getAttribute("data-col");
+                if (mode === "sku") updateField("id_sku_column", col, false);
+                if (mode === "name") updateField("id_name_columns", col, false);
+                if (mode === "name_add") updateField("id_name_columns", col, true);
+                if (mode === "price") updateField("id_price_column", col, false);
+                if (mode === "currency") updateField("id_currency_column", col, false);
+            });
+        });
+    }
+
+    function loadPreview(sheetIndex) {
+        if (!fileInput.files.length) return;
+        var formData = new FormData();
+        formData.append("file", fileInput.files[0]);
+        if (sheetIndex !== null && sheetIndex !== undefined) {
+            formData.append("sheet_index", sheetIndex);
+        }
+        var url = "/suppliers/" + supplierId + "/mapping-preview/";
+        fetch(url, {
+            method: "POST",
+            headers: { "X-Requested-With": "XMLHttpRequest" },
+            body: formData
+        }).then(function (res) { return res.json(); })
+          .then(function (data) {
+              if (data.error) {
+                  preview.innerHTML = "<p class='muted'>" + data.error + "</p>";
+                  return;
+              }
+              if (data.sheet_names && data.sheet_names.length) {
+                  if (sheetRow) {
+                      sheetRow.classList.remove("is-hidden");
+                  }
+                  sheetSelect.innerHTML = data.sheet_names.map(function (name, index) {
+                      return "<option value='" + index + "'>" + name + "</option>";
+                  }).join("");
+              }
+              renderTable(data.rows || [], data.max_cols || 0, data.col_offset || 0);
+          });
+    }
+
+    if (fileInput) {
+        fileInput.addEventListener("change", function () {
+            loadPreview(sheetSelect.value || null);
+        });
+    }
+    if (sheetSelect) {
+        sheetSelect.addEventListener("change", function () {
+            loadPreview(sheetSelect.value);
+        });
+    }
+})();
+
+

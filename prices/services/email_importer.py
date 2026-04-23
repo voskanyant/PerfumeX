@@ -1,0 +1,1108 @@
+import email
+import hashlib
+import imaplib
+import re
+import socket
+import ssl
+import time
+from datetime import datetime, timezone as dt_timezone
+from email.header import decode_header
+from email.utils import parsedate_to_datetime, parseaddr
+
+from django.core.files.base import ContentFile
+from django.utils import timezone
+
+from django.db.models import F
+
+from prices import models
+from prices.services.importer import process_import_file
+
+
+def _mailbox_host_candidates(mailbox):
+    host = (mailbox.host or "").strip()
+    candidates = []
+    if host:
+        candidates.append(host)
+    lowered = host.lower()
+    # mail.ru family domains commonly use imap.mail.ru regardless of sender domain.
+    if any(domain in lowered for domain in ("mail.ru", "inbox.ru", "list.ru", "bk.ru")):
+        if "imap.mail.ru" not in {c.lower() for c in candidates}:
+            candidates.append("imap.mail.ru")
+    return candidates
+
+
+def _decode_header(value):
+    if not value:
+        return ""
+    decoded = decode_header(value)
+    parts = []
+    for text, encoding in decoded:
+        if isinstance(text, bytes):
+            parts.append(text.decode(encoding or "utf-8", errors="ignore"))
+        else:
+            parts.append(text)
+    return "".join(parts)
+
+def _get_part_filename(part):
+    filename = part.get_filename()
+    if filename:
+        return _decode_header(filename)
+    name = part.get_param("name", header="content-type")
+    if name:
+        return _decode_header(name)
+    return ""
+
+
+def _infer_extension(content_type):
+    if not content_type:
+        return ""
+    content_type = content_type.lower()
+    if content_type in (
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    ):
+        return ".xlsx"
+    if content_type in ("application/vnd.ms-excel",):
+        return ".xls"
+    if content_type in ("text/csv", "application/csv"):
+        return ".csv"
+    if content_type in ("application/octet-stream",):
+        return ".xlsx"
+    return ""
+
+def _local_day_bounds(dt):
+    """Return UTC bounds for the local calendar day of dt."""
+    if not dt:
+        return None, None
+    local_dt = timezone.localtime(dt)
+    day_start_local = local_dt.replace(hour=0, minute=0, second=0, microsecond=0)
+    day_end_local = day_start_local + timezone.timedelta(days=1)
+    return day_start_local.astimezone(dt_timezone.utc), day_end_local.astimezone(dt_timezone.utc)
+
+
+def _local_day_window_bounds(dt, window_days=0):
+    """Return UTC bounds for local day expanded by +/- window_days."""
+    if not dt:
+        return None, None
+    safe_window = max(int(window_days or 0), 0)
+    local_dt = timezone.localtime(dt)
+    day_start_local = local_dt.replace(hour=0, minute=0, second=0, microsecond=0)
+    window_start_local = day_start_local - timezone.timedelta(days=safe_window)
+    window_end_local = day_start_local + timezone.timedelta(days=safe_window + 1)
+    return (
+        window_start_local.astimezone(dt_timezone.utc),
+        window_end_local.astimezone(dt_timezone.utc),
+    )
+
+
+def _match_pattern(value, pattern):
+    if not pattern:
+        return True
+    return pattern.lower() in value.lower()
+
+
+def _pick_rule(mailbox, from_addr, subject, filename, supplier_id=None):
+    rules = models.SupplierMailboxRule.objects.filter(
+        mailbox=mailbox, is_active=True
+    ).select_related("supplier")
+    if supplier_id:
+        rules = rules.filter(supplier_id=supplier_id)
+    for rule in rules:
+        if not _match_pattern(from_addr, rule.from_pattern):
+            continue
+        if not _match_pattern(subject, rule.subject_pattern):
+            continue
+        if not _match_pattern(filename, rule.filename_pattern):
+            continue
+        return rule
+    return None
+
+
+def _match_supplier_fallback(
+    supplier, from_addr, subject, filename, has_rules_for_mailbox: bool
+):
+    if not supplier:
+        return False
+    if has_rules_for_mailbox:
+        return False
+    if not supplier.from_address_pattern:
+        return False
+    if not _match_pattern(from_addr, supplier.from_address_pattern):
+        return False
+    if not _match_pattern(subject, supplier.price_subject_pattern):
+        return False
+    if not _match_pattern(filename, supplier.price_filename_pattern):
+        return False
+    return True
+
+
+def _find_supplier_fallback(suppliers, from_addr, subject, filename):
+    for candidate in suppliers:
+        if not candidate.from_address_pattern:
+            continue
+        if not _match_pattern(from_addr, candidate.from_address_pattern):
+            continue
+        if not _match_pattern(subject, candidate.price_subject_pattern):
+            continue
+        if not _match_pattern(filename, candidate.price_filename_pattern):
+            continue
+        return candidate
+    return None
+
+
+def _connect_imap(mailbox, logger, select_folder="INBOX"):
+    host_candidates = _mailbox_host_candidates(mailbox)
+    for attempt in range(2):
+        for host in host_candidates:
+            try:
+                client = imaplib.IMAP4_SSL(host, mailbox.port, timeout=45)
+                client.login(mailbox.username, mailbox.password)
+                if not _select_mailbox(client, select_folder):
+                    raise RuntimeError(f"Could not select mailbox: {select_folder}")
+                if (mailbox.host or "").strip().lower() != host.lower():
+                    _log(logger, f"{mailbox.name}: connected via fallback host {host}.")
+                return client
+            except Exception as exc:
+                _log(
+                    logger,
+                    f"IMAP connection failed for {mailbox.name} via {host} (attempt {attempt + 1}/2): {exc}",
+                )
+        time.sleep(1)
+    return None
+
+
+def _imap_search(client, mailbox, criteria, logger, selected_folder="INBOX"):
+    for attempt in range(2):
+        try:
+            status, data = client.search(None, *criteria)
+            return status, data, client
+        except (imaplib.IMAP4.abort, imaplib.IMAP4.error, socket.timeout, ssl.SSLError) as exc:
+            _log(logger, f"IMAP search error ({mailbox.name}): {exc}")
+            if attempt == 0:
+                client = _connect_imap(mailbox, logger, select_folder=selected_folder)
+                if not client:
+                    return "NO", [], None
+                continue
+            return "NO", [], client
+    return "NO", [], client
+
+
+def _imap_fetch(client, mailbox, msg_id, query, logger, selected_folder="INBOX"):
+    if not client:
+        return "NO", [], None
+    for attempt in range(2):
+        try:
+            status, data = client.fetch(msg_id, query)
+            return status, data, client
+        except (imaplib.IMAP4.abort, imaplib.IMAP4.error, socket.timeout, ssl.SSLError) as exc:
+            _log(logger, f"IMAP fetch error ({mailbox.name}): {exc}")
+            if attempt == 0:
+                client = _connect_imap(mailbox, logger, select_folder=selected_folder)
+                if not client:
+                    return "NO", [], None
+                continue
+            return "NO", [], client
+    return "NO", [], client
+
+
+def _extract_internaldate(meta):
+    if not meta:
+        return None
+    pattern = re.compile(r'INTERNALDATE "([^"]+)"')
+    for item in meta:
+        if isinstance(item, tuple) and item and item[0]:
+            text = item[0].decode(errors="ignore")
+            match = pattern.search(text)
+            if not match:
+                continue
+            raw = match.group(1)
+            try:
+                return datetime.strptime(raw, "%d-%b-%Y %H:%M:%S %z")
+            except ValueError:
+                return None
+    return None
+
+
+def _extract_header_date(meta):
+    if not meta:
+        return None
+    for item in meta:
+        if not isinstance(item, tuple) or len(item) < 2:
+            continue
+        raw_headers = item[1]
+        if not raw_headers:
+            continue
+        try:
+            headers = email.message_from_bytes(raw_headers)
+            raw_date = headers.get("Date")
+            if not raw_date:
+                continue
+            parsed = parsedate_to_datetime(raw_date)
+            if parsed and timezone.is_naive(parsed):
+                parsed = timezone.make_aware(parsed)
+            return parsed
+        except Exception:
+            continue
+    return None
+
+
+def _extract_raw_email_from_fetch(msg_data):
+    if not msg_data:
+        return None
+    for item in msg_data:
+        if isinstance(item, tuple) and len(item) >= 2 and isinstance(item[1], (bytes, bytearray)):
+            return bytes(item[1])
+    return None
+
+
+def _find_all_mail_folder(client):
+    try:
+        status, data = client.list()
+    except Exception:
+        return None
+    if status != "OK" or not data:
+        return None
+    for row in data:
+        if not row:
+            continue
+        text = row.decode(errors="ignore")
+        if "\\All" not in text:
+            continue
+        # Common LIST row: (\HasNoChildren \All) "/" "[Gmail]/All Mail"
+        quoted = re.findall(r'"([^"]*)"', text)
+        if quoted:
+            return quoted[-1]
+        parts = text.rsplit(" ", 1)
+        if len(parts) == 2:
+            return parts[-1].strip('"')
+    return None
+
+
+def _find_archive_like_folder(client):
+    """
+    Find archive-like folder for non-Gmail providers (e.g. mail.ru).
+    Prefer folders flagged as \\Archive, then common archive name patterns.
+    """
+    try:
+        status, data = client.list()
+    except Exception:
+        return None
+    if status != "OK" or not data:
+        return None
+
+    archive_candidates = []
+    name_candidates = []
+    for row in data:
+        if not row:
+            continue
+        text = row.decode(errors="ignore")
+        lowered = text.lower()
+        quoted = re.findall(r'"([^"]*)"', text)
+        folder_name = quoted[-1] if quoted else None
+        if not folder_name:
+            parts = text.rsplit(" ", 1)
+            if len(parts) == 2:
+                folder_name = parts[-1].strip('"')
+        if not folder_name:
+            continue
+        if "\\Archive" in text:
+            archive_candidates.append(folder_name)
+            continue
+        if any(token in lowered for token in ("archive", "архив", "all mail")):
+            name_candidates.append(folder_name)
+    if archive_candidates:
+        return archive_candidates[0]
+    if name_candidates:
+        return name_candidates[0]
+    return None
+
+
+def _select_mailbox(client, folder_name):
+    if not folder_name:
+        return False
+    candidates = [folder_name]
+    trimmed = folder_name.strip()
+    if trimmed.startswith('"') and trimmed.endswith('"'):
+        candidates.append(trimmed[1:-1])
+    else:
+        candidates.append(f'"{trimmed}"')
+    seen = set()
+    for candidate in candidates:
+        if not candidate or candidate in seen:
+            continue
+        seen.add(candidate)
+        try:
+            status, _ = client.select(candidate)
+        except Exception:
+            continue
+        if status == "OK":
+            return True
+    return False
+
+
+def run_import(
+    mailboxes,
+    supplier_id=None,
+    mark_seen=False,
+    limit=0,
+    max_bytes=20_000_000,
+    max_seconds=None,
+    logger=None,
+    run_id=None,
+    search_criteria="UNSEEN",
+    since_date=None,
+    before_date=None,
+    from_filter=None,
+    subject_filter=None,
+    dedupe_same_day_only=False,
+    dedupe_day_window=0,
+    min_received_at=None,
+    use_uid_cursor=False,
+):
+    socket.setdefaulttimeout(20)
+    supplier = None
+    if supplier_id:
+        supplier = models.Supplier.objects.filter(id=supplier_id).first()
+    fallback_suppliers = None
+    if not supplier:
+        fallback_suppliers = list(
+            models.Supplier.objects.filter(is_active=True, from_address_pattern__gt="")
+        )
+    settings_obj = models.ImportSettings.get_solo()
+    blacklist_terms = settings_obj.get_filename_blacklist()
+    last_message = None
+    timed_out = False
+    start_time = time.monotonic()
+    run_started = timezone.now()
+    mailbox_names = ", ".join([mb.name for mb in mailboxes])
+    supplier_stats: dict[int, dict[str, object]] = {}
+    unmatched_samples: dict[tuple[str, str, str], int] = {}
+    log_lines: list[str] = []
+    max_log_lines = 20000
+    unmatched_log_count = 0
+    unmatched_log_limit = 25
+
+    def _log_line(msg):
+        stamp = timezone.localtime(timezone.now()).strftime("%H:%M:%S")
+        log_lines.append(f"[{stamp}] {msg}")
+        if len(log_lines) > max_log_lines:
+            del log_lines[: len(log_lines) - max_log_lines]
+        if run_id and (len(log_lines) <= 3 or len(log_lines) % 10 == 0):
+            models.EmailImportRun.objects.filter(id=run_id).update(
+                detailed_log="\n".join(log_lines)
+            )
+        if logger:
+            logger(msg)
+
+    def _short(value, limit=180):
+        if value is None:
+            return ""
+        text = str(value).replace("\n", " ").replace("\r", " ").strip()
+        if len(text) <= limit:
+            return text
+        return f"{text[: limit - 1]}…"
+
+    def note(msg):
+        nonlocal last_message
+        last_message = msg
+        _log_line(msg)
+
+    summary = {
+        "processed_files": 0,
+        "skipped_duplicates": 0,
+        "matched_files": 0,
+        "errors": 0,
+        "timed_out": False,
+        "attachments_seen": 0,
+        "skipped_no_filename": 0,
+        "skipped_no_payload": 0,
+        "skipped_blacklist": 0,
+        "skipped_unsupported_extension": 0,
+    }
+    if run_id:
+        models.EmailImportRun.objects.filter(id=run_id).update(
+            status=models.EmailImportStatus.RUNNING
+        )
+    timeout_label = "disabled" if not max_seconds else f"{int(max_seconds // 60)}m"
+    _log_line(
+        "Run started: "
+        f"mailboxes={len(mailboxes)} supplier_id={supplier_id or '-'} "
+        f"criteria={search_criteria} since={since_date or '-'} limit={limit or 'none'} "
+        f"timeout={timeout_label}"
+    )
+    def check_timeout(context=""):
+        nonlocal timed_out
+        if not max_seconds:
+            return
+        if time.monotonic() - start_time <= max_seconds:
+            return
+        timed_out = True
+        msg = f"Timed out after {int(max_seconds // 60)} min"
+        if context:
+            msg = f"{msg} ({context})"
+        note(msg)
+        if run_id:
+            models.EmailImportRun.objects.filter(id=run_id).update(
+                status=models.EmailImportStatus.FAILED,
+                finished_at=timezone.now(),
+                errors=F("errors") + 1,
+                last_message=msg,
+                detailed_log="\n".join(log_lines),
+            )
+        raise TimeoutError(msg)
+
+    client = None
+    try:
+        for mailbox in mailboxes:
+            check_timeout("mailbox loop")
+            if run_id:
+                run = models.EmailImportRun.objects.filter(id=run_id).first()
+                if run and run.status == models.EmailImportStatus.CANCELED:
+                    break
+            if mailbox.protocol != models.Mailbox.IMAP:
+                _log(_log_line, f"Skipping {mailbox.name}: only IMAP supported.")
+                continue
+
+            has_rules_for_mailbox = False
+            if supplier:
+                has_rules_for_mailbox = models.SupplierMailboxRule.objects.filter(
+                    supplier=supplier, mailbox=mailbox, is_active=True
+                ).exists()
+            selected_folder = "INBOX"
+            client = _connect_imap(mailbox, _log_line, select_folder=selected_folder)
+            if not client:
+                summary["errors"] += 1
+                if run_id:
+                    models.EmailImportRun.objects.filter(id=run_id).update(
+                        errors=F("errors") + 1,
+                        last_message=f"IMAP connection failed: {mailbox.name}",
+                    )
+                note(f"Skipping mailbox due connection failure: {mailbox.name}")
+                continue
+            criteria = [search_criteria]
+            if from_filter:
+                criteria.extend(["FROM", from_filter])
+            if subject_filter:
+                criteria.extend(["SUBJECT", subject_filter])
+            if since_date:
+                criteria.extend(["SINCE", since_date.strftime("%d-%b-%Y")])
+            if before_date:
+                criteria.extend(["BEFORE", before_date.strftime("%d-%b-%Y")])
+            status, data, client = _imap_search(
+                client, mailbox, criteria, _log_line, selected_folder=selected_folder
+            )
+            if status != "OK":
+                note(f"Failed to search mailbox: {mailbox.name}")
+                if client:
+                    client.logout()
+                continue
+            message_ids = data[0].split()
+            inbox_ids = set(message_ids)
+            note(f"{mailbox.name}: found {len(message_ids)} message(s) in INBOX.")
+            # Gmail can have relevant messages outside INBOX (archived/labels).
+            # Always merge INBOX + All Mail for reliability.
+            if mailbox.host and "gmail.com" in mailbox.host.lower():
+                try:
+                    selected = False
+                    detected_folder = _find_all_mail_folder(client)
+                    folder_candidates = []
+                    if detected_folder:
+                        folder_candidates.append(detected_folder)
+                    folder_candidates.extend(["[Gmail]/All Mail", "[Google Mail]/All Mail"])
+                    seen = set()
+                    for folder in folder_candidates:
+                        if not folder or folder in seen:
+                            continue
+                        seen.add(folder)
+                        if _select_mailbox(client, folder):
+                            selected = True
+                            selected_folder = folder
+                            break
+                    if selected:
+                        status, data, client = _imap_search(
+                            client, mailbox, criteria, _log_line, selected_folder=selected_folder
+                        )
+                        if status == "OK":
+                            all_mail_ids = set(data[0].split())
+                            note(
+                                f"{mailbox.name}: found {len(all_mail_ids)} message(s) in Gmail All Mail."
+                            )
+                            if all_mail_ids:
+                                message_ids = list(all_mail_ids)
+                                _log(_log_line, f"Using Gmail All Mail for {mailbox.name}.")
+                            else:
+                                message_ids = list(inbox_ids)
+                                selected_folder = "INBOX"
+                    else:
+                        _log(_log_line, f"Gmail All Mail folder not accessible for {mailbox.name}.")
+                        selected_folder = "INBOX"
+                except Exception as exc:
+                    _log(_log_line, f"Failed Gmail All Mail fallback ({mailbox.name}): {exc}")
+                    selected_folder = "INBOX"
+                # Ensure we are back in SELECTED state for INBOX fetch loop.
+                if selected_folder == "INBOX":
+                    try:
+                        if not _select_mailbox(client, "INBOX"):
+                            client = _connect_imap(mailbox, _log_line, select_folder="INBOX")
+                            if not client:
+                                summary["errors"] += 1
+                                note(f"Skipping mailbox due INBOX re-select failure: {mailbox.name}")
+                                continue
+                    except Exception:
+                        client = _connect_imap(mailbox, _log_line, select_folder="INBOX")
+                        if not client:
+                            summary["errors"] += 1
+                            note(f"Skipping mailbox due INBOX re-select failure: {mailbox.name}")
+                            continue
+                elif not _select_mailbox(client, selected_folder):
+                    client = _connect_imap(mailbox, _log_line, select_folder=selected_folder)
+                    if not client:
+                        summary["errors"] += 1
+                        note(
+                            f"Skipping mailbox due mailbox re-select failure: {mailbox.name} ({selected_folder})"
+                        )
+                        continue
+            elif mailbox.host and any(
+                domain in mailbox.host.lower()
+                for domain in ("mail.ru", "inbox.ru", "list.ru", "bk.ru")
+            ):
+                # mail.ru-family providers may keep relevant messages outside INBOX.
+                # For supplier/manual runs OR when INBOX is empty, try archive-like folder.
+                # This keeps broad cron runs lightweight but prevents missing archived mail.
+                if supplier or from_filter or subject_filter or not inbox_ids:
+                    try:
+                        archive_folder = _find_archive_like_folder(client)
+                        if archive_folder and _select_mailbox(client, archive_folder):
+                            status, data, client = _imap_search(
+                                client, mailbox, criteria, _log_line, selected_folder=archive_folder
+                            )
+                            if status == "OK":
+                                archive_ids = set(data[0].split())
+                                if archive_ids:
+                                    merged = set(message_ids) | archive_ids
+                                    message_ids = list(merged)
+                                    note(
+                                        f"{mailbox.name}: found {len(archive_ids)} message(s) in archive folder '{archive_folder}'."
+                                    )
+                            # Return to INBOX for fetch loop.
+                            _select_mailbox(client, "INBOX")
+                    except Exception as exc:
+                        _log(_log_line, f"mail.ru archive fallback failed ({mailbox.name}): {exc}")
+            # Process oldest first so history is built chronologically.
+            try:
+                message_ids = sorted(message_ids, key=lambda x: int(x))
+            except Exception:
+                pass
+            cursor_field = "last_inbox_uid"
+            if selected_folder != "INBOX":
+                cursor_field = "last_all_mail_uid"
+            if use_uid_cursor and not supplier and not from_filter and not subject_filter:
+                last_uid = getattr(mailbox, cursor_field, 0) or 0
+                filtered_ids = []
+                for _mid in message_ids:
+                    uid_int = _uid_to_int(_mid)
+                    if uid_int is None:
+                        continue
+                    if uid_int > last_uid:
+                        filtered_ids.append(_mid)
+                note(
+                    f"{mailbox.name}: new by UID cursor={len(filtered_ids)} (last={last_uid}, folder={selected_folder})."
+                )
+                message_ids = filtered_ids
+            if limit:
+                if use_uid_cursor and not supplier and not from_filter and not subject_filter:
+                    # For recurring auto-import runs we prioritize newest messages first.
+                    # This prevents "stuck" behavior after mailbox re-enable when UID backlog is large.
+                    backlog = max(0, len(message_ids) - limit)
+                    if backlog:
+                        _log_line(
+                            f"{mailbox.name}: backlog={backlog} message(s); processing newest {limit}."
+                        )
+                    message_ids = message_ids[-limit:]
+                else:
+                    # Without cursor, newest-first is safer for manual recovery runs.
+                    message_ids = message_ids[-limit:]
+            note(f"{mailbox.name}: processing {len(message_ids)} message(s) after limit.")
+            if run_id:
+                models.EmailImportRun.objects.filter(id=run_id).update(
+                    total_messages=len(message_ids),
+                    processed_messages=0,
+                    last_message=f"Found {len(message_ids)} message(s) in {mailbox.name}.",
+                )
+            if not message_ids and run_id:
+                models.EmailImportRun.objects.filter(id=run_id).update(
+                    last_message=f"No messages found in {mailbox.name}.",
+                )
+
+            max_processed_uid = 0
+            for msg_id in message_ids:
+                check_timeout("processing messages")
+                if run_id:
+                    run = models.EmailImportRun.objects.filter(id=run_id).first()
+                    if run and run.status == models.EmailImportStatus.CANCELED:
+                        break
+                if run_id:
+                    models.EmailImportRun.objects.filter(id=run_id).update(
+                        processed_messages=F("processed_messages") + 1
+                    )
+                status, meta, client = _imap_fetch(
+                    client,
+                    mailbox,
+                    msg_id,
+                    "(BODY.PEEK[HEADER.FIELDS (SUBJECT FROM DATE MESSAGE-ID)] RFC822.SIZE INTERNALDATE)",
+                    _log_line,
+                    selected_folder=selected_folder,
+                )
+                if not client:
+                    continue
+                if status != "OK" or not meta:
+                    continue
+                size = None
+                for item in meta:
+                    if isinstance(item, tuple):
+                        text = item[0].decode(errors="ignore")
+                        if "RFC822.SIZE" in text:
+                            try:
+                                size = int(text.split("RFC822.SIZE")[1].split()[0])
+                            except (IndexError, ValueError):
+                                size = None
+                if size and size > max_bytes:
+                    note(f"Skipping message {msg_id.decode()}: size {size} bytes.")
+                    if run_id:
+                        models.EmailImportRun.objects.filter(id=run_id).update(
+                            last_message=f"Skipped large message {msg_id.decode()}"
+                        )
+                    continue
+                received_at = _extract_internaldate(meta)
+                if received_at and timezone.is_naive(received_at):
+                    received_at = timezone.make_aware(received_at)
+                if received_at and timezone.is_aware(received_at):
+                    received_at = received_at.astimezone(timezone.get_current_timezone())
+                if not received_at:
+                    received_at = _extract_header_date(meta)
+                if (
+                    min_received_at
+                    and received_at
+                    and received_at <= min_received_at
+                ):
+                    if run_id:
+                        models.EmailImportRun.objects.filter(id=run_id).update(
+                            last_message=(
+                                "Skipped old email at "
+                                f"{timezone.localtime(received_at).strftime('%d/%m/%Y %H:%M')}"
+                            )
+                        )
+                    last_message = (
+                        "Skipped old email at "
+                        f"{timezone.localtime(received_at).strftime('%d/%m/%Y %H:%M')}"
+                    )
+                    continue
+                status, msg_data, client = _imap_fetch(
+                    client,
+                    mailbox,
+                    msg_id,
+                    "(BODY.PEEK[])",
+                    _log_line,
+                    selected_folder=selected_folder,
+                )
+                if not client:
+                    continue
+                if status != "OK" or not msg_data:
+                    _log_line(
+                        f"{mailbox.name}: skip message {msg_id.decode(errors='ignore')} - fetch body failed."
+                    )
+                    continue
+                raw_email = _extract_raw_email_from_fetch(msg_data)
+                if not raw_email:
+                    _log_line(
+                        f"{mailbox.name}: skip message {msg_id.decode(errors='ignore')} - empty RFC822 payload."
+                    )
+                    continue
+                uid_int = _uid_to_int(msg_id)
+                if uid_int and uid_int > max_processed_uid:
+                    max_processed_uid = uid_int
+                message = email.message_from_bytes(raw_email)
+                subject = _decode_header(message.get("Subject", ""))
+                from_addr = parseaddr(message.get("From", ""))[1]
+                message_id = (message.get("Message-ID") or "").strip()
+                _log_line(
+                    "Message "
+                    f"{msg_id.decode(errors='ignore')} "
+                    f"from={_short(from_addr, 80)} "
+                    f"subject='{_short(subject, 120)}' "
+                    f"msgid={_short(message_id, 80) or '-'}"
+                )
+                if not received_at and message.get("Date"):
+                    try:
+                        received_at = parsedate_to_datetime(message.get("Date"))
+                        if received_at and timezone.is_naive(received_at):
+                            received_at = timezone.make_aware(received_at)
+                    except Exception:
+                        received_at = None
+
+                batch_by_supplier = {}
+                processed_any = False
+                first_attachment_selected = False
+                for part in message.walk():
+                    check_timeout("processing attachments")
+                    if first_attachment_selected:
+                        _log_line(
+                            f"{mailbox.name}: processed first attachment in message {msg_id.decode(errors='ignore')}; skipping remaining attachments."
+                        )
+                        break
+                    if run_id:
+                        run = models.EmailImportRun.objects.filter(id=run_id).first()
+                        if run and run.status == models.EmailImportStatus.CANCELED:
+                            break
+                    if part.get_content_maintype() == "multipart":
+                        continue
+                    filename = _get_part_filename(part)
+                    content_type = (part.get_content_type() or "").lower()
+                    if not filename:
+                        ext = _infer_extension(content_type)
+                        if ext and part.get_content_maintype() != "text":
+                            filename = f"attachment_{timezone.now():%Y%m%d_%H%M%S}{ext}"
+                            _log_line(
+                                f"{mailbox.name}: inferred attachment filename '{filename}' from content-type={content_type or '-'}."
+                            )
+                        else:
+                            summary["skipped_no_filename"] += 1
+                            _log_line(
+                                f"{mailbox.name}: SKIP attachment in message {msg_id.decode(errors='ignore')} - no filename."
+                            )
+                            continue
+                    summary["attachments_seen"] += 1
+                    first_attachment_selected = True
+                    lowered_filename = filename.lower()
+                    if blacklist_terms and any(term in lowered_filename for term in blacklist_terms):
+                        summary["skipped_blacklist"] += 1
+                        _log_line(
+                            f"{mailbox.name}: SKIP '{filename}' - blacklist match."
+                        )
+                        if run_id:
+                            models.EmailImportRun.objects.filter(id=run_id).update(
+                                last_message=f"Skipped by filename blacklist: {filename}"
+                            )
+                        last_message = f"Skipped by filename blacklist: {filename}"
+                        continue
+                    payload = part.get_payload(decode=True)
+                    if not payload:
+                        summary["skipped_no_payload"] += 1
+                        _log_line(
+                            f"{mailbox.name}: SKIP '{filename}' - empty payload."
+                        )
+                        continue
+
+                    rule = _pick_rule(mailbox, from_addr, subject, filename, supplier_id)
+                    matched_supplier = None
+                    if rule:
+                        matched_supplier = rule.supplier
+                    elif supplier:
+                        if not _match_supplier_fallback(
+                            supplier,
+                            from_addr,
+                            subject,
+                            filename,
+                            has_rules_for_mailbox,
+                        ):
+                            continue
+                        matched_supplier = supplier
+                    else:
+                        matched_supplier = _find_supplier_fallback(
+                            fallback_suppliers or [],
+                            from_addr,
+                            subject,
+                            filename,
+                        )
+                        if not matched_supplier:
+                            key = (
+                                (from_addr or "").strip().lower(),
+                                (subject or "").strip()[:120],
+                                (filename or "").strip()[:120],
+                            )
+                            unmatched_samples[key] = unmatched_samples.get(key, 0) + 1
+                            if unmatched_log_count < unmatched_log_limit:
+                                unmatched_log_count += 1
+                                _log_line(
+                                    f"{mailbox.name}: UNMATCHED '{filename}' from={_short(from_addr, 80)} subject='{_short(subject, 100)}'."
+                                )
+                            continue
+                    summary["matched_files"] += 1
+                    _log_line(
+                        f"{mailbox.name}: MATCH supplier='{matched_supplier.name}' file='{filename}'."
+                    )
+                    if run_id:
+                        models.EmailImportRun.objects.filter(id=run_id).update(
+                            matched_files=F("matched_files") + 1
+                        )
+
+                    if rule:
+                        file_kind = (
+                            models.FileKind.STOCK
+                            if rule.match_stock_files and not rule.match_price_files
+                            else models.FileKind.PRICE
+                        )
+                    else:
+                        file_kind = models.FileKind.PRICE
+                    supplier_id_for_stats = matched_supplier.id
+                    stats = supplier_stats.setdefault(
+                        supplier_id_for_stats,
+                        {
+                            "matched": 0,
+                            "processed": 0,
+                            "errors": 0,
+                            "last_message": "",
+                        },
+                    )
+                    stats["matched"] = stats.get("matched", 0) + 1
+
+                    if file_kind == models.FileKind.PRICE:
+                        lower_name = filename.lower()
+                        if not lower_name.endswith((".csv", ".xlsx", ".xls")):
+                            if run_id:
+                                models.EmailImportRun.objects.filter(id=run_id).update(
+                                    last_message=f"Skipped unsupported file: {filename}"
+                                )
+                            summary["skipped_unsupported_extension"] += 1
+                            _log_line(
+                                f"{mailbox.name}: SKIP '{filename}' - unsupported extension for price import."
+                            )
+                            last_message = f"Skipped unsupported file: {filename}"
+                            continue
+
+                    content_hash = hashlib.sha256(payload).hexdigest()
+                    if dedupe_same_day_only and received_at:
+                        day_start_utc, day_end_utc = _local_day_window_bounds(
+                            received_at, dedupe_day_window
+                        )
+                        # Deduplicate within supplier + local day window across all
+                        # mailboxes so the same attachment hash is imported once.
+                        # Include pending files too so repeated attachments in the same run
+                        # are skipped immediately.
+                        exists = models.ImportFile.objects.filter(
+                            content_hash=content_hash,
+                            file_kind=file_kind,
+                            import_batch__supplier=matched_supplier,
+                            import_batch__received_at__gte=day_start_utc,
+                            import_batch__received_at__lt=day_end_utc,
+                            status__in=[
+                                models.ImportStatus.PENDING,
+                                models.ImportStatus.PROCESSED,
+                            ],
+                        ).exists()
+                    else:
+                        exists = models.ImportFile.objects.filter(
+                            content_hash=content_hash,
+                            status=models.ImportStatus.PROCESSED,
+                            import_batch__supplier=matched_supplier,
+                        ).exists()
+                    if exists:
+                        summary["skipped_duplicates"] += 1
+                        _log_line(
+                            f"{mailbox.name}: SKIP duplicate '{filename}' (supplier={matched_supplier.name}, hash={content_hash[:10]}...)."
+                        )
+                        if run_id:
+                            models.EmailImportRun.objects.filter(id=run_id).update(
+                                skipped_duplicates=F("skipped_duplicates") + 1
+                            )
+                        last_message = f"Skipped duplicate file: {filename}"
+                        continue
+
+                    batch = batch_by_supplier.get(matched_supplier.id)
+                    if not batch:
+                        if message_id:
+                            batch, _ = models.ImportBatch.objects.get_or_create(
+                                supplier=matched_supplier,
+                                message_id=message_id,
+                                defaults={
+                                    "mailbox": mailbox,
+                                    "received_at": received_at,
+                                    "status": models.ImportStatus.PENDING,
+                                },
+                            )
+                            # Backfill critical metadata on previously created batches.
+                            update_fields = []
+                            if batch.mailbox_id is None:
+                                batch.mailbox = mailbox
+                                update_fields.append("mailbox")
+                            if batch.received_at is None and received_at is not None:
+                                batch.received_at = received_at
+                                update_fields.append("received_at")
+                            if update_fields:
+                                batch.save(update_fields=update_fields)
+                        else:
+                            # Some providers omit Message-ID; never collapse such
+                            # emails into old batches with blank IDs.
+                            batch = models.ImportBatch.objects.create(
+                                supplier=matched_supplier,
+                                mailbox=mailbox,
+                                message_id="",
+                                received_at=received_at,
+                                status=models.ImportStatus.PENDING,
+                            )
+                        batch_by_supplier[matched_supplier.id] = batch
+
+                    import_file = models.ImportFile.objects.create(
+                        import_batch=batch,
+                        mapping=models.SupplierFileMapping.objects.filter(
+                            supplier=matched_supplier,
+                            file_kind=file_kind,
+                            is_active=True,
+                        ).order_by("-id").first(),
+                        file_kind=file_kind,
+                        filename=filename,
+                        content_hash=content_hash,
+                        status=models.ImportStatus.PENDING,
+                    )
+                    import_file.file.save(filename, ContentFile(payload), save=True)
+                    _log_line(
+                        f"{mailbox.name}: PROCESS file='{filename}' supplier='{matched_supplier.name}' kind={file_kind} import_file_id={import_file.id}."
+                    )
+                    processed_any = True
+                    try:
+                        process_import_file(import_file)
+                        import_file.status = models.ImportStatus.PROCESSED
+                        import_file.save(update_fields=["status"])
+                        summary["processed_files"] += 1
+                        _log_line(
+                            f"{mailbox.name}: OK file='{filename}' supplier='{matched_supplier.name}' import_file_id={import_file.id}."
+                        )
+                        stats["processed"] = stats.get("processed", 0) + 1
+                        if run_id:
+                            models.EmailImportRun.objects.filter(id=run_id).update(
+                                processed_files=F("processed_files") + 1
+                            )
+                    except Exception as exc:
+                        import_file.status = models.ImportStatus.FAILED
+                        import_file.error_message = str(exc)
+                        import_file.save(update_fields=["status", "error_message"])
+                        batch.status = models.ImportStatus.FAILED
+                        batch.error_message = str(exc)
+                        batch.save(update_fields=["status", "error_message"])
+                        summary["errors"] += 1
+                        _log_line(
+                            f"{mailbox.name}: FAIL file='{filename}' supplier='{matched_supplier.name}' import_file_id={import_file.id} error={_short(exc, 260)}"
+                        )
+                        stats["errors"] = stats.get("errors", 0) + 1
+                        if run_id:
+                            models.EmailImportRun.objects.filter(id=run_id).update(
+                                errors=F("errors") + 1,
+                                last_message=str(exc),
+                            )
+                        last_message = f"Import failed: {filename} (see detailed log)."
+                        stats["last_message"] = str(exc)
+
+                for batch in batch_by_supplier.values():
+                    if batch.status != models.ImportStatus.FAILED:
+                        batch.status = models.ImportStatus.PROCESSED
+                        batch.save(update_fields=["status"])
+
+                if processed_any and mark_seen:
+                    try:
+                        client.store(msg_id, "+FLAGS", "\\Seen")
+                    except (imaplib.IMAP4.abort, socket.timeout, ssl.SSLError):
+                        _log(_log_line, "Failed to mark message as seen.")
+
+            if use_uid_cursor and not supplier and not from_filter and not subject_filter:
+                if max_processed_uid:
+                    current_uid = getattr(mailbox, cursor_field, 0) or 0
+                    if max_processed_uid > current_uid:
+                        setattr(mailbox, cursor_field, max_processed_uid)
+                        mailbox.last_checked_at = timezone.now()
+                        mailbox.save(update_fields=[cursor_field, "last_checked_at"])
+
+            if client:
+                client.logout()
+                client = None
+    except TimeoutError:
+        summary["errors"] += 1
+        summary["timed_out"] = True
+    finally:
+        if client:
+            try:
+                client.logout()
+            except Exception:
+                pass
+    if not supplier and fallback_suppliers is not None:
+        for fallback_supplier in fallback_suppliers:
+            stats = supplier_stats.get(
+                fallback_supplier.id,
+                {
+                    "matched": 0,
+                    "processed": 0,
+                    "errors": 0,
+                    "last_message": "No matching emails.",
+                },
+            )
+            if not stats.get("last_message"):
+                stats["last_message"] = "No matching emails."
+            fallback_supplier.last_email_check_at = run_started
+            fallback_supplier.last_email_matched = stats.get("matched", 0)
+            fallback_supplier.last_email_processed = stats.get("processed", 0)
+            fallback_supplier.last_email_errors = stats.get("errors", 0)
+            fallback_supplier.last_email_last_message = stats.get("last_message") or ""
+            fallback_supplier.last_email_mailboxes = mailbox_names
+            fallback_supplier.save(
+                update_fields=[
+                    "last_email_check_at",
+                    "last_email_matched",
+                    "last_email_processed",
+                    "last_email_errors",
+                    "last_email_last_message",
+                    "last_email_mailboxes",
+                ]
+            )
+    if run_id:
+        run = models.EmailImportRun.objects.filter(id=run_id).first()
+        if run and run.status == models.EmailImportStatus.CANCELED:
+            models.EmailImportRun.objects.filter(id=run_id).update(
+                finished_at=timezone.now(),
+                detailed_log="\n".join(log_lines),
+            )
+        elif not timed_out:
+            models.EmailImportRun.objects.filter(id=run_id).update(
+                status=models.EmailImportStatus.FINISHED,
+                finished_at=timezone.now(),
+                matched_files=summary["matched_files"],
+                processed_files=summary["processed_files"],
+                skipped_duplicates=summary["skipped_duplicates"],
+                errors=summary["errors"],
+                detailed_log="\n".join(log_lines),
+            )
+    if not summary["matched_files"] and unmatched_samples and logger:
+        _log(_log_line, "No supplier matches. Top unmatched sender/subject/file:")
+        top_items = sorted(unmatched_samples.items(), key=lambda item: item[1], reverse=True)[:10]
+        for (from_addr, subj, fname), count in top_items:
+            _log(
+                _log_line,
+                f"- x{count} from='{from_addr}' subject='{subj}' file='{fname}'",
+            )
+    if logger:
+        _log(
+            _log_line,
+            "Attachment diagnostics: "
+            f"seen={summary['attachments_seen']} "
+            f"no_filename={summary['skipped_no_filename']} "
+            f"no_payload={summary['skipped_no_payload']} "
+            f"blacklist={summary['skipped_blacklist']} "
+            f"unsupported_ext={summary['skipped_unsupported_extension']}",
+        )
+    if run_id:
+        models.EmailImportRun.objects.filter(id=run_id).update(
+            detailed_log="\n".join(log_lines)
+        )
+    summary["last_message"] = last_message
+    return summary
+
+
+def _log(logger, message):
+    if logger:
+        logger(message)
+
+
+def _uid_to_int(uid):
+    if isinstance(uid, bytes):
+        uid = uid.decode(errors="ignore")
+    try:
+        return int(str(uid).strip())
+    except Exception:
+        return None

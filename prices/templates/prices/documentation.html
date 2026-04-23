@@ -1,0 +1,138 @@
+{% extends "prices/base.html" %}
+
+{% block title %}Documentation{% endblock %}
+{% block body_data %}data-page="documentation"{% endblock %}
+
+{% block content %}
+    <div class="page-stack">
+        <div class="section-card">
+            <span class="page-kicker">Reference</span>
+            <h1 class="page-title">Technical Documentation</h1>
+            <p class="page-subtitle space-bottom-sm">Current project notes for developers, operators, and AI agents.</p>
+            <p class="tone-muted space-bottom-sm">This page is a live summary of the current codebase. The detailed repo handoff lives in <code>README.md</code> and <code>PROJECT_HANDOFF.md</code> at the repository root.</p>
+            <ul class="space-bottom-none">
+                <li><code>README.md</code>: setup, routes, stack, operations summary.</li>
+                <li><code>PROJECT_HANDOFF.md</code>: detailed architecture, data flow, commands, constraints, and maintenance notes.</li>
+            </ul>
+        </div>
+
+        <div class="section-card">
+            <h2 class="card-title">1) Current System Facts</h2>
+            <ul class="space-bottom-none">
+                <li>Framework: Django 5, server-rendered templates, one main app: <code>prices</code>.</li>
+                <li>Database: PostgreSQL only. Current settings do <strong>not</strong> support SQLite runtime.</li>
+                <li>Static files: WhiteNoise.</li>
+                <li>Timezone: request rendering is forced to <code>Europe/Moscow</code>.</li>
+                <li>Viewer routes live on <code>/</code> and still require login.</li>
+                <li>Custom staff workspace lives under <code>/admin/</code>.</li>
+                <li>Django admin lives separately under <code>/django-admin/</code>.</li>
+                <li>Frontend policy: new UI work must use native PerfumeX layout and component classes. Do not introduce Bootstrap component styling or Bootstrap-style utility class patterns in new templates.</li>
+            </ul>
+        </div>
+
+        <div class="section-card">
+            <h2 class="card-title">2) Core Data Model</h2>
+            <ul class="space-bottom-none">
+                <li><code>Supplier</code>: supplier identity, defaults, email patterns, diagnostics.</li>
+                <li><code>Mailbox</code>: IMAP settings and incremental UID cursors.</li>
+                <li><code>SupplierMailboxRule</code>: mailbox-specific supplier matching.</li>
+                <li><code>SupplierFileMapping</code>: spreadsheet parsing configuration.</li>
+                <li><code>ImportBatch</code>: one import event for one supplier.</li>
+                <li><code>ImportFile</code>: one imported file plus blob/hash/status/error.</li>
+                <li><code>SupplierProduct</code>: current supplier catalog row.</li>
+                <li><code>PriceSnapshot</code>: historical price record.</li>
+                <li><code>OurProduct</code>: internal normalized product target.</li>
+                <li><code>ExchangeRate</code>: dated conversion table.</li>
+                <li><code>ImportSettings</code>: singleton operational settings.</li>
+                <li><code>EmailImportRun</code>: import progress and detailed log.</li>
+                <li><code>UserPreference</code>: per-user saved filters and exclude terms.</li>
+            </ul>
+        </div>
+
+        <div class="section-card">
+            <h2 class="card-title">3) Import Pipeline</h2>
+            <ol class="space-bottom-sm">
+                <li>Create <code>ImportBatch</code> and <code>ImportFile</code>.</li>
+                <li>Find active supplier mapping.</li>
+                <li>Parse spreadsheet rows from <code>.csv</code>, <code>.xlsx</code>, or <code>.xls</code>.</li>
+                <li>Normalize price values and infer currency when needed.</li>
+                <li>Build supplier identity keys from SKU or normalized name.</li>
+                <li>Upsert <code>SupplierProduct</code> current-state rows.</li>
+                <li>Create <code>PriceSnapshot</code> history rows.</li>
+                <li>When the imported batch is the latest for that supplier, deactivate missing products.</li>
+            </ol>
+            <p class="tone-muted space-bottom-none">The single most important backend entry point is <code>prices.services.importer.process_import_file()</code>.</p>
+        </div>
+
+        <div class="section-card">
+            <h2 class="card-title">4) Email Import Mechanics</h2>
+            <ul class="space-bottom-none">
+                <li>Main command: <code>python manage.py import_emails</code>.</li>
+                <li>Importer uses IMAP and can merge Gmail INBOX with All Mail.</li>
+                <li>Supplier matching priority: mailbox rule first, supplier fallback second.</li>
+                <li>Duplicate detection uses supplier + local-day window + SHA-256 content hash.</li>
+                <li>Interrupted stale pending imports are auto-failed and may be retried from stored files.</li>
+                <li>Daily CBR USD/RUB rate is synced automatically when needed.</li>
+            </ul>
+        </div>
+
+        <div class="section-card">
+            <h2 class="card-title">5) Operations And Scheduler</h2>
+            <ul class="space-bottom-none">
+                <li>UI path: <strong>Settings -> Import Settings</strong>.</li>
+                <li>Scheduler install/remove is handled from the web UI.</li>
+                <li><strong>Run now</strong> starts an in-process background thread from the web app and calls <code>import_emails --force</code>.</li>
+                <li>Production deploy is defined in <code>.github/workflows/deploy.yml</code>.</li>
+                <li>Deploy target assumes app root <code>/opt/perfumex/PerfumeX</code> and service name <code>perfumex</code>.</li>
+            </ul>
+        </div>
+
+        <div class="section-card">
+            <h2 class="card-title">6) Main UI Areas</h2>
+            <ul class="space-bottom-none">
+                <li><strong>Suppliers</strong>: supplier records, mappings, mailbox rules, manual import.</li>
+                <li><strong>Supplier Overview</strong>: import operations dashboard and batch log.</li>
+                <li><strong>Supplier Products</strong>: current supplier catalog with live search and deltas.</li>
+                <li><strong>Product Detail</strong>: latest-per-day history chart and batch traceability.</li>
+                <li><strong>Our Products</strong>: internal grouping target for linked offers.</li>
+                <li><strong>Product Linking</strong>: suggestion scoring between supplier and internal products.</li>
+                <li><strong>Currencies</strong>: exchange-rate maintenance.</li>
+                <li><strong>Users / Groups / Mailboxes</strong>: staff operations and permissions.</li>
+            </ul>
+        </div>
+
+        <div class="section-card">
+            <h2 class="card-title">7) Management Commands</h2>
+            <ul class="space-bottom-none">
+                <li><code>import_emails</code>: scheduled/manual mailbox import entry point.</li>
+                <li><code>cleanup_duplicate_price_imports</code>: dedupe historical imports by supplier/day/hash.</li>
+                <li><code>import_supplier_folder</code>: bulk import price files from a server folder.</li>
+                <li><code>reorganize_import_files</code>: move stored files to organized paths.</li>
+                <li><code>repair_supplier_price_imports</code>: reprocess stored processed price files.</li>
+            </ul>
+        </div>
+
+        <div class="section-card">
+            <h2 class="card-title">8) Practical Caveats</h2>
+            <ul class="space-bottom-none">
+                <li>The repository contains <code>db.sqlite3</code>, but runtime settings still require PostgreSQL.</li>
+                <li>Local helper <code>run_python_server.cmd</code> uses <code>--noreload</code>, so edits require restart.</li>
+                <li>Automated tests are effectively missing right now.</li>
+                <li>Import, dedupe, and historical conversion changes are high-risk and should be treated carefully.</li>
+            </ul>
+        </div>
+
+        <div class="section-card">
+            <h2 class="card-title">9) Fast Debug Checklist</h2>
+            <ol class="space-bottom-none">
+                <li>Run <code>python manage.py check</code>.</li>
+                <li>Confirm PostgreSQL environment variables are loaded.</li>
+                <li>Confirm supplier mapping exists and matches the real file.</li>
+                <li>Check latest <code>EmailImportRun</code> and import batch details.</li>
+                <li>Check sender/subject/filename matching patterns.</li>
+                <li>Check blacklist terms and duplicate hash behavior.</li>
+                <li>If local UI changes look missing, restart the dev server because <code>--noreload</code> is in use.</li>
+            </ol>
+        </div>
+    </div>
+{% endblock %}

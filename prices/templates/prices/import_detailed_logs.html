@@ -1,0 +1,193 @@
+{% extends "prices/base.html" %}
+{% load static tz %}
+
+{% block title %}Import Detailed Logs{% endblock %}
+{% block body_data %}data-page="import-detailed-logs"{% endblock %}
+
+{% block extra_head %}
+    <link href="{% static 'prices/css/imports.css' %}" rel="stylesheet">
+{% endblock %}
+
+{% block content %}
+    <div class="page-stack">
+        {% include "prices/_import_tabs.html" %}
+
+        <div class="page-header">
+            <div>
+                <span class="page-kicker">Diagnostics</span>
+                <h1 class="page-title">Detailed Import Logs</h1>
+                <div class="page-meta">Full run diagnostics and batch-level traceability for supplier imports.</div>
+            </div>
+        </div>
+
+        <div class="settings-section">
+            <div class="settings-section-header">
+                <div>
+                    <span class="card-label">Filters</span>
+                    <h2 class="card-title">Run filters</h2>
+                </div>
+            </div>
+            <div class="settings-body">
+                <form method="get" class="layout-grid-12 gap-md items-end settings-row-full">
+                    <div class="span-12 md-span-4">
+                        <label for="run-supplier-filter" class="form-label">Supplier</label>
+                        <select id="run-supplier-filter" name="supplier">
+                            <option value="">All</option>
+                            {% for supplier in supplier_options %}
+                                <option value="{{ supplier.id }}"{% if supplier_filter == supplier.id|stringformat:"s" %} selected{% endif %}>{{ supplier.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="span-12 md-span-4">
+                        <label for="run-status-filter" class="form-label">Run status</label>
+                        <select id="run-status-filter" name="run_status">
+                            <option value="">All</option>
+                            {% for value in run_status_options %}
+                                <option value="{{ value }}"{% if status_filter == value %} selected{% endif %}>{{ value }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="span-12 md-span-4">
+                        <label for="batch-status-filter" class="form-label">Batch status</label>
+                        <select id="batch-status-filter" name="batch_status">
+                            <option value="">All</option>
+                            {% for value, label in batch_status_options %}
+                                <option value="{{ value }}"{% if batch_status_filter == value %} selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="span-12">
+                        <button class="button secondary" type="submit">Apply filters</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="settings-section">
+            <div class="settings-section-header">
+                <div>
+                    <span class="card-label">Runs</span>
+                    <h2 class="card-title">Run logs</h2>
+                </div>
+            </div>
+            <div class="settings-body">
+                {% if runs_page.object_list %}
+                    <div class="display-grid gap-md settings-row-full">
+                        {% for run in runs_page.object_list %}
+                            <div class="run-log-card">
+                                <div class="run-log-head">
+                                    <div class="layout-column gap-xs">
+                                        <strong>{{ run.supplier.name }}</strong>
+                                        <div class="run-log-meta">
+                                            <span class="run-log-status {{ run.status|lower }}">{{ run.status }}</span>
+                                            <span>Started: {{ run.started_at|timezone:"Europe/Moscow"|date:"d/m/Y H:i:s" }}</span>
+                                            <span>Finished: {% if run.finished_at %}{{ run.finished_at|timezone:"Europe/Moscow"|date:"d/m/Y H:i:s" }}{% else %}-{% endif %}</span>
+                                        </div>
+                                    </div>
+                                    <a class="button secondary" href="{{ overview_url }}?supplier={{ run.supplier.id }}">Open supplier</a>
+                                </div>
+                                {% if run.console_log %}
+                                    <pre class="run-log-pre">{{ run.console_log }}</pre>
+                                {% else %}
+                                    <p class="run-log-empty">No detailed lines available for this run.</p>
+                                {% endif %}
+                                <div class="run-log-summary">
+                                    <span>Messages: {{ run.processed_messages }}/{{ run.total_messages }}</span>
+                                    <span>Files: {{ run.processed_files }}</span>
+                                    <span>Errors: {{ run.errors }}</span>
+                                    <span title="{{ run.last_message|default:'-' }}">Last message: {{ run.last_message|default:"-"|truncatechars:220 }}</span>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                    {% if runs_page.paginator.num_pages > 1 %}
+                        <nav class="pagination-shell settings-row-full" aria-label="Detailed logs pagination">
+                            <div class="pagination-list">
+                                {% if runs_page.has_previous %}
+                                    <a class="page-link" href="?page={{ runs_page.previous_page_number }}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if status_filter %}&run_status={{ status_filter }}{% endif %}{% if batch_status_filter %}&batch_status={{ batch_status_filter }}{% endif %}">Previous</a>
+                                {% endif %}
+                                {% for page_num in runs_page.paginator.page_range %}
+                                    {% if page_num <= 5 or page_num > runs_page.paginator.num_pages|add:-3 %}
+                                        {% if page_num == runs_page.number %}
+                                            <span class="page-link is-active">{{ page_num }}</span>
+                                        {% else %}
+                                            <a class="page-link" href="?page={{ page_num }}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if status_filter %}&run_status={{ status_filter }}{% endif %}{% if batch_status_filter %}&batch_status={{ batch_status_filter }}{% endif %}">{{ page_num }}</a>
+                                        {% endif %}
+                                    {% endif %}
+                                {% endfor %}
+                                {% if runs_page.has_next %}
+                                    <a class="page-link" href="?page={{ runs_page.next_page_number }}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if status_filter %}&run_status={{ status_filter }}{% endif %}{% if batch_status_filter %}&batch_status={{ batch_status_filter }}{% endif %}">Next</a>
+                                {% endif %}
+                            </div>
+                            <form class="pagination-jump" method="get">
+                                <label for="runs-page-jump">Page</label>
+                                <input id="runs-page-jump" type="number" name="page" min="1" max="{{ runs_page.paginator.num_pages }}" value="{{ runs_page.number }}">
+                                {% if supplier_filter %}<input type="hidden" name="supplier" value="{{ supplier_filter }}">{% endif %}
+                                {% if status_filter %}<input type="hidden" name="run_status" value="{{ status_filter }}">{% endif %}
+                                {% if batch_status_filter %}<input type="hidden" name="batch_status" value="{{ batch_status_filter }}">{% endif %}
+                                <button class="button secondary" type="submit">Go</button>
+                            </form>
+                            <div class="pagination-summary">Page {{ runs_page.number }} of {{ runs_page.paginator.num_pages }}</div>
+                        </nav>
+                    {% endif %}
+                {% else %}
+                    <div class="products-empty-state">No run logs yet.</div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="settings-section">
+            <div class="settings-section-header">
+                <div>
+                    <span class="card-label">Batches</span>
+                    <h2 class="card-title">Import events</h2>
+                </div>
+            </div>
+            <div class="settings-body">
+                {% if batches_page.object_list %}
+                    <div class="display-grid gap-md settings-row-full">
+                        {% for batch in batches_page.object_list %}
+                            <div class="run-log-card">
+                                <div class="run-log-head">
+                                    <div class="layout-column gap-xs">
+                                        <strong>{{ batch.supplier.name }}</strong>
+                                        <div class="run-log-meta">
+                                            <span class="run-log-status {{ batch.status|lower }}">{{ batch.status }}</span>
+                                            <span>Received: {% if batch.received_at %}{{ batch.received_at|timezone:"Europe/Moscow"|date:"d/m/Y H:i:s" }}{% else %}-{% endif %}</span>
+                                            <span>Created: {{ batch.created_at|timezone:"Europe/Moscow"|date:"d/m/Y H:i:s" }}</span>
+                                            <span>Mailbox: {% if batch.mailbox %}{{ batch.mailbox.name }}{% else %}Manual upload / Backfill{% endif %}</span>
+                                            <span>Message ID: {{ batch.message_id|default:"-" }}</span>
+                                        </div>
+                                    </div>
+                                    <a class="button secondary" href="{% url 'prices:import_detail' batch.id %}">Open batch</a>
+                                </div>
+                                <pre class="run-log-pre">{{ batch.console_log }}</pre>
+                            </div>
+                        {% endfor %}
+                    </div>
+                    {% if batches_page.paginator.num_pages > 1 %}
+                        <nav class="pagination-shell settings-row-full" aria-label="Batch logs pagination">
+                            <div class="pagination-list">
+                                {% if batches_page.has_previous %}
+                                    <a class="page-link" href="?bpage={{ batches_page.previous_page_number }}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if status_filter %}&run_status={{ status_filter }}{% endif %}{% if batch_status_filter %}&batch_status={{ batch_status_filter }}{% endif %}">Previous</a>
+                                {% endif %}
+                                {% for page_num in batches_page.paginator.page_range %}
+                                    {% if page_num == batches_page.number %}
+                                        <span class="page-link is-active">{{ page_num }}</span>
+                                    {% elif page_num > batches_page.number|add:-3 and page_num < batches_page.number|add:3 %}
+                                        <a class="page-link" href="?bpage={{ page_num }}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if status_filter %}&run_status={{ status_filter }}{% endif %}{% if batch_status_filter %}&batch_status={{ batch_status_filter }}{% endif %}">{{ page_num }}</a>
+                                    {% endif %}
+                                {% endfor %}
+                                {% if batches_page.has_next %}
+                                    <a class="page-link" href="?bpage={{ batches_page.next_page_number }}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if status_filter %}&run_status={{ status_filter }}{% endif %}{% if batch_status_filter %}&batch_status={{ batch_status_filter }}{% endif %}">Next</a>
+                                {% endif %}
+                            </div>
+                        </nav>
+                    {% endif %}
+                {% else %}
+                    <div class="products-empty-state">No import batches yet.</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+{% endblock %}

@@ -1,0 +1,20 @@
+{% extends "prices/base.html" %}
+{% block body_data %}data-page="generic-form"{% endblock %}
+
+{% block content %}
+    <div class="page-stack">
+        <div class="section-card form-shell">
+            <span class="page-kicker">Editor</span>
+            <h1 class="page-title">{{ object_name }}</h1>
+            <p class="page-subtitle space-bottom-none">Update values and save changes to continue.</p>
+            <form method="post"{% if form.is_multipart %} enctype="multipart/form-data"{% endif %} class="space-top-md">
+                {% csrf_token %}
+                {{ form.as_p }}
+                <div class="form-actions">
+                    <button class="button" type="submit">Save</button>
+                    <a class="button ghost" href="javascript:history.back()">Cancel</a>
+                </div>
+            </form>
+        </div>
+    </div>
+{% endblock %}

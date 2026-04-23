@@ -1,0 +1,144 @@
+﻿.import-workspace {
+  display: grid;
+  gap: 28px;
+}
+
+.import-tabs {
+  margin-bottom: 0;
+}
+
+.import-overview-header,
+.import-board__head,
+.settings-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.import-control-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.import-control-panel,
+.import-board,
+.settings-panel {
+  border: 1px solid var(--grey-200);
+  border-radius: var(--radius-md);
+  padding: 24px;
+  background: var(--white);
+}
+
+.import-board .table-wrap,
+.settings-panel .table-wrap {
+  margin-top: 16px;
+}
+
+.import-col-actions .button,
+.import-col-actions .action-btn {
+  white-space: nowrap;
+}
+
+.progress-thin {
+  height: 6px;
+  background: var(--white);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.progress-thin .progress-bar {
+  background: var(--black);
+}
+
+.import-status,
+.email-status {
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--grey-600);
+}
+
+.settings-section {
+  border: 1px solid var(--grey-200);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--white);
+}
+
+.settings-section-header {
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--grey-200);
+  background: var(--white);
+}
+
+.settings-section-title {
+  font-family: 'Playfair Display', serif;
+  font-size: 15px;
+  font-weight: 400;
+  margin: 0 0 2px;
+}
+
+.settings-section-desc {
+  font-size: 12px;
+  color: var(--grey-600);
+}
+
+.settings-body {
+  padding: 20px 24px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.settings-row-full {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 991.98px) {
+  .import-control-grid,
+  .settings-body {
+    grid-template-columns: 1fr;
+  }
+  .import-control-panel,
+  .import-board,
+  .settings-panel { padding: 18px; }
+  .import-overview-header,
+  .import-board__head,
+  .settings-head { flex-direction: column; }
+}
+
+@media (max-width: 767.98px) {
+  .import-workspace {
+    gap: 20px;
+  }
+
+  .import-control-panel,
+  .import-board,
+  .settings-panel {
+    padding: 16px;
+  }
+
+  .settings-section-header {
+    padding: 14px 16px;
+  }
+
+  .settings-body {
+    padding: 16px;
+    gap: 16px;
+  }
+
+  .import-col-actions .d-inline-flex,
+  .import-col-actions .d-flex,
+  .import-col-actions .layout-inline,
+  .import-col-actions .layout-row {
+    width: 100%;
+  }
+
+  .import-col-actions .button,
+  .import-col-actions .action-btn {
+    white-space: normal;
+  }
+}
