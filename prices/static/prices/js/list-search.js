@@ -421,8 +421,8 @@
             return x.toFixed(1) + "," + y.toFixed(1);
         }).join(" ");
         var color = deltaDir === "down" ? "#22c55e" : deltaDir === "up" ? "#ef4444" : "#c0c0c0";
-        return "<svg class=\"product-sparkline\" width=\"" + w + "\" height=\"" + h +
-            "\" viewBox=\"0 0 " + w + " " + h + "\" fill=\"none\" aria-hidden=\"true\">" +
+        return "<svg class=\"product-sparkline\" viewBox=\"0 0 " + w + " " + h +
+            "\" preserveAspectRatio=\"none\" fill=\"none\" aria-hidden=\"true\">" +
             "<polyline points=\"" + pts + "\" stroke=\"" + color +
             "\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg>";
     }
