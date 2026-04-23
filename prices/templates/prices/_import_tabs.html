@@ -1,7 +1,0 @@
-﻿<div class="import-tabs">
-    <div class="import-tabs__inner">
-        <a class="import-tabs__link {% if import_section == 'overview' %}is-active{% endif %}" href="{{ overview_url }}">Suppliers</a>
-        <a class="import-tabs__link {% if import_section == 'detailed_logs' %}is-active{% endif %}" href="{{ detailed_logs_url }}">Detailed logs</a>
-        <a class="import-tabs__link {% if import_section == 'settings' %}is-active{% endif %}" href="{{ import_settings_url|default:'' }}{% if not import_settings_url %}{% url 'prices:import_settings' %}{% endif %}">Import settings</a>
-    </div>
-</div>
