@@ -64,7 +64,7 @@
             <aside class="app-drawer app-drawer--end product-filters-drawer" id="product-filters-sidebar" data-drawer="product-filters" aria-hidden="true" aria-labelledby="product-filters-sidebar-label">
                 <div class="drawer-header">
                     <h5 class="drawer-title" id="product-filters-sidebar-label">Filters</h5>
-                    <button type="button" class="btn-close" data-drawer-close aria-label="Close"></button>
+                    <button type="button" class="drawer-close" data-drawer-close aria-label="Close"></button>
                 </div>
                 <div class="drawer-body">
                     <div class="extra-filters-grid">
@@ -98,9 +98,9 @@
                         {% if status_options %}
                             <div class="filter-item">
                                 <label for="show-inactive-switch">Inactive products</label>
-                                <div class="form-check form-switch inactive-switch-wrap">
-                                    <input class="form-check-input" id="show-inactive-switch" type="checkbox" role="switch"{% if status_filter != 'active' %} checked{% endif %}>
-                                    <label class="form-check-label inactive-switch-label" for="show-inactive-switch">Show inactive</label>
+                                <div class="switch-row inactive-switch-wrap">
+                                    <input class="switch-input" id="show-inactive-switch" type="checkbox" role="switch"{% if status_filter != 'active' %} checked{% endif %}>
+                                    <label class="switch-label inactive-switch-label" for="show-inactive-switch">Show inactive</label>
                                 </div>
                             </div>
                         {% endif %}
@@ -111,12 +111,12 @@
                         <div class="filter-item">
                             <label for="price-max-filter">Max price</label>
                             <input id="price-max-filter" type="text" value="{{ price_max|default:'' }}" placeholder="e.g. 500">
-                            <button class="button secondary w-100 mt-2" type="button" id="price-apply-btn">Apply price</button>
+                            <button class="button secondary is-full-width space-top-sm" type="button" id="price-apply-btn">Apply price</button>
                         </div>
                         <div class="filter-item">
                             <label for="exclude-filter">Exclude words in name</label>
                             <textarea id="exclude-filter" rows="3" placeholder="One word per line (or comma-separated)">{{ exclude_terms|default:'' }}</textarea>
-                            <button class="button secondary w-100 mt-2" type="button" id="exclude-apply-btn">Apply exclusion</button>
+                            <button class="button secondary is-full-width space-top-sm" type="button" id="exclude-apply-btn">Apply exclusion</button>
                         </div>
                     </div>
                 </div>
@@ -177,7 +177,7 @@
                 <aside class="app-drawer app-drawer--end product-filters-drawer" id="product-filters-sidebar" data-drawer="product-filters" aria-hidden="true" aria-labelledby="product-filters-sidebar-label">
                     <div class="drawer-header">
                         <h5 class="drawer-title" id="product-filters-sidebar-label">Filters</h5>
-                        <button type="button" class="btn-close" data-drawer-close aria-label="Close"></button>
+                        <button type="button" class="drawer-close" data-drawer-close aria-label="Close"></button>
                     </div>
                     <div class="drawer-body">
                         <div class="extra-filters-grid">
@@ -211,9 +211,9 @@
                             {% if status_options %}
                                 <div class="filter-item">
                                     <label for="show-inactive-switch">Inactive products</label>
-                                    <div class="form-check form-switch inactive-switch-wrap">
-                                        <input class="form-check-input" id="show-inactive-switch" type="checkbox" role="switch"{% if status_filter != 'active' %} checked{% endif %}>
-                                        <label class="form-check-label inactive-switch-label" for="show-inactive-switch">Show inactive</label>
+                                    <div class="switch-row inactive-switch-wrap">
+                                        <input class="switch-input" id="show-inactive-switch" type="checkbox" role="switch"{% if status_filter != 'active' %} checked{% endif %}>
+                                        <label class="switch-label inactive-switch-label" for="show-inactive-switch">Show inactive</label>
                                     </div>
                                 </div>
                             {% endif %}
@@ -225,8 +225,8 @@
     {% endif %}
 
         {% if object_list %}
-            <div class="table-wrap table-responsive workspace-table-wrap">
-                <table class="table table-sm table-hover align-middle mb-0 table-mobile products-grid{% if list_title == 'Suppliers Products' or list_title == 'Supplier Products' %} products-mobile{% endif %}">
+            <div class="table-wrap table-scroll-x workspace-table-wrap">
+                <table class="table table-sm table-hover space-bottom-none table-mobile products-grid{% if list_title == 'Suppliers Products' or list_title == 'Supplier Products' %} products-mobile{% endif %}">
                 <thead>
                     <tr>
                         {% if show_bulk_delete %}
@@ -346,10 +346,10 @@
                             {% if show_actions %}
                                 <td class="actions" data-label="Actions">
                                     {% if show_action_menu %}
-                                        <div class="actions-desktop d-inline-flex align-items-center gap-2">
+                                        <div class="actions-desktop layout-inline items-center gap-sm">
                                             <details class="actions-menu-desktop">
                                                 <summary aria-label="More actions">...</summary>
-                                                <div class="actions-menu-pop d-flex flex-column gap-2">
+                                                <div class="actions-menu-pop layout-row layout-column gap-sm">
                                                     {% if update_url_name %}
                                                         <a class="button secondary" href="{% url update_url_name obj.pk %}">Edit</a>
                                                     {% endif %}
@@ -366,7 +366,7 @@
                                         <div class="actions-mobile">
                                             <details class="mobile-actions-menu">
                                                 <summary aria-label="Actions">...</summary>
-                                                <div class="mobile-actions-pop d-flex flex-column gap-2">
+                                                <div class="mobile-actions-pop layout-row layout-column gap-sm">
                                                     {% if update_url_name %}
                                                         <a class="button secondary" href="{% url update_url_name obj.pk %}">Edit</a>
                                                     {% endif %}
@@ -381,7 +381,7 @@
                                             </details>
                                         </div>
                                     {% else %}
-                                        <div class="d-inline-flex align-items-center gap-2">
+                                        <div class="layout-inline items-center gap-sm">
                                             {% if update_url_name %}
                                                 <a class="button secondary" href="{% url update_url_name obj.pk %}">Edit</a>
                                             {% endif %}
@@ -410,7 +410,7 @@
             {% if is_paginated %}
                 <nav class="workspace-pagination" aria-label="Pagination" id="pagination-controls">
                     <div class="pagination-shell">
-                    <ul class="pagination flex-wrap mb-0">
+                    <ul class="pagination-list">
                         {% if page_obj.has_previous %}
                             <li class="page-item">
                                 <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if current_sort %}&sort={{ current_sort }}{% endif %}{% if current_dir %}&dir={{ current_dir }}{% endif %}{% if current_q %}&q={{ current_q }}{% endif %}{% if currency_filter %}&currency={{ currency_filter }}{% endif %}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if exclude_terms %}&exclude={{ exclude_terms|urlencode }}{% endif %}{% if price_min %}&price_min={{ price_min|urlencode }}{% endif %}{% if price_max %}&price_max={{ price_max|urlencode }}{% endif %}">Previous</a>

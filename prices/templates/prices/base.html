@@ -15,7 +15,7 @@
 <body class="{% if viewer_mode %}viewer-mode{% else %}admin-mode{% endif %}{% block body_class %}{% endblock %}" {% block body_data %}{% endblock %}>
 {% if user.is_authenticated %}
 <div class="layout">
-    <aside class="sidebar d-none d-md-flex">
+    <aside class="sidebar desktop-only-flex">
         <div class="sidebar-brand">
             <a href="{% if viewer_mode %}{% url 'viewer_home' %}{% else %}{% url 'prices:dashboard' %}{% endif %}" class="sidebar-brand-link" aria-label="Go to {% if viewer_mode %}viewer home{% else %}dashboard{% endif %}">
                 <div class="brand-name">PerfumeX</div>
@@ -109,24 +109,24 @@
     </aside>
 
     <div class="main">
-        <div class="topbar d-none d-md-flex">
+        <div class="topbar desktop-only-flex">
             <div class="topbar-breadcrumb">
                 PerfumeX / <span>{% block topbar_label %}{% if viewer_mode %}Viewer{% else %}Workspace{% endif %}{% endblock %}</span>
             </div>
             <div class="topbar-right">
                 {% if user.is_staff and not viewer_mode %}
-                    <a class="btn btn-ghost topbar-status" href="{% url 'prices:supplier_overview' %}">
+                    <a class="button ghost topbar-status" href="{% url 'prices:supplier_overview' %}">
                         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="8" cy="8" r="6"/><path d="M8 5v3l2 2"/></svg>
                         <span>Last sync</span>
                     </a>
                 {% endif %}
-                <a class="btn btn-ghost" href="{% url 'user_profile' %}">Profile</a>
+                <a class="button ghost" href="{% url 'user_profile' %}">Profile</a>
             </div>
         </div>
 
-        <div class="mobile-topbar d-md-none">
+        <div class="mobile-topbar mobile-only">
             <a href="{% if viewer_mode %}{% url 'viewer_home' %}{% else %}{% url 'prices:dashboard' %}{% endif %}" class="mobile-topbar__brand mobile-topbar__brand-link">PerfumeX</a>
-            <button class="btn btn-ghost mobile-menu-btn" type="button" data-drawer-toggle="mobile-nav" aria-controls="mobileNav" aria-expanded="false">Menu</button>
+            <button class="button ghost mobile-menu-btn" type="button" data-drawer-toggle="mobile-nav" aria-controls="mobileNav" aria-expanded="false">Menu</button>
         </div>
 
         <div class="content">
@@ -169,7 +169,7 @@
 <aside class="app-drawer app-drawer--start mobile-nav-drawer" id="mobileNav" data-drawer="mobile-nav" aria-hidden="true" aria-labelledby="mobileNavLabel">
     <div class="drawer-header">
         <h5 class="drawer-title" id="mobileNavLabel">PerfumeX</h5>
-        <button type="button" class="btn-close" data-drawer-close aria-label="Close"></button>
+        <button type="button" class="drawer-close" data-drawer-close aria-label="Close"></button>
     </div>
     <div class="drawer-body">
         <nav class="mobile-nav">
@@ -234,7 +234,7 @@
                 <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="8" cy="5" r="3"/><path d="M2 14c0-3.3 2.7-6 6-6s6 2.7 6 6"/></svg>
                 <span>Profile</span>
             </a>
-            <form action="{% url 'logout' %}" method="post" class="mt-2">
+            <form action="{% url 'logout' %}" method="post" class="space-top-sm">
                 {% csrf_token %}
                 <button type="submit" class="sidebar-link sidebar-link-button">
                     <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M6 2H3a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/><path d="m10 11 3-3-3-3"/><path d="M13 8H6"/></svg>

@@ -26,12 +26,12 @@
     });
 
     document.querySelectorAll("input[type=checkbox]").forEach(function (el) {
-        el.classList.add("form-check-input");
+        el.classList.add("check-input");
     });
 
     document.querySelectorAll("table").forEach(function (table) {
         if (!table.classList.contains("table")) {
-            table.classList.add("table", "table-sm", "align-middle");
+            table.classList.add("table", "table-sm");
         }
     });
 

@@ -134,7 +134,7 @@
     function decorateInputs(container) {
         if (!container) return;
         container.querySelectorAll("input[type='checkbox']").forEach(function (el) {
-            el.classList.add("form-check-input");
+            el.classList.add("check-input");
         });
     }
 
@@ -203,7 +203,7 @@
         if (!pagination) return;
         var page = Number(data.page || 1);
         var hasKnownTotal = data.num_pages !== null && data.num_pages !== undefined;
-        var html = "<nav class='mt-3' aria-label='Pagination'><ul class='pagination flex-wrap mb-0'>";
+        var html = "<nav class='space-top-md' aria-label='Pagination'><ul class='pagination-list'>";
         if (hasKnownTotal) {
             var totalPages = Number(data.num_pages || 1);
             if (totalPages <= 1) {
@@ -225,7 +225,7 @@
             if (data.has_next) {
                 html += "<li class='page-item'><a class='page-link' href='#' data-page='" + data.next_page + "'>Next</a></li>";
             }
-            html += "</ul><div class='muted mt-2'>Page " + page + " of " + totalPages + "</div></nav>";
+            html += "</ul><div class='muted space-top-sm'>Page " + page + " of " + totalPages + "</div></nav>";
         } else {
             if (!data.has_previous && !data.has_next) {
                 pagination.style.display = "none";
@@ -238,7 +238,7 @@
             if (data.has_next) {
                 html += "<li class='page-item'><a class='page-link' href='#' data-page='" + data.next_page + "'>Next</a></li>";
             }
-            html += "</ul><div class='muted mt-2'>Page " + page + "</div></nav>";
+            html += "</ul><div class='muted space-top-sm'>Page " + page + "</div></nav>";
         }
         pagination.innerHTML = html;
         pagination.style.display = "";
@@ -464,10 +464,10 @@
                 var editUrl = editPattern ? editPattern.replace("/0/", "/" + item.id + "/") : "";
                 var deleteUrl = deletePattern ? deletePattern.replace("/0/", "/" + item.id + "/") : "";
                 actionsCell = "<td class='actions' data-label='Actions'>" +
-                    "<div class='actions-desktop d-inline-flex align-items-center gap-2'>" +
+                    "<div class='actions-desktop layout-inline items-center gap-sm'>" +
                     "<details class='actions-menu-desktop'>" +
                     "<summary aria-label='More actions'>...</summary>" +
-                    "<div class='actions-menu-pop d-flex flex-column gap-2'>";
+                    "<div class='actions-menu-pop layout-row layout-column gap-sm'>";
                 if (editUrl) {
                     actionsCell += "<a class='button secondary' href='" + editUrl + "'>Edit</a>";
                 }
@@ -480,7 +480,7 @@
                 actionsCell += "</div></details></div><div class='actions-mobile'>" +
                     "<details class='mobile-actions-menu'>" +
                     "<summary aria-label='Actions'>...</summary>" +
-                    "<div class='mobile-actions-pop d-flex flex-column gap-2'>";
+                    "<div class='mobile-actions-pop layout-row layout-column gap-sm'>";
                 if (editUrl) {
                     actionsCell += "<a class='button secondary' href='" + editUrl + "'>Edit</a>";
                 }
