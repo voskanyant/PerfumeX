@@ -345,7 +345,7 @@
 
 .price-delta-badge {
   font-family: 'DM Sans', sans-serif;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 400;
   letter-spacing: 0;
   text-transform: none;
@@ -353,7 +353,7 @@
 
 .cell-supplier {
   display: inline-block;
-  font-size: 11.5px;
+  font-size: 12px;
   font-weight: 500;
   letter-spacing: 0.01em;
   padding: 3px 9px;
@@ -397,7 +397,7 @@ tr[data-delta="up"] {
 
 .cell-imported {
   font-family: 'DM Mono', monospace;
-  font-size: 11px;
+  font-size: 11.5px;
 }
 
 .supplier-filter-link {
@@ -852,7 +852,7 @@ tr[data-delta="up"] {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-size: 11px;
+    font-size: 11.5px;
     font-weight: 600;
     line-height: 1.2;
     text-decoration: none !important;
@@ -865,7 +865,7 @@ tr[data-delta="up"] {
 
   .products-mobile td[data-field="last_imported_at"] .cell-imported {
     display: block;
-    font-size: 10px;
+    font-size: 11px;
     font-weight: 400;
     letter-spacing: 0.04em;
     line-height: 1.25;
@@ -931,7 +931,7 @@ tr[data-delta="up"] {
 
   .products-mobile .price-delta-badge {
     font-family: 'DM Sans', sans-serif !important;
-    font-size: 10px !important;
+    font-size: 11px !important;
     font-weight: 400 !important;
     letter-spacing: 0 !important;
     text-transform: none !important;
