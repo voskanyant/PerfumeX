@@ -5,27 +5,30 @@
 {% block body_data %}data-page="import-detail"{% endblock %}
 
 {% block content %}
-    <div class="card mb-3">
-        <div class="d-flex flex-wrap align-items-start justify-content-between gap-3">
-            <div>
-                <h1 class="page-title">Import #{{ object.pk }}</h1>
-                <p class="page-subtitle">Same details as Import Log row, with full batch metadata.</p>
-            </div>
-            <div class="d-inline-flex gap-2">
-                <a class="button ghost" href="{{ back_url }}">Back</a>
-                <form method="post" action="{% url 'prices:import_delete' object.pk %}" onsubmit="return confirm('Delete this import batch and all related product/snapshot changes?');">
-                    {% csrf_token %}
-                    <input type="hidden" name="next" value="{{ back_url }}">
-                    <button class="button danger" type="submit">Delete batch</button>
-                </form>
+    <div class="page-stack">
+        <div class="section-card">
+            <div class="layout-row layout-row--wrap items-start justify-between gap-md">
+                <div>
+                    <span class="page-kicker">Batch</span>
+                    <h1 class="page-title">Import #{{ object.pk }}</h1>
+                    <p class="page-subtitle space-bottom-none">Same details as Import Log row, with full batch metadata.</p>
+                </div>
+                <div class="form-actions">
+                    <a class="button ghost" href="{{ back_url }}">Back</a>
+                    <form method="post" action="{% url 'prices:import_delete' object.pk %}" onsubmit="return confirm('Delete this import batch and all related product/snapshot changes?');">
+                        {% csrf_token %}
+                        <input type="hidden" name="next" value="{{ back_url }}">
+                        <button class="button danger" type="submit">Delete batch</button>
+                    </form>
+                </div>
             </div>
         </div>
-    </div>
 
-    <div class="card mb-3">
-        <h2 class="page-title">Import Log Details</h2>
-        <div class="table-wrap table-responsive mt-3">
-            <table class="table table-sm table-hover align-middle mb-0 table-mobile">
+        <div class="section-card">
+            <span class="card-label">Metadata</span>
+            <h2 class="card-title">Import log details</h2>
+            <div class="table-wrap table-scroll-x space-top-md">
+                <table class="table space-bottom-none table-mobile">
                 <thead>
                     <tr>
                         <th>Received at</th>
@@ -56,15 +59,16 @@
                         <td data-label="Error">{{ object.error_message|default:"-" }}</td>
                     </tr>
                 </tbody>
-            </table>
+                </table>
+            </div>
         </div>
-    </div>
 
-    <div class="card">
-        <h2 class="page-title">Files</h2>
-        {% if import_files %}
-            <div class="table-wrap table-responsive mt-3">
-                <table class="table table-sm table-hover align-middle mb-0 table-mobile">
+        <div class="section-card">
+            <span class="card-label">Payload</span>
+            <h2 class="card-title">Files</h2>
+            {% if import_files %}
+                <div class="table-wrap table-scroll-x space-top-md">
+                    <table class="table space-bottom-none table-mobile">
                     <thead>
                         <tr>
                             <th>Kind</th>
@@ -87,10 +91,11 @@
                             </tr>
                         {% endfor %}
                     </tbody>
-                </table>
-            </div>
-        {% else %}
-            <p class="muted mt-3">No files in this import.</p>
-        {% endif %}
+                    </table>
+                </div>
+            {% else %}
+                <p class="muted space-top-md">No files in this import.</p>
+            {% endif %}
+        </div>
     </div>
 {% endblock %}

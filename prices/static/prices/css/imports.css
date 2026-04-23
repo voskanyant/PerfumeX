@@ -131,7 +131,9 @@
   }
 
   .import-col-actions .d-inline-flex,
-  .import-col-actions .d-flex {
+  .import-col-actions .d-flex,
+  .import-col-actions .layout-inline,
+  .import-col-actions .layout-row {
     width: 100%;
   }
 

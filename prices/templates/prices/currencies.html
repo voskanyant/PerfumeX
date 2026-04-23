@@ -5,74 +5,75 @@
 
 {% block content %}
     <div class="page-stack">
-    <div class="card mb-3">
-        <div class="d-flex flex-wrap align-items-start justify-content-between gap-3">
-            <div>
-                <span class="page-kicker">Rates</span>
-                <h1 class="page-title">Currencies</h1>
-                <p class="page-subtitle">Set exchange rates used for product price conversion.</p>
-            </div>
+        <div class="section-card">
+            <span class="page-kicker">Rates</span>
+            <h1 class="page-title">Currencies</h1>
+            <p class="page-subtitle space-bottom-none">Set exchange rates used for product price conversion.</p>
         </div>
-    </div>
-    <div class="card mb-3">
-        <h2 class="page-title">CBR Auto Rates</h2>
-        <p class="muted mt-1">Daily USD/RUB can be synced from CBR with your markup.</p>
-        <form method="post" class="mt-2">
-            {% csrf_token %}
-            {{ cbr_markup_form.as_p }}
-            <div class="d-flex flex-wrap gap-2">
-                <button class="button secondary" type="submit" name="action" value="save_cbr_markup">Save markup</button>
-                <button class="button" type="submit" name="action" value="sync_cbr_today">Sync today from CBR</button>
-            </div>
-        </form>
-        <form method="post" class="mt-3">
-            {% csrf_token %}
-            <input type="hidden" name="action" value="sync_cbr_range">
-            <div class="row g-3 align-items-end">
-                <div class="col-12 col-md-4">
-                    <label class="form-label" for="id_start_date">Start date</label>
-                    {{ cbr_range_form.start_date }}
-                </div>
-                <div class="col-12 col-md-4">
-                    <label class="form-label" for="id_end_date">End date</label>
-                    {{ cbr_range_form.end_date }}
-                </div>
-                <div class="col-12 col-md-4">
-                    <button class="button secondary w-100" type="submit">Auto-fill range from CBR</button>
-                </div>
-            </div>
-        </form>
-    </div>
-    <div class="card mb-3">
-        <h2 class="page-title">Add rate</h2>
-        <p class="muted mt-1">Enter USD to RUB rate. Product page converts selected currency by today's USD/RUB rate.</p>
-        <form method="post" class="mt-2">
-            {% csrf_token %}
-            {{ form.as_p }}
-            <div class="d-flex flex-wrap gap-2">
-                <button class="button" type="submit">Save rate</button>
-            </div>
-        </form>
-    </div>
-    <div class="card">
-        <h2 class="page-title">Rates</h2>
-        {% if rates %}
-            <form id="rate-bulk-delete-form" method="post" action="{% url 'prices:currency_rate_delete_bulk' %}" class="mt-2 mb-2">
+        <div class="section-card">
+            <span class="card-label">Automation</span>
+            <h2 class="card-title">CBR Auto Rates</h2>
+            <p class="card-desc">Daily USD/RUB can be synced from CBR with your markup.</p>
+            <form method="post">
                 {% csrf_token %}
-                <input type="hidden" name="page" value="{{ rates_page.number }}">
-                <button class="button danger" type="submit">
-                    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                        <path d="M3 6h18"/>
-                        <path d="M8 6V4h8v2"/>
-                        <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
-                        <path d="M10 11v6"/>
-                        <path d="M14 11v6"/>
-                    </svg>
-                    Delete selected
-                </button>
+                {{ cbr_markup_form.as_p }}
+                <div class="form-actions">
+                    <button class="button secondary" type="submit" name="action" value="save_cbr_markup">Save markup</button>
+                    <button class="button" type="submit" name="action" value="sync_cbr_today">Sync today from CBR</button>
+                </div>
             </form>
-            <div class="table-wrap table-responsive mt-2">
-                <table class="table table-sm table-hover align-middle mb-0 table-mobile">
+            <form method="post" class="space-top-md">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="sync_cbr_range">
+                <div class="layout-grid-12 gap-md items-end">
+                    <div class="span-12 md-span-4">
+                        <label class="form-label" for="id_start_date">Start date</label>
+                        {{ cbr_range_form.start_date }}
+                    </div>
+                    <div class="span-12 md-span-4">
+                        <label class="form-label" for="id_end_date">End date</label>
+                        {{ cbr_range_form.end_date }}
+                    </div>
+                    <div class="span-12 md-span-4">
+                        <button class="button secondary is-full-width" type="submit">Auto-fill range from CBR</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <div class="section-card">
+            <span class="card-label">Manual entry</span>
+            <h2 class="card-title">Add rate</h2>
+            <p class="card-desc">Enter USD to RUB rate. Product page converts selected currency by today's USD/RUB rate.</p>
+            <form method="post">
+                {% csrf_token %}
+                {{ form.as_p }}
+                <div class="form-actions">
+                    <button class="button" type="submit">Save rate</button>
+                </div>
+            </form>
+        </div>
+
+        <div class="section-card">
+            <span class="card-label">History</span>
+            <h2 class="card-title">Rates</h2>
+            {% if rates %}
+                <form id="rate-bulk-delete-form" method="post" action="{% url 'prices:currency_rate_delete_bulk' %}" class="space-top-sm space-bottom-sm">
+                    {% csrf_token %}
+                    <input type="hidden" name="page" value="{{ rates_page.number }}">
+                    <button class="button danger" type="submit">
+                        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M3 6h18"/>
+                            <path d="M8 6V4h8v2"/>
+                            <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+                            <path d="M10 11v6"/>
+                            <path d="M14 11v6"/>
+                        </svg>
+                        Delete selected
+                    </button>
+                </form>
+                <div class="table-wrap table-scroll-x space-top-sm">
+                    <table class="table space-bottom-none table-mobile">
                 <thead>
                     <tr>
                         <th><input type="checkbox" id="rate-select-all"></th>
@@ -108,7 +109,7 @@
                             <td data-label="Rate"><input type="text" name="rate" value="{{ rate.rate }}" form="rate-form-{{ rate.pk }}"></td>
                             <td data-label="Source"><input type="text" name="source" value="{{ rate.source }}" form="rate-form-{{ rate.pk }}"></td>
                             <td class="actions" data-label="Actions">
-                                <div class="d-inline-flex gap-2">
+                                <div class="layout-inline gap-sm">
                                     <button class="button secondary" type="submit" form="rate-form-{{ rate.pk }}">Save</button>
                                     <form method="post" action="{% url 'prices:currency_rate_delete' rate.pk %}">
                                         {% csrf_token %}
@@ -128,45 +129,39 @@
                         </tr>
                     {% endfor %}
                 </tbody>
-                </table>
-            </div>
-            {% if rates_page and rates_page.paginator.num_pages > 1 %}
-                <nav class="mt-3 pagination-shell" aria-label="Rates pagination">
-                    <ul class="pagination flex-wrap mb-0">
+                    </table>
+                </div>
+                {% if rates_page and rates_page.paginator.num_pages > 1 %}
+                    <nav class="pagination-shell space-top-md" aria-label="Rates pagination">
+                        <div class="pagination-list">
                         {% if rates_page.has_previous %}
-                            <li class="page-item">
-                                <a class="page-link" href="?page={{ rates_page.previous_page_number }}">Previous</a>
-                            </li>
+                            <a class="page-link" href="?page={{ rates_page.previous_page_number }}">Previous</a>
                         {% endif %}
                         {% for page_num in rates_page.paginator.page_range %}
                             {% if page_num <= 5 or page_num > rates_page.paginator.num_pages|add:-3 %}
-                            {% if page_num == rates_page.number %}
-                                <li class="page-item active"><span class="page-link">{{ page_num }}</span></li>
-                            {% else %}
-                                <li class="page-item">
+                                {% if page_num == rates_page.number %}
+                                    <span class="page-link is-active">{{ page_num }}</span>
+                                {% else %}
                                     <a class="page-link" href="?page={{ page_num }}">{{ page_num }}</a>
-                                </li>
-                            {% endif %}
+                                {% endif %}
                             {% endif %}
                         {% endfor %}
                         {% if rates_page.has_next %}
-                            <li class="page-item">
-                                <a class="page-link" href="?page={{ rates_page.next_page_number }}">Next</a>
-                            </li>
+                            <a class="page-link" href="?page={{ rates_page.next_page_number }}">Next</a>
                         {% endif %}
-                    </ul>
-                    <form class="pagination-jump" method="get">
-                        <label for="rates-page-jump">Page</label>
-                        <input id="rates-page-jump" type="number" name="page" min="1" max="{{ rates_page.paginator.num_pages }}" value="{{ rates_page.number }}">
-                        <button class="button secondary" type="submit">Go</button>
-                    </form>
-                    <div class="pagination-summary">Page {{ rates_page.number }} of {{ rates_page.paginator.num_pages }}</div>
-                </nav>
+                        </div>
+                        <form class="pagination-jump" method="get">
+                            <label for="rates-page-jump">Page</label>
+                            <input id="rates-page-jump" type="number" name="page" min="1" max="{{ rates_page.paginator.num_pages }}" value="{{ rates_page.number }}">
+                            <button class="button secondary" type="submit">Go</button>
+                        </form>
+                        <div class="pagination-summary">Page {{ rates_page.number }} of {{ rates_page.paginator.num_pages }}</div>
+                    </nav>
+                {% endif %}
+            {% else %}
+                <p class="muted space-top-sm">No rates yet.</p>
             {% endif %}
-        {% else %}
-            <p class="muted mt-2">No rates yet.</p>
-        {% endif %}
-    </div>
+        </div>
     </div>
 {% endblock %}
 {% block extra_scripts %}

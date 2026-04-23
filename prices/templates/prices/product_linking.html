@@ -5,42 +5,41 @@
 {% block body_data %}data-page="product-linking"{% endblock %}
 
 {% block content %}
-    <div class="card mb-3">
-        <div class="d-flex flex-wrap align-items-start justify-content-between gap-3">
-            <div>
-                <h1 class="page-title">Link Products</h1>
-                <p class="page-subtitle">Pick a supplier product, refine keywords, and link to your catalog.</p>
+    <div class="page-stack">
+        <div class="section-card">
+            <span class="page-kicker">Matching</span>
+            <h1 class="page-title">Link Products</h1>
+            <p class="page-subtitle space-bottom-none">Pick a supplier product, refine keywords, and link to your catalog.</p>
+            <div class="layout-grid-12 gap-md items-end space-top-sm">
+                <div class="span-12 md-span-4">
+                    <label for="link-supplier-filter" class="form-label">Supplier</label>
+                    <select id="link-supplier-filter">
+                        <option value="">All</option>
+                        {% for supplier in supplier_options %}
+                            <option value="{{ supplier.id }}"{% if supplier_filter == supplier.id|stringformat:"s" %} selected{% endif %}>
+                                {{ supplier.name }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="span-12 md-span-5">
+                    <label for="link-search" class="form-label">Search</label>
+                    <input id="link-search" type="text" value="{{ search_query }}" placeholder="Search supplier products">
+                </div>
+                <div class="span-12 md-span-3">
+                    <button class="button secondary is-full-width" type="button" id="link-filter-apply">Apply</button>
+                </div>
             </div>
         </div>
-        <div class="row g-3 mt-2">
-            <div class="col-12 col-md-4">
-                <label for="link-supplier-filter" class="form-label">Supplier</label>
-                <select id="link-supplier-filter">
-                    <option value="">All</option>
-                    {% for supplier in supplier_options %}
-                        <option value="{{ supplier.id }}"{% if supplier_filter == supplier.id|stringformat:"s" %} selected{% endif %}>
-                            {{ supplier.name }}
-                        </option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="col-12 col-md-5">
-                <label for="link-search" class="form-label">Search</label>
-                <input id="link-search" type="text" value="{{ search_query }}" placeholder="Search supplier products">
-            </div>
-            <div class="col-12 col-md-3 d-grid">
-                <button class="button secondary" type="button" id="link-filter-apply">Apply</button>
-            </div>
-        </div>
-    </div>
 
-    <div class="row g-3">
-        <div class="col-12 col-lg-6">
-            <div class="card h-100">
-                <h2 class="page-title">Supplier products</h2>
-                <p class="page-subtitle">Click a row to select.</p>
-                <div class="table-wrap table-responsive table-scroll-lg">
-                    <table id="supplier-products-table" class="table table-mobile table-sm table-hover align-middle mb-0">
+        <div class="layout-grid-12 gap-md">
+            <div class="span-12 lg-span-6">
+                <div class="section-panel fill-height">
+                    <span class="card-label">Source</span>
+                    <h2 class="card-title">Supplier products</h2>
+                    <p class="card-desc">Click a row to select.</p>
+                    <div class="table-wrap table-scroll-lg">
+                        <table id="supplier-products-table" class="table table-mobile space-bottom-none">
                         <thead>
                             <tr>
                                 <th>Supplier</th>
@@ -57,59 +56,61 @@
                                 </tr>
                             {% endfor %}
                         </tbody>
-                    </table>
-                </div>
-                {% if supplier_products.paginator.num_pages > 1 %}
-                    <div class="pagination-shell mt-3">
-                        <div class="d-flex flex-wrap gap-2">
-                            {% if supplier_products.has_previous %}
-                                <a class="button secondary" href="?sp_page={{ supplier_products.previous_page_number }}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if search_query %}&q={{ search_query }}{% endif %}">Previous</a>
-                            {% endif %}
-                            {% for page_num in supplier_products.paginator.page_range %}
-                                {% if page_num <= 5 or page_num > supplier_products.paginator.num_pages|add:-3 %}
-                                    {% if page_num == supplier_products.number %}
-                                        <span class="page-link">{{ page_num }}</span>
-                                    {% else %}
-                                        <a class="page-link" href="?sp_page={{ page_num }}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if search_query %}&q={{ search_query }}{% endif %}">{{ page_num }}</a>
-                                    {% endif %}
-                                {% endif %}
-                            {% endfor %}
-                            {% if supplier_products.has_next %}
-                                <a class="button secondary" href="?sp_page={{ supplier_products.next_page_number }}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if search_query %}&q={{ search_query }}{% endif %}">Next</a>
-                            {% endif %}
-                        </div>
-                        <form class="pagination-jump" method="get">
-                            <label for="sp-page-jump">Page</label>
-                            <input id="sp-page-jump" type="number" name="sp_page" min="1" max="{{ supplier_products.paginator.num_pages }}" value="{{ supplier_products.number }}">
-                            {% if supplier_filter %}<input type="hidden" name="supplier" value="{{ supplier_filter }}">{% endif %}
-                            {% if search_query %}<input type="hidden" name="q" value="{{ search_query }}">{% endif %}
-                            <button class="button secondary" type="submit">Go</button>
-                        </form>
-                        <div class="pagination-summary">Page {{ supplier_products.number }} of {{ supplier_products.paginator.num_pages }}</div>
+                        </table>
                     </div>
-                {% endif %}
-            </div>
-        </div>
-        <div class="col-12 col-lg-6">
-            <div class="card h-100">
-                <h2 class="page-title">Keywords</h2>
-                <p class="page-subtitle">Toggle words to refine matches.</p>
-                <div class="d-flex gap-2 mb-2">
-                    <button class="button secondary" type="button" id="auto-suggest-btn">Auto suggest</button>
-                    <span class="muted" id="auto-suggest-hint"></span>
+                    {% if supplier_products.paginator.num_pages > 1 %}
+                        <div class="pagination-shell space-top-md">
+                            <div class="pagination-list">
+                                {% if supplier_products.has_previous %}
+                                    <a class="button secondary" href="?sp_page={{ supplier_products.previous_page_number }}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if search_query %}&q={{ search_query }}{% endif %}">Previous</a>
+                                {% endif %}
+                                {% for page_num in supplier_products.paginator.page_range %}
+                                    {% if page_num <= 5 or page_num > supplier_products.paginator.num_pages|add:-3 %}
+                                        {% if page_num == supplier_products.number %}
+                                            <span class="page-link is-active">{{ page_num }}</span>
+                                        {% else %}
+                                            <a class="page-link" href="?sp_page={{ page_num }}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if search_query %}&q={{ search_query }}{% endif %}">{{ page_num }}</a>
+                                        {% endif %}
+                                    {% endif %}
+                                {% endfor %}
+                                {% if supplier_products.has_next %}
+                                    <a class="button secondary" href="?sp_page={{ supplier_products.next_page_number }}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if search_query %}&q={{ search_query }}{% endif %}">Next</a>
+                                {% endif %}
+                            </div>
+                            <form class="pagination-jump" method="get">
+                                <label for="sp-page-jump">Page</label>
+                                <input id="sp-page-jump" type="number" name="sp_page" min="1" max="{{ supplier_products.paginator.num_pages }}" value="{{ supplier_products.number }}">
+                                {% if supplier_filter %}<input type="hidden" name="supplier" value="{{ supplier_filter }}">{% endif %}
+                                {% if search_query %}<input type="hidden" name="q" value="{{ search_query }}">{% endif %}
+                                <button class="button secondary" type="submit">Go</button>
+                            </form>
+                            <div class="pagination-summary">Page {{ supplier_products.number }} of {{ supplier_products.paginator.num_pages }}</div>
+                        </div>
+                    {% endif %}
                 </div>
-                <div id="keyword-panel" class="row g-2"></div>
+            </div>
+            <div class="span-12 lg-span-6">
+                <div class="section-panel fill-height">
+                    <span class="card-label">Refine</span>
+                    <h2 class="card-title">Keywords</h2>
+                    <p class="card-desc">Toggle words to refine matches.</p>
+                    <div class="form-actions space-bottom-sm">
+                        <button class="button secondary" type="button" id="auto-suggest-btn">Auto suggest</button>
+                        <span class="tone-muted text-small" id="auto-suggest-hint"></span>
+                    </div>
+                    <div id="keyword-panel" class="layout-grid-12 gap-sm"></div>
+                </div>
             </div>
         </div>
-    </div>
 
-    <div class="row g-3 mt-1">
-        <div class="col-12 col-lg-7">
-            <div class="card h-100">
-                <h2 class="page-title">Matches</h2>
-                <p class="page-subtitle">Select a target to link.</p>
-                <div class="table-wrap table-responsive table-scroll-md">
-                    <table class="table table-mobile table-sm table-hover align-middle mb-0">
+        <div class="layout-grid-12 gap-md">
+            <div class="span-12 lg-span-7">
+                <div class="section-panel fill-height">
+                    <span class="card-label">Targets</span>
+                    <h2 class="card-title">Matches</h2>
+                    <p class="card-desc">Select a target to link.</p>
+                    <div class="table-wrap table-scroll-md">
+                        <table class="table table-mobile space-bottom-none">
                         <thead>
                             <tr>
                                 <th></th>
@@ -120,10 +121,10 @@
                         <tbody id="our-product-results">
                             <tr><td colspan="3" class="muted">No matches yet.</td></tr>
                         </tbody>
-                    </table>
-                </div>
-                <div class="table-wrap table-responsive table-scroll-md mt-3">
-                    <table class="table table-mobile table-sm table-hover align-middle mb-0">
+                        </table>
+                    </div>
+                    <div class="table-wrap table-scroll-md space-top-md">
+                        <table class="table table-mobile space-bottom-none">
                         <thead>
                             <tr>
                                 <th></th>
@@ -134,22 +135,24 @@
                         <tbody id="supplier-product-results">
                             <tr><td colspan="3" class="muted">No matches yet.</td></tr>
                         </tbody>
-                    </table>
+                        </table>
+                    </div>
                 </div>
             </div>
-        </div>
-        <div class="col-12 col-lg-5">
-            <div class="card h-100">
-                <h2 class="page-title">Link action</h2>
-                <p class="page-subtitle">Confirm the link for the selected supplier product.</p>
-                <form method="post" action="{% url 'prices:product_linking_apply' %}">
-                    {% csrf_token %}
-                    <input type="hidden" name="source_id" id="link-source-id">
-                    <input type="hidden" name="target_our" id="link-target-our">
-                    <input type="hidden" name="target_supplier" id="link-target-supplier">
-                    <p class="muted" id="link-selection">No product selected.</p>
-                    <button class="button w-100" type="submit">Link product</button>
-                </form>
+            <div class="span-12 lg-span-5">
+                <div class="section-panel fill-height">
+                    <span class="card-label">Confirm</span>
+                    <h2 class="card-title">Link action</h2>
+                    <p class="card-desc">Confirm the link for the selected supplier product.</p>
+                    <form method="post" action="{% url 'prices:product_linking_apply' %}">
+                        {% csrf_token %}
+                        <input type="hidden" name="source_id" id="link-source-id">
+                        <input type="hidden" name="target_our" id="link-target-our">
+                        <input type="hidden" name="target_supplier" id="link-target-supplier">
+                        <p class="muted space-bottom-sm" id="link-selection">No product selected.</p>
+                        <button class="button is-full-width" type="submit">Link product</button>
+                    </form>
+                </div>
             </div>
         </div>
     </div>

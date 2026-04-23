@@ -636,7 +636,9 @@ body.drawer-open .quick-menu.is-collapsible {
 }
 
 .table-active > td,
-tr.table-active > td {
+tr.table-active > td,
+.is-selected-row > td,
+tr.is-selected-row > td {
   background: var(--grey-100) !important;
 }
 
@@ -1107,6 +1109,38 @@ tbody td,
 .price-change-pos,
 .cell-imported.state-fresh,
 .cell-imported.age-fresh { color: var(--success); }
+
+.score-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 48px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+}
+
+.score-badge--success {
+  background: rgba(34, 197, 94, 0.12);
+  color: #166534;
+}
+
+.score-badge--strong {
+  background: rgba(10, 10, 10, 0.08);
+  color: var(--black);
+}
+
+.score-badge--warning {
+  background: rgba(245, 158, 11, 0.18);
+  color: #92400e;
+}
+
+.score-badge--muted {
+  background: rgba(160, 160, 160, 0.16);
+  color: var(--grey-700);
+}
 .price-delta-badge.neutral,
 .price-change-neu,
 .cell-imported.state-warn,
@@ -1129,7 +1163,15 @@ tbody td,
 .empty-state-copy { color: var(--grey-600); }
 
 .pagination,
-.pagination-list { gap: 6px; }
+.pagination-list {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
 .pagination-shell {
   display: grid;
   gap: 10px;
@@ -1172,6 +1214,7 @@ tbody td,
   font-size: 12px;
   padding: 6px 10px;
 }
+.page-link.is-active,
 .page-item.active .page-link {
   background: var(--black);
   border-color: var(--black);
@@ -1525,7 +1568,9 @@ pre, code {
   }
 
   .table-mobile:not(.products-mobile) > tbody > tr > td.actions .d-inline-flex,
-  .table-mobile:not(.products-mobile) > tbody > tr > td[data-label="Actions"] .d-inline-flex {
+  .table-mobile:not(.products-mobile) > tbody > tr > td[data-label="Actions"] .d-inline-flex,
+  .table-mobile:not(.products-mobile) > tbody > tr > td.actions .layout-inline,
+  .table-mobile:not(.products-mobile) > tbody > tr > td[data-label="Actions"] .layout-inline {
     width: 100%;
     justify-content: flex-end;
   }

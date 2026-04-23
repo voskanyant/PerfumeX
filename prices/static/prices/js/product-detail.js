@@ -9,7 +9,7 @@
     var exportButton = document.getElementById("chart-export-png");
     var snapToggleButton = document.getElementById("chart-snap-toggle");
     var chartCurrencyInput = document.getElementById("chart-currency-input");
-    var filterForm = document.querySelector("form.row.g-3.align-items-end.mt-2");
+    var filterForm = document.getElementById("chart-filter-form");
     var summaryMin = document.getElementById("chart-summary-min");
     var summaryMax = document.getElementById("chart-summary-max");
     var summaryLatest = document.getElementById("chart-summary-latest");

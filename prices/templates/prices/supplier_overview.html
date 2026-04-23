@@ -20,11 +20,11 @@
             </div>
             <div>
                 <a class="button secondary" href="{% url 'prices:import_settings' %}">Import settings</a>
-                <form action="{% url 'prices:supplier_reimport_all_prices' %}" method="post" class="d-inline-flex">
+                <form action="{% url 'prices:supplier_reimport_all_prices' %}" method="post" class="layout-inline">
                     {% csrf_token %}
                     <button class="button secondary" type="submit">Reimport all prices</button>
                 </form>
-                <form action="{% url 'prices:supplier_import_email_all' %}" method="post" class="d-inline-flex">
+                <form action="{% url 'prices:supplier_import_email_all' %}" method="post" class="layout-inline">
                     {% csrf_token %}
                     <button class="button" type="submit" data-email-update-all{% if any_running %} disabled{% endif %}>Update all from email</button>
                 </form>
@@ -38,17 +38,17 @@
                 <p class="card-desc">Run history import for selected suppliers.</p>
                 <form id="bulk-backfill-form" method="post" action="{% url 'prices:supplier_import_email_backfill_bulk' %}">
                     {% csrf_token %}
-                    <div class="row g-3 align-items-end">
-                        <div class="col-12 col-md-4">
+                    <div class="layout-grid-12 gap-md items-end">
+                        <div class="span-12 md-span-4">
                             <label for="bulk-backfill-start" class="form-label">Start date</label>
                             <input id="bulk-backfill-start" name="start_date" type="date" required>
                         </div>
-                        <div class="col-12 col-md-4">
+                        <div class="span-12 md-span-4">
                             <label for="bulk-backfill-end" class="form-label">End date</label>
                             <input id="bulk-backfill-end" name="end_date" type="date">
                         </div>
-                        <div class="col-12 col-md-4">
-                            <button class="button w-100" type="submit">Run backfill</button>
+                        <div class="span-12 md-span-4">
+                            <button class="button is-full-width" type="submit">Run backfill</button>
                         </div>
                     </div>
                     <div id="bulk-backfill-selected"></div>
@@ -61,17 +61,17 @@
                 <p class="card-desc">Fill USD/RUB CBR rates for dates that exist in processed imports.</p>
                 <form id="bulk-rates-form" method="post" action="{% url 'prices:supplier_rates_recalculate' %}">
                     {% csrf_token %}
-                    <div class="row g-3 align-items-end">
-                        <div class="col-12 col-md-4">
+                    <div class="layout-grid-12 gap-md items-end">
+                        <div class="span-12 md-span-4">
                             <label for="bulk-rates-start" class="form-label">Start date</label>
                             <input id="bulk-rates-start" name="start_date" type="date">
                         </div>
-                        <div class="col-12 col-md-4">
+                        <div class="span-12 md-span-4">
                             <label for="bulk-rates-end" class="form-label">End date</label>
                             <input id="bulk-rates-end" name="end_date" type="date">
                         </div>
-                        <div class="col-12 col-md-4">
-                            <button class="button secondary w-100" type="submit">Recalculate</button>
+                        <div class="span-12 md-span-4">
+                            <button class="button secondary is-full-width" type="submit">Recalculate</button>
                         </div>
                     </div>
                     <div id="bulk-rates-selected"></div>
@@ -80,7 +80,7 @@
         </div>
 
         <div class="import-board">
-            <div class="page-header mb-0">
+            <div class="page-header space-bottom-none">
                 <div>
                     <span class="page-kicker">Suppliers</span>
                     <h2 class="page-title">Supplier import board</h2>
@@ -88,8 +88,8 @@
                 </div>
             </div>
             {% if rows %}
-                <div class="table-wrap table-responsive">
-                    <table class="table table-sm table-hover align-middle mb-0 table-mobile supplier-import-table">
+                <div class="table-wrap table-scroll-x">
+                    <table class="table space-bottom-none table-mobile supplier-import-table">
                         <thead>
                             <tr>
                                 <th><input type="checkbox" id="supplier-select-all"></th>
@@ -116,32 +116,32 @@
                                             <span data-email-status>{{ row.latest_run.status }}</span>
                                             {% if row.latest_run.status == "running" %}
                                                 {% if row.latest_run_progress is not None %}
-                                                    <div class="progress mt-2 progress-thin">
+                                                    <div class="progress space-top-sm progress-thin">
                                                         <div class="progress-bar" data-email-progress role="progressbar" data-progress-value="{{ row.latest_run_progress }}"></div>
                                                     </div>
-                                                    <div class="muted small">{{ row.latest_run_progress }}%</div>
+                                                    <div class="tone-muted text-small">{{ row.latest_run_progress }}%</div>
                                                 {% endif %}
                                             {% else %}
-                                                <div class="muted small">{{ row.latest_run.processed_files }} files, {{ row.latest_run.errors }} errors</div>
+                                                <div class="tone-muted text-small">{{ row.latest_run.processed_files }} files, {{ row.latest_run.errors }} errors</div>
                                             {% endif %}
                                             {% if row.latest_run.last_message %}
-                                                <div class="muted small" data-email-message title="{{ row.latest_run.last_message }}">{{ row.latest_run.last_message|truncatechars:180 }}</div>
+                                                <div class="tone-muted text-small" data-email-message title="{{ row.latest_run.last_message }}">{{ row.latest_run.last_message|truncatechars:180 }}</div>
                                             {% endif %}
                                             {% if row.latest_run.detailed_log %}
-                                                <details class="mt-1">
-                                                    <summary class="muted small">Detailed log</summary>
-                                                    <pre class="small mt-1 mb-0 log-pre" data-email-log>{{ row.latest_run.detailed_log }}</pre>
+                                                <details class="space-top-xs">
+                                                    <summary class="tone-muted text-small">Detailed log</summary>
+                                                    <pre class="text-small space-top-xs space-bottom-none log-pre" data-email-log>{{ row.latest_run.detailed_log }}</pre>
                                                 </details>
                                             {% else %}
-                                                <pre class="small mt-1 mb-0 d-none log-pre" data-email-log></pre>
+                                                <pre class="text-small space-top-xs space-bottom-none is-hidden log-pre" data-email-log></pre>
                                             {% endif %}
                                         {% else %}
                                             <span data-email-status>-</span>
-                                            <pre class="small mt-1 mb-0 d-none log-pre" data-email-log></pre>
+                                            <pre class="text-small space-top-xs space-bottom-none is-hidden log-pre" data-email-log></pre>
                                         {% endif %}
                                     </td>
                                     <td class="actions import-col-actions" data-label="Actions">
-                                        <div class="d-inline-flex flex-wrap gap-2">
+                                        <div class="layout-inline layout-row--wrap gap-sm">
                                             <a class="button secondary icon" href="{% url 'prices:supplier_import' row.supplier.pk %}" title="Edit mapping" aria-label="Edit mapping">
                                                 <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                                                     <path d="M12 20h9"/>
@@ -198,7 +198,10 @@
                                 if (statusEl) statusEl.textContent = "-";
                                 if (progressEl) progressEl.parentElement.style.display = "none";
                                 if (messageEl) messageEl.textContent = "";
-                                if (logEl) logEl.textContent = "";
+                                if (logEl) {
+                                    logEl.textContent = "";
+                                    logEl.classList.add("is-hidden");
+                                }
                                 if (updateBtn) updateBtn.disabled = false;
                                 if (cancelBtn) cancelBtn.style.display = "none";
                                 row.setAttribute("data-email-running", "0");
@@ -223,7 +226,9 @@
                             if (logEl && run.detailed_log !== undefined) {
                                 logEl.textContent = run.detailed_log || "";
                                 if (run.detailed_log) {
-                                    logEl.classList.remove("d-none");
+                                    logEl.classList.remove("is-hidden");
+                                } else {
+                                    logEl.classList.add("is-hidden");
                                 }
                             }
                             if (run.status === "running") {

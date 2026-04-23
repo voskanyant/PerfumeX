@@ -28,8 +28,8 @@
                 </div>
             </div>
             <div class="settings-body">
-                <form method="get" class="row g-3 align-items-end">
-                    <div class="col-12 col-md-4">
+                <form method="get" class="layout-grid-12 gap-md items-end settings-row-full">
+                    <div class="span-12 md-span-4">
                         <label for="run-supplier-filter" class="form-label">Supplier</label>
                         <select id="run-supplier-filter" name="supplier">
                             <option value="">All</option>
@@ -38,7 +38,7 @@
                             {% endfor %}
                         </select>
                     </div>
-                    <div class="col-12 col-md-4">
+                    <div class="span-12 md-span-4">
                         <label for="run-status-filter" class="form-label">Run status</label>
                         <select id="run-status-filter" name="run_status">
                             <option value="">All</option>
@@ -47,7 +47,7 @@
                             {% endfor %}
                         </select>
                     </div>
-                    <div class="col-12 col-md-4">
+                    <div class="span-12 md-span-4">
                         <label for="batch-status-filter" class="form-label">Batch status</label>
                         <select id="batch-status-filter" name="batch_status">
                             <option value="">All</option>
@@ -56,7 +56,7 @@
                             {% endfor %}
                         </select>
                     </div>
-                    <div class="col-12">
+                    <div class="span-12">
                         <button class="button secondary" type="submit">Apply filters</button>
                     </div>
                 </form>
@@ -72,11 +72,11 @@
             </div>
             <div class="settings-body">
                 {% if runs_page.object_list %}
-                    <div class="d-grid gap-3">
+                    <div class="display-grid gap-md settings-row-full">
                         {% for run in runs_page.object_list %}
                             <div class="run-log-card">
                                 <div class="run-log-head">
-                                    <div class="d-flex flex-column gap-1">
+                                    <div class="layout-column gap-xs">
                                         <strong>{{ run.supplier.name }}</strong>
                                         <div class="run-log-meta">
                                             <span class="run-log-status {{ run.status|lower }}">{{ run.status }}</span>
@@ -101,30 +101,24 @@
                         {% endfor %}
                     </div>
                     {% if runs_page.paginator.num_pages > 1 %}
-                        <nav class="mt-3 pagination-shell" aria-label="Detailed logs pagination">
-                            <ul class="pagination flex-wrap mb-0">
+                        <nav class="pagination-shell settings-row-full" aria-label="Detailed logs pagination">
+                            <div class="pagination-list">
                                 {% if runs_page.has_previous %}
-                                    <li class="page-item">
-                                        <a class="page-link" href="?page={{ runs_page.previous_page_number }}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if status_filter %}&run_status={{ status_filter }}{% endif %}{% if batch_status_filter %}&batch_status={{ batch_status_filter }}{% endif %}">Previous</a>
-                                    </li>
+                                    <a class="page-link" href="?page={{ runs_page.previous_page_number }}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if status_filter %}&run_status={{ status_filter }}{% endif %}{% if batch_status_filter %}&batch_status={{ batch_status_filter }}{% endif %}">Previous</a>
                                 {% endif %}
                                 {% for page_num in runs_page.paginator.page_range %}
                                     {% if page_num <= 5 or page_num > runs_page.paginator.num_pages|add:-3 %}
-                                    {% if page_num == runs_page.number %}
-                                        <li class="page-item active"><span class="page-link">{{ page_num }}</span></li>
-                                    {% else %}
-                                        <li class="page-item">
+                                        {% if page_num == runs_page.number %}
+                                            <span class="page-link is-active">{{ page_num }}</span>
+                                        {% else %}
                                             <a class="page-link" href="?page={{ page_num }}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if status_filter %}&run_status={{ status_filter }}{% endif %}{% if batch_status_filter %}&batch_status={{ batch_status_filter }}{% endif %}">{{ page_num }}</a>
-                                        </li>
-                                    {% endif %}
+                                        {% endif %}
                                     {% endif %}
                                 {% endfor %}
                                 {% if runs_page.has_next %}
-                                    <li class="page-item">
-                                        <a class="page-link" href="?page={{ runs_page.next_page_number }}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if status_filter %}&run_status={{ status_filter }}{% endif %}{% if batch_status_filter %}&batch_status={{ batch_status_filter }}{% endif %}">Next</a>
-                                    </li>
+                                    <a class="page-link" href="?page={{ runs_page.next_page_number }}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if status_filter %}&run_status={{ status_filter }}{% endif %}{% if batch_status_filter %}&batch_status={{ batch_status_filter }}{% endif %}">Next</a>
                                 {% endif %}
-                            </ul>
+                            </div>
                             <form class="pagination-jump" method="get">
                                 <label for="runs-page-jump">Page</label>
                                 <input id="runs-page-jump" type="number" name="page" min="1" max="{{ runs_page.paginator.num_pages }}" value="{{ runs_page.number }}">
@@ -151,11 +145,11 @@
             </div>
             <div class="settings-body">
                 {% if batches_page.object_list %}
-                    <div class="d-grid gap-3">
+                    <div class="display-grid gap-md settings-row-full">
                         {% for batch in batches_page.object_list %}
                             <div class="run-log-card">
                                 <div class="run-log-head">
-                                    <div class="d-flex flex-column gap-1">
+                                    <div class="layout-column gap-xs">
                                         <strong>{{ batch.supplier.name }}</strong>
                                         <div class="run-log-meta">
                                             <span class="run-log-status {{ batch.status|lower }}">{{ batch.status }}</span>
@@ -172,28 +166,22 @@
                         {% endfor %}
                     </div>
                     {% if batches_page.paginator.num_pages > 1 %}
-                        <nav class="mt-3" aria-label="Batch logs pagination">
-                            <ul class="pagination flex-wrap mb-0">
+                        <nav class="pagination-shell settings-row-full" aria-label="Batch logs pagination">
+                            <div class="pagination-list">
                                 {% if batches_page.has_previous %}
-                                    <li class="page-item">
-                                        <a class="page-link" href="?bpage={{ batches_page.previous_page_number }}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if status_filter %}&run_status={{ status_filter }}{% endif %}{% if batch_status_filter %}&batch_status={{ batch_status_filter }}{% endif %}">Previous</a>
-                                    </li>
+                                    <a class="page-link" href="?bpage={{ batches_page.previous_page_number }}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if status_filter %}&run_status={{ status_filter }}{% endif %}{% if batch_status_filter %}&batch_status={{ batch_status_filter }}{% endif %}">Previous</a>
                                 {% endif %}
                                 {% for page_num in batches_page.paginator.page_range %}
                                     {% if page_num == batches_page.number %}
-                                        <li class="page-item active"><span class="page-link">{{ page_num }}</span></li>
+                                        <span class="page-link is-active">{{ page_num }}</span>
                                     {% elif page_num > batches_page.number|add:-3 and page_num < batches_page.number|add:3 %}
-                                        <li class="page-item">
-                                            <a class="page-link" href="?bpage={{ page_num }}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if status_filter %}&run_status={{ status_filter }}{% endif %}{% if batch_status_filter %}&batch_status={{ batch_status_filter }}{% endif %}">{{ page_num }}</a>
-                                        </li>
+                                        <a class="page-link" href="?bpage={{ page_num }}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if status_filter %}&run_status={{ status_filter }}{% endif %}{% if batch_status_filter %}&batch_status={{ batch_status_filter }}{% endif %}">{{ page_num }}</a>
                                     {% endif %}
                                 {% endfor %}
                                 {% if batches_page.has_next %}
-                                    <li class="page-item">
-                                        <a class="page-link" href="?bpage={{ batches_page.next_page_number }}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if status_filter %}&run_status={{ status_filter }}{% endif %}{% if batch_status_filter %}&batch_status={{ batch_status_filter }}{% endif %}">Next</a>
-                                    </li>
+                                    <a class="page-link" href="?bpage={{ batches_page.next_page_number }}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if status_filter %}&run_status={{ status_filter }}{% endif %}{% if batch_status_filter %}&batch_status={{ batch_status_filter }}{% endif %}">Next</a>
                                 {% endif %}
-                            </ul>
+                            </div>
                         </nav>
                     {% endif %}
                 {% else %}

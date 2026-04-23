@@ -59,9 +59,9 @@
         }).slice(0, 18).forEach(function (token) {
             var id = "kw-" + token.replace(/[^a-z0-9]/gi, "").toLowerCase();
             var wrapper = document.createElement("div");
-            wrapper.className = "col-6";
+            wrapper.className = "span-12 md-span-6";
             var label = document.createElement("label");
-            label.className = "d-flex align-items-center gap-2";
+            label.className = "layout-row items-center gap-sm";
             var input = document.createElement("input");
             input.type = "checkbox";
             input.value = token;
@@ -83,10 +83,10 @@
     }
 
     function scoreBadge(score) {
-        if (score >= 92) return "bg-success-subtle text-success-emphasis";
-        if (score >= 80) return "bg-primary-subtle text-primary-emphasis";
-        if (score >= 65) return "bg-warning-subtle text-warning-emphasis";
-        return "bg-secondary-subtle text-secondary-emphasis";
+        if (score >= 92) return "score-badge score-badge--success";
+        if (score >= 80) return "score-badge score-badge--strong";
+        if (score >= 65) return "score-badge score-badge--warning";
+        return "score-badge score-badge--muted";
     }
 
     function searchMatches(autoMode) {
@@ -117,8 +117,8 @@
                         if (item.brand) label += " | " + item.brand;
                         if (item.size) label += " | " + item.size;
                         row.innerHTML = "<td data-label='Select'><input type='checkbox' data-target-select='our:" + item.id + "'></td>" +
-                            "<td data-label='Our products'>" + label + "<div class='small muted'>" + (item.reason || "") + "</div></td>" +
-                            "<td data-label='Score'><span class='badge " + scoreBadge(item.score || 0) + "'>" + (item.score || 0) + "%</span></td>";
+                            "<td data-label='Our products'>" + label + "<div class='text-small tone-muted'>" + (item.reason || "") + "</div></td>" +
+                            "<td data-label='Score'><span class='" + scoreBadge(item.score || 0) + "'>" + (item.score || 0) + "%</span></td>";
                         row.querySelector("input").addEventListener("change", function () {
                             setTarget("our", item.id);
                         });
@@ -131,8 +131,8 @@
                     data.supplier_products.forEach(function (item) {
                         var row = document.createElement("tr");
                         row.innerHTML = "<td data-label='Select'><input type='checkbox' data-target-select='supplier:" + item.id + "'></td>" +
-                            "<td data-label='Supplier products'>" + item.name + "<div class='small muted'>" + (item.supplier || "") + " " + (item.sku || "") + " | " + (item.reason || "") + "</div></td>" +
-                            "<td data-label='Score'><span class='badge " + scoreBadge(item.score || 0) + "'>" + (item.score || 0) + "%</span></td>";
+                            "<td data-label='Supplier products'>" + item.name + "<div class='text-small tone-muted'>" + (item.supplier || "") + " " + (item.sku || "") + " | " + (item.reason || "") + "</div></td>" +
+                            "<td data-label='Score'><span class='" + scoreBadge(item.score || 0) + "'>" + (item.score || 0) + "%</span></td>";
                         row.querySelector("input").addEventListener("change", function () {
                             setTarget("supplier", item.id);
                         });
@@ -144,9 +144,9 @@
 
     document.querySelectorAll("#supplier-products-table tbody tr").forEach(function (row) {
         row.addEventListener("click", function () {
-            if (selectedRow) selectedRow.classList.remove("table-active");
+            if (selectedRow) selectedRow.classList.remove("is-selected-row");
             selectedRow = row;
-            row.classList.add("table-active");
+            row.classList.add("is-selected-row");
             var id = row.getAttribute("data-id");
             var name = row.getAttribute("data-name");
             sourceInput.value = id;

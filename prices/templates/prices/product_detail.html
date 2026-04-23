@@ -10,114 +10,113 @@
 
 {% block content %}
     <div class="page-stack">
-    <div class="card mb-3">
-        <div class="d-flex flex-wrap align-items-start justify-content-between gap-3">
-            <div>
-                <span class="page-kicker">Supplier offer</span>
-                <h1 class="page-title">{{ object.name|fix_text }}</h1>
-                <p class="page-subtitle">{{ object.supplier.name|fix_text }} &middot; {{ object.supplier_sku|fix_text }}</p>
+        <div class="section-card">
+            <div class="layout-row layout-row--wrap items-start justify-between gap-md">
+                <div>
+                    <span class="page-kicker">Supplier offer</span>
+                    <h1 class="page-title">{{ object.name|fix_text }}</h1>
+                    <p class="page-subtitle space-bottom-none">{{ object.supplier.name|fix_text }} &middot; {{ object.supplier_sku|fix_text }}</p>
+                </div>
+                <a class="button ghost" href="{{ back_url }}">Back to products</a>
             </div>
-            <a class="button ghost" href="{{ back_url }}">Back to products</a>
-        </div>
-        <div class="row g-3 mt-2">
-            <div class="col-12 col-md-6">
-                <div class="detail-stat price">
-                    <div class="label">Current price</div>
-                    <div class="value">{{ object.current_price|default:"-" }} {{ object.currency|currency_symbol }}</div>
+            <div class="layout-grid-12 gap-md space-top-sm">
+                <div class="span-12 md-span-6">
+                    <div class="detail-stat price">
+                        <div class="label">Current price</div>
+                        <div class="value">{{ object.current_price|default:"-" }} {{ object.currency|currency_symbol }}</div>
+                    </div>
+                </div>
+                <div class="span-12 md-span-6">
+                    <div class="detail-stat">
+                        <div class="label">Last imported at</div>
+                        <div class="value">{{ object.last_imported_at|date:"d/m/Y H:i" }}</div>
+                    </div>
                 </div>
             </div>
-            <div class="col-12 col-md-6">
-                <div class="detail-stat">
-                    <div class="label">Last imported at</div>
-                    <div class="value">{{ object.last_imported_at|date:"d/m/Y H:i" }}</div>
-                </div>
-            </div>
-        </div>
-        {% if not viewer_mode %}
-            <form method="post" action="{% url 'prices:product_link' object.pk %}" class="mt-3">
-                {% csrf_token %}
-                <div class="row g-3 align-items-end">
-                    <div class="col-12 col-md-6">
-                        <label for="id_our_product" class="form-label">Our product</label>
-                        {{ link_form.our_product }}
-                    </div>
-                    <div class="col-12 col-md-3">
-                        <button class="button secondary w-100" type="submit">Link</button>
-                    </div>
-                    {% if our_product %}
-                        <div class="col-12 col-md-3">
-                            <a class="button ghost w-100" href="{% url 'prices:our_product_detail' our_product.pk %}">Open Our Product</a>
+            {% if not viewer_mode %}
+                <form method="post" action="{% url 'prices:product_link' object.pk %}" class="space-top-md">
+                    {% csrf_token %}
+                    <div class="layout-grid-12 gap-md items-end">
+                        <div class="span-12 md-span-6">
+                            <label for="id_our_product" class="form-label">Our product</label>
+                            {{ link_form.our_product }}
                         </div>
-                    {% endif %}
-                </div>
-            </form>
-        {% endif %}
-    </div>
-    <div class="card mb-3">
-        <div class="d-flex flex-wrap align-items-start justify-content-between gap-3">
+                        <div class="span-12 md-span-3">
+                            <button class="button secondary is-full-width" type="submit">Link</button>
+                        </div>
+                        {% if our_product %}
+                            <div class="span-12 md-span-3">
+                                <a class="button ghost is-full-width" href="{% url 'prices:our_product_detail' our_product.pk %}">Open Our Product</a>
+                            </div>
+                        {% endif %}
+                    </div>
+                </form>
+            {% endif %}
+        </div>
+
+        <div class="section-card">
             <div>
                 <span class="page-kicker">History</span>
                 <h2 class="page-title">Price history</h2>
-                <p class="page-subtitle">Latest daily price snapshots.</p>
+                <p class="page-subtitle space-bottom-none">Latest daily price snapshots.</p>
             </div>
-        </div>
-        <div class="d-flex flex-wrap gap-2 mt-2">
-            <button class="button {% if chart_currency != 'original' %}secondary{% endif %}" type="button" data-chart-currency="original">Original</button>
-            <button class="button {% if chart_currency != 'usd' %}secondary{% endif %}" type="button" data-chart-currency="usd">USD</button>
-            <button class="button {% if chart_currency != 'rub' %}secondary{% endif %}" type="button" data-chart-currency="rub">RUB</button>
-        </div>
-        <div class="chart-summary mt-3" id="chart-summary">
-            <div class="chart-summary-item">
-                <div class="label">Latest</div>
-                <div class="value" id="chart-summary-latest">-</div>
+            <div class="form-actions space-top-sm">
+                <button class="button {% if chart_currency != 'original' %}secondary{% endif %}" type="button" data-chart-currency="original">Original</button>
+                <button class="button {% if chart_currency != 'usd' %}secondary{% endif %}" type="button" data-chart-currency="usd">USD</button>
+                <button class="button {% if chart_currency != 'rub' %}secondary{% endif %}" type="button" data-chart-currency="rub">RUB</button>
             </div>
-            <div class="chart-summary-item">
-                <div class="label">Min</div>
-                <div class="value" id="chart-summary-min">-</div>
+            <div class="chart-summary space-top-md" id="chart-summary">
+                <div class="chart-summary-item">
+                    <div class="label">Latest</div>
+                    <div class="value" id="chart-summary-latest">-</div>
+                </div>
+                <div class="chart-summary-item">
+                    <div class="label">Min</div>
+                    <div class="value" id="chart-summary-min">-</div>
+                </div>
+                <div class="chart-summary-item">
+                    <div class="label">Max</div>
+                    <div class="value" id="chart-summary-max">-</div>
+                </div>
+                <div class="chart-summary-item">
+                    <div class="label">Delta</div>
+                    <div class="value" id="chart-summary-change">-</div>
+                </div>
             </div>
-            <div class="chart-summary-item">
-                <div class="label">Max</div>
-                <div class="value" id="chart-summary-max">-</div>
+            <div id="price-chart-wrap" class="space-top-md chart-mobile-edge chart-wrap">
+                <canvas id="price-chart" class="chart-canvas"></canvas>
+                <div id="chart-empty-state" class="text-small tone-muted chart-empty">
+                    No data in selected range.
+                </div>
+                <div class="form-actions chart-tools">
+                    <button id="chart-export-png" class="button secondary" type="button" title="Export PNG" aria-label="Export chart PNG">PNG</button>
+                    <button id="chart-snap-toggle" class="button secondary" type="button" title="Snap to points" aria-label="Snap to points">Snap: Off</button>
+                    <button id="chart-fullscreen-toggle" class="button secondary" type="button" title="Fullscreen chart" aria-label="Fullscreen chart">⛶</button>
+                </div>
+                <div id="chart-range-buttons" class="form-actions chart-ranges">
+                    <button class="button secondary" type="button" data-range="6m">6m</button>
+                    <button class="button secondary" type="button" data-range="1y">1y</button>
+                    <button class="button secondary" type="button" data-range="2y">2y</button>
+                    <button class="button secondary" type="button" data-range="reset">Reset</button>
+                </div>
             </div>
-            <div class="chart-summary-item">
-                <div class="label">Delta</div>
-                <div class="value" id="chart-summary-change">-</div>
-            </div>
-        </div>
-        <div id="price-chart-wrap" class="mt-3 chart-mobile-edge chart-wrap">
-            <canvas id="price-chart" class="chart-canvas"></canvas>
-            <div id="chart-empty-state" class="small muted chart-empty">
-                No data in selected range.
-            </div>
-            <div class="d-flex gap-2 chart-tools">
-                <button id="chart-export-png" class="button secondary" type="button" title="Export PNG" aria-label="Export chart PNG">PNG</button>
-                <button id="chart-snap-toggle" class="button secondary" type="button" title="Snap to points" aria-label="Snap to points">Snap: Off</button>
-                <button id="chart-fullscreen-toggle" class="button secondary" type="button" title="Fullscreen chart" aria-label="Fullscreen chart">⛶</button>
-            </div>
-            <div id="chart-range-buttons" class="d-flex gap-2 chart-ranges">
-                <button class="button secondary" type="button" data-range="6m">6m</button>
-                <button class="button secondary" type="button" data-range="1y">1y</button>
-                <button class="button secondary" type="button" data-range="2y">2y</button>
-                <button class="button secondary" type="button" data-range="reset">Reset</button>
-            </div>
-        </div>
-        <form method="get" class="row g-3 align-items-end mt-2">
-            <input type="hidden" name="chart_currency" id="chart-currency-input" value="{{ chart_currency }}">
-            <div class="col-12 col-md-5">
-                <label for="start" class="form-label">Start</label>
-                <input id="start" name="start" type="datetime-local" value="{{ start_value }}">
-            </div>
-            <div class="col-12 col-md-5">
-                <label for="end" class="form-label">End</label>
-                <input id="end" name="end" type="datetime-local" value="{{ end_value }}">
-            </div>
-            <div class="col-12 col-md-2">
-                <button class="button w-100" type="submit">Filter</button>
-            </div>
-        </form>
-        {% if snapshots %}
-            <div class="table-wrap table-responsive mt-3">
-                <table class="table table-sm table-hover align-middle mb-0 table-mobile">
+            <form id="chart-filter-form" method="get" class="layout-grid-12 gap-md items-end space-top-sm">
+                <input type="hidden" name="chart_currency" id="chart-currency-input" value="{{ chart_currency }}">
+                <div class="span-12 md-span-5">
+                    <label for="start" class="form-label">Start</label>
+                    <input id="start" name="start" type="datetime-local" value="{{ start_value }}">
+                </div>
+                <div class="span-12 md-span-5">
+                    <label for="end" class="form-label">End</label>
+                    <input id="end" name="end" type="datetime-local" value="{{ end_value }}">
+                </div>
+                <div class="span-12 md-span-2">
+                    <button class="button is-full-width" type="submit">Filter</button>
+                </div>
+            </form>
+            {% if snapshots %}
+                <div class="table-wrap table-scroll-x space-top-md">
+                    <table class="table space-bottom-none table-mobile">
                     <thead>
                         <tr>
                             <th>Date</th>
@@ -150,11 +149,11 @@
                             </tr>
                         {% endfor %}
                     </tbody>
-                </table>
-            </div>
-            {% if history_is_paginated %}
-                <div class="pagination-shell mt-3">
-                    <div class="d-flex flex-wrap gap-2">
+                    </table>
+                </div>
+                {% if history_is_paginated %}
+                    <div class="pagination-shell space-top-md">
+                        <div class="pagination-list">
                         {% if history_page_obj.has_previous %}
                             <a class="button secondary" href="{% if history_querystring %}?{{ history_querystring }}&history_page=1{% else %}?history_page=1{% endif %}">First</a>
                             <a class="button secondary" href="{% if history_querystring %}?{{ history_querystring }}&history_page={{ history_page_obj.previous_page_number }}{% else %}?history_page={{ history_page_obj.previous_page_number }}{% endif %}">Prev</a>
@@ -162,7 +161,7 @@
                         {% for page_num in history_page_obj.paginator.page_range %}
                             {% if page_num <= 5 or page_num > history_page_obj.paginator.num_pages|add:-3 %}
                                 {% if page_num == history_page_obj.number %}
-                                    <span class="page-link">{{ page_num }}</span>
+                                    <span class="page-link is-active">{{ page_num }}</span>
                                 {% else %}
                                     <a class="page-link" href="{% if history_querystring %}?{{ history_querystring }}&history_page={{ page_num }}{% else %}?history_page={{ page_num }}{% endif %}">{{ page_num }}</a>
                                 {% endif %}
@@ -172,27 +171,28 @@
                             <a class="button secondary" href="{% if history_querystring %}?{{ history_querystring }}&history_page={{ history_page_obj.next_page_number }}{% else %}?history_page={{ history_page_obj.next_page_number }}{% endif %}">Next</a>
                             <a class="button secondary" href="{% if history_querystring %}?{{ history_querystring }}&history_page={{ history_page_obj.paginator.num_pages }}{% else %}?history_page={{ history_page_obj.paginator.num_pages }}{% endif %}">Last</a>
                         {% endif %}
+                        </div>
+                        <form class="pagination-jump" method="get">
+                            <label for="history-page-jump">Page</label>
+                            <input id="history-page-jump" type="number" name="history_page" min="1" max="{{ history_page_obj.paginator.num_pages }}" value="{{ history_page_obj.number }}">
+                            {% if chart_currency %}<input type="hidden" name="chart_currency" value="{{ chart_currency }}">{% endif %}
+                            {% if start_value %}<input type="hidden" name="start" value="{{ start_value }}">{% endif %}
+                            {% if end_value %}<input type="hidden" name="end" value="{{ end_value }}">{% endif %}
+                            <button class="button secondary" type="submit">Go</button>
+                        </form>
+                        <div class="pagination-summary">Page {{ history_page_obj.number }} of {{ history_page_obj.paginator.num_pages }}</div>
                     </div>
-                    <form class="pagination-jump" method="get">
-                        <label for="history-page-jump">Page</label>
-                        <input id="history-page-jump" type="number" name="history_page" min="1" max="{{ history_page_obj.paginator.num_pages }}" value="{{ history_page_obj.number }}">
-                        {% if chart_currency %}<input type="hidden" name="chart_currency" value="{{ chart_currency }}">{% endif %}
-                        {% if start_value %}<input type="hidden" name="start" value="{{ start_value }}">{% endif %}
-                        {% if end_value %}<input type="hidden" name="end" value="{{ end_value }}">{% endif %}
-                        <button class="button secondary" type="submit">Go</button>
-                    </form>
-                    <div class="pagination-summary">Page {{ history_page_obj.number }} of {{ history_page_obj.paginator.num_pages }}</div>
-                </div>
+                {% endif %}
+            {% else %}
+                <p class="muted space-top-md">No price history in this range.</p>
             {% endif %}
-        {% else %}
-            <p class="muted mt-3">No price history in this range.</p>
-        {% endif %}
-    </div>
-    {{ chart_labels|json_script:"chart-labels" }}
-    {{ chart_values|json_script:"chart-values" }}
-    {{ chart_currency_symbol|json_script:"chart-currency-symbol" }}
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-    <script src="{% static 'prices/js/product-detail.js' %}"></script>
+        </div>
+
+        {{ chart_labels|json_script:"chart-labels" }}
+        {{ chart_values|json_script:"chart-values" }}
+        {{ chart_currency_symbol|json_script:"chart-currency-symbol" }}
+        <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+        <script src="{% static 'prices/js/product-detail.js' %}"></script>
     </div>
 {% endblock %}
 
