@@ -332,7 +332,16 @@
                                         <td data-field="{{ field }}"
                                             data-label="{% if field == 'supplier' %}Supplier{% elif field == 'supplier_sku' %}SKU{% elif field == 'name' %}Name{% else %}{{ field|capfirst }}{% endif %}">
                                             {% if link_detail and detail_url_name and field == "name" %}
-                                                <a class="cell-name" href="{% url detail_url_name obj.pk %}?next={{ request.get_full_path|urlencode }}&from={{ obj.pk }}">{{ obj|get_attr:field }}</a>
+                                                <span class="cell-name-wrap">
+                                                    <button class="cell-name cell-name-copy" type="button" data-copy-product-name="{{ obj|get_attr:field }}" aria-label="Copy product name">{{ obj|get_attr:field }}</button>
+                                                    <a class="cell-name-open" data-product-detail-link href="{% url detail_url_name obj.pk %}?next={{ request.get_full_path|urlencode }}&from={{ obj.pk }}" aria-label="Open product page" title="Open product page">
+                                                        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                                            <path d="M6 3H3.75A1.75 1.75 0 0 0 2 4.75v7.5C2 13.216 2.784 14 3.75 14h7.5A1.75 1.75 0 0 0 13 12.25V10"></path>
+                                                            <path d="M9 2h5v5"></path>
+                                                            <path d="M14 2 7.5 8.5"></path>
+                                                        </svg>
+                                                    </a>
+                                                </span>
                                             {% elif field == "supplier" and obj.supplier_id %}
                                                 <a href="?supplier={{ obj.supplier_id }}" class="supplier-filter-link cell-supplier" data-supplier-id="{{ obj.supplier_id }}">{{ obj|get_attr:field }}</a>
                                             {% elif field == "name" %}

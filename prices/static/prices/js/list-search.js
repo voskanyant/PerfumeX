@@ -42,7 +42,12 @@
     var useServerSearch = input.getAttribute("data-server-search") === "1";
 
     function getStickyTopOffset() {
-        return window.matchMedia("(max-width: 991.98px)").matches ? 64 : 72;
+        var topbar = document.querySelector(".mobile-topbar") || document.querySelector(".topbar");
+        if (!topbar) {
+            return 54;
+        }
+        var rect = topbar.getBoundingClientRect();
+        return Math.max(Math.round(rect.bottom), 0);
     }
 
     function ensureStickyPlaceholder() {
@@ -432,6 +437,78 @@
             "\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg>";
     }
 
+    function buildProductNameCell(nameText, detailUrl) {
+        var escapedName = escapeHtml(nameText);
+        if (!detailUrl) {
+            return "<span class='cell-name'>" + escapedName + "</span>";
+        }
+        var iconSvg = "<svg viewBox='0 0 16 16' fill='none' stroke='currentColor' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round' aria-hidden='true'>" +
+            "<path d='M6 3H3.75A1.75 1.75 0 0 0 2 4.75v7.5C2 13.216 2.784 14 3.75 14h7.5A1.75 1.75 0 0 0 13 12.25V10'></path>" +
+            "<path d='M9 2h5v5'></path>" +
+            "<path d='M14 2 7.5 8.5'></path>" +
+            "</svg>";
+        return "<span class='cell-name-wrap'>" +
+            "<button class='cell-name cell-name-copy' type='button' data-copy-product-name='" + escapedName + "' aria-label='Copy product name'>" + escapedName + "</button>" +
+            "<a class='cell-name-open' data-product-detail-link href='" + detailUrl + "' aria-label='Open product page' title='Open product page'>" + iconSvg + "</a>" +
+            "</span>";
+    }
+
+    function ensureCopyToast() {
+        var existing = document.getElementById("copy-feedback-toast");
+        if (existing) return existing;
+        var toast = document.createElement("div");
+        toast.id = "copy-feedback-toast";
+        toast.className = "copy-feedback-toast";
+        toast.setAttribute("aria-live", "polite");
+        toast.setAttribute("aria-atomic", "true");
+        document.body.appendChild(toast);
+        return toast;
+    }
+
+    function showCopyToast(message) {
+        var toast = ensureCopyToast();
+        toast.textContent = message;
+        toast.classList.add("is-visible");
+        if (toast._hideTimer) {
+            window.clearTimeout(toast._hideTimer);
+        }
+        toast._hideTimer = window.setTimeout(function () {
+            toast.classList.remove("is-visible");
+            toast._hideTimer = null;
+        }, 1400);
+    }
+
+    function copyTextToClipboard(text) {
+        if (!text) {
+            return Promise.reject(new Error("Missing text"));
+        }
+        if (navigator.clipboard && window.isSecureContext) {
+            return navigator.clipboard.writeText(text);
+        }
+        return new Promise(function (resolve, reject) {
+            var textarea = document.createElement("textarea");
+            textarea.value = text;
+            textarea.setAttribute("readonly", "");
+            textarea.style.position = "fixed";
+            textarea.style.opacity = "0";
+            textarea.style.pointerEvents = "none";
+            document.body.appendChild(textarea);
+            textarea.focus();
+            textarea.select();
+            try {
+                if (document.execCommand("copy")) {
+                    resolve();
+                } else {
+                    reject(new Error("Copy command failed"));
+                }
+            } catch (error) {
+                reject(error);
+            } finally {
+                document.body.removeChild(textarea);
+            }
+        });
+    }
+
     function renderRows(items) {
         var detailBase = input.getAttribute("data-detail-base") || "";
         var bulkEnabled = input.getAttribute("data-bulk") === "1";
@@ -448,8 +525,7 @@
             var supplierId = escapeHtml(String(item.supplier_id || ""));
             var sku = escapeHtml(item.supplier_sku);
             var rawName = String(item.name || "");
-            var escapedName = escapeHtml(rawName);
-            var name = "<span class='cell-name'>" + escapedName + "</span>";
+            var name = "<span class='cell-name'>" + escapeHtml(rawName) + "</span>";
             var price = escapeHtml(item.current_price);
             var originalPrice = escapeHtml(item.original_price || "");
             var deltaDirection = item.price_delta_direction || "";
@@ -477,9 +553,11 @@
                 : "<span class='cell-supplier'>" + supplier + "</span>";
             var priceHtml = "<div class='desktop-price-stack'>" + desktopPriceHtml + "</div>";
 
+            var detailUrl = "";
             if (detailBase && item.id) {
-                name = "<a class='cell-name' href='" + detailBase + item.id + "/?next=" + encodeURIComponent(nextValue) + "&from=" + item.id + "'>" + escapedName + "</a>";
+                detailUrl = detailBase + item.id + "/?next=" + encodeURIComponent(nextValue) + "&from=" + item.id;
             }
+            name = buildProductNameCell(rawName, detailUrl);
 
             var checkboxCell = bulkEnabled
                 ? "<td class='select-col bulk-col'><input type='checkbox' name='product_ids' value='" + item.id + "'></td>"
@@ -875,6 +953,29 @@
     }
     if (tbody) {
         tbody.addEventListener("click", function (event) {
+            var copyButton = event.target.closest("[data-copy-product-name]");
+            if (copyButton) {
+                event.preventDefault();
+                copyTextToClipboard(copyButton.getAttribute("data-copy-product-name") || "")
+                    .then(function () {
+                        showCopyToast("Copied");
+                    })
+                    .catch(function () {
+                        showCopyToast("Copy failed");
+                    });
+                return;
+            }
+            var detailLink = event.target.closest("a[data-product-detail-link]");
+            if (detailLink) {
+                var detailRow = event.target.closest("tr[data-product-id]");
+                if (detailRow) {
+                    var detailProductId = detailRow.getAttribute("data-product-id");
+                    if (detailProductId) {
+                        sessionStorage.setItem(lastViewedKey, detailProductId);
+                    }
+                }
+                return;
+            }
             var isMobileProductsTable =
                 table &&
                 table.classList.contains("products-mobile") &&
@@ -908,7 +1009,7 @@
                 window.location.href = supplierUrl.toString();
                 return;
             }
-            var link = event.target.closest("td[data-field='name'] a");
+            var link = event.target.closest("a[data-product-detail-link]");
             if (!link) return;
             var row = event.target.closest("tr[data-product-id]");
             if (!row) return;
