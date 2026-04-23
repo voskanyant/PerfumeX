@@ -823,12 +823,12 @@ tr[data-delta="up"] {
     top: 12px;
     right: 12px;
     margin-top: 0;
-    width: 24px;
-    height: 24px;
+    width: 18px;
+    height: 18px;
     flex: none;
-    background: var(--white);
-    border: 1px solid var(--grey-200);
-    box-shadow: var(--shadow-sm);
+    background: transparent;
+    border: 0;
+    box-shadow: none;
   }
 
   .products-mobile td[data-field="sparkline"],
@@ -856,11 +856,10 @@ tr[data-delta="up"] {
     font-weight: 600;
     line-height: 1.2;
     text-decoration: none !important;
-    /* Override pill on mobile — plain text for clean alignment */
-    background: linear-gradient(180deg, var(--grey-50), var(--grey-100)) !important;
-    border: 1px solid var(--grey-200) !important;
-    padding: 3px 8px !important;
-    border-radius: 999px !important;
+    background: none !important;
+    border: none !important;
+    padding: 0 !important;
+    border-radius: 0 !important;
     color: var(--grey-700) !important;
   }
 
