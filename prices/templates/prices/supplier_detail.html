@@ -5,43 +5,46 @@
 {% block body_data %}data-page="supplier-detail"{% endblock %}
 
 {% block content %}
-    <div class="card mb-3">
-        <div class="d-flex flex-wrap align-items-start justify-content-between gap-3">
-            <div>
-                <h1 class="page-title">{{ object.name|fix_text }}</h1>
-                <p class="page-subtitle">Supplier profile and mappings.</p>
+    <div class="page-stack">
+        <div class="section-card">
+            <div class="layout-row layout-row--wrap items-start justify-between gap-md">
+                <div>
+                    <span class="page-kicker">Supplier</span>
+                    <h1 class="page-title">{{ object.name|fix_text }}</h1>
+                    <p class="page-subtitle space-bottom-none">Supplier profile and mappings.</p>
+                </div>
+                <a class="button secondary icon" href="{% url 'prices:supplier_update' object.pk %}" title="Edit supplier" aria-label="Edit supplier">
+                    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M12 20h9"/>
+                        <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/>
+                    </svg>
+                </a>
             </div>
-            <a class="button secondary icon" href="{% url 'prices:supplier_update' object.pk %}" title="Edit supplier" aria-label="Edit supplier">
-                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                    <path d="M12 20h9"/>
-                    <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/>
-                </svg>
-            </a>
-        </div>
-        <div class="surface-grid mt-2">
-            <div class="surface-meta">
-                <div class="label">Code</div>
-                <div class="value">{{ object.code|default:"-" }}</div>
-            </div>
-            <div class="surface-meta">
-                <div class="label">Default currency</div>
-                <div class="value">{{ object.default_currency }}</div>
-            </div>
-            <div class="surface-meta">
-                <div class="label">Active</div>
-                <div class="value">{{ object.is_active }}</div>
-            </div>
-            <div class="surface-meta">
-                <div class="label">From address pattern</div>
-                <div class="value">{{ object.from_address_pattern|default:"-" }}</div>
-            </div>
-            <div class="surface-meta">
-                <div class="label">Price subject pattern</div>
-                <div class="value">{{ object.price_subject_pattern|default:"-" }}</div>
-            </div>
-            <div class="surface-meta">
-                <div class="label">Price filename pattern</div>
-                <div class="value">{{ object.price_filename_pattern|default:"-" }}</div>
+            <div class="surface-grid space-top-sm">
+                <div class="surface-meta">
+                    <div class="label">Code</div>
+                    <div class="value">{{ object.code|default:"-" }}</div>
+                </div>
+                <div class="surface-meta">
+                    <div class="label">Default currency</div>
+                    <div class="value">{{ object.default_currency }}</div>
+                </div>
+                <div class="surface-meta">
+                    <div class="label">Active</div>
+                    <div class="value">{{ object.is_active }}</div>
+                </div>
+                <div class="surface-meta">
+                    <div class="label">From address pattern</div>
+                    <div class="value">{{ object.from_address_pattern|default:"-" }}</div>
+                </div>
+                <div class="surface-meta">
+                    <div class="label">Price subject pattern</div>
+                    <div class="value">{{ object.price_subject_pattern|default:"-" }}</div>
+                </div>
+                <div class="surface-meta">
+                    <div class="label">Price filename pattern</div>
+                    <div class="value">{{ object.price_filename_pattern|default:"-" }}</div>
+                </div>
             </div>
         </div>
     </div>

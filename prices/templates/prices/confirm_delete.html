@@ -2,15 +2,18 @@
 {% block body_data %}data-page="confirm-delete"{% endblock %}
 
 {% block content %}
-    <div class="card">
-        <h1 class="page-title">Delete {{ object }}</h1>
-        <p class="muted">This action cannot be undone.</p>
-        <form method="post">
-            {% csrf_token %}
-            <div class="form-actions">
-                <button class="button" type="submit">Confirm delete</button>
-                <a class="button ghost" href="javascript:history.back()">Cancel</a>
-            </div>
-        </form>
+    <div class="page-stack">
+        <div class="section-card">
+            <span class="page-kicker">Delete</span>
+            <h1 class="page-title">Delete {{ object }}</h1>
+            <p class="page-subtitle space-bottom-none">This action cannot be undone.</p>
+            <form method="post" class="space-top-md">
+                {% csrf_token %}
+                <div class="form-actions">
+                    <button class="button danger" type="submit">Confirm delete</button>
+                    <a class="button ghost" href="javascript:history.back()">Cancel</a>
+                </div>
+            </form>
+        </div>
     </div>
 {% endblock %}

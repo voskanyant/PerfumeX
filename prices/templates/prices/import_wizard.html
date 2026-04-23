@@ -4,21 +4,24 @@
 {% block body_data %}data-page="import-wizard"{% endblock %}
 
 {% block content %}
-    <div class="card form-shell">
-        <h1 class="page-title">Import Prices</h1>
-        <p class="page-subtitle">Choose supplier and upload the price list.</p>
-        <form method="post" enctype="multipart/form-data" class="mt-3">
-            {% csrf_token %}
-            <fieldset class="import-wizard-fieldset">
-                <legend class="import-wizard-legend">Import</legend>
-                <p>{{ form.supplier.label_tag }} {{ form.supplier }}</p>
-                <p>{{ form.file_kind.label_tag }} {{ form.file_kind }}</p>
-                <p>{{ form.file.label_tag }} {{ form.file }}</p>
-            </fieldset>
-            <div class="form-actions">
-                <button class="button" type="submit">Create import</button>
-                <a class="button ghost" href="{% url 'prices:supplier_overview' %}">Cancel</a>
-            </div>
-        </form>
+    <div class="page-stack">
+        <div class="section-card form-shell">
+            <span class="page-kicker">Import</span>
+            <h1 class="page-title">Import Prices</h1>
+            <p class="page-subtitle space-bottom-none">Choose supplier and upload the price list.</p>
+            <form method="post" enctype="multipart/form-data" class="space-top-md">
+                {% csrf_token %}
+                <fieldset class="import-wizard-fieldset">
+                    <legend class="import-wizard-legend">Import</legend>
+                    <p>{{ form.supplier.label_tag }} {{ form.supplier }}</p>
+                    <p>{{ form.file_kind.label_tag }} {{ form.file_kind }}</p>
+                    <p>{{ form.file.label_tag }} {{ form.file }}</p>
+                </fieldset>
+                <div class="form-actions">
+                    <button class="button" type="submit">Create import</button>
+                    <a class="button ghost" href="{% url 'prices:supplier_overview' %}">Cancel</a>
+                </div>
+            </form>
+        </div>
     </div>
 {% endblock %}
