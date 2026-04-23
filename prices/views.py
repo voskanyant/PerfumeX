@@ -1141,6 +1141,28 @@ class SupplierProductSearchView(LoginRequiredMixin, View):
             product.display_price = display_price
             product.display_currency = display_currency
         _attach_previous_price_deltas(visible_products, currency, rates)
+
+        # Build 6-month sparkline data for each visible product (one query)
+        from datetime import timedelta
+        from collections import defaultdict
+        six_months_ago = timezone.now() - timedelta(days=180)
+        product_ids = [p.id for p in visible_products]
+        raw_snaps = list(
+            models.PriceSnapshot.objects
+            .filter(supplier_product_id__in=product_ids, recorded_at__gte=six_months_ago)
+            .values("supplier_product_id", "price", "recorded_at")
+            .order_by("supplier_product_id", "recorded_at")
+        )
+        product_day_prices: dict = defaultdict(dict)
+        for snap in raw_snaps:
+            pid = snap["supplier_product_id"]
+            day = snap["recorded_at"].date()
+            product_day_prices[pid][day] = float(snap["price"])
+        sparklines: dict = {
+            pid: [v for _, v in sorted(days.items())]
+            for pid, days in product_day_prices.items()
+        }
+
         for product in visible_products:
             imported_at = _short_relative_datetime(product.last_imported_at)
             imported_at_full = (
@@ -1177,6 +1199,7 @@ class SupplierProductSearchView(LoginRequiredMixin, View):
                         if product.price_delta_percent is not None
                         else ""
                     ),
+                    "sparkline": sparklines.get(product.id, []),
                 }
             )
 

@@ -409,6 +409,24 @@
             .replace(/'/g, "&#39;");
     }
 
+    function buildSparkline(values, deltaDir) {
+        if (!values || values.length < 2) return "";
+        var min = Math.min.apply(null, values);
+        var max = Math.max.apply(null, values);
+        var range = max - min || 1;
+        var w = 56, h = 22, pad = 2;
+        var pts = values.map(function(v, i) {
+            var x = pad + (i / (values.length - 1)) * (w - pad * 2);
+            var y = (h - pad) - ((v - min) / range) * (h - pad * 2);
+            return x.toFixed(1) + "," + y.toFixed(1);
+        }).join(" ");
+        var color = deltaDir === "down" ? "#22c55e" : deltaDir === "up" ? "#ef4444" : "#c0c0c0";
+        return "<svg class=\"product-sparkline\" width=\"" + w + "\" height=\"" + h +
+            "\" viewBox=\"0 0 " + w + " " + h + "\" fill=\"none\" aria-hidden=\"true\">" +
+            "<polyline points=\"" + pts + "\" stroke=\"" + color +
+            "\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg>";
+    }
+
     function renderRows(items) {
         var detailBase = input.getAttribute("data-detail-base") || "";
         var bulkEnabled = input.getAttribute("data-bulk") === "1";
@@ -498,19 +516,25 @@
 
             var hasActions = showActions && !!(editPattern || deletePattern);
             var colCount = bulkEnabled ? (hasActions ? 7 : 6) : (hasActions ? 6 : 5);
-            var rowClass = item.is_active ? "" : " class='inactive-product-row'";
+            var rowClass = item.is_active ? "" : "inactive-product-row";
+            var deltaAttr = deltaDirection ? " data-delta='" + escapeHtml(deltaDirection) + "'" : "";
+            var rowClassAttr = rowClass ? " class='" + rowClass + "'" : "";
             if (item.is_active === false && !inactiveDividerInserted) {
                 rows += "<tr class='inactive-divider-row'><td colspan='" + colCount + "'>Inactive products</td></tr>";
                 inactiveDividerInserted = true;
             }
 
-            rows += "<tr data-product-id='" + item.id + "'" + rowClass + ">" +
+            var sparklineHtml = buildSparkline(item.sparkline, deltaDirection);
+            var sparklineCell = "<td data-field='sparkline' class='sparkline-cell'>" + sparklineHtml + "</td>";
+
+            rows += "<tr data-product-id='" + item.id + "'" + rowClassAttr + deltaAttr + ">" +
                 checkboxCell +
                 "<td data-field='supplier_sku' data-label='SKU'><span class='cell-sku'>" + sku + "</span></td>" +
                 "<td data-field='name' data-label='Name'>" + name + "</td>" +
                 "<td data-field='current_price' data-label='Price'>" + priceHtml + "</td>" +
                 "<td data-field='supplier' data-label='Supplier'>" + mobileSupplier + "</td>" +
                 "<td data-field='last_imported_at' data-label='Last imported'>" + imported + "</td>" +
+                sparklineCell +
                 actionsCell +
             "</tr>";
         });
