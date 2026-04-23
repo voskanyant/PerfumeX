@@ -254,6 +254,11 @@
   line-height: 1.35;
 }
 
+.cell-imported[data-full-datetime],
+.cell-price-main[data-original-price] {
+  position: relative;
+}
+
 .price-delta-wrap {
   margin-top: 0;
 }
@@ -619,6 +624,40 @@
     letter-spacing: 0.04em;
     line-height: 1.25;
     white-space: nowrap;
+  }
+
+  .products-mobile td[data-field="last_imported_at"] .cell-imported[data-full-datetime],
+  .products-mobile .desktop-price-stack .cell-price-main[data-original-price] {
+    cursor: pointer;
+  }
+
+  .products-mobile td[data-field="last_imported_at"] .cell-imported.show-full-datetime::after,
+  .products-mobile .desktop-price-stack .cell-price-main.show-original-price::after {
+    content: attr(data-full-datetime);
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    z-index: 20;
+    padding: 6px 8px;
+    border-radius: var(--radius-sm);
+    background: rgba(10, 10, 10, 0.92);
+    color: var(--white);
+    box-shadow: 0 10px 24px rgba(10, 10, 10, 0.18);
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    font-weight: 400;
+    letter-spacing: 0.02em;
+    line-height: 1.3;
+    white-space: nowrap;
+    pointer-events: none;
+  }
+
+  .products-mobile .desktop-price-stack .cell-price-main.show-original-price::after {
+    content: attr(data-original-price);
+    left: 0;
+    right: auto;
+    max-width: min(78vw, 240px);
+    white-space: normal;
   }
 
   .products-mobile .desktop-price-stack {

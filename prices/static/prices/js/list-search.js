@@ -432,8 +432,11 @@
             var deltaDirection = item.price_delta_direction || "";
             var deltaValue = escapeHtml(item.price_delta_value || "");
             var deltaPercent = escapeHtml(item.price_delta_percent || "");
-            var priceTitle = originalPrice ? " title='Original: " + originalPrice + "'" : "";
-            var desktopPriceHtml = "<div class='cell-price-main'" + priceTitle + ">" + price + "</div>";
+            var originalPriceText = originalPrice ? "Original: " + originalPrice : "";
+            var priceAttrs = originalPriceText
+                ? " title='" + originalPriceText + "' data-original-price='" + originalPriceText + "'"
+                : "";
+            var desktopPriceHtml = "<div class='cell-price-main'" + priceAttrs + ">" + price + "</div>";
             if (deltaDirection && deltaValue) {
                 var arrow = deltaDirection === "down" ? "↓" : "↑";
                 var deltaTail = deltaPercent ? " (" + deltaPercent + ")" : "";
@@ -519,29 +522,42 @@
         }
         tbody.innerHTML = rows;
         decorateButtons(tbody);
-        bindImportedDatetimeTooltips(tbody);
+        bindMobileDetailTooltips(tbody);
         applyLastViewedHighlight();
     }
 
-    function bindImportedDatetimeTooltips(container) {
+    function bindTooltipGroup(container, selector, activeClass, groupName) {
         if (!container) return;
-        var chips = container.querySelectorAll(".cell-imported[data-full-datetime]");
-        chips.forEach(function (chip) {
-            if (chip.dataset.tooltipBound === "1") return;
-            chip.dataset.tooltipBound = "1";
-            chip.addEventListener("click", function (event) {
+        var items = container.querySelectorAll(selector);
+        items.forEach(function (item) {
+            var boundKey = groupName + "TooltipBound";
+            if (item.dataset[boundKey] === "1") return;
+            item.dataset[boundKey] = "1";
+            item.addEventListener("click", function (event) {
                 event.preventDefault();
-                chips.forEach(function (item) {
-                    if (item !== chip) item.classList.remove("show-full-datetime");
+                items.forEach(function (otherItem) {
+                    if (otherItem !== item) {
+                        otherItem.classList.remove(activeClass);
+                    }
                 });
-                chip.classList.toggle("show-full-datetime");
-                if (chip.classList.contains("show-full-datetime")) {
-                    window.setTimeout(function () {
-                        chip.classList.remove("show-full-datetime");
+                item.classList.toggle(activeClass);
+                if (item._tooltipHideTimer) {
+                    window.clearTimeout(item._tooltipHideTimer);
+                    item._tooltipHideTimer = null;
+                }
+                if (item.classList.contains(activeClass)) {
+                    item._tooltipHideTimer = window.setTimeout(function () {
+                        item.classList.remove(activeClass);
+                        item._tooltipHideTimer = null;
                     }, 1800);
                 }
             });
         });
+    }
+
+    function bindMobileDetailTooltips(container) {
+        bindTooltipGroup(container, ".cell-imported[data-full-datetime]", "show-full-datetime", "datetime");
+        bindTooltipGroup(container, ".cell-price-main[data-original-price]", "show-original-price", "originalPrice");
     }
 
     function runAjaxSearch(query, page, force) {
@@ -881,7 +897,7 @@
         syncPinnedSearchGeometry();
     });
     applyLastViewedHighlight();
-    bindImportedDatetimeTooltips(document);
+    bindMobileDetailTooltips(document);
     var serverSearchOnLoad = input.getAttribute("data-server-search") === "1";
     syncClearSearchVisibility();
     if (!serverSearchOnLoad) {

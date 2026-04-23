@@ -1144,7 +1144,7 @@ class SupplierProductSearchView(LoginRequiredMixin, View):
         for product in visible_products:
             imported_at = _short_relative_datetime(product.last_imported_at)
             imported_at_full = (
-                timezone.localtime(product.last_imported_at).strftime("%d/%m/%Y %H:%M")
+                timezone.localtime(product.last_imported_at).strftime("%d.%m.%Y %H:%M")
                 if product.last_imported_at
                 else ""
             )
@@ -1161,11 +1161,7 @@ class SupplierProductSearchView(LoginRequiredMixin, View):
                     "supplier_sku": product.supplier_sku,
                     "name": product.name,
                     "current_price": _format_price(product.display_price, product.display_currency),
-                    "original_price": (
-                        original_price
-                        if original_price and product.currency != product.display_currency
-                        else ""
-                    ),
+                    "original_price": original_price,
                     "last_imported_at": imported_at,
                     "last_imported_at_full": imported_at_full,
                     "last_imported_age_class": _imported_age_class(product.last_imported_at),
@@ -2314,7 +2310,7 @@ class SupplierProductListView(BaseListView):
         for product in context["object_list"]:
             product.original_price_display = (
                 _format_price(product.current_price, product.currency)
-                if product.current_price is not None and product.currency != getattr(product, "display_currency", product.currency)
+                if product.current_price is not None
                 else ""
             )
         return context
