@@ -1,0 +1,68 @@
+{% extends "prices/base.html" %}
+{% block title %}Our Products{% endblock %}
+{% block topbar_label %}Our Products{% endblock %}
+{% block content %}
+<div class="page-head">
+    <div>
+        <span class="page-kicker">Catalogue</span>
+        <h1 class="page-title">Our Products</h1>
+        <div class="page-meta">Total {{ total_count }} catalogue perfumes</div>
+    </div>
+    <div class="page-actions">
+        <a class="button secondary" href="{% url 'assistant_core:catalog_import' %}">Import Excel</a>
+        <a class="button primary" href="{% url 'assistant_core:catalog_perfume_create' %}">Add new</a>
+    </div>
+</div>
+
+<div class="workspace-block">
+    <form method="get" class="search-wrap">
+        <input type="text" name="q" value="{{ search_query }}" placeholder="Search brand, scent, collection, concentration...">
+        <button class="button ghost" type="submit">Search</button>
+    </form>
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Brand</th>
+                <th>Scent</th>
+                <th>Collection / subname</th>
+                <th>Concentration</th>
+                <th>Audience</th>
+                <th>Variants</th>
+                <th>Status</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for perfume in perfumes %}
+            <tr>
+                <td>{{ perfume.brand.name }}</td>
+                <td>{{ perfume.name }}</td>
+                <td>{{ perfume.collection_name }}</td>
+                <td>{{ perfume.concentration }}</td>
+                <td>{{ perfume.audience }}</td>
+                <td>{{ perfume.variant_count }}</td>
+                <td>{{ perfume.verification_status }}</td>
+                <td>
+                    <a class="button ghost" href="{% url 'assistant_core:catalog_perfume_update' perfume.pk %}">Edit</a>
+                    <a class="button ghost" href="{% url 'assistant_core:catalog_perfume_delete' perfume.pk %}">Delete</a>
+                </td>
+            </tr>
+        {% empty %}
+            <tr><td colspan="8">No catalogue products yet.</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+
+    {% if is_paginated %}
+        <div class="pagination">
+            {% if page_obj.has_previous %}
+                <a class="button ghost" href="?q={{ search_query|urlencode }}&page={{ page_obj.previous_page_number }}">Previous</a>
+            {% endif %}
+            <span>Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+            {% if page_obj.has_next %}
+                <a class="button ghost" href="?q={{ search_query|urlencode }}&page={{ page_obj.next_page_number }}">Next</a>
+            {% endif %}
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

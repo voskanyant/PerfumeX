@@ -41,6 +41,7 @@ import unicodedata
 
 from django.db.models import (
     Case,
+    Count,
     DecimalField,
     ExpressionWrapper,
     F,
@@ -51,6 +52,8 @@ from django.db.models import (
     Window,
 )
 from django.db.models.functions import Coalesce, RowNumber, TruncDate
+
+from catalog.models import Perfume as CatalogPerfume
 
 from . import forms, models
 from django.shortcuts import get_object_or_404, redirect
@@ -3183,14 +3186,30 @@ class SupplierProductDeleteView(BaseDeleteView):
     success_url_name = "prices:product_list"
 
 
-class OurProductListView(BaseListView):
-    model = models.OurProduct
-    list_display = ("name", "brand", "size", "is_active", "created_at")
-    list_title = "Our Products"
-    detail_url_name = "prices:our_product_detail"
-    create_url_name = "prices:our_product_create"
-    update_url_name = "prices:our_product_update"
-    delete_url_name = "prices:our_product_delete"
+class OurProductListView(LoginRequiredMixin, ListView):
+    model = CatalogPerfume
+    template_name = "prices/our_products_catalog.html"
+    context_object_name = "perfumes"
+    paginate_by = 50
+
+    def get_queryset(self):
+        queryset = CatalogPerfume.objects.select_related("brand").annotate(variant_count=Count("variants"))
+        query = self.request.GET.get("q", "").strip()
+        if query:
+            queryset = queryset.filter(
+                Q(name__icontains=query)
+                | Q(brand__name__icontains=query)
+                | Q(collection_name__icontains=query)
+                | Q(concentration__icontains=query)
+                | Q(audience__icontains=query)
+            )
+        return queryset.order_by("brand__name", "name", "concentration")
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["total_count"] = context["paginator"].count if context.get("paginator") else len(context["perfumes"])
+        context["search_query"] = self.request.GET.get("q", "").strip()
+        return context
 
 
 class OurProductCreateView(BaseCreateView):
