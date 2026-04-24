@@ -138,49 +138,16 @@ def _run_activity_datetime(run):
     return dt
 
 
-def _build_import_batch_status(batch) -> dict[str, str]:
-    if not batch:
-        return {
-            "label": "never",
-            "class_name": "is-missing",
-            "note": "No imports yet",
-            "code": "missing",
-        }
-    if (batch.message_id or "").startswith(PRODUCT_REMOVED_EVENT_PREFIX):
-        return {
-            "label": "cleanup",
-            "class_name": "is-neutral",
-            "note": "System product cleanup event",
-            "code": "cleanup",
-        }
-    if batch.status == models.ImportStatus.PROCESSED:
-        note = "Imported from email" if batch.mailbox_id else "Manual upload or backfill"
-        return {
-            "label": "successful",
-            "class_name": "is-success",
-            "note": note,
-            "code": "successful",
-        }
-    if batch.status == models.ImportStatus.FAILED:
-        return {
-            "label": "error",
-            "class_name": "is-failed",
-            "note": batch.error_message or "Batch failed",
-            "code": "failed",
-        }
-    if batch.status == models.ImportStatus.PENDING:
-        return {
-            "label": "pending",
-            "class_name": "is-pending",
-            "note": "Import batch is waiting to process",
-            "code": "pending",
-        }
-    return {
-        "label": batch.status,
-        "class_name": "is-neutral",
-        "note": "",
-        "code": batch.status,
-    }
+def _expected_import_interval_hours(supplier) -> int:
+    value = int(getattr(supplier, "expected_import_interval_hours", 0) or 0)
+    return value if value > 0 else 72
+
+
+def _format_interval_hours(hours: int) -> str:
+    if hours % 24 == 0:
+        days = hours // 24
+        return f"{days}d" if days != 1 else "1d"
+    return f"{hours}h"
 
 
 def _build_email_run_status(run) -> dict[str, str | int | None]:
@@ -226,10 +193,29 @@ def _build_email_run_status(run) -> dict[str, str | int | None]:
                 "code": "no-files",
                 "progress": progress,
             }
+        if not run.processed_files and run.skipped_duplicates:
+            return {
+                "label": "no change",
+                "class_name": "is-neutral",
+                "note": f"{run.skipped_duplicates} duplicate file(s) skipped",
+                "code": "no-change",
+                "progress": progress,
+            }
+        if not run.processed_files:
+            return {
+                "label": "no change",
+                "class_name": "is-neutral",
+                "note": "Matching files found, but nothing new was imported",
+                "code": "no-change",
+                "progress": progress,
+            }
+        note = f"{run.processed_files} file(s) imported"
+        if run.skipped_duplicates:
+            note = f"{note}, {run.skipped_duplicates} duplicate(s) skipped"
         return {
             "label": "successful",
             "class_name": "is-success",
-            "note": f"{run.processed_files} file(s) imported",
+            "note": note,
             "code": "successful",
             "progress": progress,
         }
@@ -250,24 +236,269 @@ def _build_email_run_status(run) -> dict[str, str | int | None]:
             "progress": progress,
         }
     return {
-        "label": run.status,
+        "label": "unknown",
         "class_name": "is-neutral",
-        "note": "",
-        "code": run.status,
+        "note": run.last_message or "Unknown email status",
+        "code": "unknown",
         "progress": progress,
     }
 
 
-def _build_supplier_import_status(run, batch) -> dict[str, str | int | None]:
+def _collect_latest_successful_imports() -> dict[int, models.ImportBatch]:
+    batches = (
+        models.ImportBatch.objects.select_related("supplier", "mailbox")
+        .filter(
+            status=models.ImportStatus.PROCESSED,
+            importfile__file_kind=models.FileKind.PRICE,
+        )
+        .exclude(message_id__startswith=PRODUCT_REMOVED_EVENT_PREFIX)
+        .order_by("-received_at", "-created_at", "-id")
+        .distinct()
+    )
+    latest: dict[int, models.ImportBatch] = {}
+    for batch in batches:
+        if batch.supplier_id not in latest:
+            latest[batch.supplier_id] = batch
+    return latest
+
+
+def _collect_active_price_mappings() -> dict[int, models.SupplierFileMapping]:
+    mappings = (
+        models.SupplierFileMapping.objects.filter(
+            file_kind=models.FileKind.PRICE,
+            is_active=True,
+        )
+        .select_related("supplier")
+        .order_by("supplier_id", "-id")
+    )
+    latest: dict[int, models.SupplierFileMapping] = {}
+    for mapping in mappings:
+        if mapping.supplier_id not in latest:
+            latest[mapping.supplier_id] = mapping
+    return latest
+
+
+def _collect_latest_runs_and_streaks() -> tuple[dict[int, models.EmailImportRun], dict[int, int]]:
+    runs = (
+        models.EmailImportRun.objects.select_related("supplier")
+        .order_by("-started_at", "-id")
+    )
+    latest_runs: dict[int, models.EmailImportRun] = {}
+    streaks: dict[int, int] = {}
+    target_codes: dict[int, str] = {}
+    closed: set[int] = set()
+    for run in runs:
+        supplier_id = run.supplier_id
+        code = str(_build_email_run_status(run).get("code") or "unknown")
+        if supplier_id not in latest_runs:
+            latest_runs[supplier_id] = run
+            streaks[supplier_id] = 1
+            target_codes[supplier_id] = code
+            continue
+        if supplier_id in closed:
+            continue
+        if target_codes.get(supplier_id) == code:
+            streaks[supplier_id] += 1
+        else:
+            closed.add(supplier_id)
+    return latest_runs, streaks
+
+
+def _build_last_import_info(batch) -> dict[str, str | int]:
     batch_dt = _batch_activity_datetime(batch)
-    run_dt = _run_activity_datetime(run)
-    if run and (
-        run.status == models.EmailImportStatus.RUNNING
-        or not batch_dt
-        or (run_dt and run_dt >= batch_dt)
-    ):
-        return _build_email_run_status(run)
-    return _build_import_batch_status(batch)
+    if not batch or not batch_dt:
+        return {
+            "relative": "Never",
+            "full": "",
+            "class_name": "age-stale",
+            "note": "No successful import yet",
+            "source_code": "never",
+            "sort_age_seconds": 10**12,
+        }
+    if batch.mailbox_id:
+        note = "Email import"
+        source_code = "email"
+    else:
+        note = "Manual upload / backfill"
+        source_code = "manual"
+    now = timezone.localtime(timezone.now())
+    age_seconds = max(int((now - batch_dt).total_seconds()), 0)
+    return {
+        "relative": _short_relative_datetime(batch_dt),
+        "full": _format_local_datetime(batch_dt),
+        "class_name": _imported_age_class(batch_dt),
+        "note": note,
+        "source_code": source_code,
+        "sort_age_seconds": age_seconds,
+    }
+
+
+def _build_latest_check_info(supplier, run, streak_count: int = 1) -> dict[str, str | int | None | bool]:
+    if run:
+        run_dt = _run_activity_datetime(run)
+        run_status = _build_email_run_status(run)
+        note = str(run_status.get("note") or "")
+        code = str(run_status.get("code") or "unknown")
+        if code == "failed" and streak_count > 1:
+            note = f"{streak_count} failed checks in a row"
+        elif code == "no-files" and streak_count > 1:
+            note = f"{streak_count} no-file checks in a row"
+        elif code == "no-change" and streak_count > 1:
+            note = f"{streak_count} unchanged checks in a row"
+        return {
+            "label": str(run_status["label"]),
+            "class_name": str(run_status["class_name"]),
+            "code": code,
+            "note": note,
+            "relative": _short_relative_datetime(run_dt) if run_dt else "Checked",
+            "full": _format_local_datetime(run_dt),
+            "progress": run_status.get("progress"),
+            "show_time": bool(run_dt),
+        }
+
+    fallback_dt = supplier.last_email_check_at
+    if fallback_dt:
+        if supplier.last_email_errors:
+            label = "issues"
+            class_name = "is-warning"
+            code = "warning"
+            note = f"{supplier.last_email_errors} error(s) on latest check"
+        elif supplier.last_email_processed:
+            label = "successful"
+            class_name = "is-success"
+            code = "successful"
+            note = f"{supplier.last_email_processed} file(s) imported"
+        elif supplier.last_email_matched:
+            label = "no change"
+            class_name = "is-neutral"
+            code = "no-change"
+            note = "Matching emails found, but nothing new was imported"
+        else:
+            label = "no file"
+            class_name = "is-warning"
+            code = "no-files"
+            note = supplier.last_email_last_message or "No matching email files found"
+        return {
+            "label": label,
+            "class_name": class_name,
+            "code": code,
+            "note": note,
+            "relative": _short_relative_datetime(fallback_dt),
+            "full": _format_local_datetime(fallback_dt),
+            "progress": None,
+            "show_time": True,
+        }
+
+    if not supplier.from_address_pattern:
+        return {
+            "label": "not configured",
+            "class_name": "is-missing",
+            "code": "not-configured",
+            "note": "Supplier email route missing",
+            "relative": "Not configured",
+            "full": "",
+            "progress": None,
+            "show_time": False,
+        }
+
+    return {
+        "label": "idle",
+        "class_name": "is-neutral",
+        "code": "idle",
+        "note": "No email check recorded yet",
+        "relative": "Not checked",
+        "full": "",
+        "progress": None,
+        "show_time": False,
+    }
+
+
+def _build_health_info(supplier, last_import_info, latest_check_info, streak_count: int = 1) -> dict[str, str | int]:
+    expected_hours = _expected_import_interval_hours(supplier)
+    cadence_label = _format_interval_hours(expected_hours)
+    code = str(latest_check_info.get("code") or "")
+    sort_age_seconds = int(last_import_info.get("sort_age_seconds") or 10**12)
+    age_hours = sort_age_seconds / 3600 if sort_age_seconds < 10**11 else None
+
+    if not supplier.from_address_pattern:
+        return {
+            "label": "critical",
+            "class_name": "is-critical",
+            "note": f"Email route missing · expected every {cadence_label}",
+            "code": "critical",
+            "severity": 0,
+        }
+
+    if last_import_info["source_code"] == "never":
+        return {
+            "label": "critical",
+            "class_name": "is-critical",
+            "note": f"No successful import yet · target {cadence_label}",
+            "code": "critical",
+            "severity": 0,
+        }
+
+    if code == "failed" and streak_count >= 2:
+        return {
+            "label": "critical",
+            "class_name": "is-critical",
+            "note": f"{streak_count} failed checks in a row · target {cadence_label}",
+            "code": "critical",
+            "severity": 0,
+        }
+
+    if age_hours is not None and age_hours > expected_hours * 3:
+        return {
+            "label": "critical",
+            "class_name": "is-critical",
+            "note": f"Late beyond expected {cadence_label}",
+            "code": "critical",
+            "severity": 0,
+        }
+
+    if code == "failed":
+        return {
+            "label": "warning",
+            "class_name": "is-warning",
+            "note": latest_check_info["note"] or f"Latest check failed · target {cadence_label}",
+            "code": "warning",
+            "severity": 2,
+        }
+
+    if code == "no-files" and streak_count >= 3 and age_hours is not None and age_hours > expected_hours:
+        return {
+            "label": "stale",
+            "class_name": "is-stale",
+            "note": f"{streak_count} no-file checks in a row · expected every {cadence_label}",
+            "code": "stale",
+            "severity": 1,
+        }
+
+    if age_hours is not None and age_hours > expected_hours * 2:
+        return {
+            "label": "stale",
+            "class_name": "is-stale",
+            "note": f"Past expected cadence {cadence_label}",
+            "code": "stale",
+            "severity": 1,
+        }
+
+    if age_hours is not None and age_hours > expected_hours:
+        return {
+            "label": "warning",
+            "class_name": "is-warning",
+            "note": f"Approaching overdue · expected every {cadence_label}",
+            "code": "warning",
+            "severity": 2,
+        }
+
+    return {
+        "label": "fresh",
+        "class_name": "is-success",
+        "note": f"On cadence · expected every {cadence_label}",
+        "code": "fresh",
+        "severity": 3,
+    }
 
 
 def _supplier_log_url(supplier_id: int, run=None, batch=None) -> str:
@@ -276,15 +507,80 @@ def _supplier_log_url(supplier_id: int, run=None, batch=None) -> str:
     anchor = ""
     batch_dt = _batch_activity_datetime(batch)
     run_dt = _run_activity_datetime(run)
-    if run and (
-        run.status == models.EmailImportStatus.RUNNING
-        or not batch_dt
-        or (run_dt and run_dt >= batch_dt)
-    ):
+    if run and (not batch_dt or (run_dt and run_dt >= batch_dt)):
         anchor = f"#run-{run.id}"
     elif batch:
         anchor = f"#batch-{batch.id}"
     return f"{base_url}?{query}{anchor}"
+
+
+def _build_supplier_board_row(supplier, successful_batch, latest_run, streak_count: int = 1) -> dict[str, object]:
+    last_import = _build_last_import_info(successful_batch)
+    latest_check = _build_latest_check_info(supplier, latest_run, streak_count)
+    health = _build_health_info(supplier, last_import, latest_check, streak_count)
+    return {
+        "supplier": supplier,
+        "has_email_route": bool(supplier.from_address_pattern),
+        "is_running": bool(latest_run and latest_run.status == models.EmailImportStatus.RUNNING),
+        "expected_interval_label": _format_interval_hours(_expected_import_interval_hours(supplier)),
+        "last_import_relative": str(last_import["relative"]),
+        "last_import_full": str(last_import["full"]),
+        "last_import_age_class": str(last_import["class_name"]),
+        "last_import_note": str(last_import["note"]),
+        "last_import_sort_age_seconds": int(last_import["sort_age_seconds"]),
+        "check_label": str(latest_check["label"]),
+        "check_class": str(latest_check["class_name"]),
+        "check_code": str(latest_check["code"]),
+        "check_note": str(latest_check["note"]),
+        "check_relative": str(latest_check["relative"]),
+        "check_full": str(latest_check["full"]),
+        "check_progress": latest_check["progress"],
+        "check_has_time": bool(latest_check["show_time"]),
+        "check_streak_count": streak_count,
+        "health_label": str(health["label"]),
+        "health_class": str(health["class_name"]),
+        "health_code": str(health["code"]),
+        "health_note": str(health["note"]),
+        "health_severity": int(health["severity"]),
+        "latest_log_url": _supplier_log_url(supplier.id, run=latest_run, batch=successful_batch),
+    }
+
+
+def _board_sort_key(row: dict[str, object]) -> tuple:
+    check_priority = {
+        "failed": 0,
+        "warning": 1,
+        "not-configured": 2,
+        "no-files": 3,
+        "no-change": 4,
+        "idle": 5,
+        "successful": 6,
+        "running": 7,
+    }
+    return (
+        int(row["health_severity"]),
+        check_priority.get(str(row["check_code"]), 9),
+        -int(row["last_import_sort_age_seconds"]),
+        str(row["supplier"].name).lower(),
+    )
+
+
+def _build_supplier_board_summary(rows: list[dict[str, object]]) -> dict[str, int]:
+    summary = {
+        "total": len(rows),
+        "updating": 0,
+        "fresh": 0,
+        "warning": 0,
+        "stale": 0,
+        "critical": 0,
+    }
+    for row in rows:
+        if row["is_running"]:
+            summary["updating"] += 1
+        code = str(row["health_code"])
+        if code in summary:
+            summary[code] += 1
+    return summary
 
 
 def _normalize_exclude_terms(raw: str) -> str:
@@ -826,22 +1122,9 @@ class SupplierOverviewView(LoginRequiredMixin, TemplateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         suppliers = list(models.Supplier.objects.order_by("name"))
-        latest_imports = {}
-        latest_runs = {}
-        batches = (
-            models.ImportBatch.objects.select_related("supplier")
-            .order_by("-created_at")
-        )
-        for batch in batches:
-            if batch.supplier_id not in latest_imports:
-                latest_imports[batch.supplier_id] = batch
-        runs = (
-            models.EmailImportRun.objects.select_related("supplier")
-            .order_by("-started_at")
-        )
-        for run in runs:
-            if run.supplier_id not in latest_runs:
-                latest_runs[run.supplier_id] = run
+        latest_successful_imports = _collect_latest_successful_imports()
+        active_price_mappings = _collect_active_price_mappings()
+        latest_runs, run_streaks = _collect_latest_runs_and_streaks()
         rows = []
         import_batches = models.ImportBatch.objects.select_related(
             "supplier", "mailbox"
@@ -927,66 +1210,18 @@ class SupplierOverviewView(LoginRequiredMixin, TemplateView):
                 batch.display_status = batch.status
                 batch.row_class = ""
         for supplier in suppliers:
-            run = latest_runs.get(supplier.id)
-            latest_import = latest_imports.get(supplier.id)
-            latest_import_at = _batch_activity_datetime(latest_import)
-            status_meta = _build_supplier_import_status(run, latest_import)
-            status_note = status_meta.get("note") or ""
-            if not supplier.from_address_pattern:
-                status_note = "Email route is not configured"
             rows.append(
-                {
-                    "supplier": supplier,
-                    "latest_import": latest_import,
-                    "latest_import_relative": (
-                        _short_relative_datetime(latest_import_at) if latest_import_at else "Never"
-                    ),
-                    "latest_import_full": _format_local_datetime(latest_import_at),
-                    "latest_import_age_class": (
-                        _imported_age_class(latest_import_at) if latest_import_at else "age-stale"
-                    ),
-                    "latest_run": run,
-                    "latest_run_progress": status_meta.get("progress"),
-                    "is_running": run and run.status == models.EmailImportStatus.RUNNING,
-                    "status_label": status_meta["label"],
-                    "status_class": status_meta["class_name"],
-                    "status_note": status_note,
-                    "status_code": status_meta["code"],
-                    "has_email_route": bool(supplier.from_address_pattern),
-                    "latest_log_url": _supplier_log_url(supplier.id, run=run, batch=latest_import),
-                }
+                _build_supplier_board_row(
+                    supplier=supplier,
+                    successful_batch=latest_successful_imports.get(supplier.id),
+                    latest_run=latest_runs.get(supplier.id),
+                    streak_count=run_streaks.get(supplier.id, 1),
+                )
             )
-        fresh_count = 0
-        stale_count = 0
-        never_count = 0
-        running_count = 0
-        attention_count = 0
-        for row in rows:
-            if row["latest_import"]:
-                if row["latest_import_age_class"] == "age-fresh":
-                    fresh_count += 1
-                elif row["latest_import_age_class"] == "age-stale":
-                    stale_count += 1
-            else:
-                never_count += 1
-            if row["is_running"]:
-                running_count += 1
-            if (
-                not row["has_email_route"]
-                or not row["latest_import"]
-                or row["latest_import_age_class"] == "age-stale"
-                or row["status_code"] in {"failed", "warning", "no-files", "pending"}
-            ):
-                attention_count += 1
+            rows[-1]["has_quick_upload"] = supplier.id in active_price_mappings
+        rows.sort(key=_board_sort_key)
         context["rows"] = rows
-        context["supplier_summary"] = {
-            "total": len(rows),
-            "fresh": fresh_count,
-            "stale": stale_count,
-            "never": never_count,
-            "running": running_count,
-            "attention": attention_count,
-        }
+        context["supplier_summary"] = _build_supplier_board_summary(rows)
         context["import_batches"] = log_page
         context["import_log_page"] = log_page
         context["any_running"] = models.EmailImportRun.objects.filter(
@@ -1544,38 +1779,46 @@ class SupplierImportView(LoginRequiredMixin, FormView):
         supplier = get_object_or_404(models.Supplier, pk=self.kwargs["pk"])
         mapping = _save_supplier_mapping_from_import_form(form, supplier)
         upload = form.cleaned_data["file"]
-        import_batch = models.ImportBatch.objects.create(
-            supplier=supplier,
-            status=models.ImportStatus.PENDING,
-            received_at=timezone.now(),
-        )
-        content_hash = ""
-        if upload:
-            hasher = hashlib.sha256()
-            for chunk in upload.chunks():
-                hasher.update(chunk)
-            content_hash = hasher.hexdigest()
-        import_file = models.ImportFile.objects.create(
-            import_batch=import_batch,
-            mapping=mapping,
-            file_kind=models.FileKind.PRICE,
-            filename=upload.name if upload else "",
-            file=upload,
-            content_hash=content_hash,
-            status=models.ImportStatus.PENDING,
-        )
         try:
-            process_import_file(import_file)
-            import_batch.status = models.ImportStatus.PROCESSED
-            import_batch.save(update_fields=["status"])
+            _process_supplier_price_upload(supplier, mapping, upload)
         except Exception as exc:
-            import_file.status = models.ImportStatus.FAILED
-            import_file.error_message = str(exc)
-            import_file.save(update_fields=["status", "error_message"])
-            import_batch.status = models.ImportStatus.FAILED
-            import_batch.error_message = str(exc)
-            import_batch.save(update_fields=["status", "error_message"])
+            messages.error(request=self.request, message=f"{supplier.name}: upload failed. {exc}")
+        else:
+            messages.success(request=self.request, message=f"{supplier.name}: {upload.name} imported.")
         return super().form_valid(form)
+
+
+class SupplierQuickUploadView(LoginRequiredMixin, View):
+    def post(self, request, pk):
+        supplier = get_object_or_404(models.Supplier, pk=pk)
+        mapping = (
+            models.SupplierFileMapping.objects.filter(
+                supplier=supplier,
+                file_kind=models.FileKind.PRICE,
+                is_active=True,
+            )
+            .order_by("-id")
+            .first()
+        )
+        if not mapping:
+            messages.info(
+                request,
+                "Create or confirm the supplier price mapping first.",
+            )
+            return redirect("prices:supplier_import", pk=pk)
+
+        upload = request.FILES.get("file")
+        if not upload:
+            messages.info(request, "Select a file to upload.")
+            return redirect("prices:supplier_overview")
+
+        try:
+            _process_supplier_price_upload(supplier, mapping, upload)
+        except Exception as exc:
+            messages.error(request, f"{supplier.name}: upload failed. {exc}")
+        else:
+            messages.success(request, f"{supplier.name}: {upload.name} imported.")
+        return redirect("prices:supplier_overview")
 
 
 class SupplierEmailImportView(LoginRequiredMixin, View):
@@ -1963,50 +2206,43 @@ class SupplierEmailImportStatusView(LoginRequiredMixin, View):
 
 class SupplierEmailImportStatusAllView(LoginRequiredMixin, View):
     def get(self, request):
-        runs = (
-            models.EmailImportRun.objects.select_related("supplier")
-            .order_by("-started_at")
-        )
-        latest = {}
-        for run in runs:
-            if run.supplier_id not in latest:
-                progress = None
-                if run.total_messages:
-                    progress = int((run.processed_messages / run.total_messages) * 100)
-                detailed_log_tail = (run.detailed_log or "")[-4000:]
-                latest[run.supplier_id] = {
-                    "status": run.status,
-                    "progress": progress,
-                    "total_messages": run.total_messages,
-                    "processed_messages": run.processed_messages,
-                    "matched_files": run.matched_files,
-                    "processed_files": run.processed_files,
-                    "errors": run.errors,
-                    "last_message": run.last_message,
-                    "detailed_log": detailed_log_tail,
-                }
-        imports = {}
-        batches = (
-            models.ImportBatch.objects.select_related("supplier", "mailbox")
-            .order_by("-created_at")
-        )
-        for batch in batches:
-            if batch.supplier_id in imports:
-                continue
-            batch_dt = _batch_activity_datetime(batch)
-            if (batch.message_id or "").startswith(PRODUCT_REMOVED_EVENT_PREFIX):
-                import_note = "System product cleanup"
-            elif batch.mailbox_id:
-                import_note = "Email import"
-            else:
-                import_note = "Manual upload / backfill"
-            imports[batch.supplier_id] = {
-                "relative": _short_relative_datetime(batch_dt) if batch_dt else "Never",
-                "full": _format_local_datetime(batch_dt),
-                "age_class": _imported_age_class(batch_dt) if batch_dt else "age-stale",
-                "note": import_note,
+        suppliers = list(models.Supplier.objects.order_by("name"))
+        latest_successful_imports = _collect_latest_successful_imports()
+        latest_runs, run_streaks = _collect_latest_runs_and_streaks()
+        rows = {}
+        for supplier in suppliers:
+            row = _build_supplier_board_row(
+                supplier=supplier,
+                successful_batch=latest_successful_imports.get(supplier.id),
+                latest_run=latest_runs.get(supplier.id),
+                streak_count=run_streaks.get(supplier.id, 1),
+            )
+            rows[str(supplier.id)] = {
+                "is_running": row["is_running"],
+                "has_email_route": row["has_email_route"],
+                "last_import_relative": row["last_import_relative"],
+                "last_import_full": row["last_import_full"],
+                "last_import_age_class": row["last_import_age_class"],
+                "last_import_note": row["last_import_note"],
+                "check_label": row["check_label"],
+                "check_class": row["check_class"],
+                "check_code": row["check_code"],
+                "check_note": row["check_note"],
+                "check_relative": row["check_relative"],
+                "check_full": row["check_full"],
+                "check_progress": row["check_progress"],
+                "check_has_time": row["check_has_time"],
+                "health_label": row["health_label"],
+                "health_class": row["health_class"],
+                "health_code": row["health_code"],
+                "health_note": row["health_note"],
             }
-        return JsonResponse({"runs": latest, "imports": imports})
+        return JsonResponse(
+            {
+                "rows": rows,
+                "summary": _build_supplier_board_summary(list(rows.values())),
+            }
+        )
 
 
 class SupplierEmailImportCancelView(LoginRequiredMixin, View):
@@ -2373,6 +2609,42 @@ def _save_supplier_mapping_from_import_form(form, supplier):
         },
     )
     return mapping
+
+
+def _process_supplier_price_upload(supplier, mapping, upload):
+    import_batch = models.ImportBatch.objects.create(
+        supplier=supplier,
+        status=models.ImportStatus.PENDING,
+        received_at=timezone.now(),
+    )
+    content_hash = ""
+    if upload:
+        hasher = hashlib.sha256()
+        for chunk in upload.chunks():
+            hasher.update(chunk)
+        content_hash = hasher.hexdigest()
+    import_file = models.ImportFile.objects.create(
+        import_batch=import_batch,
+        mapping=mapping,
+        file_kind=models.FileKind.PRICE,
+        filename=upload.name if upload else "",
+        file=upload,
+        content_hash=content_hash,
+        status=models.ImportStatus.PENDING,
+    )
+    try:
+        process_import_file(import_file)
+        import_batch.status = models.ImportStatus.PROCESSED
+        import_batch.save(update_fields=["status"])
+    except Exception as exc:
+        import_file.status = models.ImportStatus.FAILED
+        import_file.error_message = str(exc)
+        import_file.save(update_fields=["status", "error_message"])
+        import_batch.status = models.ImportStatus.FAILED
+        import_batch.error_message = str(exc)
+        import_batch.save(update_fields=["status", "error_message"])
+        raise
+    return import_batch
 
 
 class MailboxListView(BaseListView):

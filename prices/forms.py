@@ -15,17 +15,23 @@ class SupplierForm(forms.ModelForm):
             "is_active",
             "default_currency",
             "from_address_pattern",
+            "expected_import_interval_hours",
             "notes",
         )
         labels = {
             "from_address_pattern": "Supplier email",
+            "expected_import_interval_hours": "Expected import cadence (hours)",
         }
         help_texts = {
             "from_address_pattern": "Email address used to receive this supplier's price lists.",
+            "expected_import_interval_hours": "Used on the Import Prices board to decide when this supplier becomes warning, stale, or critical.",
         }
         widgets = {
             "from_address_pattern": forms.TextInput(
                 attrs={"placeholder": "supplier@example.com"}
+            ),
+            "expected_import_interval_hours": forms.NumberInput(
+                attrs={"min": 1, "step": 1}
             ),
         }
 

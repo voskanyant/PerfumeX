@@ -85,33 +85,33 @@
                 <div>
                     <span class="page-kicker">Suppliers</span>
                     <h2 class="page-title">Supplier import board</h2>
-                    <div class="page-meta">Quick scan for stale suppliers, last successful import time, and direct import actions.</div>
+                    <div class="page-meta">Attention-first board with last successful import, latest email check, and supplier health.</div>
                 </div>
             </div>
             <div class="import-summary-strip">
-                <div class="import-summary-card">
+                <div class="import-summary-card" data-summary-card="total">
                     <span class="import-summary-label">Total</span>
-                    <strong class="import-summary-value">{{ supplier_summary.total }}</strong>
+                    <strong class="import-summary-value" data-summary-value="total">{{ supplier_summary.total }}</strong>
                 </div>
-                <div class="import-summary-card">
+                <div class="import-summary-card" data-summary-card="updating">
                     <span class="import-summary-label">Updating</span>
-                    <strong class="import-summary-value">{{ supplier_summary.running }}</strong>
+                    <strong class="import-summary-value" data-summary-value="updating">{{ supplier_summary.updating }}</strong>
                 </div>
-                <div class="import-summary-card">
+                <div class="import-summary-card" data-summary-card="fresh">
                     <span class="import-summary-label">Fresh</span>
-                    <strong class="import-summary-value">{{ supplier_summary.fresh }}</strong>
+                    <strong class="import-summary-value" data-summary-value="fresh">{{ supplier_summary.fresh }}</strong>
                 </div>
-                <div class="import-summary-card is-alert">
+                <div class="import-summary-card is-warn" data-summary-card="warning">
+                    <span class="import-summary-label">Warning</span>
+                    <strong class="import-summary-value" data-summary-value="warning">{{ supplier_summary.warning }}</strong>
+                </div>
+                <div class="import-summary-card is-alert" data-summary-card="stale">
                     <span class="import-summary-label">Stale</span>
-                    <strong class="import-summary-value">{{ supplier_summary.stale }}</strong>
+                    <strong class="import-summary-value" data-summary-value="stale">{{ supplier_summary.stale }}</strong>
                 </div>
-                <div class="import-summary-card is-muted">
-                    <span class="import-summary-label">Never</span>
-                    <strong class="import-summary-value">{{ supplier_summary.never }}</strong>
-                </div>
-                <div class="import-summary-card is-warn">
-                    <span class="import-summary-label">Attention</span>
-                    <strong class="import-summary-value">{{ supplier_summary.attention }}</strong>
+                <div class="import-summary-card is-critical" data-summary-card="critical">
+                    <span class="import-summary-label">Critical</span>
+                    <strong class="import-summary-value" data-summary-value="critical">{{ supplier_summary.critical }}</strong>
                 </div>
             </div>
             {% if rows %}
@@ -122,17 +122,19 @@
                                 <th><input type="checkbox" id="supplier-select-all"></th>
                                 <th>Supplier</th>
                                 <th>Last import</th>
-                                <th>Status</th>
+                                <th>Latest check</th>
+                                <th>Health</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody>
                             {% for row in rows %}
-                                <tr data-supplier-id="{{ row.supplier.pk }}" data-email-running="{% if row.is_running %}1{% else %}0{% endif %}" data-has-email-route="{% if row.has_email_route %}1{% else %}0{% endif %}">
+                                <tr data-supplier-id="{{ row.supplier.pk }}" data-email-running="{% if row.is_running %}1{% else %}0{% endif %}">
                                     <td class="import-col-select" data-label="Select"><input type="checkbox" class="supplier-select" value="{{ row.supplier.pk }}"></td>
                                     <td class="import-col-supplier" data-label="Supplier">
                                         <div class="import-supplier-stack">
                                             <div class="import-supplier-name">{{ row.supplier.name }}</div>
+                                            <div class="import-supplier-note">Expected every {{ row.expected_interval_label }}</div>
                                             {% if not row.has_email_route %}
                                                 <div class="import-supplier-note is-warning">Email route missing</div>
                                             {% endif %}
@@ -141,47 +143,60 @@
                                     <td class="import-col-last" data-label="Last import">
                                         <button
                                             type="button"
-                                            class="import-relative-time cell-imported {{ row.latest_import_age_class }}{% if not row.latest_import_full %} import-relative-time--empty{% endif %}"
-                                            data-last-import-button
+                                            class="import-relative-time cell-imported {{ row.last_import_age_class }}{% if not row.last_import_full %} import-relative-time--empty{% endif %}"
+                                            data-relative-time-button
                                             data-last-import-label
-                                            {% if row.latest_import_full %}data-full-datetime="{{ row.latest_import_full }}"{% endif %}
-                                        >{{ row.latest_import_relative }}</button>
-                                        <div class="import-last-note" data-last-import-note>
-                                            {% if row.latest_import %}
-                                                {% if row.latest_import.mailbox_id %}
-                                                    Email import
-                                                {% else %}
-                                                    Manual upload / backfill
-                                                {% endif %}
-                                            {% else %}
-                                                No successful import yet
-                                            {% endif %}
+                                            {% if row.last_import_full %}data-full-datetime="{{ row.last_import_full }}"{% endif %}
+                                        >{{ row.last_import_relative }}</button>
+                                        <div class="import-last-note" data-last-import-note>{{ row.last_import_note }}</div>
+                                    </td>
+                                    <td class="import-col-check" data-label="Latest check">
+                                        <div class="import-check-stack">
+                                            <div class="import-check-head">
+                                                <button
+                                                    type="button"
+                                                    class="import-relative-time{% if not row.check_full %} import-relative-time--empty{% endif %}"
+                                                    data-relative-time-button
+                                                    data-check-time-label
+                                                    {% if row.check_full %}data-full-datetime="{{ row.check_full }}"{% endif %}
+                                                >{{ row.check_relative }}</button>
+                                                <span class="import-status-chip {{ row.check_class }}" data-check-status-chip>{{ row.check_label }}</span>
+                                            </div>
+                                            <div class="import-status-note" data-check-status-note title="{{ row.check_note }}">{{ row.check_note }}</div>
+                                            <div class="progress progress-thin import-row-progress{% if not row.is_running or row.check_progress is None %} is-hidden{% endif %}" data-email-progress-wrap>
+                                                <div class="progress-bar" data-email-progress role="progressbar"{% if row.check_progress is not None %} data-progress-value="{{ row.check_progress }}"{% endif %}></div>
+                                            </div>
                                         </div>
                                     </td>
-                                    <td
-                                        class="import-col-status"
-                                        data-label="Status"
-                                        data-base-status-label="{{ row.status_label }}"
-                                        data-base-status-class="{{ row.status_class }}"
-                                        data-base-status-note="{{ row.status_note }}"
-                                    >
-                                        <div class="import-status-stack">
-                                            <span class="import-status-chip {{ row.status_class }}" data-email-status-chip>{{ row.status_label }}</span>
-                                            <div class="import-status-note" data-email-status-note title="{{ row.status_note }}">{{ row.status_note }}</div>
-                                            <div class="progress progress-thin import-row-progress{% if not row.is_running or row.latest_run_progress is None %} is-hidden{% endif %}" data-email-progress-wrap>
-                                                <div class="progress-bar" data-email-progress role="progressbar"{% if row.latest_run_progress is not None %} data-progress-value="{{ row.latest_run_progress }}"{% endif %}></div>
-                                            </div>
+                                    <td class="import-col-health" data-label="Health">
+                                        <div class="import-health-stack">
+                                            <span class="import-health-chip {{ row.health_class }}" data-health-chip>{{ row.health_label }}</span>
+                                            <div class="import-status-note" data-health-note title="{{ row.health_note }}">{{ row.health_note }}</div>
                                         </div>
                                     </td>
                                     <td class="actions import-col-actions" data-label="Actions">
                                         <div class="import-actions-row">
-                                            <a class="button secondary icon import-action-button" href="{% url 'prices:supplier_import' row.supplier.pk %}#manual-upload" title="Manual upload" aria-label="Manual upload">
-                                                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                                                    <path d="M12 3v12"/>
-                                                    <path d="m7 10 5 5 5-5"/>
-                                                    <path d="M5 21h14"/>
-                                                </svg>
-                                            </a>
+                                            {% if row.has_quick_upload %}
+                                                <form action="{% url 'prices:supplier_quick_upload' row.supplier.pk %}" method="post" enctype="multipart/form-data" class="import-action-form" data-quick-upload-form>
+                                                    {% csrf_token %}
+                                                    <input type="file" name="file" accept=".csv,.xls,.xlsx" class="import-quick-upload-input" data-quick-upload-input hidden>
+                                                    <button class="button secondary icon import-action-button" type="button" data-quick-upload-trigger title="Quick upload" aria-label="Quick upload">
+                                                        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                                            <path d="M12 3v12"/>
+                                                            <path d="m7 10 5 5 5-5"/>
+                                                            <path d="M5 21h14"/>
+                                                        </svg>
+                                                    </button>
+                                                </form>
+                                            {% else %}
+                                                <a class="button secondary icon import-action-button" href="{% url 'prices:supplier_import' row.supplier.pk %}#manual-upload" title="Set mapping and upload" aria-label="Set mapping and upload">
+                                                    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                                        <path d="M12 3v12"/>
+                                                        <path d="m7 10 5 5 5-5"/>
+                                                        <path d="M5 21h14"/>
+                                                    </svg>
+                                                </a>
+                                            {% endif %}
                                             <form action="{% url 'prices:supplier_import_email' row.supplier.pk %}" method="post" class="import-action-form">
                                                 {% csrf_token %}
                                                 <button class="button icon import-action-button" type="submit" data-email-update{% if row.is_running or not row.has_email_route %} disabled{% endif %} title="Update from email" aria-label="Update from email">
@@ -242,112 +257,93 @@
                 bar.style.width = progress + "%";
             }
 
-            function applyStatus(row, label, className, note, progress) {
-                var chip = row.querySelector("[data-email-status-chip]");
-                var noteEl = row.querySelector("[data-email-status-note]");
-                if (chip) {
-                    chip.textContent = label || "-";
-                    chip.className = "import-status-chip " + (className || "is-neutral");
-                }
-                if (noteEl) {
-                    var safeNote = note || "";
-                    noteEl.textContent = safeNote;
-                    noteEl.title = safeNote;
-                }
-                applyProgress(row, progress);
-            }
-
-            function applyBaseStatus(row) {
-                applyStatus(
-                    row,
-                    row.getAttribute("data-base-status-label"),
-                    row.getAttribute("data-base-status-class"),
-                    row.getAttribute("data-base-status-note"),
-                    null
-                );
-            }
-
-            function mapRunStatus(run) {
-                var progress = run.progress;
-                if (run.status === "running") {
-                    return {
-                        label: "updating",
-                        className: "is-running",
-                        note: progress !== null && progress !== undefined ? (progress + "% complete") : "Checking mailbox",
-                        progress: progress
-                    };
-                }
-                if (run.status === "failed") {
-                    return {
-                        label: "error",
-                        className: "is-failed",
-                        note: run.last_message || "Email import failed",
-                        progress: null
-                    };
-                }
-                if (run.status === "canceled") {
-                    return {
-                        label: "canceled",
-                        className: "is-neutral",
-                        note: run.last_message || "Canceled by user",
-                        progress: null
-                    };
-                }
-                if (run.status === "finished") {
-                    if (run.errors) {
-                        return {
-                            label: "issues",
-                            className: "is-warning",
-                            note: run.errors + " error(s) during import",
-                            progress: null
-                        };
-                    }
-                    if (!run.matched_files && !run.processed_files) {
-                        return {
-                            label: "no file",
-                            className: "is-warning",
-                            note: "No matching email files found",
-                            progress: null
-                        };
-                    }
-                    return {
-                        label: "successful",
-                        className: "is-success",
-                        note: (run.processed_files || 0) + " file(s) imported",
-                        progress: null
-                    };
-                }
-                return {
-                    label: run.status || "-",
-                    className: "is-neutral",
-                    note: "",
-                    progress: null
-                };
-            }
-
-            function applyImportTimestamp(row, importState) {
-                if (!importState) {
+            function applyRelativeField(button, relative, full, extraClass) {
+                if (!button) {
                     return;
                 }
-                var label = row.querySelector("[data-last-import-label]");
-                var note = row.querySelector("[data-last-import-note]");
-                if (label) {
-                    label.textContent = importState.relative || "Never";
-                    label.classList.remove("age-fresh", "age-warn", "age-stale");
-                    if (importState.age_class) {
-                        label.classList.add(importState.age_class);
-                    }
-                    if (importState.full) {
-                        label.setAttribute("data-full-datetime", importState.full);
-                        label.classList.remove("import-relative-time--empty");
-                    } else {
-                        label.removeAttribute("data-full-datetime");
-                        label.classList.add("import-relative-time--empty");
-                    }
+                button.textContent = relative || "";
+                button.classList.remove("import-relative-time--empty", "age-fresh", "age-warn", "age-stale");
+                if (extraClass) {
+                    button.classList.add(extraClass);
                 }
-                if (note && importState.note) {
-                    note.textContent = importState.note;
+                if (full) {
+                    button.setAttribute("data-full-datetime", full);
+                } else {
+                    button.removeAttribute("data-full-datetime");
+                    button.classList.add("import-relative-time--empty");
                 }
+            }
+
+            function applyChip(element, baseClass, className, label) {
+                if (!element) {
+                    return;
+                }
+                element.textContent = label || "";
+                element.className = baseClass + " " + (className || "is-neutral");
+            }
+
+            function applyText(element, value) {
+                if (!element) {
+                    return;
+                }
+                var safeValue = value || "";
+                element.textContent = safeValue;
+                element.title = safeValue;
+            }
+
+            function applyRowState(row, state) {
+                if (!row || !state) {
+                    return;
+                }
+                applyRelativeField(
+                    row.querySelector("[data-last-import-label]"),
+                    state.last_import_relative,
+                    state.last_import_full,
+                    state.last_import_age_class
+                );
+                applyText(row.querySelector("[data-last-import-note]"), state.last_import_note);
+                applyRelativeField(
+                    row.querySelector("[data-check-time-label]"),
+                    state.check_relative,
+                    state.check_full,
+                    ""
+                );
+                applyChip(
+                    row.querySelector("[data-check-status-chip]"),
+                    "import-status-chip",
+                    state.check_class,
+                    state.check_label
+                );
+                applyText(row.querySelector("[data-check-status-note]"), state.check_note);
+                applyChip(
+                    row.querySelector("[data-health-chip]"),
+                    "import-health-chip",
+                    state.health_class,
+                    state.health_label
+                );
+                applyText(row.querySelector("[data-health-note]"), state.health_note);
+                applyProgress(row, state.check_progress);
+
+                var updateBtn = row.querySelector("[data-email-update]");
+                var cancelWrap = row.querySelector("[data-email-cancel-wrap]");
+                if (updateBtn) {
+                    updateBtn.disabled = !!state.is_running || !state.has_email_route;
+                }
+                if (cancelWrap) {
+                    cancelWrap.classList.toggle("is-hidden", !state.is_running);
+                }
+            }
+
+            function applySummary(summary) {
+                if (!summary) {
+                    return;
+                }
+                Object.keys(summary).forEach(function (key) {
+                    var target = document.querySelector('[data-summary-value="' + key + '"]');
+                    if (target) {
+                        target.textContent = summary[key];
+                    }
+                });
             }
 
             document.querySelectorAll("[data-email-progress][data-progress-value]").forEach(function (bar) {
@@ -358,8 +354,18 @@
             });
 
             document.addEventListener("click", function (event) {
-                var trigger = event.target.closest("[data-last-import-button][data-full-datetime]");
-                document.querySelectorAll("[data-last-import-button].show-full-datetime").forEach(function (button) {
+                var quickUploadTrigger = event.target.closest("[data-quick-upload-trigger]");
+                if (quickUploadTrigger) {
+                    var quickUploadForm = quickUploadTrigger.closest("[data-quick-upload-form]");
+                    var quickUploadInput = quickUploadForm ? quickUploadForm.querySelector("[data-quick-upload-input]") : null;
+                    if (quickUploadInput) {
+                        quickUploadInput.click();
+                    }
+                    return;
+                }
+
+                var trigger = event.target.closest("[data-relative-time-button][data-full-datetime]");
+                document.querySelectorAll("[data-relative-time-button].show-full-datetime").forEach(function (button) {
                     if (button !== trigger) {
                         button.classList.remove("show-full-datetime");
                     }
@@ -376,50 +382,44 @@
                 }
             });
 
+            document.addEventListener("change", function (event) {
+                var quickUploadInput = event.target.closest("[data-quick-upload-input]");
+                if (!quickUploadInput || !quickUploadInput.files || !quickUploadInput.files.length) {
+                    return;
+                }
+                var quickUploadForm = quickUploadInput.closest("[data-quick-upload-form]");
+                if (quickUploadForm) {
+                    quickUploadForm.submit();
+                }
+            });
+
             function updateAll() {
                 fetch("{% url 'prices:supplier_import_email_status_all' %}")
                     .then(function (res) { return res.json(); })
                     .then(function (data) {
-                        var runs = data.runs || {};
-                        var imports = data.imports || {};
+                        var rows = data.rows || {};
                         var anyRunning = false;
                         document.querySelectorAll("[data-supplier-id]").forEach(function (row) {
                             var supplierId = row.getAttribute("data-supplier-id");
-                            var run = runs[supplierId];
-                            var updateBtn = row.querySelector("[data-email-update]");
-                            var cancelWrap = row.querySelector("[data-email-cancel-wrap]");
-                            var hasEmailRoute = row.getAttribute("data-has-email-route") === "1";
-
-                            applyImportTimestamp(row, imports[supplierId]);
-
-                            if (!run) {
-                                applyBaseStatus(row);
-                                if (updateBtn) updateBtn.disabled = !hasEmailRoute;
-                                if (cancelWrap) cancelWrap.classList.add("is-hidden");
-                                row.setAttribute("data-email-running", "0");
+                            var state = rows[supplierId];
+                            if (!state) {
                                 return;
                             }
-
-                            var mapped = mapRunStatus(run);
-                            applyStatus(row, mapped.label, mapped.className, mapped.note, mapped.progress);
-                            if (run.status === "running") {
+                            applyRowState(row, state);
+                            if (state.is_running) {
                                 anyRunning = true;
-                                if (updateBtn) updateBtn.disabled = true;
-                                if (cancelWrap) cancelWrap.classList.remove("is-hidden");
-                                row.setAttribute("data-email-running", "1");
-                            } else {
-                                if (updateBtn) updateBtn.disabled = !hasEmailRoute;
-                                if (cancelWrap) cancelWrap.classList.add("is-hidden");
-                                row.setAttribute("data-email-running", "0");
-                                row.setAttribute("data-base-status-label", mapped.label);
-                                row.setAttribute("data-base-status-class", mapped.className);
-                                row.setAttribute("data-base-status-note", mapped.note);
                             }
                         });
+                        applySummary(data.summary || {});
                         var updateAllBtn = document.querySelector("[data-email-update-all]");
-                        if (updateAllBtn) updateAllBtn.disabled = anyRunning;
+                        if (updateAllBtn) {
+                            updateAllBtn.disabled = anyRunning;
+                        }
                         if (anyRunning) {
                             hasSeenRunning = true;
+                            if (!intervalId) {
+                                intervalId = setInterval(updateAll, 3000);
+                            }
                         }
                         if (!anyRunning && hasSeenRunning && intervalId) {
                             clearInterval(intervalId);
@@ -427,6 +427,7 @@
                         }
                     });
             }
+
             var hasSeenRunning = {% if any_running %}true{% else %}false{% endif %};
             var intervalId = setInterval(updateAll, 3000);
             updateAll();
