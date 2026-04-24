@@ -12,7 +12,7 @@ from assistant_linking import forms, models
 from assistant_linking.services.catalog_matcher import candidate_matches, rule_impact, similar_supplier_rows
 from assistant_linking.services.grouping import rebuild_groups
 from assistant_linking.services.mock_suggester import generate_link_suggestions
-from assistant_linking.services.normalizer import save_parse
+from assistant_linking.services.normalizer import PARSER_VERSION, save_parse
 from assistant_linking.services.smart_search import normalize_query
 from catalog.models import Brand, Perfume, PerfumeVariant
 from prices.models import SupplierProduct
@@ -102,7 +102,7 @@ class UnparsedListView(NormalizationSearchMixin, StaffAssistantMixin, ListView):
     model = SupplierProduct
     template_name = "assistant_linking/normalization/product_list.html"
     context_object_name = "products"
-    paginate_by = 100
+    paginate_by = 50
 
     def get_queryset(self):
         queryset = SupplierProduct.objects.select_related("supplier").filter(assistant_parse__isnull=True)
@@ -123,7 +123,7 @@ class LowConfidenceListView(NormalizationSearchMixin, StaffAssistantMixin, ListV
     model = models.ParsedSupplierProduct
     template_name = "assistant_linking/normalization/low_confidence.html"
     context_object_name = "parses"
-    paginate_by = 100
+    paginate_by = 50
 
     def get_queryset(self):
         queryset = models.ParsedSupplierProduct.objects.select_related(
@@ -149,6 +149,18 @@ class LowConfidenceListView(NormalizationSearchMixin, StaffAssistantMixin, ListV
     def parse_matches_view(self, parsed):
         return parsed.confidence < 75
 
+    def should_refresh_parse(self, parsed) -> bool:
+        if parsed.locked_by_human:
+            return False
+        if parsed.parser_version != PARSER_VERSION:
+            return True
+        if not parsed.last_parsed_at:
+            return True
+        product_updated_at = getattr(parsed.supplier_product, "updated_at", None)
+        if product_updated_at and product_updated_at > parsed.last_parsed_at:
+            return True
+        return False
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         page_obj = context.get("page_obj")
@@ -157,7 +169,11 @@ class LowConfidenceListView(NormalizationSearchMixin, StaffAssistantMixin, ListV
 
         refreshed = []
         for stored_parse in list(page_obj.object_list):
-            refreshed_parse = save_parse(stored_parse.supplier_product)
+            refreshed_parse = (
+                save_parse(stored_parse.supplier_product)
+                if self.should_refresh_parse(stored_parse)
+                else stored_parse
+            )
             if self.parse_matches_view(refreshed_parse):
                 refreshed.append(refreshed_parse)
 

@@ -354,3 +354,16 @@ class TeachParseTests(TestCase):
         parses = list(response.context["parses"])
         self.assertEqual(len(parses), 2)
         self.assertTrue(all("tester" not in parsed.supplier_product.name.lower() for parsed in parses))
+
+    def test_unparsed_page_uses_50_row_pagination(self):
+        for index in range(60):
+            SupplierProduct.objects.create(
+                supplier=self.supplier,
+                identity_key=f"unparsed-page-{index}",
+                name=f"Queue Product {index}",
+            )
+
+        response = self.client.get(reverse("assistant_linking:normalization_unparsed"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["page_obj"].paginator.per_page, 50)
