@@ -17,6 +17,8 @@
     var isMobileViewport = (window.innerWidth || document.documentElement.clientWidth || 1024) <= 768;
     var snapToPoints = isMobileViewport;
     var lastTapPointIndex = null;
+    var lastTapEventAt = 0;
+    var lastTapEventType = "";
     document.querySelectorAll("button[data-chart-currency]").forEach(function (button) {
         button.addEventListener("click", function () {
             var mode = button.getAttribute("data-chart-currency");
@@ -165,6 +167,17 @@
         });
     });
     detectActiveRangeFromInputs();
+    var shouldHandleTap = function (eventType, nativeEvent) {
+        if (isMobileViewport) {
+            if (eventType !== "pointerup" && eventType !== "touchend") return false;
+            var now = nativeEvent && typeof nativeEvent.timeStamp === "number" ? nativeEvent.timeStamp : Date.now();
+            var isDuplicateTap = lastTapEventAt && (now - lastTapEventAt) < 180 && lastTapEventType !== eventType;
+            lastTapEventAt = now;
+            lastTapEventType = eventType;
+            return !isDuplicateTap;
+        }
+        return eventType === "click";
+    };
     var crosshair = {
         id: "crosshair",
         afterEvent: function(chart, args) {
@@ -179,11 +192,7 @@
             if (!inside) return;
 
             var eventType = (event.type || "").toLowerCase();
-            var isTap =
-                eventType === "click" ||
-                eventType === "touchstart" ||
-                eventType === "touchend" ||
-                eventType === "pointerup";
+            var isTap = shouldHandleTap(eventType, event.native);
 
             // Mobile behavior: tap once shows crosshair, tap again hides it.
             if (isTap) {
