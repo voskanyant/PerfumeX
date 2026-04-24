@@ -1,6 +1,6 @@
 from django.test import TestCase
 
-from assistant_linking.models import BrandAlias
+from assistant_linking.models import BrandAlias, ProductAlias
 from assistant_linking.services.normalizer import parse_supplier_product, save_parse
 from catalog.models import Brand
 from prices.models import Supplier, SupplierProduct
@@ -37,3 +37,23 @@ class NormalizerTests(TestCase):
         again = save_parse(product)
 
         self.assertEqual(again.product_name_text, "Human value")
+
+    def test_product_alias_must_match_whole_phrase(self):
+        brand = Brand.objects.create(name="12 Parfumeurs")
+        BrandAlias.objects.create(brand=brand, alias_text="12 Parfumeurs", normalized_alias="12 parfumeurs")
+        ProductAlias.objects.create(
+            brand=brand,
+            alias_text="O",
+            canonical_text="O",
+            active=True,
+        )
+        product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="3",
+            name="12 Parfumeurs Malmaison 100ml EDP",
+        )
+
+        parsed = parse_supplier_product(product)
+
+        self.assertEqual(parsed.normalized_brand, brand)
+        self.assertEqual(parsed.product_name_text, "malmaison")
