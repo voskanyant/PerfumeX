@@ -1,10 +1,68 @@
 {% extends "prices/base.html" %}
 {% block title %}Parsed Product{% endblock %}
 {% block content %}
-<div class="page-head"><div><span class="page-kicker">Normalisation</span><h1 class="page-title">{{ product.name }}</h1><div class="page-meta">{{ product.supplier }} · {{ product.supplier_sku }}</div></div><div class="page-actions"><form method="post" action="{% url 'assistant_linking:normalization_reparse' product.pk %}">{% csrf_token %}<button class="button ghost">Reparse</button></form><form method="post" action="{% url 'assistant_linking:normalization_lock' product.pk %}">{% csrf_token %}<button class="button ghost">Lock parse</button></form><a class="button primary" href="{% url 'assistant_linking:product_workbench' product.pk %}">Open linking workbench</a></div></div>
+<div class="page-head">
+    <div>
+        <span class="page-kicker">Normalisation</span>
+        <h1 class="page-title">{{ product.name }}</h1>
+        <div class="page-meta">{{ product.supplier }} · {{ product.supplier_sku }}</div>
+    </div>
+    <div class="page-actions">
+        <form method="post" action="{% url 'assistant_linking:normalization_reparse' product.pk %}">
+            {% csrf_token %}
+            <button class="button ghost">Reparse</button>
+        </form>
+        <form method="post" action="{% url 'assistant_linking:normalization_lock' product.pk %}">
+            {% csrf_token %}
+            <button class="button ghost">Lock parse</button>
+        </form>
+        <a class="button primary" href="{% url 'assistant_linking:product_workbench' product.pk %}">Open linking workbench</a>
+    </div>
+</div>
+
 <div class="page-grid-3">
-    <div class="workspace-block"><h2 class="kpi-link-title">Supplier row</h2><p>{{ product.name }}</p><p>{{ product.current_price }} {{ product.currency }}</p><p>{{ product.is_active|yesno:"active,inactive" }}</p></div>
-    <div class="workspace-block"><h2 class="kpi-link-title">Parsed fields</h2><p>Brand: {{ parsed.normalized_brand|default:parsed.detected_brand_text }}</p><p>Name: {{ parsed.product_name_text }}</p><p>{{ parsed.concentration }} · {{ parsed.size_ml }} ml · {{ parsed.supplier_gender_hint }}</p><p>Confidence {{ parsed.confidence }}</p></div>
-    <div class="workspace-block"><h2 class="kpi-link-title">Warnings</h2>{% for warning in parsed.warnings %}<div class="flash flash--warning">{{ warning }}</div>{% empty %}<p>No warnings.</p>{% endfor %}</div>
+    <div class="workspace-block">
+        <h2 class="kpi-link-title">Supplier row</h2>
+        <p>{{ product.name }}</p>
+        <p>{{ product.current_price }} {{ product.currency }}</p>
+        <p>{{ product.is_active|yesno:"active,inactive" }}</p>
+    </div>
+    <div class="workspace-block">
+        <h2 class="kpi-link-title">Parsed fields</h2>
+        <p>Brand: {{ parsed.normalized_brand|default:parsed.detected_brand_text }}</p>
+        <p>Name: {{ parsed.product_name_text }}</p>
+        <p>{{ parsed.concentration }} · {{ parsed.size_ml }} ml · {{ parsed.supplier_gender_hint }}</p>
+        <p>Confidence {{ parsed.confidence }}</p>
+    </div>
+    <div class="workspace-block">
+        <h2 class="kpi-link-title">Warnings</h2>
+        {% for warning in parsed.warnings %}
+            <div class="flash flash--warning">{{ warning }}</div>
+        {% empty %}
+            <p>No warnings.</p>
+        {% endfor %}
+    </div>
+</div>
+
+<div class="workspace-block space-top-md">
+    <h2 class="kpi-link-title">Teach this product</h2>
+    <form method="post" action="{% url 'assistant_linking:normalization_teach' product.pk %}" class="form-shell">
+        {% csrf_token %}
+        <div class="page-grid-3">
+            <p>{{ teach_form.brand_name.label_tag }}{{ teach_form.brand_name }}</p>
+            <p>{{ teach_form.product_name.label_tag }}{{ teach_form.product_name }}</p>
+            <p>{{ teach_form.concentration.label_tag }}{{ teach_form.concentration }}</p>
+            <p>{{ teach_form.size_ml.label_tag }}{{ teach_form.size_ml }}</p>
+            <p>{{ teach_form.audience.label_tag }}{{ teach_form.audience }}</p>
+            <p>{{ teach_form.alias_scope.label_tag }}{{ teach_form.alias_scope }}</p>
+            <p>{{ teach_form.brand_alias_text.label_tag }}{{ teach_form.brand_alias_text }}</p>
+            <p>{{ teach_form.product_alias_text.label_tag }}{{ teach_form.product_alias_text }}</p>
+            <p>
+                <label>{{ teach_form.lock_parse }} Lock this corrected parse</label>
+                <label>{{ teach_form.reparse_similar }} Reparse similar rows now</label>
+            </p>
+        </div>
+        <button class="button primary" type="submit">Save teaching</button>
+    </form>
 </div>
 {% endblock %}

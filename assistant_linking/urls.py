@@ -12,6 +12,7 @@ urlpatterns = [
     path("normalization/<int:supplier_product_id>/", views.ParsedProductDetailView.as_view(), name="normalization_detail"),
     path("normalization/<int:supplier_product_id>/reparse/", views.ReparseProductView.as_view(), name="normalization_reparse"),
     path("normalization/<int:supplier_product_id>/lock/", views.LockParseView.as_view(), name="normalization_lock"),
+    path("normalization/<int:supplier_product_id>/teach/", views.TeachParseView.as_view(), name="normalization_teach"),
     path("normalization/<int:supplier_product_id>/brand-alias/", views.SaveBrandAliasView.as_view(), name="save_brand_alias"),
     path("normalization/<int:supplier_product_id>/product-alias/", views.SaveProductAliasView.as_view(), name="save_product_alias"),
     path("linking/", views.GroupQueueView.as_view(), name="group_queue"),

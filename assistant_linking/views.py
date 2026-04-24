@@ -12,6 +12,8 @@ from assistant_linking import forms, models
 from assistant_linking.services.grouping import rebuild_groups
 from assistant_linking.services.mock_suggester import generate_link_suggestions
 from assistant_linking.services.normalizer import save_parse
+from assistant_linking.services.smart_search import normalize_query
+from catalog.models import Brand
 from prices.models import SupplierProduct
 
 
@@ -61,7 +63,24 @@ class ParsedProductDetailView(StaffAssistantMixin, DetailView):
 
     def get_context_data(self, **kwargs):
         product = self.object
-        return {**super().get_context_data(**kwargs), "parsed": save_parse(product)}
+        parsed = save_parse(product)
+        teach_initial = {
+            "brand_name": parsed.normalized_brand.name if parsed.normalized_brand_id else parsed.detected_brand_text,
+            "product_name": parsed.product_name_text,
+            "concentration": parsed.concentration,
+            "size_ml": parsed.size_ml,
+            "audience": parsed.supplier_gender_hint,
+            "brand_alias_text": parsed.detected_brand_text or product.brand,
+            "product_alias_text": parsed.product_name_text or product.name,
+            "alias_scope": forms.ParseTeachingForm.SCOPE_GLOBAL,
+            "lock_parse": True,
+            "reparse_similar": True,
+        }
+        return {
+            **super().get_context_data(**kwargs),
+            "parsed": parsed,
+            "teach_form": forms.ParseTeachingForm(initial=teach_initial),
+        }
 
 
 class ReparseProductView(StaffAssistantMixin, View):
@@ -100,6 +119,77 @@ class SaveProductAliasView(StaffAssistantMixin, View):
             messages.success(request, "Product alias saved.")
         else:
             messages.error(request, "Product alias was not saved.")
+        return redirect("assistant_linking:normalization_detail", supplier_product_id=supplier_product_id)
+
+
+class TeachParseView(StaffAssistantMixin, View):
+    def post(self, request, supplier_product_id):
+        product = get_object_or_404(SupplierProduct.objects.select_related("supplier"), pk=supplier_product_id)
+        parsed = save_parse(product)
+        form = forms.ParseTeachingForm(request.POST)
+        if not form.is_valid():
+            messages.error(request, "Teaching form has invalid values.")
+            return redirect("assistant_linking:normalization_detail", supplier_product_id=supplier_product_id)
+
+        data = form.cleaned_data
+        brand_name = data["brand_name"].strip()
+        product_name = data["product_name"].strip()
+        brand, _ = Brand.objects.get_or_create(name=brand_name)
+        supplier = product.supplier if data["alias_scope"] == forms.ParseTeachingForm.SCOPE_SUPPLIER else None
+
+        brand_alias_text = (data.get("brand_alias_text") or brand_name).strip()
+        if brand_alias_text:
+            models.BrandAlias.objects.get_or_create(
+                brand=brand,
+                supplier=supplier,
+                alias_text=brand_alias_text,
+                defaults={
+                    "normalized_alias": normalize_query(brand_alias_text),
+                    "priority": 10 if supplier else 50,
+                    "active": True,
+                },
+            )
+
+        product_alias_text = (data.get("product_alias_text") or product_name).strip()
+        if product_alias_text:
+            models.ProductAlias.objects.get_or_create(
+                brand=brand,
+                supplier=supplier,
+                alias_text=product_alias_text,
+                defaults={
+                    "canonical_text": product_name,
+                    "concentration": data.get("concentration") or "",
+                    "audience": data.get("audience") or "",
+                    "priority": 10 if supplier else 50,
+                    "active": True,
+                },
+            )
+
+        parsed.normalized_brand = brand
+        parsed.detected_brand_text = brand_alias_text
+        parsed.product_name_text = product_name
+        parsed.concentration = data.get("concentration") or ""
+        parsed.size_ml = data.get("size_ml")
+        parsed.supplier_gender_hint = data.get("audience") or ""
+        parsed.confidence = 100
+        parsed.warnings = []
+        parsed.locked_by_human = bool(data.get("lock_parse"))
+        parsed.last_parsed_at = timezone.now()
+        parsed.save()
+
+        updated_similar = 0
+        if data.get("reparse_similar"):
+            similar = SupplierProduct.objects.filter(
+                Q(name__icontains=brand_alias_text) | Q(name__icontains=product_alias_text)
+            ).exclude(pk=product.pk)[:500]
+            for similar_product in similar:
+                save_parse(similar_product)
+                updated_similar += 1
+
+        messages.success(
+            request,
+            f"Teaching saved. This product is now parsed as {brand.name} / {product_name}. Reparsed {updated_similar} similar rows.",
+        )
         return redirect("assistant_linking:normalization_detail", supplier_product_id=supplier_product_id)
 
 
