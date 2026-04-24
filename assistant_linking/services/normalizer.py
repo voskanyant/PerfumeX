@@ -15,15 +15,15 @@ from prices.models import SupplierProduct
 PARSER_VERSION = "deterministic-v1"
 
 CONCENTRATION_ALIASES = (
-    ("extrait de parfum", "extrait"),
-    ("extrait", "extrait"),
-    ("parfum", "parfum"),
-    ("eau de parfum", "edp"),
-    ("edp", "edp"),
-    ("eau de toilette", "edt"),
-    ("edt", "edt"),
-    ("eau de cologne", "edc"),
-    ("edc", "edc"),
+    ("extrait de parfum", "Extrait de Parfum"),
+    ("extrait", "Extrait de Parfum"),
+    ("eau de parfum", "Eau de Parfum"),
+    ("edp", "Eau de Parfum"),
+    ("eau de toilette", "Eau de Toilette"),
+    ("edt", "Eau de Toilette"),
+    ("eau de cologne", "Eau de Cologne"),
+    ("edc", "Eau de Cologne"),
+    ("parfum", "Parfum"),
 )
 
 GENDER_ALIASES = (

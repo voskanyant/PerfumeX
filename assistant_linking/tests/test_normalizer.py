@@ -21,7 +21,7 @@ class NormalizerTests(TestCase):
 
         parsed = parse_supplier_product(product)
 
-        self.assertEqual(parsed.concentration, "edt")
+        self.assertEqual(parsed.concentration, "Eau de Toilette")
         self.assertEqual(parsed.size_ml, 100)
         self.assertTrue(parsed.is_tester)
         self.assertEqual(parsed.supplier_gender_hint, "men")

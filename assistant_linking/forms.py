@@ -31,11 +31,11 @@ class ParseTeachingForm(forms.Form):
     )
     CONCENTRATION_CHOICES = (
         ("", "Unknown"),
-        ("edp", "Eau de Parfum"),
-        ("edt", "Eau de Toilette"),
-        ("edc", "Eau de Cologne"),
-        ("parfum", "Parfum"),
-        ("extrait", "Extrait de Parfum"),
+        ("Eau de Parfum", "Eau de Parfum"),
+        ("Eau de Toilette", "Eau de Toilette"),
+        ("Eau de Cologne", "Eau de Cologne"),
+        ("Parfum", "Parfum"),
+        ("Extrait de Parfum", "Extrait de Parfum"),
     )
     AUDIENCE_CHOICES = (
         ("", "Unknown"),

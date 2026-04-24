@@ -34,16 +34,16 @@ COLUMN_ALIASES = {
 }
 
 CONCENTRATION_MAP = {
-    "eau de parfum": "edp",
-    "edp": "edp",
-    "eau de toilette": "edt",
-    "edt": "edt",
-    "eau de cologne": "edc",
-    "edc": "edc",
-    "parfum": "parfum",
-    "extrait": "extrait",
-    "extrait de parfum": "extrait",
-    "perfume oil": "perfume_oil",
+    "eau de parfum": "Eau de Parfum",
+    "edp": "Eau de Parfum",
+    "eau de toilette": "Eau de Toilette",
+    "edt": "Eau de Toilette",
+    "eau de cologne": "Eau de Cologne",
+    "edc": "Eau de Cologne",
+    "parfum": "Parfum",
+    "extrait": "Extrait de Parfum",
+    "extrait de parfum": "Extrait de Parfum",
+    "perfume oil": "Perfume Oil",
 }
 
 

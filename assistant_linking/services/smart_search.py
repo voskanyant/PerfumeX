@@ -17,11 +17,11 @@ AUDIENCE_SYNONYMS = {
 }
 
 CONCENTRATION_SYNONYMS = {
-    "edp": {"edp", "eau de parfum"},
-    "edt": {"edt", "eau de toilette"},
-    "edc": {"edc", "eau de cologne"},
-    "parfum": {"parfum", "perfume"},
-    "extrait": {"extrait", "extrait de parfum"},
+    "Eau de Parfum": {"edp", "eau de parfum"},
+    "Eau de Toilette": {"edt", "eau de toilette"},
+    "Eau de Cologne": {"edc", "eau de cologne"},
+    "Parfum": {"parfum", "perfume"},
+    "Extrait de Parfum": {"extrait", "extrait de parfum"},
 }
 
 NOISE_VARIANTS = {

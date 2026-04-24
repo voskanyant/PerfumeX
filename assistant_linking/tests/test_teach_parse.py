@@ -39,7 +39,7 @@ class TeachParseTests(TestCase):
                 "product_name": "Vanilla Extasy",
                 "product_excluded_terms": "",
                 "supplier_concentration_text": "edp",
-                "concentration": "edp",
+                "concentration": "Eau de Parfum",
                 "supplier_size_text": "100ml",
                 "size_ml": "100",
                 "supplier_audience_text": "",
@@ -59,7 +59,7 @@ class TeachParseTests(TestCase):
         parsed = ParsedSupplierProduct.objects.get(supplier_product=self.product)
         self.assertEqual(parsed.normalized_brand, brand)
         self.assertEqual(parsed.product_name_text, "Vanilla Extasy")
-        self.assertEqual(parsed.concentration, "edp")
+        self.assertEqual(parsed.concentration, "Eau de Parfum")
         self.assertEqual(parsed.size_ml, 100)
         self.assertEqual(parsed.raw_size_text, "100ml")
         self.assertEqual(parsed.variant_type, "standard")
@@ -77,7 +77,7 @@ class TeachParseTests(TestCase):
                 "product_name": "Light Blue",
                 "product_excluded_terms": "intense, love in capri",
                 "supplier_concentration_text": "eau de parfum",
-                "concentration": "edp",
+                "concentration": "Eau de Parfum",
                 "supplier_size_text": "100ml",
                 "size_ml": "100",
                 "supplier_audience_text": "",
@@ -113,7 +113,7 @@ class TeachParseTests(TestCase):
 
     def test_staff_can_accept_catalog_candidate_from_normalization(self):
         brand = Brand.objects.create(name="Montale")
-        perfume = Perfume.objects.create(brand=brand, name="Vanilla Extasy", concentration="edp")
+        perfume = Perfume.objects.create(brand=brand, name="Vanilla Extasy", concentration="Eau de Parfum")
         variant = PerfumeVariant.objects.create(perfume=perfume, size_ml="100", variant_type="standard")
 
         response = self.client.post(

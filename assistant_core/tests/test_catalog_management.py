@@ -18,7 +18,7 @@ class CatalogManagementTests(TestCase):
         self.user = User.objects.create_user(username="staff", password="pass", is_staff=True)
         self.client.force_login(self.user)
         self.brand = Brand.objects.create(name="Montale")
-        self.perfume = Perfume.objects.create(brand=self.brand, name="Vanilla Extasy", concentration="edp")
+        self.perfume = Perfume.objects.create(brand=self.brand, name="Vanilla Extasy", concentration="Eau de Parfum")
         self.variant = PerfumeVariant.objects.create(perfume=self.perfume, size_ml="100", variant_type="standard")
 
     def test_staff_can_search_catalogue_perfumes(self):
@@ -51,7 +51,7 @@ class CatalogManagementTests(TestCase):
         self.assertFalse(PerfumeVariant.objects.filter(pk=self.variant.pk).exists())
 
     def test_staff_can_merge_catalogue_perfumes(self):
-        duplicate = Perfume.objects.create(brand=self.brand, name="Vanilla Extasy", concentration="edp")
+        duplicate = Perfume.objects.create(brand=self.brand, name="Vanilla Extasy", concentration="Eau de Parfum")
         duplicate_variant = PerfumeVariant.objects.create(perfume=duplicate, size_ml="50", variant_type="standard")
 
         response = self.client.post(
@@ -89,7 +89,7 @@ class CatalogManagementTests(TestCase):
         brand = Brand.objects.get(name="Dolce & Gabbana")
         perfume = Perfume.objects.get(brand=brand, name="Light Blue")
         variant = PerfumeVariant.objects.get(perfume=perfume, size_ml="100.00")
-        self.assertEqual(perfume.concentration, "edt")
+        self.assertEqual(perfume.concentration, "Eau de Toilette")
         self.assertEqual(variant.variant_type, "travel_set")
         self.assertEqual(variant.sku, "DG-LB-100")
         self.assertTrue(variant.is_tester)

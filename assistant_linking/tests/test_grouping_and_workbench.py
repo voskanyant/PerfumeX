@@ -16,7 +16,7 @@ class GroupingWorkbenchTests(TestCase):
     def setUp(self):
         self.staff = User.objects.create_user(username="staff", password="pass", is_staff=True)
         self.brand = Brand.objects.create(name="Brand")
-        self.perfume = Perfume.objects.create(brand=self.brand, name="Hero", concentration="edp")
+        self.perfume = Perfume.objects.create(brand=self.brand, name="Hero", concentration="Eau de Parfum")
         self.s1 = Supplier.objects.create(name="S1", code="s1")
         self.s2 = Supplier.objects.create(name="S2", code="s2")
         self.p1 = SupplierProduct.objects.create(supplier=self.s1, identity_key="1", name="Brand Hero EDP 100ml")

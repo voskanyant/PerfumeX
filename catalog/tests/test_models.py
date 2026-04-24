@@ -6,7 +6,7 @@ from catalog.models import Brand, Perfume, PerfumeVariant
 class CatalogModelTests(TestCase):
     def test_brand_and_perfume_slugs_are_created(self):
         brand = Brand.objects.create(name="Dolce & Gabbana")
-        perfume = Perfume.objects.create(brand=brand, name="Light Blue", concentration="edt")
+        perfume = Perfume.objects.create(brand=brand, name="Light Blue", concentration="Eau de Toilette")
 
         self.assertTrue(brand.slug)
         self.assertTrue(perfume.slug)
@@ -21,7 +21,7 @@ class CatalogModelTests(TestCase):
 
     def test_variant_sku_is_generated_when_blank(self):
         brand = Brand.objects.create(name="Dolce & Gabbana")
-        perfume = Perfume.objects.create(brand=brand, name="Light Blue", concentration="edt")
+        perfume = Perfume.objects.create(brand=brand, name="Light Blue", concentration="Eau de Toilette")
 
         variant = PerfumeVariant.objects.create(perfume=perfume, size_ml="100.00", variant_type="standard")
 
