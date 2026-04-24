@@ -99,6 +99,10 @@ def _concentration(value: str) -> str:
     return CONCENTRATION_MAP.get(normalize_text(value), normalize_text(value))
 
 
+def _identity(value: str) -> str:
+    return normalize_text(value)
+
+
 def _variant_type_from_comments(value: str) -> str:
     text = normalize_text(value)
     if not text:
@@ -149,6 +153,24 @@ def read_catalog_rows(uploaded_file) -> list[dict]:
 def import_catalog_file(uploaded_file, *, create_aliases: bool = True, update_existing: bool = True) -> CatalogImportResult:
     result = CatalogImportResult()
     rows = read_catalog_rows(uploaded_file)
+    brand_cache = {_identity(brand.name): brand for brand in Brand.objects.all()}
+    perfume_cache = {
+        (perfume.brand_id, _identity(perfume.name), perfume.concentration or "", perfume.audience or ""): perfume
+        for perfume in Perfume.objects.select_related("brand").all()
+    }
+    variant_cache = {
+        (variant.perfume_id, variant.size_ml, variant.packaging or "", variant.variant_type or "", variant.is_tester): variant
+        for variant in PerfumeVariant.objects.all()
+    }
+    brand_alias_cache = {
+        (alias.brand_id, alias.supplier_id, _identity(alias.alias_text))
+        for alias in BrandAlias.objects.all()
+    }
+    product_alias_cache = {
+        (alias.brand_id, alias.perfume_id, alias.supplier_id, _identity(alias.alias_text))
+        for alias in ProductAlias.objects.all()
+    }
+
     for index, row in enumerate(rows, start=2):
         result.rows_seen += 1
         brand_name = _text(row, "brand")
@@ -157,11 +179,11 @@ def import_catalog_file(uploaded_file, *, create_aliases: bool = True, update_ex
             result.skipped_rows.append(f"Row {index}: missing brand or scent name")
             continue
 
-        brand, brand_created = Brand.objects.get_or_create(
-            name=brand_name,
-            defaults={"country_of_origin": _text(row, "country_of_origin")},
-        )
-        if brand_created:
+        brand_key = _identity(brand_name)
+        brand = brand_cache.get(brand_key)
+        if not brand:
+            brand = Brand.objects.create(name=brand_name, country_of_origin=_text(row, "country_of_origin"))
+            brand_cache[brand_key] = brand
             result.brands_created += 1
         elif update_existing and _text(row, "country_of_origin") and not brand.country_of_origin:
             brand.country_of_origin = _text(row, "country_of_origin")
@@ -171,7 +193,8 @@ def import_catalog_file(uploaded_file, *, create_aliases: bool = True, update_ex
         audience = normalize_text(_text(row, "audience"))
         comments = _text(row, "comments")
         collection_name = _text(row, "collection_name")
-        perfume = Perfume.objects.filter(brand=brand, name__iexact=perfume_name, concentration=concentration, audience=audience).first()
+        perfume_key = (brand.id, _identity(perfume_name), concentration, audience)
+        perfume = perfume_cache.get(perfume_key)
         if perfume:
             if update_existing:
                 perfume.collection_name = collection_name or perfume.collection_name
@@ -192,6 +215,7 @@ def import_catalog_file(uploaded_file, *, create_aliases: bool = True, update_ex
                 perfumer_name=_text(row, "perfumer_name"),
                 country_of_manufacture=_text(row, "country_of_manufacture"),
             )
+            perfume_cache[perfume_key] = perfume
             result.perfumes_created += 1
 
         size_ml = _decimal(_text(row, "size_ml"))
@@ -205,15 +229,19 @@ def import_catalog_file(uploaded_file, *, create_aliases: bool = True, update_ex
         )
         packaging = "" if raw_packaging == "tester" else raw_packaging
         if size_ml or packaging or variant_type or is_tester or _text(row, "sku") or _text(row, "ean"):
-            variant, variant_created = PerfumeVariant.objects.get_or_create(
-                perfume=perfume,
-                size_ml=size_ml,
-                packaging=packaging,
-                variant_type=variant_type,
-                is_tester=is_tester,
-                defaults={"sku": _text(row, "sku"), "ean": _text(row, "ean")},
-            )
-            if variant_created:
+            variant_key = (perfume.id, size_ml, packaging, variant_type, is_tester)
+            variant = variant_cache.get(variant_key)
+            if not variant:
+                variant = PerfumeVariant.objects.create(
+                    perfume=perfume,
+                    size_ml=size_ml,
+                    packaging=packaging,
+                    variant_type=variant_type,
+                    is_tester=is_tester,
+                    sku=_text(row, "sku"),
+                    ean=_text(row, "ean"),
+                )
+                variant_cache[variant_key] = variant
                 result.variants_created += 1
             elif update_existing:
                 variant.sku = _text(row, "sku") or variant.sku
@@ -222,26 +250,32 @@ def import_catalog_file(uploaded_file, *, create_aliases: bool = True, update_ex
                 result.variants_updated += 1
 
         if create_aliases:
-            _, created = BrandAlias.objects.get_or_create(
-                brand=brand,
-                supplier=None,
-                alias_text=brand_name,
-                defaults={"normalized_alias": normalize_text(brand_name), "priority": 50, "active": True},
-            )
-            result.aliases_created += int(created)
-            _, created = ProductAlias.objects.get_or_create(
-                brand=brand,
-                perfume=perfume,
-                supplier=None,
-                alias_text=perfume_name,
-                defaults={
-                    "canonical_text": perfume.name,
-                    "concentration": perfume.concentration,
-                    "audience": perfume.audience,
-                    "priority": 50,
-                    "active": True,
-                },
-            )
-            result.aliases_created += int(created)
+            brand_alias_key = (brand.id, None, _identity(brand_name))
+            if brand_alias_key not in brand_alias_cache:
+                BrandAlias.objects.create(
+                    brand=brand,
+                    supplier=None,
+                    alias_text=brand_name,
+                    normalized_alias=normalize_text(brand_name),
+                    priority=50,
+                    active=True,
+                )
+                brand_alias_cache.add(brand_alias_key)
+                result.aliases_created += 1
+            product_alias_key = (brand.id, perfume.id, None, _identity(perfume_name))
+            if product_alias_key not in product_alias_cache:
+                ProductAlias.objects.create(
+                    brand=brand,
+                    perfume=perfume,
+                    supplier=None,
+                    alias_text=perfume_name,
+                    canonical_text=perfume.name,
+                    concentration=perfume.concentration,
+                    audience=perfume.audience,
+                    priority=50,
+                    active=True,
+                )
+                product_alias_cache.add(product_alias_key)
+                result.aliases_created += 1
         result.rows_imported += 1
     return result
