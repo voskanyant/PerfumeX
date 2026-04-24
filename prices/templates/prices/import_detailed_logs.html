@@ -74,7 +74,7 @@
                 {% if runs_page.object_list %}
                     <div class="display-grid gap-md settings-row-full">
                         {% for run in runs_page.object_list %}
-                            <div class="run-log-card">
+                            <div class="run-log-card" id="run-{{ run.id }}">
                                 <div class="run-log-head">
                                     <div class="layout-column gap-xs">
                                         <strong>{{ run.supplier.name }}</strong>
@@ -147,7 +147,7 @@
                 {% if batches_page.object_list %}
                     <div class="display-grid gap-md settings-row-full">
                         {% for batch in batches_page.object_list %}
-                            <div class="run-log-card">
+                            <div class="run-log-card" id="batch-{{ batch.id }}">
                                 <div class="run-log-head">
                                     <div class="layout-column gap-xs">
                                         <strong>{{ batch.supplier.name }}</strong>

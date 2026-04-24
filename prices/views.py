@@ -111,6 +111,182 @@ def _imported_age_class(value) -> str:
     return "age-stale"
 
 
+def _format_local_datetime(value) -> str:
+    if not value:
+        return ""
+    dt = value
+    if timezone.is_naive(dt):
+        dt = timezone.make_aware(dt, timezone.get_current_timezone())
+    return timezone.localtime(dt).strftime("%d.%m.%Y %H:%M")
+
+
+def _batch_activity_datetime(batch):
+    if not batch:
+        return None
+    dt = batch.received_at or batch.created_at
+    if dt and timezone.is_naive(dt):
+        dt = timezone.make_aware(dt, timezone.get_current_timezone())
+    return dt
+
+
+def _run_activity_datetime(run):
+    if not run:
+        return None
+    dt = run.finished_at or run.started_at
+    if dt and timezone.is_naive(dt):
+        dt = timezone.make_aware(dt, timezone.get_current_timezone())
+    return dt
+
+
+def _build_import_batch_status(batch) -> dict[str, str]:
+    if not batch:
+        return {
+            "label": "never",
+            "class_name": "is-missing",
+            "note": "No imports yet",
+            "code": "missing",
+        }
+    if (batch.message_id or "").startswith(PRODUCT_REMOVED_EVENT_PREFIX):
+        return {
+            "label": "cleanup",
+            "class_name": "is-neutral",
+            "note": "System product cleanup event",
+            "code": "cleanup",
+        }
+    if batch.status == models.ImportStatus.PROCESSED:
+        note = "Imported from email" if batch.mailbox_id else "Manual upload or backfill"
+        return {
+            "label": "successful",
+            "class_name": "is-success",
+            "note": note,
+            "code": "successful",
+        }
+    if batch.status == models.ImportStatus.FAILED:
+        return {
+            "label": "error",
+            "class_name": "is-failed",
+            "note": batch.error_message or "Batch failed",
+            "code": "failed",
+        }
+    if batch.status == models.ImportStatus.PENDING:
+        return {
+            "label": "pending",
+            "class_name": "is-pending",
+            "note": "Import batch is waiting to process",
+            "code": "pending",
+        }
+    return {
+        "label": batch.status,
+        "class_name": "is-neutral",
+        "note": "",
+        "code": batch.status,
+    }
+
+
+def _build_email_run_status(run) -> dict[str, str | int | None]:
+    progress = None
+    if run and run.total_messages:
+        progress = int((run.processed_messages / run.total_messages) * 100)
+    if not run:
+        return {
+            "label": "idle",
+            "class_name": "is-neutral",
+            "note": "",
+            "code": "idle",
+            "progress": progress,
+        }
+    if run.status == models.EmailImportStatus.RUNNING:
+        if progress is not None:
+            note = f"{progress}% complete"
+        elif run.total_messages:
+            note = f"{run.processed_messages}/{run.total_messages} messages"
+        else:
+            note = "Checking mailbox"
+        return {
+            "label": "updating",
+            "class_name": "is-running",
+            "note": note,
+            "code": "running",
+            "progress": progress,
+        }
+    if run.status == models.EmailImportStatus.FINISHED:
+        if run.errors:
+            return {
+                "label": "issues",
+                "class_name": "is-warning",
+                "note": f"{run.errors} error(s) during import",
+                "code": "warning",
+                "progress": progress,
+            }
+        if not run.matched_files and not run.processed_files:
+            return {
+                "label": "no file",
+                "class_name": "is-warning",
+                "note": "No matching email files found",
+                "code": "no-files",
+                "progress": progress,
+            }
+        return {
+            "label": "successful",
+            "class_name": "is-success",
+            "note": f"{run.processed_files} file(s) imported",
+            "code": "successful",
+            "progress": progress,
+        }
+    if run.status == models.EmailImportStatus.FAILED:
+        return {
+            "label": "error",
+            "class_name": "is-failed",
+            "note": run.last_message or "Email import failed",
+            "code": "failed",
+            "progress": progress,
+        }
+    if run.status == models.EmailImportStatus.CANCELED:
+        return {
+            "label": "canceled",
+            "class_name": "is-neutral",
+            "note": run.last_message or "Canceled by user",
+            "code": "canceled",
+            "progress": progress,
+        }
+    return {
+        "label": run.status,
+        "class_name": "is-neutral",
+        "note": "",
+        "code": run.status,
+        "progress": progress,
+    }
+
+
+def _build_supplier_import_status(run, batch) -> dict[str, str | int | None]:
+    batch_dt = _batch_activity_datetime(batch)
+    run_dt = _run_activity_datetime(run)
+    if run and (
+        run.status == models.EmailImportStatus.RUNNING
+        or not batch_dt
+        or (run_dt and run_dt >= batch_dt)
+    ):
+        return _build_email_run_status(run)
+    return _build_import_batch_status(batch)
+
+
+def _supplier_log_url(supplier_id: int, run=None, batch=None) -> str:
+    base_url = str(reverse_lazy("prices:import_detailed_logs"))
+    query = urlencode({"supplier": supplier_id})
+    anchor = ""
+    batch_dt = _batch_activity_datetime(batch)
+    run_dt = _run_activity_datetime(run)
+    if run and (
+        run.status == models.EmailImportStatus.RUNNING
+        or not batch_dt
+        or (run_dt and run_dt >= batch_dt)
+    ):
+        anchor = f"#run-{run.id}"
+    elif batch:
+        anchor = f"#batch-{batch.id}"
+    return f"{base_url}?{query}{anchor}"
+
+
 def _normalize_exclude_terms(raw: str) -> str:
     text = (raw or "").replace(";", "\n").replace(",", "\n")
     terms = []
@@ -752,19 +928,65 @@ class SupplierOverviewView(LoginRequiredMixin, TemplateView):
                 batch.row_class = ""
         for supplier in suppliers:
             run = latest_runs.get(supplier.id)
-            progress = None
-            if run and run.total_messages:
-                progress = int((run.processed_messages / run.total_messages) * 100)
+            latest_import = latest_imports.get(supplier.id)
+            latest_import_at = _batch_activity_datetime(latest_import)
+            status_meta = _build_supplier_import_status(run, latest_import)
+            status_note = status_meta.get("note") or ""
+            if not supplier.from_address_pattern:
+                status_note = "Email route is not configured"
             rows.append(
                 {
                     "supplier": supplier,
-                    "latest_import": latest_imports.get(supplier.id),
+                    "latest_import": latest_import,
+                    "latest_import_relative": (
+                        _short_relative_datetime(latest_import_at) if latest_import_at else "Never"
+                    ),
+                    "latest_import_full": _format_local_datetime(latest_import_at),
+                    "latest_import_age_class": (
+                        _imported_age_class(latest_import_at) if latest_import_at else "age-stale"
+                    ),
                     "latest_run": run,
-                    "latest_run_progress": progress,
+                    "latest_run_progress": status_meta.get("progress"),
                     "is_running": run and run.status == models.EmailImportStatus.RUNNING,
+                    "status_label": status_meta["label"],
+                    "status_class": status_meta["class_name"],
+                    "status_note": status_note,
+                    "status_code": status_meta["code"],
+                    "has_email_route": bool(supplier.from_address_pattern),
+                    "latest_log_url": _supplier_log_url(supplier.id, run=run, batch=latest_import),
                 }
             )
+        fresh_count = 0
+        stale_count = 0
+        never_count = 0
+        running_count = 0
+        attention_count = 0
+        for row in rows:
+            if row["latest_import"]:
+                if row["latest_import_age_class"] == "age-fresh":
+                    fresh_count += 1
+                elif row["latest_import_age_class"] == "age-stale":
+                    stale_count += 1
+            else:
+                never_count += 1
+            if row["is_running"]:
+                running_count += 1
+            if (
+                not row["has_email_route"]
+                or not row["latest_import"]
+                or row["latest_import_age_class"] == "age-stale"
+                or row["status_code"] in {"failed", "warning", "no-files", "pending"}
+            ):
+                attention_count += 1
         context["rows"] = rows
+        context["supplier_summary"] = {
+            "total": len(rows),
+            "fresh": fresh_count,
+            "stale": stale_count,
+            "never": never_count,
+            "running": running_count,
+            "attention": attention_count,
+        }
         context["import_batches"] = log_page
         context["import_log_page"] = log_page
         context["any_running"] = models.EmailImportRun.objects.filter(
@@ -1755,12 +1977,36 @@ class SupplierEmailImportStatusAllView(LoginRequiredMixin, View):
                 latest[run.supplier_id] = {
                     "status": run.status,
                     "progress": progress,
+                    "total_messages": run.total_messages,
+                    "processed_messages": run.processed_messages,
+                    "matched_files": run.matched_files,
                     "processed_files": run.processed_files,
                     "errors": run.errors,
                     "last_message": run.last_message,
                     "detailed_log": detailed_log_tail,
                 }
-        return JsonResponse({"runs": latest})
+        imports = {}
+        batches = (
+            models.ImportBatch.objects.select_related("supplier", "mailbox")
+            .order_by("-created_at")
+        )
+        for batch in batches:
+            if batch.supplier_id in imports:
+                continue
+            batch_dt = _batch_activity_datetime(batch)
+            if (batch.message_id or "").startswith(PRODUCT_REMOVED_EVENT_PREFIX):
+                import_note = "System product cleanup"
+            elif batch.mailbox_id:
+                import_note = "Email import"
+            else:
+                import_note = "Manual upload / backfill"
+            imports[batch.supplier_id] = {
+                "relative": _short_relative_datetime(batch_dt) if batch_dt else "Never",
+                "full": _format_local_datetime(batch_dt),
+                "age_class": _imported_age_class(batch_dt) if batch_dt else "age-stale",
+                "note": import_note,
+            }
+        return JsonResponse({"runs": latest, "imports": imports})
 
 
 class SupplierEmailImportCancelView(LoginRequiredMixin, View):
