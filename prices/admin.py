@@ -43,13 +43,15 @@ class SupplierProductAdmin(admin.ModelAdmin):
         "supplier",
         "supplier_sku",
         "name",
+        "catalog_perfume",
+        "catalog_variant",
         "currency",
         "current_price",
         "current_stock",
         "last_imported_at",
         "is_active",
     )
-    search_fields = ("supplier__name", "supplier_sku", "name", "brand")
+    search_fields = ("supplier__name", "supplier_sku", "name", "brand", "catalog_perfume__name", "catalog_perfume__brand__name")
     list_filter = ("supplier", "currency", "is_active")
 
 

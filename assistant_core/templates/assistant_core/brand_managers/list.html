@@ -1,0 +1,15 @@
+{% extends "prices/base.html" %}
+{% block title %}Brand Managers{% endblock %}
+{% block topbar_label %}Assistant / Brand Managers{% endblock %}
+{% block content %}
+<div class="page-head"><div><span class="page-kicker">Assistant</span><h1 class="page-title">Brand Managers</h1></div><a class="button primary" href="{% url 'assistant_core:brand_manager_create' %}">New profile</a></div>
+<div class="page-grid-3">
+{% for profile in profiles %}
+    <a class="metric-card" href="{% url 'assistant_core:brand_manager_detail' profile.pk %}">
+        <div class="metric-label">{{ profile.watch_frequency }}</div>
+        <div class="kpi-link-title">{{ profile.brand.name }}</div>
+        <div class="metric-meta">Last run {{ profile.last_success_at|default:"never" }}</div>
+    </a>
+{% empty %}<div class="workspace-block">No brand watch profiles.</div>{% endfor %}
+</div>
+{% endblock %}

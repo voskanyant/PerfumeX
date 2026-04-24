@@ -47,6 +47,9 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'catalog',
+    'assistant_core',
+    'assistant_linking',
     'prices',
 ]
 
@@ -154,3 +157,8 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 LOGIN_URL = "login"
 LOGIN_REDIRECT_URL = "viewer_home"
 LOGOUT_REDIRECT_URL = "login"
+
+ASSISTANT_USE_OPENAI = os.getenv("ASSISTANT_USE_OPENAI", "false").lower() in {"1", "true", "yes", "on"}
+OPENAI_MODEL_SUGGESTION = os.getenv("OPENAI_MODEL_SUGGESTION", "gpt-5.4-mini")
+OPENAI_MODEL_RESEARCH = os.getenv("OPENAI_MODEL_RESEARCH", "gpt-5.4")
+OPENAI_MODEL_WRITER = os.getenv("OPENAI_MODEL_WRITER", "gpt-5.4-mini")

@@ -127,6 +127,22 @@ class SupplierProduct(models.Model):
     our_product = models.ForeignKey(
         "OurProduct", on_delete=models.SET_NULL, null=True, blank=True
     )
+    catalog_perfume = models.ForeignKey(
+        "catalog.Perfume",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="supplier_products",
+        db_index=True,
+    )
+    catalog_variant = models.ForeignKey(
+        "catalog.PerfumeVariant",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="supplier_products",
+        db_index=True,
+    )
     supplier = models.ForeignKey(Supplier, on_delete=models.CASCADE)
     supplier_sku = models.CharField(max_length=200, blank=True)
     identity_key = models.CharField(max_length=255, db_index=True, blank=True)

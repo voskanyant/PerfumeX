@@ -53,6 +53,10 @@
 
             <div class="sidebar-section">
                 <div class="sidebar-section-label">Warehouse</div>
+                <a href="{% url 'assistant_core:dashboard' %}" class="sidebar-link {% if request.resolver_match.namespace == 'assistant_core' or request.resolver_match.namespace == 'assistant_linking' %}active{% endif %}">
+                    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M8 1.5v13"/><path d="M2.5 5.5h11"/><path d="M3.5 11.5h9"/><circle cx="8" cy="5.5" r="2"/><circle cx="8" cy="11.5" r="2"/></svg>
+                    <span>Assistant</span>
+                </a>
                 <a href="{% url 'prices:our_product_list' %}" class="sidebar-link {% if request.resolver_match.url_name == 'our_product_list' or request.resolver_match.url_name == 'our_product_detail' or request.resolver_match.url_name == 'our_product_create' or request.resolver_match.url_name == 'our_product_update' %}active{% endif %}">
                     <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M2 5 8 2l6 3v6l-6 3-6-3V5Z"/><path d="M2 5l6 3 6-3"/></svg>
                     <span>Our Products</span>
@@ -192,6 +196,10 @@
                     <span>Import Prices</span>
                 </a>
                 <div class="sidebar-section-label">Warehouse</div>
+                <a href="{% url 'assistant_core:dashboard' %}" class="sidebar-link {% if request.resolver_match.namespace == 'assistant_core' or request.resolver_match.namespace == 'assistant_linking' %}active{% endif %}">
+                    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M8 1.5v13"/><path d="M2.5 5.5h11"/><path d="M3.5 11.5h9"/><circle cx="8" cy="5.5" r="2"/><circle cx="8" cy="11.5" r="2"/></svg>
+                    <span>Assistant</span>
+                </a>
                 <a href="{% url 'prices:our_product_list' %}" class="sidebar-link {% if request.resolver_match.url_name == 'our_product_list' or request.resolver_match.url_name == 'our_product_detail' or request.resolver_match.url_name == 'our_product_create' or request.resolver_match.url_name == 'our_product_update' %}active{% endif %}">
                     <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M2 5 8 2l6 3v6l-6 3-6-3V5Z"/><path d="M2 5l6 3 6-3"/></svg>
                     <span>Our Products</span>

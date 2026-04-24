@@ -23,6 +23,23 @@ The system handles five main jobs:
 4. Link supplier products to `OurProduct` records for internal catalog grouping.
 5. Provide search, filtering, history, and audit screens for operators and regular logged-in users.
 
+## Assistant Rollout
+
+The staff-only assistant workspace lives under `/admin/assistant/`. It adds review queues for catalogue
+normalisation, cross-supplier linking, visible teaching rules, brand-watch research, fact claims, and AI
+drafts. The assistant never publishes catalogue data automatically and never overwrites existing assistant
+links unless a staff action explicitly confirms that behavior.
+
+OpenAI integration is gated by environment:
+
+- `ASSISTANT_USE_OPENAI=false` by default
+- `OPENAI_API_KEY`
+- `OPENAI_MODEL_SUGGESTION`
+- `OPENAI_MODEL_RESEARCH`
+- `OPENAI_MODEL_WRITER`
+
+When OpenAI is disabled or unavailable, the assistant falls back to deterministic/mock services.
+
 ## Main Surfaces
 
 ### Public / viewer-facing

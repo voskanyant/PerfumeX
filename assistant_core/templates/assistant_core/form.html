@@ -1,0 +1,19 @@
+{% extends "prices/base.html" %}
+{% block title %}Assistant Form{% endblock %}
+{% block topbar_label %}Assistant{% endblock %}
+{% block content %}
+<div class="page-head">
+    <div>
+        <span class="page-kicker">Assistant</span>
+        <h1 class="page-title">Edit review record</h1>
+    </div>
+</div>
+<div class="workspace-block form-shell">
+    <form method="post">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button class="button primary" type="submit">Save</button>
+        <a class="button ghost" href="{% url 'assistant_core:dashboard' %}">Cancel</a>
+    </form>
+</div>
+{% endblock %}

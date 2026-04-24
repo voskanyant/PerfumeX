@@ -26,6 +26,8 @@ urlpatterns = [
     path("products/search/", price_views.ViewerProductSearchView.as_view(), name="viewer_product_search"),
     path("products/<int:pk>/", price_views.ViewerProductDetailView.as_view(), name="viewer_product_detail"),
     path("account/profile/", price_views.UserProfileUpdateView.as_view(), name="user_profile"),
+    path("admin/assistant/", include(("assistant_core.urls", "assistant_core"), namespace="assistant_core")),
+    path("admin/assistant/", include(("assistant_linking.urls", "assistant_linking"), namespace="assistant_linking")),
     path("admin/", include("prices.urls")),
     path("django-admin/", admin.site.urls),
     path("accounts/", include("django.contrib.auth.urls")),

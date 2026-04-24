@@ -1,0 +1,22 @@
+{
+  "sources": [
+    {
+      "url": "https://example.com/official",
+      "title": "Official brand fixture",
+      "source_type": "official",
+      "summary": "Fixture source for mock brand research.",
+      "facts": {"collection": "Fixture"}
+    }
+  ],
+  "changes": [
+    {
+      "change_type": "missing_field",
+      "field_name": "official_url",
+      "old_value": {},
+      "new_value": {"value": "https://example.com/official"},
+      "confidence": 80,
+      "source_urls": ["https://example.com/official"],
+      "explanation": "Fixture detected a missing official URL."
+    }
+  ]
+}

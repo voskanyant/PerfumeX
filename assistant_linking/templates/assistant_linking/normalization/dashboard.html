@@ -1,0 +1,15 @@
+{% extends "prices/base.html" %}
+{% block title %}Normalisation{% endblock %}
+{% block topbar_label %}Assistant / Normalisation{% endblock %}
+{% block content %}
+<div class="page-head">
+    <div><span class="page-kicker">Assistant</span><h1 class="page-title">Normalisation</h1></div>
+    <form method="post" action="{% url 'assistant_linking:rebuild_groups' %}">{% csrf_token %}<button class="button ghost">Rebuild groups</button></form>
+</div>
+<div class="page-grid-3">
+    <a class="metric-card" href="{% url 'assistant_linking:normalization_unparsed' %}"><div class="metric-label">Unparsed</div><div class="metric-value">{{ unparsed_count }}</div></a>
+    <a class="metric-card" href="{% url 'assistant_linking:normalization_low_confidence' %}"><div class="metric-label">Low confidence</div><div class="metric-value">{{ low_confidence_count }}</div></a>
+    <div class="metric-card"><div class="metric-label">Parsed</div><div class="metric-value">{{ parsed_count }}</div></div>
+</div>
+<div class="workspace-block space-top-md"><table class="data-table"><tbody>{% for parsed in recent %}<tr><td><a href="{% url 'assistant_linking:normalization_detail' parsed.supplier_product_id %}">{{ parsed.supplier_product }}</a></td><td>{{ parsed.normalized_brand }}</td><td>{{ parsed.product_name_text }}</td><td>{{ parsed.confidence }}</td></tr>{% empty %}<tr><td>No parsed rows.</td></tr>{% endfor %}</tbody></table></div>
+{% endblock %}

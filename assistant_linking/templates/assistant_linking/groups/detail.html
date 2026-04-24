@@ -1,0 +1,12 @@
+{% extends "prices/base.html" %}
+{% block title %}Match Group{% endblock %}
+{% block content %}
+<div class="page-head"><div><span class="page-kicker">Group</span><h1 class="page-title">{{ group.canonical_name }}</h1><div class="page-meta">{{ group.group_key }}</div></div></div>
+<form method="post" action="{% url 'assistant_linking:group_action' group.pk 'exclude' %}" class="workspace-block">{% csrf_token %}
+<div class="run-log-meta"><span>{{ group.normalized_brand }}</span><span>{{ group.concentration }}</span><span>{{ group.size_ml }} ml</span><span>{{ group.status }}</span></div>
+<table class="data-table"><tbody>{% for item in items %}<tr><td><input type="checkbox" name="item_ids" value="{{ item.pk }}"></td><td>{{ item.supplier_product.supplier }}</td><td><a href="{% url 'assistant_linking:product_workbench' item.supplier_product_id %}">{{ item.supplier_product.name }}</a></td><td>{{ item.supplier_product.is_active|yesno:"active,inactive" }}</td><td>{{ item.role }}</td><td>{{ item.supplier_product.catalog_perfume|default:"unlinked" }}</td></tr>{% empty %}<tr><td>No rows.</td></tr>{% endfor %}</tbody></table>
+<textarea name="reason" rows="3" placeholder="Reason"></textarea>
+<button class="button ghost" type="submit">Exclude selected</button>
+<button class="button ghost" formaction="{% url 'assistant_linking:group_action' group.pk 'split' %}">Split selected</button>
+</form>
+{% endblock %}

@@ -1,0 +1,38 @@
+from django.contrib.auth import get_user_model
+from django.test import TestCase
+
+from assistant_core.models import BrandWatchProfile, DetectedChange, GlobalRule, KnowledgeNote, SupplierRule
+from assistant_core.services.context_builder import build_assistant_context
+from assistant_core.services.mock_brand_research import run_mock_brand_watch
+from catalog.models import Brand
+from prices.models import Supplier, SupplierProduct
+
+
+User = get_user_model()
+
+
+class KnowledgeResearchTests(TestCase):
+    def test_context_builder_includes_only_approved_active_rules(self):
+        supplier = Supplier.objects.create(name="Supplier", code="sup")
+        product = SupplierProduct.objects.create(supplier=supplier, identity_key="1", name="Name")
+        GlobalRule.objects.create(title="yes", rule_kind="linking", scope_type="global", rule_text="use", approved=True, active=True)
+        GlobalRule.objects.create(title="no", rule_kind="linking", scope_type="global", rule_text="ignore", approved=False, active=True)
+        SupplierRule.objects.create(supplier=supplier, title="supplier", rule_kind="linking", rule_text="use", approved=True, active=True)
+        KnowledgeNote.objects.create(category="brand", title="note", content="visible", supplier=supplier, active=True)
+
+        context = build_assistant_context(supplier_product_id=product.id)
+
+        self.assertEqual([rule["title"] for rule in context["global_rules"]], ["yes"])
+        self.assertEqual([rule["title"] for rule in context["supplier_rules"]], ["supplier"])
+        self.assertEqual(len(context["knowledge_notes"]), 1)
+
+    def test_mock_brand_watch_creates_review_records_without_mutating_brand(self):
+        brand = Brand.objects.create(name="Fixture Brand", official_url="")
+        profile = BrandWatchProfile.objects.create(brand=brand, official_url="https://example.com")
+
+        job = run_mock_brand_watch(profile.id)
+        brand.refresh_from_db()
+
+        self.assertEqual(job.status, "finished")
+        self.assertEqual(DetectedChange.objects.filter(brand_profile=profile).count(), 1)
+        self.assertEqual(brand.official_url, "")

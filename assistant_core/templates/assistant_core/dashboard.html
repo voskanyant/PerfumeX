@@ -1,0 +1,40 @@
+{% extends "prices/base.html" %}
+{% block title %}Assistant{% endblock %}
+{% block topbar_label %}Assistant{% endblock %}
+{% block content %}
+<div class="page-head">
+    <div>
+        <span class="page-kicker">Assistant</span>
+        <h1 class="page-title">Assistant control room</h1>
+        <div class="page-meta">Staff-only review queues for catalogue, linking, research, and drafts.</div>
+    </div>
+</div>
+<div class="workspace-block">
+    <strong>Safety mode:</strong> no catalogue changes are published automatically. Assistant actions create suggestions only.
+</div>
+<div class="page-grid-3 space-top-md">
+    {% for title, route, count in cards %}
+    <a class="metric-card kpi-link-card" href="{% url route %}">
+        <div class="metric-label">{{ title }}</div>
+        <div class="metric-value">{{ count }}</div>
+        <div class="metric-meta">Open records</div>
+    </a>
+    {% endfor %}
+</div>
+<div class="workspace-block space-top-md">
+    <div class="run-log-summary">
+        <span>Pending approvals: {{ pending_approvals }}</span>
+        <span>Low-confidence parses: {{ low_confidence }}</span>
+    </div>
+    <h3 class="kpi-link-title space-top-sm">Recent manual decisions</h3>
+    <table class="data-table">
+        <tbody>
+        {% for decision in recent_decisions %}
+            <tr><td>{{ decision.supplier_product }}</td><td>{{ decision.decision_type }}</td><td>{{ decision.created_at }}</td></tr>
+        {% empty %}
+            <tr><td>No decisions yet.</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}
