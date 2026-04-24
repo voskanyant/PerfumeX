@@ -8,7 +8,7 @@
         <div class="page-meta">{{ product.supplier }} &middot; {{ product.supplier_sku }}</div>
     </div>
     <div class="page-actions">
-        <a class="button ghost" href="{% url 'assistant_linking:normalization_low_confidence' %}">Back</a>
+        <a class="button ghost" href="{% url 'assistant_linking:normalization_dashboard' %}">Back</a>
         <form method="post" action="{% url 'assistant_linking:normalization_reparse' product.pk %}">
             {% csrf_token %}
             <button class="button ghost">Reparse</button>
