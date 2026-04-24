@@ -1,3 +1,66 @@
 {% extends "prices/base.html" %}
 {% block title %}Low Confidence Parses{% endblock %}
-{% block content %}<div class="page-head"><div><span class="page-kicker">Normalisation</span><h1 class="page-title">Low-confidence parses</h1></div><a class="button ghost" href="{% url 'assistant_linking:normalization_dashboard' %}">Back</a></div><div class="workspace-block"><table class="data-table"><tbody>{% for parsed in parses %}<tr><td>{{ parsed.supplier_product.supplier }}</td><td><a href="{% url 'assistant_linking:normalization_detail' parsed.supplier_product_id %}">{{ parsed.supplier_product.name }}</a></td><td>{{ parsed.confidence }}</td><td>{{ parsed.warnings|join:", " }}</td></tr>{% empty %}<tr><td>No low-confidence rows.</td></tr>{% endfor %}</tbody></table></div>{% endblock %}
+{% block content %}
+<div class="page-head">
+    <div>
+        <span class="page-kicker">Normalisation</span>
+        <h1 class="page-title">Low-confidence parses</h1>
+    </div>
+    <a class="button ghost" href="{% url 'assistant_linking:normalization_dashboard' %}">Back</a>
+</div>
+
+<div class="workspace-block">
+    <form method="get" class="page-actions">
+        <input
+            type="search"
+            name="q"
+            value="{{ search_query }}"
+            placeholder="{{ search_placeholder }}"
+            class="form-control"
+        >
+        <button class="button ghost" type="submit">Search</button>
+        {% if search_query %}
+            <a class="button ghost" href="{% url 'assistant_linking:normalization_low_confidence' %}">Reset</a>
+        {% endif %}
+    </form>
+</div>
+
+<div class="workspace-block space-top-md">
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Supplier</th>
+                <th>Product</th>
+                <th>Parsed</th>
+                <th>Flags</th>
+                <th>Confidence</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for parsed in parses %}
+            <tr>
+                <td>{{ parsed.supplier_product.supplier }}</td>
+                <td><a href="{% url 'assistant_linking:normalization_detail' parsed.supplier_product_id %}">{{ parsed.supplier_product.name }}</a></td>
+                <td>{{ parsed.normalized_brand|default:parsed.detected_brand_text }} / {{ parsed.product_name_text }} / {{ parsed.concentration }} / {{ parsed.size_ml }}</td>
+                <td>{{ parsed.warnings|join:", " }}</td>
+                <td>{{ parsed.confidence }}</td>
+            </tr>
+        {% empty %}
+            <tr><td colspan="5">No low-confidence rows.</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% if page_obj and page_obj.paginator.num_pages > 1 %}
+<nav class="workspace-pagination" aria-label="Pagination">
+    {% if page_obj.has_previous %}
+        <a class="workspace-page-link" href="?{% if search_query %}q={{ search_query|urlencode }}&amp;{% endif %}page={{ page_obj.previous_page_number }}">Previous</a>
+    {% endif %}
+    <span class="workspace-page-status">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+    {% if page_obj.has_next %}
+        <a class="workspace-page-link" href="?{% if search_query %}q={{ search_query|urlencode }}&amp;{% endif %}page={{ page_obj.next_page_number }}">Next</a>
+    {% endif %}
+</nav>
+{% endif %}
+{% endblock %}

@@ -16,6 +16,38 @@ from assistant_linking.services.normalizer import save_parse
 from assistant_linking.services.smart_search import normalize_query
 from catalog.models import Brand, Perfume, PerfumeVariant
 from prices.models import SupplierProduct
+from prices.services.product_visibility import (
+    apply_hidden_product_keywords,
+    get_hidden_product_keywords_for_user,
+)
+
+
+SUPPLIER_PRODUCT_HIDDEN_FIELDS = ("name", "brand", "supplier_sku")
+PARSED_PRODUCT_HIDDEN_FIELDS = (
+    "supplier_product__name",
+    "supplier_product__brand",
+    "supplier_product__supplier_sku",
+)
+
+
+def _hidden_product_keywords(request) -> list[str]:
+    return get_hidden_product_keywords_for_user(request.user)
+
+
+def _hide_supplier_products(queryset, request):
+    return apply_hidden_product_keywords(
+        queryset,
+        _hidden_product_keywords(request),
+        fields=SUPPLIER_PRODUCT_HIDDEN_FIELDS,
+    )
+
+
+def _hide_parsed_products(queryset, request):
+    return apply_hidden_product_keywords(
+        queryset,
+        _hidden_product_keywords(request),
+        fields=PARSED_PRODUCT_HIDDEN_FIELDS,
+    )
 
 
 class StaffAssistantMixin(LoginRequiredMixin, UserPassesTestMixin):
@@ -27,37 +59,112 @@ class NormalizationDashboardView(StaffAssistantMixin, TemplateView):
     template_name = "assistant_linking/normalization/dashboard.html"
 
     def get_context_data(self, **kwargs):
+        hidden_keywords = _hidden_product_keywords(self.request)
+        parsed_queryset = _hide_parsed_products(
+            models.ParsedSupplierProduct.objects.all(),
+            self.request,
+        )
+        unparsed_queryset = _hide_supplier_products(
+            SupplierProduct.objects.all(),
+            self.request,
+        )
         return {
             **super().get_context_data(**kwargs),
-            "parsed_count": models.ParsedSupplierProduct.objects.count(),
-            "unparsed_count": SupplierProduct.objects.filter(assistant_parse__isnull=True).count(),
-            "low_confidence_count": models.ParsedSupplierProduct.objects.filter(confidence__lt=75).count(),
-            "missing_brand_count": models.ParsedSupplierProduct.objects.filter(normalized_brand__isnull=True).count(),
-            "missing_size_count": models.ParsedSupplierProduct.objects.filter(size_ml__isnull=True).count(),
-            "modifier_count": models.ParsedSupplierProduct.objects.exclude(modifiers=[]).count(),
-            "tester_sample_count": models.ParsedSupplierProduct.objects.filter(Q(is_tester=True) | Q(is_sample=True) | Q(is_travel=True) | Q(is_set=True)).count(),
-            "recent": models.ParsedSupplierProduct.objects.select_related("supplier_product", "normalized_brand").order_by("-updated_at")[:20],
+            "parsed_count": parsed_queryset.count(),
+            "unparsed_count": unparsed_queryset.filter(assistant_parse__isnull=True).count(),
+            "low_confidence_count": parsed_queryset.filter(confidence__lt=75).count(),
+            "missing_brand_count": parsed_queryset.filter(normalized_brand__isnull=True).count(),
+            "missing_size_count": parsed_queryset.filter(size_ml__isnull=True).count(),
+            "modifier_count": parsed_queryset.exclude(modifiers=[]).count(),
+            "tester_sample_count": parsed_queryset.filter(
+                Q(is_tester=True) | Q(is_sample=True) | Q(is_travel=True) | Q(is_set=True)
+            ).count(),
+            "recent": parsed_queryset.select_related("supplier_product", "normalized_brand").order_by("-updated_at")[:20],
+            "hidden_keywords_active": bool(hidden_keywords),
         }
 
 
-class UnparsedListView(StaffAssistantMixin, ListView):
+class NormalizationSearchMixin:
+    search_param = "q"
+    search_placeholder = "Search supplier, product, brand, or SKU"
+
+    def get_search_query(self):
+        return self.request.GET.get(self.search_param, "").strip()
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["search_query"] = self.get_search_query()
+        context["search_placeholder"] = self.search_placeholder
+        return context
+
+
+class UnparsedListView(NormalizationSearchMixin, StaffAssistantMixin, ListView):
     model = SupplierProduct
     template_name = "assistant_linking/normalization/product_list.html"
     context_object_name = "products"
     paginate_by = 100
 
     def get_queryset(self):
-        return SupplierProduct.objects.select_related("supplier").filter(assistant_parse__isnull=True).order_by("supplier__name", "name")
+        queryset = SupplierProduct.objects.select_related("supplier").filter(assistant_parse__isnull=True)
+        query = self.get_search_query()
+        if query:
+            queryset = queryset.filter(
+                Q(supplier__name__icontains=query)
+                | Q(name__icontains=query)
+                | Q(brand__icontains=query)
+                | Q(size__icontains=query)
+                | Q(supplier_sku__icontains=query)
+            )
+        queryset = _hide_supplier_products(queryset, self.request)
+        return queryset.order_by("supplier__name", "name")
 
 
-class LowConfidenceListView(StaffAssistantMixin, ListView):
+class LowConfidenceListView(NormalizationSearchMixin, StaffAssistantMixin, ListView):
     model = models.ParsedSupplierProduct
     template_name = "assistant_linking/normalization/low_confidence.html"
     context_object_name = "parses"
     paginate_by = 100
 
     def get_queryset(self):
-        return models.ParsedSupplierProduct.objects.select_related("supplier_product", "supplier_product__supplier", "normalized_brand").filter(confidence__lt=75).order_by("confidence")
+        queryset = models.ParsedSupplierProduct.objects.select_related(
+            "supplier_product",
+            "supplier_product__supplier",
+            "normalized_brand",
+        ).filter(confidence__lt=75)
+        query = self.get_search_query()
+        if query:
+            queryset = queryset.filter(
+                Q(supplier_product__supplier__name__icontains=query)
+                | Q(supplier_product__name__icontains=query)
+                | Q(supplier_product__supplier_sku__icontains=query)
+                | Q(supplier_product__brand__icontains=query)
+                | Q(normalized_brand__name__icontains=query)
+                | Q(detected_brand_text__icontains=query)
+                | Q(product_name_text__icontains=query)
+                | Q(concentration__icontains=query)
+            )
+        queryset = _hide_parsed_products(queryset, self.request)
+        return queryset.order_by("confidence", "supplier_product__supplier__name", "supplier_product__name")
+
+    def parse_matches_view(self, parsed):
+        return parsed.confidence < 75
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        page_obj = context.get("page_obj")
+        if not page_obj:
+            return context
+
+        refreshed = []
+        for stored_parse in list(page_obj.object_list):
+            refreshed_parse = save_parse(stored_parse.supplier_product)
+            if self.parse_matches_view(refreshed_parse):
+                refreshed.append(refreshed_parse)
+
+        page_obj.object_list = refreshed
+        context["object_list"] = refreshed
+        context[self.context_object_name] = refreshed
+        return context
 
 
 class NormalizationIssueListView(LowConfidenceListView):
@@ -72,28 +179,92 @@ class MissingBrandListView(NormalizationIssueListView):
     issue_title = "Missing brand"
 
     def get_queryset(self):
-        return models.ParsedSupplierProduct.objects.select_related("supplier_product", "supplier_product__supplier", "normalized_brand").filter(normalized_brand__isnull=True).order_by("supplier_product__name")
+        queryset = models.ParsedSupplierProduct.objects.select_related(
+            "supplier_product",
+            "supplier_product__supplier",
+            "normalized_brand",
+        ).filter(normalized_brand__isnull=True)
+        queryset = _hide_parsed_products(queryset, self.request)
+        return queryset.order_by("supplier_product__name")
+
+    def parse_matches_view(self, parsed):
+        return parsed.normalized_brand_id is None
 
 
 class MissingSizeListView(NormalizationIssueListView):
     issue_title = "Missing or ambiguous size"
 
     def get_queryset(self):
-        return models.ParsedSupplierProduct.objects.select_related("supplier_product", "supplier_product__supplier", "normalized_brand").filter(size_ml__isnull=True).order_by("supplier_product__name")
+        queryset = models.ParsedSupplierProduct.objects.select_related(
+            "supplier_product",
+            "supplier_product__supplier",
+            "normalized_brand",
+        ).filter(size_ml__isnull=True)
+        queryset = _hide_parsed_products(queryset, self.request)
+        return queryset.order_by("supplier_product__name")
+
+    def parse_matches_view(self, parsed):
+        return parsed.size_ml is None
 
 
 class TesterSampleListView(NormalizationIssueListView):
     issue_title = "Tester, sample, travel, and set rows"
 
     def get_queryset(self):
-        return models.ParsedSupplierProduct.objects.select_related("supplier_product", "supplier_product__supplier", "normalized_brand").filter(Q(is_tester=True) | Q(is_sample=True) | Q(is_travel=True) | Q(is_set=True)).order_by("supplier_product__name")
+        queryset = models.ParsedSupplierProduct.objects.select_related(
+            "supplier_product",
+            "supplier_product__supplier",
+            "normalized_brand",
+        ).filter(Q(is_tester=True) | Q(is_sample=True) | Q(is_travel=True) | Q(is_set=True))
+        queryset = _hide_parsed_products(queryset, self.request)
+        return queryset.order_by("supplier_product__name")
+
+    def parse_matches_view(self, parsed):
+        return bool(parsed.is_tester or parsed.is_sample or parsed.is_travel or parsed.is_set)
 
 
 class ModifierConflictListView(NormalizationIssueListView):
     issue_title = "Identity modifiers"
 
     def get_queryset(self):
-        return models.ParsedSupplierProduct.objects.select_related("supplier_product", "supplier_product__supplier", "normalized_brand").exclude(modifiers=[]).order_by("supplier_product__name")
+        queryset = models.ParsedSupplierProduct.objects.select_related(
+            "supplier_product",
+            "supplier_product__supplier",
+            "normalized_brand",
+        ).exclude(modifiers=[])
+        queryset = _hide_parsed_products(queryset, self.request)
+        return queryset.order_by("supplier_product__name")
+
+    def parse_matches_view(self, parsed):
+        return bool(parsed.modifiers)
+
+
+class ParsedListView(NormalizationIssueListView):
+    issue_title = "Parsed products"
+
+    def get_queryset(self):
+        queryset = models.ParsedSupplierProduct.objects.select_related(
+            "supplier_product",
+            "supplier_product__supplier",
+            "normalized_brand",
+        )
+        query = self.get_search_query()
+        if query:
+            queryset = queryset.filter(
+                Q(supplier_product__supplier__name__icontains=query)
+                | Q(supplier_product__name__icontains=query)
+                | Q(supplier_product__supplier_sku__icontains=query)
+                | Q(supplier_product__brand__icontains=query)
+                | Q(normalized_brand__name__icontains=query)
+                | Q(detected_brand_text__icontains=query)
+                | Q(product_name_text__icontains=query)
+                | Q(concentration__icontains=query)
+            )
+        queryset = _hide_parsed_products(queryset, self.request)
+        return queryset.order_by("-updated_at", "supplier_product__supplier__name", "supplier_product__name")
+
+    def parse_matches_view(self, parsed):
+        return True
 
 
 class ParsedProductDetailView(StaffAssistantMixin, DetailView):
@@ -143,8 +314,18 @@ class ParsedProductDetailView(StaffAssistantMixin, DetailView):
             "parsed": parsed,
             "teach_form": forms.ParseTeachingForm(initial=teach_initial),
             "catalog_candidates": candidate_matches(parsed),
-            "similar_rows": similar_supplier_rows(product, parsed),
-            "rule_impact": rule_impact(product, brand_alias_text, product_alias_text, existing_blockers),
+            "similar_rows": similar_supplier_rows(
+                product,
+                parsed,
+                hidden_terms=_hidden_product_keywords(self.request),
+            ),
+            "rule_impact": rule_impact(
+                product,
+                brand_alias_text,
+                product_alias_text,
+                existing_blockers,
+                hidden_terms=_hidden_product_keywords(self.request),
+            ),
             "catalog_brands": Brand.objects.filter(is_active=True).order_by("name")[:1000],
             "catalog_perfumes": Perfume.objects.select_related("brand").order_by("brand__name", "name")[:2000],
             "catalog_packagings": PerfumeVariant.objects.exclude(packaging="").values_list("packaging", flat=True).distinct().order_by("packaging"),
@@ -328,19 +509,24 @@ class TeachParseView(StaffAssistantMixin, View):
 
         updated_similar = 0
         if data.get("reparse_similar"):
+            selected_ids = {
+                int(value)
+                for value in request.POST.getlist("selected_similar_ids")
+                if str(value).isdigit()
+            }
             similar_terms = [brand_alias_text, product_alias_text, data.get("supplier_concentration_text"), data.get("supplier_size_text")]
             similar_filter = Q()
             for term in [term.strip() for term in similar_terms if term and term.strip()]:
                 similar_filter |= Q(name__icontains=term)
-            if similar_filter:
-                similar = SupplierProduct.objects.filter(similar_filter).exclude(pk=product.pk)[:500]
+            if similar_filter and selected_ids:
+                similar = SupplierProduct.objects.filter(similar_filter, pk__in=selected_ids).exclude(pk=product.pk)[:500]
                 for similar_product in similar:
                     save_parse(similar_product)
                     updated_similar += 1
 
         messages.success(
             request,
-            f"Teaching saved. This product is now parsed as {brand.name} / {product_name}. Reparsed {updated_similar} similar rows.",
+            f"Teaching saved. This product is now parsed as {brand.name} / {product_name}. Updated {updated_similar} selected preview rows.",
         )
         return redirect("assistant_linking:normalization_detail", supplier_product_id=supplier_product_id)
 

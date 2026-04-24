@@ -122,9 +122,9 @@
                             <button class="button secondary is-full-width space-top-sm" type="button" id="price-apply-btn">Apply price</button>
                         </div>
                         <div class="filter-item">
-                            <label for="exclude-filter">Exclude words in name</label>
-                            <textarea id="exclude-filter" rows="3" placeholder="One word per line (or comma-separated)">{{ exclude_terms|default:'' }}</textarea>
-                            <button class="button secondary is-full-width space-top-sm" type="button" id="exclude-apply-btn">Apply exclusion</button>
+                            <label for="exclude-filter">Hidden product keywords</label>
+                            <textarea id="exclude-filter" rows="3" placeholder="One keyword per line (saved globally)">{{ exclude_terms|default:'' }}</textarea>
+                            <button class="button secondary is-full-width space-top-sm" type="button" id="exclude-apply-btn">Save hidden keywords</button>
                         </div>
                     </div>
                 </div>

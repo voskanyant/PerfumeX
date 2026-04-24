@@ -64,6 +64,11 @@ from django.db import close_old_connections
 from .services.importer import preview_mapping_file
 from .services.cbr_rates import upsert_cbr_markup_rates, upsert_cbr_markup_rates_range
 from .services.email_import_lock import email_import_worker_is_busy
+from .services.product_visibility import (
+    apply_hidden_product_keywords,
+    normalize_hidden_product_keywords,
+    parse_hidden_product_keywords,
+)
 
 
 CRON_MARKER = "PERFUMEX_IMPORT_CRON"
@@ -127,7 +132,7 @@ def _format_local_datetime(value) -> str:
 def _batch_activity_datetime(batch):
     if not batch:
         return None
-    dt = batch.received_at or batch.created_at
+    dt = getattr(batch, "updated_at", None) or batch.created_at or batch.received_at
     if dt and timezone.is_naive(dt):
         dt = timezone.make_aware(dt, timezone.get_current_timezone())
     return dt
@@ -308,7 +313,8 @@ def _collect_latest_successful_imports() -> dict[int, models.ImportBatch]:
             importfile__file_kind=models.FileKind.PRICE,
         )
         .exclude(message_id__startswith=PRODUCT_REMOVED_EVENT_PREFIX)
-        .order_by("-received_at", "-created_at", "-id")
+        .annotate(updated_at=Coalesce(Max("importfile__processed_at"), "created_at"))
+        .order_by("-updated_at", "-received_at", "-created_at", "-id")
         .distinct()
     )
     latest: dict[int, models.ImportBatch] = {}
@@ -662,24 +668,11 @@ def _build_supplier_board_summary(rows: list[dict[str, object]]) -> dict[str, in
 
 
 def _normalize_exclude_terms(raw: str) -> str:
-    text = (raw or "").replace(";", "\n").replace(",", "\n")
-    terms = []
-    seen = set()
-    for term in text.splitlines():
-        cleaned = term.strip()
-        if not cleaned:
-            continue
-        key = cleaned.lower()
-        if key in seen:
-            continue
-        seen.add(key)
-        terms.append(cleaned)
-    return "\n".join(terms)
+    return normalize_hidden_product_keywords(raw)
 
 
 def _parse_exclude_terms(raw: str) -> list[str]:
-    normalized = _normalize_exclude_terms(raw)
-    return [term.lower() for term in normalized.splitlines() if term.strip()]
+    return parse_hidden_product_keywords(raw)
 
 
 def _parse_search_query(raw: str) -> tuple[list[str], list[str]]:
@@ -1728,8 +1721,7 @@ class SupplierProductSearchView(LoginRequiredMixin, View):
             queryset = queryset.filter(is_active=True)
         elif status_filter == "inactive":
             queryset = queryset.filter(is_active=False)
-        for term in exclude_terms:
-            queryset = queryset.exclude(name__icontains=term)
+        queryset = apply_hidden_product_keywords(queryset, exclude_terms)
         queryset, _, _ = _apply_supplier_price_filter(queryset, request)
         if status_filter == "all":
             queryset = queryset.order_by("-is_active", ordering, "id")
@@ -2873,8 +2865,7 @@ class SupplierProductListView(BaseListView):
             queryset = queryset.filter(is_active=True)
         elif status_filter == "inactive":
             queryset = queryset.filter(is_active=False)
-        for term in exclude_terms:
-            queryset = queryset.exclude(name__icontains=term)
+        queryset = apply_hidden_product_keywords(queryset, exclude_terms)
         queryset, self._price_min_raw, self._price_max_raw = _apply_supplier_price_filter(
             queryset, self.request
         )
@@ -3283,6 +3274,10 @@ class OurProductDetailView(LoginRequiredMixin, DetailView):
         offers = models.SupplierProduct.objects.select_related("supplier").filter(
             our_product=self.object
         )
+        offers = apply_hidden_product_keywords(
+            offers,
+            _parse_exclude_terms(_resolve_supplier_exclude_terms(self.request)),
+        )
         context["offers"] = offers
         return context
 
@@ -3296,6 +3291,10 @@ class ProductLinkingView(LoginRequiredMixin, TemplateView):
         supplier_filter = _serialize_supplier_filter_ids(supplier_filter_ids)
         search_query = self.request.GET.get("q", "").strip()
         supplier_products = models.SupplierProduct.objects.select_related("supplier")
+        supplier_products = apply_hidden_product_keywords(
+            supplier_products,
+            _parse_exclude_terms(_resolve_supplier_exclude_terms(self.request)),
+        )
         if supplier_filter_ids:
             supplier_products = supplier_products.filter(supplier_id__in=supplier_filter_ids)
         if search_query:
@@ -3403,9 +3402,14 @@ class ProductLinkingSearchView(LoginRequiredMixin, View):
         if auto and not terms:
             terms = supplier_product.name or ""
         tokens = [token for token in re.split(r"[\\s,]+", terms) if token]
+        hidden_terms = _parse_exclude_terms(_resolve_supplier_exclude_terms(request))
         our_products = models.OurProduct.objects.all()
         other_supplier_products = models.SupplierProduct.objects.select_related("supplier").exclude(
             supplier_id=supplier_product.supplier_id
+        )
+        other_supplier_products = apply_hidden_product_keywords(
+            other_supplier_products,
+            hidden_terms,
         )
         for token in tokens:
             our_products = our_products.filter(

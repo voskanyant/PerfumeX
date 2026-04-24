@@ -108,8 +108,25 @@ class PerfumeVariant(TimeStampedModel):
             )
         ]
 
+    @property
+    def display_size(self) -> str:
+        if self.size_label:
+            return self.size_label
+        if self.size_ml:
+            try:
+                return f"{Decimal(str(self.size_ml)):g}ml"
+            except (InvalidOperation, ValueError):
+                return f"{self.size_ml}ml"
+        return ""
+
     def __str__(self) -> str:
-        parts = [str(self.perfume), self.size_label or (f"{self.size_ml:g} ml" if self.size_ml else ""), self.packaging, self.variant_type]
+        parts = [str(self.perfume)]
+        if self.display_size:
+            parts.append(self.display_size)
+        if self.variant_type and self.variant_type != "standard":
+            parts.append(self.variant_type)
+        if self.packaging and self.packaging != "standard":
+            parts.append(self.packaging)
         if self.is_tester:
             parts.append("tester")
         return " / ".join([part for part in parts if part])

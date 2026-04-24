@@ -42,7 +42,7 @@
                 </td>
                 <td><input type="text" name="perfume_name" value="{{ variant.perfume.name }}" form="variant-form-{{ variant.pk }}"></td>
                 <td><input type="text" name="concentration" value="{{ variant.perfume.concentration }}" list="catalog-concentration-options" form="variant-form-{{ variant.pk }}"></td>
-                <td><input type="text" name="size_ml" value="{% if variant.size_label %}{{ variant.size_label }}{% elif variant.size_ml %}{{ variant.size_ml|floatformat:"-2" }}{% endif %}" form="variant-form-{{ variant.pk }}"></td>
+                <td><input type="text" name="size_ml" value="{{ variant.display_size }}" form="variant-form-{{ variant.pk }}"></td>
                 <td>
                     <select name="is_tester" form="variant-form-{{ variant.pk }}">
                         <option value="0"></option>

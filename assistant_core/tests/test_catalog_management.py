@@ -24,9 +24,8 @@ class CatalogManagementTests(TestCase):
     def test_staff_can_search_catalogue_perfumes(self):
         response = self.client.get(reverse("assistant_core:catalog_perfumes"), {"q": "mont"})
 
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Vanilla Extasy")
-        self.assertContains(response, "Montale")
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, f"{reverse('prices:our_product_list')}?q=mont")
 
     def test_staff_can_edit_catalogue_brand(self):
         response = self.client.post(

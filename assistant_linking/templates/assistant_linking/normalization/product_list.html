@@ -1,3 +1,66 @@
 {% extends "prices/base.html" %}
 {% block title %}Unparsed Products{% endblock %}
-{% block content %}<div class="page-head"><div><span class="page-kicker">Normalisation</span><h1 class="page-title">Unparsed supplier rows</h1></div><a class="button ghost" href="{% url 'assistant_linking:normalization_dashboard' %}">Back</a></div><div class="workspace-block"><table class="data-table"><tbody>{% for product in products %}<tr><td>{{ product.supplier }}</td><td>{{ product.name }}</td><td><a class="button ghost" href="{% url 'assistant_linking:normalization_detail' product.pk %}">Open detail</a></td></tr>{% empty %}<tr><td>No unparsed rows.</td></tr>{% endfor %}</tbody></table></div>{% endblock %}
+{% block content %}
+<div class="page-head">
+    <div>
+        <span class="page-kicker">Normalisation</span>
+        <h1 class="page-title">Unparsed supplier rows</h1>
+    </div>
+    <a class="button ghost" href="{% url 'assistant_linking:normalization_dashboard' %}">Back</a>
+</div>
+
+<div class="workspace-block">
+    <form method="get" class="page-actions">
+        <input
+            type="search"
+            name="q"
+            value="{{ search_query }}"
+            placeholder="{{ search_placeholder }}"
+            class="form-control"
+        >
+        <button class="button ghost" type="submit">Search</button>
+        {% if search_query %}
+            <a class="button ghost" href="{% url 'assistant_linking:normalization_unparsed' %}">Reset</a>
+        {% endif %}
+    </form>
+</div>
+
+<div class="workspace-block space-top-md">
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Supplier</th>
+                <th>Product</th>
+                <th>Brand</th>
+                <th>SKU</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for product in products %}
+            <tr>
+                <td>{{ product.supplier }}</td>
+                <td>{{ product.name }}</td>
+                <td>{{ product.brand|default:"-" }}</td>
+                <td>{{ product.supplier_sku|default:"-" }}</td>
+                <td><a class="button ghost" href="{% url 'assistant_linking:normalization_detail' product.pk %}">Open detail</a></td>
+            </tr>
+        {% empty %}
+            <tr><td colspan="5">No unparsed rows.</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% if page_obj and page_obj.paginator.num_pages > 1 %}
+<nav class="workspace-pagination" aria-label="Pagination">
+    {% if page_obj.has_previous %}
+        <a class="workspace-page-link" href="?{% if search_query %}q={{ search_query|urlencode }}&amp;{% endif %}page={{ page_obj.previous_page_number }}">Previous</a>
+    {% endif %}
+    <span class="workspace-page-status">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+    {% if page_obj.has_next %}
+        <a class="workspace-page-link" href="?{% if search_query %}q={{ search_query|urlencode }}&amp;{% endif %}page={{ page_obj.next_page_number }}">Next</a>
+    {% endif %}
+</nav>
+{% endif %}
+{% endblock %}

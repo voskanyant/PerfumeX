@@ -7,6 +7,7 @@ from assistant_linking.models import ParsedSupplierProduct
 from assistant_linking.services.normalizer import normalize_text
 from catalog.models import Perfume, PerfumeVariant
 from prices.models import SupplierProduct
+from prices.services.product_visibility import apply_hidden_product_keywords
 
 
 @dataclass
@@ -112,27 +113,41 @@ def candidate_matches(parsed: ParsedSupplierProduct, limit: int = 8) -> list[Cat
     return sorted(candidates, key=lambda candidate: candidate.score, reverse=True)[:limit]
 
 
-def similar_supplier_rows(product: SupplierProduct, parsed: ParsedSupplierProduct, limit: int = 25):
+def similar_supplier_rows(
+    product: SupplierProduct,
+    parsed: ParsedSupplierProduct,
+    limit: int = 25,
+    hidden_terms: list[str] | None = None,
+):
     terms = [parsed.detected_brand_text, parsed.product_name_text]
     queryset = SupplierProduct.objects.select_related("supplier").exclude(pk=product.pk)
+    queryset = apply_hidden_product_keywords(queryset, hidden_terms or [])
     for term in [term for term in terms if term]:
         queryset = queryset.filter(name__icontains=term.split()[0])
     return queryset.order_by("-is_active", "supplier__name", "name")[:limit]
 
 
-def rule_impact(product: SupplierProduct, brand_alias_text: str, product_alias_text: str, excluded_terms: str = "") -> dict:
-    queryset = SupplierProduct.objects.exclude(pk=product.pk)
+def rule_impact(
+    product: SupplierProduct,
+    brand_alias_text: str,
+    product_alias_text: str,
+    excluded_terms: str = "",
+    hidden_terms: list[str] | None = None,
+) -> dict:
+    queryset = SupplierProduct.objects.select_related("supplier").exclude(pk=product.pk)
+    queryset = apply_hidden_product_keywords(queryset, hidden_terms or [])
     if brand_alias_text:
         queryset = queryset.filter(name__icontains=brand_alias_text)
     if product_alias_text:
         queryset = queryset.filter(name__icontains=product_alias_text)
+    queryset = queryset.order_by("-is_active", "supplier__name", "name")
     excluded = [normalize_text(term) for term in excluded_terms.replace(";", ",").split(",") if normalize_text(term)]
     examples = []
     risky = 0
-    for row in queryset[:50]:
+    for row in queryset:
         text = normalize_text(row.name)
         has_blocker = any(term in text for term in excluded)
         if has_blocker:
             risky += 1
         examples.append({"product": row, "blocked": has_blocker})
-    return {"count": queryset.count(), "risky": risky, "examples": examples[:10]}
+    return {"count": len(examples), "risky": risky, "examples": examples}

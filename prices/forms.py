@@ -4,6 +4,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group, Permission
 
 from . import models
+from .services.product_visibility import normalize_hidden_product_keywords
 
 
 class SupplierForm(forms.ModelForm):
@@ -303,6 +304,17 @@ class AppGroupForm(forms.ModelForm):
 
 
 class UserProfileForm(forms.ModelForm):
+    hidden_product_keywords = forms.CharField(
+        required=False,
+        label="Hidden product keywords",
+        help_text="One keyword per line or comma-separated. Matching supplier products will be hidden across supplier lists, linking, and assistant queues.",
+        widget=forms.Textarea(
+            attrs={
+                "rows": 5,
+                "placeholder": "tester\nsample\nbody mist",
+            }
+        ),
+    )
     current_password = forms.CharField(
         required=False,
         widget=forms.PasswordInput(render_value=False),
@@ -322,6 +334,14 @@ class UserProfileForm(forms.ModelForm):
     class Meta:
         model = get_user_model()
         fields = ("username", "first_name", "last_name", "email")
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if getattr(self.instance, "pk", None):
+            prefs = models.UserPreference.get_for_user(self.instance)
+            self.fields["hidden_product_keywords"].initial = (
+                prefs.supplier_exclude_terms or ""
+            )
 
     def clean(self):
         cleaned_data = super().clean()
@@ -352,4 +372,9 @@ class UserProfileForm(forms.ModelForm):
             self.password_changed = True
         if commit:
             user.save()
+            prefs = models.UserPreference.get_for_user(user)
+            prefs.supplier_exclude_terms = normalize_hidden_product_keywords(
+                self.cleaned_data.get("hidden_product_keywords", "")
+            )
+            prefs.save(update_fields=["supplier_exclude_terms", "updated_at"])
         return user

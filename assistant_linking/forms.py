@@ -86,4 +86,4 @@ class ParseTeachingForm(forms.Form):
     )
     alias_scope = forms.ChoiceField(choices=SCOPE_CHOICES, initial=SCOPE_GLOBAL)
     lock_parse = forms.BooleanField(required=False, initial=True)
-    reparse_similar = forms.BooleanField(required=False, initial=True)
+    reparse_similar = forms.BooleanField(required=False, initial=False)

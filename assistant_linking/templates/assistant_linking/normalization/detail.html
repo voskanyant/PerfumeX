@@ -171,7 +171,7 @@
             <p>{{ teach_form.alias_scope.label_tag }}{{ teach_form.alias_scope }}</p>
             <p>
                 <label>{{ teach_form.lock_parse }} Lock this corrected parse</label>
-                <label>{{ teach_form.reparse_similar }} Reparse similar rows now</label>
+                <label>{{ teach_form.reparse_similar }} Apply teaching to selected preview rows now</label>
             </p>
         </div>
         <div class="flash flash--warning">
@@ -179,16 +179,35 @@
         </div>
         {% if rule_impact.examples %}
             <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>
+                            <input type="checkbox" id="select-all-preview-rows">
+                        </th>
+                        <th>Supplier</th>
+                        <th>Product</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
                 <tbody>
                 {% for example in rule_impact.examples %}
                     <tr>
+                        <td>
+                            <input
+                                type="checkbox"
+                                name="selected_similar_ids"
+                                value="{{ example.product.pk }}"
+                                class="preview-row-checkbox"
+                            >
+                        </td>
                         <td>{{ example.product.supplier }}</td>
-                        <td>{{ example.product.name }}</td>
+                        <td><a href="{% url 'assistant_linking:normalization_detail' example.product.pk %}">{{ example.product.name }}</a></td>
                         <td>{% if example.blocked %}blocked by term{% else %}would be affected{% endif %}</td>
                     </tr>
                 {% endfor %}
                 </tbody>
             </table>
+            <p class="page-meta">Tick only the rows you want reparsed right now. Saving the teaching still saves the alias rule itself.</p>
         {% endif %}
         <button class="button primary" type="submit">Save teaching</button>
     </form>
@@ -210,4 +229,18 @@
         </tbody>
     </table>
 </div>
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    var master = document.getElementById("select-all-preview-rows");
+    if (!master) {
+        return;
+    }
+    var boxes = Array.prototype.slice.call(document.querySelectorAll(".preview-row-checkbox"));
+    master.addEventListener("change", function () {
+        boxes.forEach(function (box) {
+            box.checked = master.checked;
+        });
+    });
+});
+</script>
 {% endblock %}

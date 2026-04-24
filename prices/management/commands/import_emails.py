@@ -17,9 +17,9 @@ def _get_supplier_latest_batch_time(supplier: models.Supplier):
         supplier=supplier,
         importfile__status=models.ImportStatus.PROCESSED,
         importfile__file_kind=models.FileKind.PRICE,
-    ).values_list("received_at", "created_at")
-    for received_at, created_at in batches:
-        candidate = received_at or created_at
+    ).values_list("importfile__processed_at", "received_at", "created_at")
+    for processed_at, received_at, created_at in batches:
+        candidate = processed_at or created_at or received_at
         if candidate and (latest is None or candidate > latest):
             latest = candidate
     return latest

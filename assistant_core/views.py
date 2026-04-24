@@ -10,7 +10,7 @@ from django.db.models import Count, Q
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse_lazy
 from django.utils import timezone
-from django.views.generic import CreateView, DeleteView, DetailView, ListView, TemplateView, UpdateView, View
+from django.views.generic import CreateView, DeleteView, DetailView, ListView, RedirectView, TemplateView, UpdateView, View
 
 from assistant_core import forms, models
 from assistant_core.services.catalog_importer import import_catalog_file
@@ -42,7 +42,7 @@ class DashboardView(StaffAssistantMixin, TemplateView):
             **super().get_context_data(**kwargs),
             "cards": [
                 ("Normalisation", "assistant_linking:normalization_dashboard", ParsedSupplierProduct.objects.filter(confidence__lt=75).count()),
-                ("Catalogue", "assistant_core:catalog_perfumes", Perfume.objects.count()),
+                ("Catalogue", "prices:our_product_list", Perfume.objects.count()),
                 ("Linking Workbench", "assistant_linking:group_queue", LinkSuggestion.objects.filter(status=LinkSuggestion.STATUS_PENDING).count()),
                 ("Knowledge Base", "assistant_core:knowledge", knowledge_count),
                 ("Brand Managers", "assistant_core:brand_manager_list", models.BrandWatchProfile.objects.filter(active=True).count()),
@@ -185,24 +185,9 @@ class CatalogBrandListView(StaffAssistantMixin, ListView):
         return queryset.order_by("name")
 
 
-class CatalogPerfumeListView(StaffAssistantMixin, ListView):
-    model = Perfume
-    template_name = "assistant_core/catalog/perfumes.html"
-    context_object_name = "perfumes"
-    paginate_by = 50
-
-    def get_queryset(self):
-        queryset = Perfume.objects.select_related("brand").annotate(variant_count=Count("variants"))
-        query = self.request.GET.get("q", "").strip()
-        if query:
-            queryset = queryset.filter(
-                Q(name__icontains=query)
-                | Q(brand__name__icontains=query)
-                | Q(collection_name__icontains=query)
-                | Q(concentration__icontains=query)
-                | Q(audience__icontains=query)
-            )
-        return queryset.order_by("brand__name", "name")
+class CatalogPerfumeListView(StaffAssistantMixin, RedirectView):
+    pattern_name = "prices:our_product_list"
+    query_string = True
 
 
 class CatalogVariantListView(StaffAssistantMixin, ListView):

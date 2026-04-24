@@ -8,6 +8,7 @@ app_name = "assistant_linking"
 urlpatterns = [
     path("normalization/", views.NormalizationDashboardView.as_view(), name="normalization_dashboard"),
     path("normalization/unparsed/", views.UnparsedListView.as_view(), name="normalization_unparsed"),
+    path("normalization/parsed/", views.ParsedListView.as_view(), name="normalization_parsed"),
     path("normalization/low-confidence/", views.LowConfidenceListView.as_view(), name="normalization_low_confidence"),
     path("normalization/missing-brand/", views.MissingBrandListView.as_view(), name="normalization_missing_brand"),
     path("normalization/missing-size/", views.MissingSizeListView.as_view(), name="normalization_missing_size"),

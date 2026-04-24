@@ -35,3 +35,15 @@ class CatalogModelTests(TestCase):
         second = PerfumeVariant.objects.create(perfume=perfume, size_ml="100.00", variant_type="standard", packaging="box")
 
         self.assertNotEqual(first.sku, second.sku)
+
+    def test_variant_display_size_uses_compact_ml_format(self):
+        brand = Brand.objects.create(name="Example")
+        perfume = Perfume.objects.create(brand=brand, name="Example Scent")
+        variant = PerfumeVariant.objects.create(
+            perfume=perfume,
+            size_ml="100.00",
+            variant_type="standard",
+        )
+
+        self.assertEqual(variant.display_size, "100ml")
+        self.assertEqual(str(variant), "Example / Example Scent / 100ml")
