@@ -13,7 +13,7 @@ class BrandAliasAdmin(admin.ModelAdmin):
 @admin.register(models.ProductAlias)
 class ProductAliasAdmin(admin.ModelAdmin):
     list_display = ("alias_text", "canonical_text", "brand", "perfume", "supplier", "priority", "active")
-    search_fields = ("alias_text", "canonical_text", "brand__name", "perfume__name", "supplier__name")
+    search_fields = ("alias_text", "canonical_text", "excluded_terms", "brand__name", "perfume__name", "supplier__name")
     list_filter = ("active", "supplier", "brand")
 
 

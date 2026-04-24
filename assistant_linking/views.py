@@ -13,6 +13,7 @@ from assistant_linking.services.grouping import rebuild_groups
 from assistant_linking.services.mock_suggester import generate_link_suggestions
 from assistant_linking.services.normalizer import save_parse
 from assistant_linking.services.smart_search import normalize_query
+from assistant_linking.services.teaching import suggest_product_alias_blockers
 from catalog.models import Brand
 from prices.models import SupplierProduct
 
@@ -64,14 +65,28 @@ class ParsedProductDetailView(StaffAssistantMixin, DetailView):
     def get_context_data(self, **kwargs):
         product = self.object
         parsed = save_parse(product)
+        suggested_blockers = suggest_product_alias_blockers(
+            product,
+            parsed.product_name_text,
+            parsed.detected_brand_text or (parsed.normalized_brand.name if parsed.normalized_brand_id else ""),
+        )
+        excluded_terms = sorted({term for term in [*parsed.modifiers, *suggested_blockers] if term})
         teach_initial = {
+            "supplier_brand_text": parsed.detected_brand_text or product.brand,
             "brand_name": parsed.normalized_brand.name if parsed.normalized_brand_id else parsed.detected_brand_text,
+            "supplier_product_text": parsed.product_name_text or product.name,
             "product_name": parsed.product_name_text,
+            "product_excluded_terms": ", ".join(excluded_terms),
+            "supplier_concentration_text": parsed.concentration,
             "concentration": parsed.concentration,
+            "supplier_size_text": parsed.raw_size_text or product.size,
             "size_ml": parsed.size_ml,
+            "supplier_audience_text": parsed.supplier_gender_hint,
             "audience": parsed.supplier_gender_hint,
-            "brand_alias_text": parsed.detected_brand_text or product.brand,
-            "product_alias_text": parsed.product_name_text or product.name,
+            "supplier_type_text": parsed.variant_type,
+            "variant_type": parsed.variant_type,
+            "supplier_packaging_text": parsed.packaging,
+            "packaging": parsed.packaging,
             "alias_scope": forms.ParseTeachingForm.SCOPE_GLOBAL,
             "lock_parse": True,
             "reparse_similar": True,
@@ -80,6 +95,7 @@ class ParsedProductDetailView(StaffAssistantMixin, DetailView):
             **super().get_context_data(**kwargs),
             "parsed": parsed,
             "teach_form": forms.ParseTeachingForm(initial=teach_initial),
+            "suggested_blockers": suggested_blockers,
         }
 
 
@@ -137,7 +153,7 @@ class TeachParseView(StaffAssistantMixin, View):
         brand, _ = Brand.objects.get_or_create(name=brand_name)
         supplier = product.supplier if data["alias_scope"] == forms.ParseTeachingForm.SCOPE_SUPPLIER else None
 
-        brand_alias_text = (data.get("brand_alias_text") or brand_name).strip()
+        brand_alias_text = (data.get("supplier_brand_text") or brand_name).strip()
         if brand_alias_text:
             models.BrandAlias.objects.get_or_create(
                 brand=brand,
@@ -150,9 +166,9 @@ class TeachParseView(StaffAssistantMixin, View):
                 },
             )
 
-        product_alias_text = (data.get("product_alias_text") or product_name).strip()
+        product_alias_text = (data.get("supplier_product_text") or product_name).strip()
         if product_alias_text:
-            models.ProductAlias.objects.get_or_create(
+            models.ProductAlias.objects.update_or_create(
                 brand=brand,
                 supplier=supplier,
                 alias_text=product_alias_text,
@@ -160,6 +176,7 @@ class TeachParseView(StaffAssistantMixin, View):
                     "canonical_text": product_name,
                     "concentration": data.get("concentration") or "",
                     "audience": data.get("audience") or "",
+                    "excluded_terms": (data.get("product_excluded_terms") or "").strip(),
                     "priority": 10 if supplier else 50,
                     "active": True,
                 },
@@ -170,7 +187,14 @@ class TeachParseView(StaffAssistantMixin, View):
         parsed.product_name_text = product_name
         parsed.concentration = data.get("concentration") or ""
         parsed.size_ml = data.get("size_ml")
+        parsed.raw_size_text = (data.get("supplier_size_text") or "").strip()
         parsed.supplier_gender_hint = data.get("audience") or ""
+        parsed.packaging = (data.get("packaging") or "").strip().lower()
+        parsed.variant_type = (data.get("variant_type") or "").strip().lower()
+        parsed.is_sample = parsed.variant_type == "sample"
+        parsed.is_travel = parsed.variant_type == "travel"
+        parsed.is_set = parsed.variant_type == "set"
+        parsed.is_tester = parsed.variant_type == "tester" or "tester" in parsed.packaging
         parsed.confidence = 100
         parsed.warnings = []
         parsed.locked_by_human = bool(data.get("lock_parse"))
@@ -179,8 +203,12 @@ class TeachParseView(StaffAssistantMixin, View):
 
         updated_similar = 0
         if data.get("reparse_similar"):
+            similar_terms = [brand_alias_text, product_alias_text, data.get("supplier_concentration_text"), data.get("supplier_size_text")]
+            similar_filter = Q()
+            for term in [term.strip() for term in similar_terms if term and term.strip()]:
+                similar_filter |= Q(name__icontains=term)
             similar = SupplierProduct.objects.filter(
-                Q(name__icontains=brand_alias_text) | Q(name__icontains=product_alias_text)
+                similar_filter
             ).exclude(pk=product.pk)[:500]
             for similar_product in similar:
                 save_parse(similar_product)

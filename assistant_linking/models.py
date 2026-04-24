@@ -38,6 +38,7 @@ class ProductAlias(TimeStampedModel):
     supplier = models.ForeignKey("prices.Supplier", on_delete=models.CASCADE, null=True, blank=True, related_name="product_aliases", db_index=True)
     concentration = models.CharField(max_length=80, blank=True)
     audience = models.CharField(max_length=80, blank=True)
+    excluded_terms = models.TextField(blank=True)
     active = models.BooleanField(default=True, db_index=True)
     priority = models.IntegerField(default=100, db_index=True)
 

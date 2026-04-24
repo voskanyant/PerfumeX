@@ -65,6 +65,10 @@ def normalize_text(value: str) -> str:
     return text
 
 
+def _split_terms(value: str) -> list[str]:
+    return [normalize_text(term) for term in re.split(r"[,;\n]+", value or "") if normalize_text(term)]
+
+
 def _extract_size(text: str) -> tuple[Decimal | None, str, str]:
     ml_match = re.search(r"\b(\d+(?:[.,]\d+)?)\s*(?:ml|мл)\b", text)
     if ml_match:
@@ -148,7 +152,8 @@ def parse_supplier_product(product: SupplierProduct) -> ParseResult:
     product_aliases = ProductAlias.objects.filter(active=True).order_by("supplier_id", "priority", "-alias_text")
     for product_alias in list(product_aliases.filter(supplier_id=product.supplier_id)) + list(product_aliases.filter(supplier__isnull=True)):
         alias_text = normalize_text(product_alias.alias_text)
-        if alias_text and alias_text in text:
+        excluded_terms = _split_terms(product_alias.excluded_terms)
+        if alias_text and alias_text in text and not any(term in text for term in excluded_terms):
             result.product_name_text = product_alias.canonical_text
             if product_alias.concentration and not result.concentration:
                 result.concentration = product_alias.concentration

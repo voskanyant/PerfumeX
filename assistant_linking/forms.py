@@ -44,13 +44,26 @@ class ParseTeachingForm(forms.Form):
         ("unisex", "Unisex"),
     )
 
-    brand_name = forms.CharField(max_length=200, required=True, label="Brand")
-    product_name = forms.CharField(max_length=255, required=True, label="Scent name")
-    concentration = forms.ChoiceField(choices=CONCENTRATION_CHOICES, required=False)
-    size_ml = forms.DecimalField(max_digits=7, decimal_places=2, required=False, label="Size ml")
-    audience = forms.ChoiceField(choices=AUDIENCE_CHOICES, required=False)
+    supplier_brand_text = forms.CharField(max_length=255, required=False, label="Supplier brand text")
+    brand_name = forms.CharField(max_length=200, required=True, label="Correct brand")
+    supplier_product_text = forms.CharField(max_length=255, required=False, label="Supplier scent text")
+    product_name = forms.CharField(max_length=255, required=True, label="Correct scent name")
+    product_excluded_terms = forms.CharField(
+        required=False,
+        label="Do not match when supplier name contains",
+        widget=forms.Textarea(attrs={"rows": 2}),
+        help_text="Comma-separated blockers, for example: intense, love in capri, forever",
+    )
+    supplier_concentration_text = forms.CharField(max_length=80, required=False, label="Supplier concentration text")
+    concentration = forms.ChoiceField(choices=CONCENTRATION_CHOICES, required=False, label="Correct concentration")
+    supplier_size_text = forms.CharField(max_length=80, required=False, label="Supplier size text")
+    size_ml = forms.DecimalField(max_digits=7, decimal_places=2, required=False, label="Correct size ml")
+    supplier_audience_text = forms.CharField(max_length=80, required=False, label="Supplier audience text")
+    audience = forms.ChoiceField(choices=AUDIENCE_CHOICES, required=False, label="Correct audience")
+    supplier_type_text = forms.CharField(max_length=80, required=False, label="Supplier type text")
+    variant_type = forms.CharField(max_length=80, required=False, label="Correct product type")
+    supplier_packaging_text = forms.CharField(max_length=80, required=False, label="Supplier packaging text")
+    packaging = forms.CharField(max_length=80, required=False, label="Correct packaging")
     alias_scope = forms.ChoiceField(choices=SCOPE_CHOICES, initial=SCOPE_GLOBAL)
-    brand_alias_text = forms.CharField(max_length=255, required=False, label="Brand text in supplier row")
-    product_alias_text = forms.CharField(max_length=255, required=False, label="Product text in supplier row")
     lock_parse = forms.BooleanField(required=False, initial=True)
     reparse_similar = forms.BooleanField(required=False, initial=True)

@@ -5,7 +5,7 @@
     <div>
         <span class="page-kicker">Normalisation</span>
         <h1 class="page-title">{{ product.name }}</h1>
-        <div class="page-meta">{{ product.supplier }} · {{ product.supplier_sku }}</div>
+        <div class="page-meta">{{ product.supplier }} &middot; {{ product.supplier_sku }}</div>
     </div>
     <div class="page-actions">
         <a class="button ghost" href="{% url 'assistant_linking:normalization_low_confidence' %}">Back</a>
@@ -32,7 +32,8 @@
         <h2 class="kpi-link-title">Parsed fields</h2>
         <p>Brand: {{ parsed.normalized_brand|default:parsed.detected_brand_text }}</p>
         <p>Name: {{ parsed.product_name_text }}</p>
-        <p>{{ parsed.concentration }} · {{ parsed.size_ml }} ml · {{ parsed.supplier_gender_hint }}</p>
+        <p>{{ parsed.concentration }} &middot; {{ parsed.size_ml }} ml &middot; {{ parsed.supplier_gender_hint }}</p>
+        <p>Type: {{ parsed.variant_type|default:"unknown" }} &middot; Packaging: {{ parsed.packaging|default:"standard" }}</p>
         <p>Confidence {{ parsed.confidence }}</p>
     </div>
     <div class="workspace-block">
@@ -49,15 +50,65 @@
     <h2 class="kpi-link-title">Teach this product</h2>
     <form method="post" action="{% url 'assistant_linking:normalization_teach' product.pk %}" class="form-shell">
         {% csrf_token %}
-        <div class="page-grid-3">
-            <p>{{ teach_form.brand_name.label_tag }}{{ teach_form.brand_name }}</p>
-            <p>{{ teach_form.product_name.label_tag }}{{ teach_form.product_name }}</p>
-            <p>{{ teach_form.concentration.label_tag }}{{ teach_form.concentration }}</p>
-            <p>{{ teach_form.size_ml.label_tag }}{{ teach_form.size_ml }}</p>
-            <p>{{ teach_form.audience.label_tag }}{{ teach_form.audience }}</p>
+        <div class="table-wrap">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Field</th>
+                        <th>How supplier writes it</th>
+                        <th>Correct normalized value</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Brand</td>
+                        <td>{{ teach_form.supplier_brand_text }}</td>
+                        <td>{{ teach_form.brand_name }}</td>
+                    </tr>
+                    <tr>
+                        <td>Scent name</td>
+                        <td>{{ teach_form.supplier_product_text }}</td>
+                        <td>{{ teach_form.product_name }}</td>
+                    </tr>
+                    <tr>
+                        <td>Blockers</td>
+                        <td colspan="2">
+                            {{ teach_form.product_excluded_terms }}
+                            {% if suggested_blockers %}
+                                <p class="page-meta">Suggested from similar supplier rows: {{ suggested_blockers|join:", " }}</p>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>Concentration</td>
+                        <td>{{ teach_form.supplier_concentration_text }}</td>
+                        <td>{{ teach_form.concentration }}</td>
+                    </tr>
+                    <tr>
+                        <td>Size</td>
+                        <td>{{ teach_form.supplier_size_text }}</td>
+                        <td>{{ teach_form.size_ml }}</td>
+                    </tr>
+                    <tr>
+                        <td>Audience</td>
+                        <td>{{ teach_form.supplier_audience_text }}</td>
+                        <td>{{ teach_form.audience }}</td>
+                    </tr>
+                    <tr>
+                        <td>Product type</td>
+                        <td>{{ teach_form.supplier_type_text }}</td>
+                        <td>{{ teach_form.variant_type }}</td>
+                    </tr>
+                    <tr>
+                        <td>Packaging</td>
+                        <td>{{ teach_form.supplier_packaging_text }}</td>
+                        <td>{{ teach_form.packaging }}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="page-grid-3 space-top-md">
             <p>{{ teach_form.alias_scope.label_tag }}{{ teach_form.alias_scope }}</p>
-            <p>{{ teach_form.brand_alias_text.label_tag }}{{ teach_form.brand_alias_text }}</p>
-            <p>{{ teach_form.product_alias_text.label_tag }}{{ teach_form.product_alias_text }}</p>
             <p>
                 <label>{{ teach_form.lock_parse }} Lock this corrected parse</label>
                 <label>{{ teach_form.reparse_similar }} Reparse similar rows now</label>
