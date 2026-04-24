@@ -367,7 +367,7 @@
                     state.health_label
                 );
                 applyText(row.querySelector("[data-health-note]"), state.health_note);
-                applyProgress(row, state.check_progress);
+                applyProgress(row, state.is_running ? state.check_progress : null);
 
                 var updateBtn = row.querySelector("[data-email-update]");
                 var cancelWrap = row.querySelector("[data-email-cancel-wrap]");

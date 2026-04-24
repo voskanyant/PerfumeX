@@ -207,18 +207,18 @@ def _spawn_management_command(*args: str) -> subprocess.Popen:
 
 
 def _build_email_run_status(run) -> dict[str, str | int | None]:
-    progress = None
-    if run and run.total_messages:
-        progress = int((run.processed_messages / run.total_messages) * 100)
     if not run:
         return {
             "label": "idle",
             "class_name": "is-neutral",
             "note": "",
             "code": "idle",
-            "progress": progress,
+            "progress": None,
         }
     if run.status == models.EmailImportStatus.RUNNING:
+        progress = None
+        if run.total_messages:
+            progress = int((run.processed_messages / run.total_messages) * 100)
         if progress is not None:
             note = f"{progress}% complete"
         elif run.total_messages:
@@ -239,7 +239,7 @@ def _build_email_run_status(run) -> dict[str, str | int | None]:
                 "class_name": "is-warning",
                 "note": f"{run.errors} error(s) during import",
                 "code": "warning",
-                "progress": progress,
+                "progress": None,
             }
         if not run.matched_files and not run.processed_files:
             return {
@@ -247,7 +247,7 @@ def _build_email_run_status(run) -> dict[str, str | int | None]:
                 "class_name": "is-warning",
                 "note": "No matching email files found",
                 "code": "no-files",
-                "progress": progress,
+                "progress": None,
             }
         if not run.processed_files and run.skipped_duplicates:
             return {
@@ -255,7 +255,7 @@ def _build_email_run_status(run) -> dict[str, str | int | None]:
                 "class_name": "is-neutral",
                 "note": f"{run.skipped_duplicates} duplicate file(s) skipped",
                 "code": "no-change",
-                "progress": progress,
+                "progress": None,
             }
         if not run.processed_files:
             return {
@@ -263,7 +263,7 @@ def _build_email_run_status(run) -> dict[str, str | int | None]:
                 "class_name": "is-neutral",
                 "note": "Matching files found, but nothing new was imported",
                 "code": "no-change",
-                "progress": progress,
+                "progress": None,
             }
         note = f"{run.processed_files} file(s) imported"
         if run.skipped_duplicates:
@@ -273,7 +273,7 @@ def _build_email_run_status(run) -> dict[str, str | int | None]:
             "class_name": "is-success",
             "note": note,
             "code": "successful",
-            "progress": progress,
+            "progress": None,
         }
     if run.status == models.EmailImportStatus.FAILED:
         return {
@@ -281,7 +281,7 @@ def _build_email_run_status(run) -> dict[str, str | int | None]:
             "class_name": "is-failed",
             "note": run.last_message or "Email import failed",
             "code": "failed",
-            "progress": progress,
+            "progress": None,
         }
     if run.status == models.EmailImportStatus.CANCELED:
         return {
@@ -289,14 +289,14 @@ def _build_email_run_status(run) -> dict[str, str | int | None]:
             "class_name": "is-neutral",
             "note": run.last_message or "Canceled by user",
             "code": "canceled",
-            "progress": progress,
+            "progress": None,
         }
     return {
         "label": "unknown",
         "class_name": "is-neutral",
         "note": run.last_message or "Unknown email status",
         "code": "unknown",
-        "progress": progress,
+        "progress": None,
     }
 
 
