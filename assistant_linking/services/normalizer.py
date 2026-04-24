@@ -5,6 +5,7 @@ import unicodedata
 from dataclasses import dataclass, field
 from decimal import Decimal, ROUND_HALF_UP
 
+from django.db.models import Q
 from django.utils import timezone
 
 from assistant_linking.models import BrandAlias, ParsedSupplierProduct, ProductAlias
@@ -150,6 +151,8 @@ def parse_supplier_product(product: SupplierProduct) -> ParseResult:
             result.warnings.append("supplier-specific alias overrode global alias")
 
     product_aliases = ProductAlias.objects.filter(active=True).order_by("supplier_id", "priority", "-alias_text")
+    if result.normalized_brand:
+        product_aliases = product_aliases.filter(Q(brand_id=result.normalized_brand.id) | Q(brand__isnull=True))
     for product_alias in list(product_aliases.filter(supplier_id=product.supplier_id)) + list(product_aliases.filter(supplier__isnull=True)):
         alias_text = normalize_text(product_alias.alias_text)
         excluded_terms = _split_terms(product_alias.excluded_terms)

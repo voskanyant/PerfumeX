@@ -62,7 +62,7 @@ class ParseTeachingForm(forms.Form):
         required=False,
         label="Do not match when supplier name contains",
         widget=forms.Textarea(attrs={"rows": 2}),
-        help_text="Comma-separated blockers, for example: intense, love in capri, forever",
+        help_text="Comma-separated blockers for this brand and scent alias, for example: intense, love in capri, forever",
     )
     supplier_concentration_text = forms.CharField(max_length=80, required=False, label="Supplier concentration text")
     concentration = forms.ChoiceField(choices=CONCENTRATION_CHOICES, required=False, label="Correct concentration")

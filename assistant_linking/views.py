@@ -14,7 +14,6 @@ from assistant_linking.services.grouping import rebuild_groups
 from assistant_linking.services.mock_suggester import generate_link_suggestions
 from assistant_linking.services.normalizer import save_parse
 from assistant_linking.services.smart_search import normalize_query
-from assistant_linking.services.teaching import suggest_product_alias_blockers
 from catalog.models import Brand, Perfume, PerfumeVariant
 from prices.models import SupplierProduct
 
@@ -106,12 +105,6 @@ class ParsedProductDetailView(StaffAssistantMixin, DetailView):
     def get_context_data(self, **kwargs):
         product = self.object
         parsed = save_parse(product)
-        suggested_blockers = suggest_product_alias_blockers(
-            product,
-            parsed.product_name_text,
-            parsed.detected_brand_text or (parsed.normalized_brand.name if parsed.normalized_brand_id else ""),
-        )
-        excluded_terms = sorted({term for term in [*parsed.modifiers, *suggested_blockers] if term})
         product_alias_text = parsed.product_name_text or product.name
         brand_alias_text = parsed.detected_brand_text or product.brand
         teach_initial = {
@@ -119,7 +112,7 @@ class ParsedProductDetailView(StaffAssistantMixin, DetailView):
             "brand_name": parsed.normalized_brand.name if parsed.normalized_brand_id else parsed.detected_brand_text,
             "supplier_product_text": product_alias_text,
             "product_name": parsed.product_name_text,
-            "product_excluded_terms": ", ".join(excluded_terms),
+            "product_excluded_terms": "",
             "supplier_concentration_text": parsed.concentration,
             "concentration": parsed.concentration,
             "supplier_size_text": parsed.raw_size_text or product.size,
@@ -138,10 +131,9 @@ class ParsedProductDetailView(StaffAssistantMixin, DetailView):
             **super().get_context_data(**kwargs),
             "parsed": parsed,
             "teach_form": forms.ParseTeachingForm(initial=teach_initial),
-            "suggested_blockers": suggested_blockers,
             "catalog_candidates": candidate_matches(parsed),
             "similar_rows": similar_supplier_rows(product, parsed),
-            "rule_impact": rule_impact(product, brand_alias_text, product_alias_text, ", ".join(excluded_terms)),
+            "rule_impact": rule_impact(product, brand_alias_text, product_alias_text, ""),
             "catalog_brands": Brand.objects.filter(is_active=True).order_by("name")[:1000],
             "catalog_perfumes": Perfume.objects.select_related("brand").order_by("brand__name", "name")[:2000],
             "catalog_packagings": PerfumeVariant.objects.exclude(packaging="").values_list("packaging", flat=True).distinct().order_by("packaging"),

@@ -4,7 +4,6 @@ from django.urls import reverse
 
 from assistant_linking.models import BrandAlias, ParsedSupplierProduct, ProductAlias
 from assistant_linking.services.normalizer import save_parse
-from assistant_linking.services.teaching import suggest_product_alias_blockers
 from catalog.models import Brand, Perfume, PerfumeVariant
 from prices.models import Supplier, SupplierProduct
 
@@ -100,16 +99,57 @@ class TeachParseTests(TestCase):
         self.assertNotEqual(parsed.product_name_text, "Light Blue")
         self.assertIn("intense", parsed.product_name_text)
 
-    def test_teaching_page_suggests_blockers_from_similar_supplier_rows(self):
-        classic = SupplierProduct.objects.create(
-            supplier=self.supplier,
-            identity_key="dg-2",
-            name="dolce gabanna light blue eau de parfum 100ml",
+    def test_blocked_modifier_can_be_taught_as_separate_product(self):
+        brand = Brand.objects.create(name="Dolce & Gabbana")
+        BrandAlias.objects.create(
+            brand=brand,
+            alias_text="dolce gabanna",
+            normalized_alias="dolce gabanna",
+        )
+        ProductAlias.objects.create(
+            brand=brand,
+            alias_text="light blue",
+            canonical_text="Light Blue",
+            concentration="Eau de Parfum",
+            excluded_terms="intense",
+            priority=50,
+            active=True,
+        )
+        ProductAlias.objects.create(
+            brand=brand,
+            alias_text="light blue eau intense",
+            canonical_text="Light Blue Eau Intense",
+            concentration="Eau de Parfum",
+            priority=40,
+            active=True,
         )
 
-        blockers = suggest_product_alias_blockers(classic, "light blue", "dolce gabanna")
+        parsed = save_parse(self.intense_product, force=True)
 
-        self.assertIn("intense", blockers)
+        self.assertEqual(parsed.product_name_text, "Light Blue Eau Intense")
+
+    def test_product_aliases_are_limited_to_detected_brand(self):
+        dolce = Brand.objects.create(name="Dolce & Gabbana")
+        montale = Brand.objects.create(name="Montale")
+        BrandAlias.objects.create(brand=dolce, alias_text="dolce gabanna", normalized_alias="dolce gabanna")
+        BrandAlias.objects.create(brand=montale, alias_text="montale", normalized_alias="montale")
+        ProductAlias.objects.create(
+            brand=dolce,
+            alias_text="light blue",
+            canonical_text="Dolce Classic Light Blue",
+            priority=50,
+            active=True,
+        )
+        montale_product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="montale-light-blue",
+            name="montale light blue eau de parfum 100ml",
+        )
+
+        parsed = save_parse(montale_product, force=True)
+
+        self.assertEqual(parsed.normalized_brand, montale)
+        self.assertNotEqual(parsed.product_name_text, "Dolce Classic Light Blue")
 
     def test_staff_can_accept_catalog_candidate_from_normalization(self):
         brand = Brand.objects.create(name="Montale")
