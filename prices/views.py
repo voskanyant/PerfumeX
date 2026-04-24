@@ -32,6 +32,7 @@ from django.views.decorators.http import require_POST
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 from datetime import datetime, time
+import sys
 
 from decimal import Decimal
 import threading
@@ -58,7 +59,6 @@ from .services.importer import delete_import_batch, process_import_file
 from django.contrib import messages
 from django.db import close_old_connections
 
-from .services.email_importer import run_import
 from .services.importer import preview_mapping_file
 from .services.cbr_rates import upsert_cbr_markup_rates, upsert_cbr_markup_rates_range
 
@@ -67,6 +67,7 @@ CRON_MARKER = "PERFUMEX_IMPORT_CRON"
 PRODUCT_REMOVED_EVENT_PREFIX = "SYSTEM_DEACTIVATE:"
 logger = logging.getLogger(__name__)
 FRONT_FILTER_KEYS = ("q", "currency", "supplier", "status", "price_min", "price_max", "exclude")
+EMAIL_IMPORT_BUSY_MESSAGE = "Another email import is already running. Wait for it to finish or cancel it first."
 
 
 def _short_relative_datetime(value) -> str:
@@ -148,6 +149,56 @@ def _format_interval_hours(hours: int) -> str:
         days = hours // 24
         return f"{days}d" if days != 1 else "1d"
     return f"{hours}h"
+
+
+def _email_import_timeout_seconds() -> int | None:
+    timeout_minutes = int(models.ImportSettings.get_solo().supplier_timeout_minutes or 0)
+    return timeout_minutes * 60 if timeout_minutes > 0 else None
+
+
+def _expire_stale_email_import_runs() -> int:
+    timeout_seconds = _email_import_timeout_seconds()
+    if not timeout_seconds:
+        return 0
+    cutoff = timezone.now() - timezone.timedelta(seconds=timeout_seconds)
+    return models.EmailImportRun.objects.filter(
+        status=models.EmailImportStatus.RUNNING,
+        started_at__lt=cutoff,
+    ).update(
+        status=models.EmailImportStatus.FAILED,
+        finished_at=timezone.now(),
+        errors=F("errors") + 1,
+        last_message="Auto-failed timeout. Previous run exceeded supplier timeout.",
+    )
+
+
+def _has_running_email_imports(supplier=None) -> bool:
+    _expire_stale_email_import_runs()
+    runs = models.EmailImportRun.objects.filter(status=models.EmailImportStatus.RUNNING)
+    if supplier is not None:
+        runs = runs.filter(supplier=supplier)
+    return runs.exists()
+
+
+def _spawn_management_command(*args: str) -> subprocess.Popen:
+    manage_py = Path(__file__).resolve().parent.parent / "manage.py"
+    command = [sys.executable, str(manage_py), *args]
+    popen_kwargs = {
+        "cwd": str(manage_py.parent),
+        "stdin": subprocess.DEVNULL,
+        "stdout": subprocess.DEVNULL,
+        "stderr": subprocess.DEVNULL,
+        "env": os.environ.copy(),
+        "close_fds": True,
+    }
+    if os.name == "nt":
+        popen_kwargs["creationflags"] = (
+            getattr(subprocess, "DETACHED_PROCESS", 0)
+            | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+        )
+    else:
+        popen_kwargs["start_new_session"] = True
+    return subprocess.Popen(command, **popen_kwargs)
 
 
 def _build_email_run_status(run) -> dict[str, str | int | None]:
@@ -1124,6 +1175,7 @@ class SupplierOverviewView(LoginRequiredMixin, TemplateView):
         suppliers = list(models.Supplier.objects.order_by("name"))
         latest_successful_imports = _collect_latest_successful_imports()
         active_price_mappings = _collect_active_price_mappings()
+        _expire_stale_email_import_runs()
         latest_runs, run_streaks = _collect_latest_runs_and_streaks()
         rows = []
         import_batches = models.ImportBatch.objects.select_related(
@@ -1416,13 +1468,15 @@ class ImportSettingsView(LoginRequiredMixin, TemplateView):
             return redirect("prices:import_settings")
 
         if action == "run_now":
-            def _run_now():
-                close_old_connections()
-                call_command("import_emails", force=True)
-
-            thread = threading.Thread(target=_run_now, daemon=True)
-            thread.start()
-            messages.success(request, "Email import started.")
+            if _has_running_email_imports():
+                messages.info(request, EMAIL_IMPORT_BUSY_MESSAGE)
+                return redirect("prices:import_settings")
+            try:
+                _spawn_management_command("import_emails", "--force")
+            except Exception as exc:
+                messages.error(request, f"Failed to start email import: {exc}")
+            else:
+                messages.success(request, "Email import started.")
             return redirect("prices:import_settings")
 
         settings_obj = models.ImportSettings.get_solo()
@@ -1830,21 +1884,22 @@ class SupplierEmailImportView(LoginRequiredMixin, View):
                 "Supplier has no sender email configured. Set From address pattern first.",
             )
             return redirect("prices:supplier_overview")
-        if models.EmailImportRun.objects.filter(
-            supplier=supplier, status=models.EmailImportStatus.RUNNING
-        ).exists():
-            messages.info(request, "Email import already running for this supplier.")
+        if _has_running_email_imports():
+            messages.info(request, EMAIL_IMPORT_BUSY_MESSAGE)
             return redirect("prices:supplier_overview")
         run = models.EmailImportRun.objects.create(
             supplier=supplier, status=models.EmailImportStatus.RUNNING
         )
-
-        def _run():
-            close_old_connections()
-            call_command("import_emails", force=True, supplier_id=supplier.id, run_id=run.id)
-
-        thread = threading.Thread(target=_run, daemon=True)
-        thread.start()
+        try:
+            _spawn_management_command("process_email_runs", "--run-id", str(run.id))
+        except Exception as exc:
+            models.EmailImportRun.objects.filter(id=run.id).update(
+                status=models.EmailImportStatus.FAILED,
+                finished_at=timezone.now(),
+                errors=1,
+                last_message=f"Failed to start background import: {exc}",
+            )
+            messages.error(request, f"Failed to start email import: {exc}")
         return redirect("prices:supplier_overview")
 
 
@@ -1857,10 +1912,8 @@ class SupplierEmailBackfillView(LoginRequiredMixin, View):
                 "Supplier has no sender email configured. Set From address pattern first.",
             )
             return redirect("prices:supplier_import", pk=pk)
-        if models.EmailImportRun.objects.filter(
-            supplier=supplier, status=models.EmailImportStatus.RUNNING
-        ).exists():
-            messages.info(request, "Email import already running for this supplier.")
+        if _has_running_email_imports():
+            messages.info(request, EMAIL_IMPORT_BUSY_MESSAGE)
             return redirect("prices:supplier_import", pk=pk)
 
         start_raw = request.POST.get("start_date", "").strip()
@@ -1888,46 +1941,33 @@ class SupplierEmailBackfillView(LoginRequiredMixin, View):
             status=models.EmailImportStatus.RUNNING,
             last_message=f"Backfill {start_date.isoformat()} to {end_date or 'today'}",
         )
-
-        def _run():
-            close_old_connections()
-            mailboxes = models.Mailbox.objects.filter(is_active=True).order_by(
-                "priority", "id"
+        command_args = [
+            "process_email_runs",
+            "--run-id",
+            str(run.id),
+            "--start-date",
+            start_date.isoformat(),
+        ]
+        if end_date:
+            command_args.extend(["--end-date", end_date.isoformat()])
+        try:
+            _spawn_management_command(*command_args)
+        except Exception as exc:
+            models.EmailImportRun.objects.filter(id=run.id).update(
+                status=models.EmailImportStatus.FAILED,
+                finished_at=timezone.now(),
+                errors=1,
+                last_message=f"Failed to start backfill: {exc}",
             )
-            settings_obj = models.ImportSettings.get_solo()
-            timeout_minutes = int(settings_obj.supplier_timeout_minutes or 0)
-            timeout_seconds = timeout_minutes * 60 if timeout_minutes > 0 else None
-            since_date = timezone.make_aware(datetime.combine(start_date, time(0, 0)))
-            before_date = None
-            if end_date:
-                before_date = timezone.make_aware(
-                    datetime.combine(end_date + timezone.timedelta(days=1), time(0, 0))
-                )
-            run_import(
-                mailboxes=mailboxes,
-                supplier_id=supplier.id,
-                mark_seen=False,
-                limit=0,
-                max_bytes=20_000_000,
-                max_seconds=timeout_seconds,
-                logger=None,
-                run_id=run.id,
-                search_criteria="ALL",
-                since_date=since_date,
-                before_date=before_date,
-                from_filter=supplier.from_address_pattern or None,
-                subject_filter=supplier.price_subject_pattern or None,
-                dedupe_same_day_only=True,
-                dedupe_day_window=3,
-            )
-
-        thread = threading.Thread(target=_run, daemon=True)
-        thread.start()
+            messages.error(request, f"Failed to start backfill: {exc}")
         return redirect("prices:supplier_import", pk=pk)
 
 
 class SupplierEmailBackfillBulkView(LoginRequiredMixin, View):
     def post(self, request):
+        if _has_running_email_imports():
+            messages.info(request, EMAIL_IMPORT_BUSY_MESSAGE)
+            return redirect("prices:supplier_overview")
         supplier_ids = request.POST.getlist("supplier_ids")
         start_raw = request.POST.get("start_date", "").strip()
         end_raw = request.POST.get("end_date", "").strip()
@@ -1958,61 +1998,35 @@ class SupplierEmailBackfillBulkView(LoginRequiredMixin, View):
         if not suppliers:
             messages.info(request, "No valid suppliers selected.")
             return redirect("prices:supplier_overview")
-
-        def _run_bulk():
-            close_old_connections()
-            mailboxes = list(
-                models.Mailbox.objects.filter(is_active=True).order_by("priority", "id")
+        run_ids = []
+        for supplier in suppliers:
+            if not supplier.from_address_pattern:
+                continue
+            run = models.EmailImportRun.objects.create(
+                supplier=supplier,
+                status=models.EmailImportStatus.RUNNING,
+                last_message=f"Bulk backfill {start_date.isoformat()} to {end_date or 'today'}",
             )
-            settings_obj = models.ImportSettings.get_solo()
-            timeout_minutes = int(settings_obj.supplier_timeout_minutes or 0)
-            timeout_seconds = timeout_minutes * 60 if timeout_minutes > 0 else None
-            since_date = timezone.make_aware(datetime.combine(start_date, time(0, 0)))
-            before_date = None
-            if end_date:
-                before_date = timezone.make_aware(
-                    datetime.combine(end_date + timezone.timedelta(days=1), time(0, 0))
-                )
-            for supplier in suppliers:
-                if not supplier.from_address_pattern:
-                    continue
-                if models.EmailImportRun.objects.filter(
-                    supplier=supplier, status=models.EmailImportStatus.RUNNING
-                ).exists():
-                    continue
-                run = models.EmailImportRun.objects.create(
-                    supplier=supplier,
-                    status=models.EmailImportStatus.RUNNING,
-                    last_message=f"Bulk backfill {start_date.isoformat()} to {end_date or 'today'}",
-                )
-                try:
-                    run_import(
-                        mailboxes=mailboxes,
-                        supplier_id=supplier.id,
-                        mark_seen=False,
-                        limit=0,
-                        max_bytes=20_000_000,
-                        max_seconds=timeout_seconds,
-                        logger=None,
-                        run_id=run.id,
-                        search_criteria="ALL",
-                        since_date=since_date,
-                        before_date=before_date,
-                        from_filter=supplier.from_address_pattern or None,
-                        subject_filter=supplier.price_subject_pattern or None,
-                        dedupe_same_day_only=True,
-                        dedupe_day_window=3,
-                    )
-                except Exception as exc:
-                    models.EmailImportRun.objects.filter(id=run.id).update(
-                        status=models.EmailImportStatus.FAILED,
-                        finished_at=timezone.now(),
-                        errors=1,
-                        last_message=str(exc),
-                    )
-
-        thread = threading.Thread(target=_run_bulk, daemon=True)
-        thread.start()
+            run_ids.append(run.id)
+        if not run_ids:
+            messages.info(request, "No selected suppliers have sender email configured.")
+            return redirect("prices:supplier_overview")
+        command_args = ["process_email_runs"]
+        for run_id in run_ids:
+            command_args.extend(["--run-id", str(run_id)])
+        command_args.extend(["--start-date", start_date.isoformat()])
+        if end_date:
+            command_args.extend(["--end-date", end_date.isoformat()])
+        try:
+            _spawn_management_command(*command_args)
+        except Exception as exc:
+            models.EmailImportRun.objects.filter(id__in=run_ids).update(
+                status=models.EmailImportStatus.FAILED,
+                finished_at=timezone.now(),
+                errors=1,
+                last_message=f"Failed to start bulk backfill: {exc}",
+            )
+            messages.error(request, f"Failed to start bulk backfill: {exc}")
         return redirect("prices:supplier_overview")
 
 
@@ -2093,10 +2107,8 @@ class SupplierRatesRecalculateView(LoginRequiredMixin, View):
 
 class SupplierEmailImportAllView(LoginRequiredMixin, View):
     def post(self, request):
-        if models.EmailImportRun.objects.filter(
-            status=models.EmailImportStatus.RUNNING
-        ).exists():
-            messages.info(request, "Email import already running.")
+        if _has_running_email_imports():
+            messages.info(request, EMAIL_IMPORT_BUSY_MESSAGE)
             return redirect("prices:supplier_overview")
         suppliers = list(
             models.Supplier.objects.filter(
@@ -2108,56 +2120,33 @@ class SupplierEmailImportAllView(LoginRequiredMixin, View):
                 request, "No active suppliers with sender email configured."
             )
             return redirect("prices:supplier_overview")
-
-        def _run_all():
-            close_old_connections()
-            mailboxes = list(
-                models.Mailbox.objects.filter(is_active=True).order_by("priority", "id")
+        settings_obj = models.ImportSettings.get_solo()
+        mark_seen = bool(settings_obj.auto_mark_seen)
+        runs_by_supplier_id = {
+            supplier.id: models.EmailImportRun.objects.create(
+                supplier=supplier,
+                status=models.EmailImportStatus.RUNNING,
+                last_message="Queued for update from email.",
             )
-            settings_obj = models.ImportSettings.get_solo()
-            timeout_minutes = int(settings_obj.supplier_timeout_minutes or 0)
-            timeout_seconds = timeout_minutes * 60 if timeout_minutes > 0 else None
-            for supplier in suppliers:
-                run = models.EmailImportRun.objects.create(
-                    supplier=supplier, status=models.EmailImportStatus.RUNNING
-                )
-                since_date = timezone.now() - timezone.timedelta(
-                    days=supplier.email_search_days
-                )
-                try:
-                    latest_batch = _get_supplier_latest_batch_time(supplier)
-                    if latest_batch and timezone.is_naive(latest_batch):
-                        latest_batch = timezone.make_aware(latest_batch)
-                    if latest_batch:
-                        since_date = timezone.localtime(latest_batch) - timezone.timedelta(days=1)
-                    else:
-                        since_date = timezone.now() - timezone.timedelta(days=supplier.email_search_days)
-                    run_import(
-                        mailboxes=mailboxes,
-                        supplier_id=supplier.id,
-                        mark_seen=True,
-                        limit=0,
-                        max_bytes=20_000_000,
-                        max_seconds=timeout_seconds,
-                        logger=None,
-                        run_id=run.id,
-                        search_criteria="ALL",
-                        since_date=since_date,
-                        min_received_at=latest_batch,
-                        from_filter=supplier.from_address_pattern or None,
-                        subject_filter=supplier.price_subject_pattern or None,
-                        dedupe_same_day_only=True,
-                    )
-                except Exception as exc:
-                    models.EmailImportRun.objects.filter(id=run.id).update(
-                        status=models.EmailImportStatus.FAILED,
-                        finished_at=timezone.now(),
-                        errors=1,
-                        last_message=str(exc),
-                    )
-
-        thread = threading.Thread(target=_run_all, daemon=True)
-        thread.start()
+            for supplier in suppliers
+        }
+        command_args = ["process_email_runs"]
+        for run in runs_by_supplier_id.values():
+            command_args.extend(["--run-id", str(run.id)])
+        if mark_seen:
+            command_args.append("--mark-seen")
+        try:
+            _spawn_management_command(*command_args)
+        except Exception as exc:
+            models.EmailImportRun.objects.filter(
+                id__in=[run.id for run in runs_by_supplier_id.values()]
+            ).update(
+                status=models.EmailImportStatus.FAILED,
+                finished_at=timezone.now(),
+                errors=1,
+                last_message=f"Failed to start email updates: {exc}",
+            )
+            messages.error(request, f"Failed to start email updates: {exc}")
         return redirect("prices:supplier_overview")
 
 
@@ -2181,6 +2170,7 @@ class SupplierPriceReimportAllView(LoginRequiredMixin, View):
 
 class SupplierEmailImportStatusView(LoginRequiredMixin, View):
     def get(self, request, pk):
+        _expire_stale_email_import_runs()
         run = (
             models.EmailImportRun.objects.filter(supplier_id=pk)
             .order_by("-started_at")
@@ -2206,6 +2196,7 @@ class SupplierEmailImportStatusView(LoginRequiredMixin, View):
 
 class SupplierEmailImportStatusAllView(LoginRequiredMixin, View):
     def get(self, request):
+        _expire_stale_email_import_runs()
         suppliers = list(models.Supplier.objects.order_by("name"))
         latest_successful_imports = _collect_latest_successful_imports()
         latest_runs, run_streaks = _collect_latest_runs_and_streaks()
@@ -2247,6 +2238,7 @@ class SupplierEmailImportStatusAllView(LoginRequiredMixin, View):
 
 class SupplierEmailImportCancelView(LoginRequiredMixin, View):
     def post(self, request, pk):
+        _expire_stale_email_import_runs()
         supplier = get_object_or_404(models.Supplier, pk=pk)
         updated = models.EmailImportRun.objects.filter(
             supplier=supplier, status=models.EmailImportStatus.RUNNING

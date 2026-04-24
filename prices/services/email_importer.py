@@ -171,11 +171,20 @@ def _connect_imap(mailbox, logger, select_folder="INBOX"):
 
 
 def _imap_search(client, mailbox, criteria, logger, selected_folder="INBOX"):
+    if not client:
+        return "NO", [], None
     for attempt in range(2):
         try:
             status, data = client.search(None, *criteria)
             return status, data, client
-        except (imaplib.IMAP4.abort, imaplib.IMAP4.error, socket.timeout, ssl.SSLError) as exc:
+        except (
+            imaplib.IMAP4.abort,
+            imaplib.IMAP4.error,
+            socket.timeout,
+            ssl.SSLError,
+            OSError,
+            AttributeError,
+        ) as exc:
             _log(logger, f"IMAP search error ({mailbox.name}): {exc}")
             if attempt == 0:
                 client = _connect_imap(mailbox, logger, select_folder=selected_folder)
@@ -193,7 +202,14 @@ def _imap_fetch(client, mailbox, msg_id, query, logger, selected_folder="INBOX")
         try:
             status, data = client.fetch(msg_id, query)
             return status, data, client
-        except (imaplib.IMAP4.abort, imaplib.IMAP4.error, socket.timeout, ssl.SSLError) as exc:
+        except (
+            imaplib.IMAP4.abort,
+            imaplib.IMAP4.error,
+            socket.timeout,
+            ssl.SSLError,
+            OSError,
+            AttributeError,
+        ) as exc:
             _log(logger, f"IMAP fetch error ({mailbox.name}): {exc}")
             if attempt == 0:
                 client = _connect_imap(mailbox, logger, select_folder=selected_folder)
@@ -380,6 +396,9 @@ def run_import(
     max_log_lines = 20000
     unmatched_log_count = 0
     unmatched_log_limit = 25
+    last_cancel_check = 0.0
+    cancel_check_interval = 2.0
+    is_canceled = False
 
     def _log_line(msg):
         stamp = timezone.localtime(timezone.now()).strftime("%H:%M:%S")
@@ -405,6 +424,22 @@ def run_import(
         nonlocal last_message
         last_message = msg
         _log_line(msg)
+
+    def run_was_canceled() -> bool:
+        nonlocal last_cancel_check, is_canceled
+        if is_canceled or not run_id:
+            return is_canceled
+        now = time.monotonic()
+        if now - last_cancel_check < cancel_check_interval:
+            return False
+        last_cancel_check = now
+        status = (
+            models.EmailImportRun.objects.filter(id=run_id)
+            .values_list("status", flat=True)
+            .first()
+        )
+        is_canceled = status == models.EmailImportStatus.CANCELED
+        return is_canceled
 
     summary = {
         "processed_files": 0,
@@ -454,10 +489,8 @@ def run_import(
     try:
         for mailbox in mailboxes:
             check_timeout("mailbox loop")
-            if run_id:
-                run = models.EmailImportRun.objects.filter(id=run_id).first()
-                if run and run.status == models.EmailImportStatus.CANCELED:
-                    break
+            if run_was_canceled():
+                break
             if mailbox.protocol != models.Mailbox.IMAP:
                 _log(_log_line, f"Skipping {mailbox.name}: only IMAP supported.")
                 continue
@@ -636,10 +669,8 @@ def run_import(
             max_processed_uid = 0
             for msg_id in message_ids:
                 check_timeout("processing messages")
-                if run_id:
-                    run = models.EmailImportRun.objects.filter(id=run_id).first()
-                    if run and run.status == models.EmailImportStatus.CANCELED:
-                        break
+                if run_was_canceled():
+                    break
                 if run_id:
                     models.EmailImportRun.objects.filter(id=run_id).update(
                         processed_messages=F("processed_messages") + 1
@@ -749,10 +780,8 @@ def run_import(
                             f"{mailbox.name}: processed first attachment in message {msg_id.decode(errors='ignore')}; skipping remaining attachments."
                         )
                         break
-                    if run_id:
-                        run = models.EmailImportRun.objects.filter(id=run_id).first()
-                        if run and run.status == models.EmailImportStatus.CANCELED:
-                            break
+                    if run_was_canceled():
+                        break
                     if part.get_content_maintype() == "multipart":
                         continue
                     filename = _get_part_filename(part)
