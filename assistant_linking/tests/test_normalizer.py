@@ -57,3 +57,20 @@ class NormalizerTests(TestCase):
 
         self.assertEqual(parsed.normalized_brand, brand)
         self.assertEqual(parsed.product_name_text, "malmaison")
+
+    def test_compact_concentration_and_size_are_split(self):
+        brand = Brand.objects.create(name="Montale")
+        BrandAlias.objects.create(brand=brand, alias_text="Montale", normalized_alias="montale")
+        product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="4",
+            name="Montale Tropical Wood tester edp100ml",
+        )
+
+        parsed = parse_supplier_product(product)
+
+        self.assertEqual(parsed.normalized_brand, brand)
+        self.assertEqual(parsed.product_name_text, "tropical wood")
+        self.assertEqual(parsed.concentration, "Eau de Parfum")
+        self.assertEqual(parsed.size_ml, 100)
+        self.assertTrue(parsed.is_tester)

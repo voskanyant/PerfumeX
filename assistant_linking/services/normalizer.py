@@ -60,6 +60,8 @@ class ParseResult:
 
 def normalize_text(value: str) -> str:
     text = unicodedata.normalize("NFKC", value or "").lower()
+    text = re.sub(r"\b(edp|edt|edc)(?=\d)", r"\1 ", text)
+    text = re.sub(r"\b(eau de parfum|eau de toilette|eau de cologne|extrait de parfum|extrait|parfum)(?=\d)", r"\1 ", text)
     text = re.sub(r"[\u00a0_/,;:|()\[\]{}]+", " ", text)
     text = re.sub(r"(?<=\d),(?=\d)", ".", text)
     text = re.sub(r"\s+", " ", text).strip()
