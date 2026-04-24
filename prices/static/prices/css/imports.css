@@ -257,6 +257,16 @@
   width: min(150px, 100%);
 }
 
+.supplier-import-table tr.is-row-pending {
+  background: linear-gradient(180deg, rgba(10, 10, 10, 0.02), rgba(10, 10, 10, 0.01));
+}
+
+.supplier-import-table tr.is-row-pending .import-supplier-name,
+.supplier-import-table tr.is-row-pending .import-relative-time,
+.supplier-import-table tr.is-row-pending .import-status-note {
+  opacity: 0.92;
+}
+
 .import-actions-row {
   display: flex;
   flex-wrap: wrap;

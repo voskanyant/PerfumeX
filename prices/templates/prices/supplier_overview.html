@@ -25,7 +25,7 @@
                     {% csrf_token %}
                     <button class="button secondary" type="submit">Reimport all prices</button>
                 </form>
-                <form action="{% url 'prices:supplier_import_email_all' %}" method="post" class="layout-inline">
+                <form action="{% url 'prices:supplier_import_email_all' %}" method="post" class="layout-inline" data-email-update-all-form>
                     {% csrf_token %}
                     <button class="button" type="submit" data-email-update-all{% if any_running %} disabled{% endif %}>Update all from email</button>
                 </form>
@@ -85,7 +85,7 @@
                 <div>
                     <span class="page-kicker">Suppliers</span>
                     <h2 class="page-title">Supplier import board</h2>
-                    <div class="page-meta">Attention-first board with last successful import, latest email check, and supplier health.</div>
+                    <div class="page-meta">Attention-first board with last successful import, latest email check result, and supplier health.</div>
                 </div>
             </div>
             <div class="import-summary-strip">
@@ -121,8 +121,8 @@
                             <tr>
                                 <th><input type="checkbox" id="supplier-select-all"></th>
                                 <th>Supplier</th>
-                                <th>Last import</th>
-                                <th>Latest check</th>
+                                <th>Last success</th>
+                                <th>Latest email check</th>
                                 <th>Health</th>
                                 <th>Actions</th>
                             </tr>
@@ -140,7 +140,7 @@
                                             {% endif %}
                                         </div>
                                     </td>
-                                    <td class="import-col-last" data-label="Last import">
+                                    <td class="import-col-last" data-label="Last success">
                                         <button
                                             type="button"
                                             class="import-relative-time cell-imported {{ row.last_import_age_class }}{% if not row.last_import_full %} import-relative-time--empty{% endif %}"
@@ -150,7 +150,7 @@
                                         >{{ row.last_import_relative }}</button>
                                         <div class="import-last-note" data-last-import-note>{{ row.last_import_note }}</div>
                                     </td>
-                                    <td class="import-col-check" data-label="Latest check">
+                                    <td class="import-col-check" data-label="Latest email check">
                                         <div class="import-check-stack">
                                             <div class="import-check-head">
                                                 <button
@@ -197,7 +197,7 @@
                                                     </svg>
                                                 </a>
                                             {% endif %}
-                                            <form action="{% url 'prices:supplier_import_email' row.supplier.pk %}" method="post" class="import-action-form">
+                                            <form action="{% url 'prices:supplier_import_email' row.supplier.pk %}" method="post" class="import-action-form" data-email-update-form>
                                                 {% csrf_token %}
                                                 <button class="button icon import-action-button" type="submit" data-email-update{% if row.is_running or not row.has_email_route %} disabled{% endif %} title="Update from email" aria-label="Update from email">
                                                     <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -289,6 +289,51 @@
                 var safeValue = value || "";
                 element.textContent = safeValue;
                 element.title = safeValue;
+            }
+
+            function currentText(selector, row) {
+                var element = row.querySelector(selector);
+                return element ? element.textContent.trim() : "";
+            }
+
+            function buildPendingState(row) {
+                return {
+                    is_running: true,
+                    has_email_route: true,
+                    last_import_relative: currentText("[data-last-import-label]", row),
+                    last_import_full: (row.querySelector("[data-last-import-label]") || {}).getAttribute ? row.querySelector("[data-last-import-label]").getAttribute("data-full-datetime") || "" : "",
+                    last_import_age_class: (function () {
+                        var label = row.querySelector("[data-last-import-label]");
+                        if (!label) {
+                            return "";
+                        }
+                        if (label.classList.contains("age-fresh")) return "age-fresh";
+                        if (label.classList.contains("age-warn")) return "age-warn";
+                        if (label.classList.contains("age-stale")) return "age-stale";
+                        return "";
+                    })(),
+                    last_import_note: currentText("[data-last-import-note]", row),
+                    check_label: "updating",
+                    check_class: "is-running",
+                    check_code: "running",
+                    check_note: "Starting background import…",
+                    check_relative: "Now",
+                    check_full: "",
+                    check_progress: 8,
+                    check_has_time: false,
+                    health_label: currentText("[data-health-chip]", row),
+                    health_class: (function () {
+                        var chip = row.querySelector("[data-health-chip]");
+                        if (!chip) {
+                            return "is-neutral";
+                        }
+                        return Array.from(chip.classList).filter(function (className) {
+                            return className.indexOf("is-") === 0;
+                        })[0] || "is-neutral";
+                    })(),
+                    health_code: "",
+                    health_note: currentText("[data-health-note]", row)
+                };
             }
 
             function applyRowState(row, state) {
@@ -393,6 +438,35 @@
                 }
             });
 
+            document.addEventListener("submit", function (event) {
+                var singleUpdateForm = event.target.closest("[data-email-update-form]");
+                if (singleUpdateForm) {
+                    var row = singleUpdateForm.closest("[data-supplier-id]");
+                    if (row) {
+                        row.classList.add("is-row-pending");
+                        applyRowState(row, buildPendingState(row));
+                    }
+                    return;
+                }
+
+                var updateAllForm = event.target.closest("[data-email-update-all-form]");
+                if (updateAllForm) {
+                    var updateAllBtn = updateAllForm.querySelector("[data-email-update-all]");
+                    if (updateAllBtn) {
+                        updateAllBtn.disabled = true;
+                        updateAllBtn.textContent = "Starting…";
+                    }
+                    document.querySelectorAll("[data-supplier-id]").forEach(function (row) {
+                        var updateBtn = row.querySelector("[data-email-update]");
+                        if (!updateBtn || updateBtn.disabled) {
+                            return;
+                        }
+                        row.classList.add("is-row-pending");
+                        applyRowState(row, buildPendingState(row));
+                    });
+                }
+            });
+
             function updateAll() {
                 fetch("{% url 'prices:supplier_import_email_status_all' %}")
                     .then(function (res) { return res.json(); })
@@ -406,6 +480,7 @@
                                 return;
                             }
                             applyRowState(row, state);
+                            row.classList.toggle("is-row-pending", !!state.is_running);
                             if (state.is_running) {
                                 anyRunning = true;
                             }

@@ -464,6 +464,23 @@ def _build_latest_check_info(supplier, run, streak_count: int = 1) -> dict[str, 
     }
 
 
+def _clarify_latest_check_with_last_success(
+    latest_check: dict[str, str | int | None | bool],
+    last_import: dict[str, str | int],
+) -> dict[str, str | int | None | bool]:
+    code = str(latest_check.get("code") or "")
+    if str(last_import.get("source_code") or "") == "never":
+        return latest_check
+    if code not in {"failed", "warning", "no-files", "no-change"}:
+        return latest_check
+    note = str(latest_check.get("note") or "").strip()
+    last_success = str(last_import.get("relative") or "").strip()
+    if not last_success:
+        return latest_check
+    latest_check["note"] = f"{note} · last success {last_success}" if note else f"Last success {last_success}"
+    return latest_check
+
+
 def _build_health_info(supplier, last_import_info, latest_check_info, streak_count: int = 1) -> dict[str, str | int]:
     expected_hours = _expected_import_interval_hours(supplier)
     cadence_label = _format_interval_hours(expected_hours)
@@ -508,10 +525,14 @@ def _build_health_info(supplier, last_import_info, latest_check_info, streak_cou
         }
 
     if code == "failed":
+        recent_success = str(last_import_info.get("relative") or "").strip()
+        note = latest_check_info["note"] or f"Latest check failed · target {cadence_label}"
+        if recent_success and age_hours is not None and age_hours <= expected_hours:
+            note = f"Recent success {recent_success} · latest email check failed"
         return {
             "label": "warning",
             "class_name": "is-warning",
-            "note": latest_check_info["note"] or f"Latest check failed · target {cadence_label}",
+            "note": note,
             "code": "warning",
             "severity": 2,
         }
@@ -568,6 +589,7 @@ def _supplier_log_url(supplier_id: int, run=None, batch=None) -> str:
 def _build_supplier_board_row(supplier, successful_batch, latest_run, streak_count: int = 1) -> dict[str, object]:
     last_import = _build_last_import_info(successful_batch)
     latest_check = _build_latest_check_info(supplier, latest_run, streak_count)
+    latest_check = _clarify_latest_check_with_last_success(latest_check, last_import)
     health = _build_health_info(supplier, last_import, latest_check, streak_count)
     return {
         "supplier": supplier,
