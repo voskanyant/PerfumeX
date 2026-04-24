@@ -137,6 +137,9 @@
                 <div class="page-meta">Total {{ total_count }}</div>
             </div>
             <div class="generic-list-actions">
+                {% if list_title == "Our Products" %}
+                    <a class="button secondary" href="{% url 'assistant_core:catalog_import' %}">Import Excel</a>
+                {% endif %}
                 {% if show_create and create_url_name %}
                     <a class="button" href="{% url create_url_name %}">Add new</a>
                 {% endif %}
