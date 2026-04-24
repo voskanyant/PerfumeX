@@ -41,7 +41,6 @@ import unicodedata
 
 from django.db.models import (
     Case,
-    Count,
     DecimalField,
     ExpressionWrapper,
     F,
@@ -53,7 +52,7 @@ from django.db.models import (
 )
 from django.db.models.functions import Coalesce, RowNumber, TruncDate
 
-from catalog.models import Perfume as CatalogPerfume
+from catalog.models import PerfumeVariant as CatalogPerfumeVariant
 
 from . import forms, models
 from django.shortcuts import get_object_or_404, redirect
@@ -3187,27 +3186,31 @@ class SupplierProductDeleteView(BaseDeleteView):
 
 
 class OurProductListView(LoginRequiredMixin, ListView):
-    model = CatalogPerfume
+    model = CatalogPerfumeVariant
     template_name = "prices/our_products_catalog.html"
-    context_object_name = "perfumes"
+    context_object_name = "variants"
     paginate_by = 50
 
     def get_queryset(self):
-        queryset = CatalogPerfume.objects.select_related("brand").annotate(variant_count=Count("variants"))
+        queryset = CatalogPerfumeVariant.objects.select_related("perfume", "perfume__brand")
         query = self.request.GET.get("q", "").strip()
         if query:
             queryset = queryset.filter(
-                Q(name__icontains=query)
-                | Q(brand__name__icontains=query)
-                | Q(collection_name__icontains=query)
-                | Q(concentration__icontains=query)
-                | Q(audience__icontains=query)
+                Q(perfume__name__icontains=query)
+                | Q(perfume__brand__name__icontains=query)
+                | Q(perfume__collection_name__icontains=query)
+                | Q(perfume__concentration__icontains=query)
+                | Q(size_label__icontains=query)
+                | Q(packaging__icontains=query)
+                | Q(variant_type__icontains=query)
+                | Q(sku__icontains=query)
+                | Q(ean__icontains=query)
             )
-        return queryset.order_by("brand__name", "name", "concentration")
+        return queryset.order_by("perfume__brand__name", "perfume__name", "perfume__concentration", "size_ml", "packaging")
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context["total_count"] = context["paginator"].count if context.get("paginator") else len(context["perfumes"])
+        context["total_count"] = context["paginator"].count if context.get("paginator") else len(context["variants"])
         context["search_query"] = self.request.GET.get("q", "").strip()
         return context
 
