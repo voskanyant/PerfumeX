@@ -472,7 +472,7 @@
                     .then(function (res) { return res.json(); })
                     .then(function (data) {
                         var rows = data.rows || {};
-                        var anyRunning = false;
+                        var anyRunning = !!data.worker_busy;
                         document.querySelectorAll("[data-supplier-id]").forEach(function (row) {
                             var supplierId = row.getAttribute("data-supplier-id");
                             var state = rows[supplierId];

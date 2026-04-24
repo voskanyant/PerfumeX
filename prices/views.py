@@ -61,6 +61,7 @@ from django.db import close_old_connections
 
 from .services.importer import preview_mapping_file
 from .services.cbr_rates import upsert_cbr_markup_rates, upsert_cbr_markup_rates_range
+from .services.email_import_lock import email_import_worker_is_busy
 
 
 CRON_MARKER = "PERFUMEX_IMPORT_CRON"
@@ -174,6 +175,8 @@ def _expire_stale_email_import_runs() -> int:
 
 def _has_running_email_imports(supplier=None) -> bool:
     _expire_stale_email_import_runs()
+    if email_import_worker_is_busy():
+        return True
     runs = models.EmailImportRun.objects.filter(status=models.EmailImportStatus.RUNNING)
     if supplier is not None:
         runs = runs.filter(supplier=supplier)
@@ -1298,9 +1301,12 @@ class SupplierOverviewView(LoginRequiredMixin, TemplateView):
         context["supplier_summary"] = _build_supplier_board_summary(rows)
         context["import_batches"] = log_page
         context["import_log_page"] = log_page
-        context["any_running"] = models.EmailImportRun.objects.filter(
-            status=models.EmailImportStatus.RUNNING
-        ).exists()
+        context["any_running"] = (
+            models.EmailImportRun.objects.filter(
+                status=models.EmailImportStatus.RUNNING
+            ).exists()
+            or email_import_worker_is_busy()
+        )
         context["supplier_filter"] = supplier_filter
         context["status_filter"] = status_filter
         context["log_sort"] = log_sort
@@ -2254,6 +2260,7 @@ class SupplierEmailImportStatusAllView(LoginRequiredMixin, View):
             {
                 "rows": rows,
                 "summary": _build_supplier_board_summary(list(rows.values())),
+                "worker_busy": email_import_worker_is_busy(),
             }
         )
 
