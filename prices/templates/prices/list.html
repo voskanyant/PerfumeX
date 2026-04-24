@@ -106,6 +106,13 @@
                             </div>
                         {% endif %}
                         <div class="filter-item">
+                            <label for="smart-search-switch">Search mode</label>
+                            <div class="switch-row inactive-switch-wrap">
+                                <input class="switch-input" id="smart-search-switch" type="checkbox" role="switch"{% if smart_search_enabled %} checked{% endif %}>
+                                <label class="switch-label inactive-switch-label" for="smart-search-switch">Smart search</label>
+                            </div>
+                        </div>
+                        <div class="filter-item">
                             <label for="price-min-filter">Min price</label>
                             <input id="price-min-filter" type="text" value="{{ price_min|default:'' }}" placeholder="e.g. 100">
                         </div>
@@ -236,7 +243,7 @@
                             <th data-field="{{ field }}">
                                 {% if current_sort == field %}
                                     {% if current_dir == "asc" %}
-                                        <a href="?sort={{ field }}&dir=desc{% if current_q %}&q={{ current_q }}{% endif %}{% if currency_filter %}&currency={{ currency_filter }}{% endif %}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if exclude_terms %}&exclude={{ exclude_terms|urlencode }}{% endif %}{% if price_min %}&price_min={{ price_min|urlencode }}{% endif %}{% if price_max %}&price_max={{ price_max|urlencode }}{% endif %}">
+                                        <a href="?sort={{ field }}&dir=desc{% if current_q %}&q={{ current_q }}{% endif %}{% if currency_filter %}&currency={{ currency_filter }}{% endif %}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if exclude_terms %}&exclude={{ exclude_terms|urlencode }}{% endif %}{% if smart_search_enabled %}&smart=1{% endif %}{% if price_min %}&price_min={{ price_min|urlencode }}{% endif %}{% if price_max %}&price_max={{ price_max|urlencode }}{% endif %}">
                                             {% if field == "current_price" %}
                                                 Price ({% if currency_filter %}{{ currency_filter|currency_symbol }}{% else %}Original{% endif %}) ▲
                                             {% else %}
@@ -244,7 +251,7 @@
                                             {% endif %}
                                         </a>
                                     {% else %}
-                                        <a href="?sort={{ field }}&dir=asc{% if current_q %}&q={{ current_q }}{% endif %}{% if currency_filter %}&currency={{ currency_filter }}{% endif %}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if exclude_terms %}&exclude={{ exclude_terms|urlencode }}{% endif %}{% if price_min %}&price_min={{ price_min|urlencode }}{% endif %}{% if price_max %}&price_max={{ price_max|urlencode }}{% endif %}">
+                                        <a href="?sort={{ field }}&dir=asc{% if current_q %}&q={{ current_q }}{% endif %}{% if currency_filter %}&currency={{ currency_filter }}{% endif %}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if exclude_terms %}&exclude={{ exclude_terms|urlencode }}{% endif %}{% if smart_search_enabled %}&smart=1{% endif %}{% if price_min %}&price_min={{ price_min|urlencode }}{% endif %}{% if price_max %}&price_max={{ price_max|urlencode }}{% endif %}">
                                             {% if field == "current_price" %}
                                                 Price ({% if currency_filter %}{{ currency_filter|currency_symbol }}{% else %}Original{% endif %}) ▼
                                             {% else %}
@@ -253,7 +260,7 @@
                                         </a>
                                     {% endif %}
                                 {% else %}
-                                    <a href="?sort={{ field }}&dir=asc{% if current_q %}&q={{ current_q }}{% endif %}{% if currency_filter %}&currency={{ currency_filter }}{% endif %}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if exclude_terms %}&exclude={{ exclude_terms|urlencode }}{% endif %}{% if price_min %}&price_min={{ price_min|urlencode }}{% endif %}{% if price_max %}&price_max={{ price_max|urlencode }}{% endif %}">
+                                    <a href="?sort={{ field }}&dir=asc{% if current_q %}&q={{ current_q }}{% endif %}{% if currency_filter %}&currency={{ currency_filter }}{% endif %}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if exclude_terms %}&exclude={{ exclude_terms|urlencode }}{% endif %}{% if smart_search_enabled %}&smart=1{% endif %}{% if price_min %}&price_min={{ price_min|urlencode }}{% endif %}{% if price_max %}&price_max={{ price_max|urlencode }}{% endif %}">
                                         {% if field == "current_price" %}
                                             Price ({% if currency_filter %}{{ currency_filter|currency_symbol }}{% else %}Original{% endif %})
                                         {% else %}
@@ -430,7 +437,7 @@
                     <ul class="pagination-list">
                         {% if page_obj.has_previous %}
                             <li class="page-item">
-                                <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if current_sort %}&sort={{ current_sort }}{% endif %}{% if current_dir %}&dir={{ current_dir }}{% endif %}{% if current_q %}&q={{ current_q }}{% endif %}{% if currency_filter %}&currency={{ currency_filter }}{% endif %}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if exclude_terms %}&exclude={{ exclude_terms|urlencode }}{% endif %}{% if price_min %}&price_min={{ price_min|urlencode }}{% endif %}{% if price_max %}&price_max={{ price_max|urlencode }}{% endif %}">Previous</a>
+                                <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if current_sort %}&sort={{ current_sort }}{% endif %}{% if current_dir %}&dir={{ current_dir }}{% endif %}{% if current_q %}&q={{ current_q }}{% endif %}{% if currency_filter %}&currency={{ currency_filter }}{% endif %}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if exclude_terms %}&exclude={{ exclude_terms|urlencode }}{% endif %}{% if smart_search_enabled %}&smart=1{% endif %}{% if price_min %}&price_min={{ price_min|urlencode }}{% endif %}{% if price_max %}&price_max={{ price_max|urlencode }}{% endif %}">Previous</a>
                             </li>
                         {% endif %}
                         {% for page_num in page_obj.paginator.page_range %}
@@ -442,14 +449,14 @@
                                     <li class="page-item active"><span class="page-link">{{ page_num }}</span></li>
                                 {% else %}
                                     <li class="page-item">
-                                        <a class="page-link" href="?page={{ page_num }}{% if current_sort %}&sort={{ current_sort }}{% endif %}{% if current_dir %}&dir={{ current_dir }}{% endif %}{% if current_q %}&q={{ current_q }}{% endif %}{% if currency_filter %}&currency={{ currency_filter }}{% endif %}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if exclude_terms %}&exclude={{ exclude_terms|urlencode }}{% endif %}{% if price_min %}&price_min={{ price_min|urlencode }}{% endif %}{% if price_max %}&price_max={{ price_max|urlencode }}{% endif %}">{{ page_num }}</a>
+                                        <a class="page-link" href="?page={{ page_num }}{% if current_sort %}&sort={{ current_sort }}{% endif %}{% if current_dir %}&dir={{ current_dir }}{% endif %}{% if current_q %}&q={{ current_q }}{% endif %}{% if currency_filter %}&currency={{ currency_filter }}{% endif %}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if exclude_terms %}&exclude={{ exclude_terms|urlencode }}{% endif %}{% if smart_search_enabled %}&smart=1{% endif %}{% if price_min %}&price_min={{ price_min|urlencode }}{% endif %}{% if price_max %}&price_max={{ price_max|urlencode }}{% endif %}">{{ page_num }}</a>
                                     </li>
                                 {% endif %}
                             {% endif %}
                         {% endfor %}
                         {% if page_obj.has_next %}
                             <li class="page-item">
-                                <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if current_sort %}&sort={{ current_sort }}{% endif %}{% if current_dir %}&dir={{ current_dir }}{% endif %}{% if current_q %}&q={{ current_q }}{% endif %}{% if currency_filter %}&currency={{ currency_filter }}{% endif %}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if exclude_terms %}&exclude={{ exclude_terms|urlencode }}{% endif %}{% if price_min %}&price_min={{ price_min|urlencode }}{% endif %}{% if price_max %}&price_max={{ price_max|urlencode }}{% endif %}">Next</a>
+                                <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if current_sort %}&sort={{ current_sort }}{% endif %}{% if current_dir %}&dir={{ current_dir }}{% endif %}{% if current_q %}&q={{ current_q }}{% endif %}{% if currency_filter %}&currency={{ currency_filter }}{% endif %}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if exclude_terms %}&exclude={{ exclude_terms|urlencode }}{% endif %}{% if smart_search_enabled %}&smart=1{% endif %}{% if price_min %}&price_min={{ price_min|urlencode }}{% endif %}{% if price_max %}&price_max={{ price_max|urlencode }}{% endif %}">Next</a>
                             </li>
                         {% endif %}
                     </ul>
@@ -463,6 +470,7 @@
                         {% if supplier_filter %}<input type="hidden" name="supplier" value="{{ supplier_filter }}">{% endif %}
                         {% if status_filter %}<input type="hidden" name="status" value="{{ status_filter }}">{% endif %}
                         {% if exclude_terms %}<input type="hidden" name="exclude" value="{{ exclude_terms }}">{% endif %}
+                        {% if smart_search_enabled %}<input type="hidden" name="smart" value="1">{% endif %}
                         {% if price_min %}<input type="hidden" name="price_min" value="{{ price_min }}">{% endif %}
                         {% if price_max %}<input type="hidden" name="price_max" value="{{ price_max }}">{% endif %}
                         <button class="button secondary" type="submit">Go</button>

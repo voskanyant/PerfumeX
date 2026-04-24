@@ -13,6 +13,7 @@
     var showInactiveSwitch = document.getElementById("show-inactive-switch");
     var excludeFilter = document.getElementById("exclude-filter");
     var excludeApplyBtn = document.getElementById("exclude-apply-btn");
+    var smartSearchSwitch = document.getElementById("smart-search-switch");
     var priceMinFilter = document.getElementById("price-min-filter");
     var priceMaxFilter = document.getElementById("price-max-filter");
     var priceApplyBtn = document.getElementById("price-apply-btn");
@@ -178,6 +179,13 @@
                 url.searchParams.set("exclude", excludeRaw);
             } else {
                 url.searchParams.delete("exclude");
+            }
+        }
+        if (smartSearchSwitch) {
+            if (smartSearchSwitch.checked) {
+                url.searchParams.set("smart", "1");
+            } else {
+                url.searchParams.delete("smart");
             }
         }
         var priceMinRaw = getPriceMinValue();
@@ -675,6 +683,7 @@
             currencyFilter ? currencyFilter.value : "",
             supplierFilter ? supplierFilter.value : "",
             getStatusFilterValue(),
+            smartSearchSwitch && smartSearchSwitch.checked ? "1" : "",
             excludeFilter ? excludeFilter.value.trim() : "",
             getPriceMinValue(),
             getPriceMaxValue(),
@@ -714,6 +723,9 @@
         }
         if (excludeFilter && excludeFilter.value.trim()) {
             url += "&exclude=" + encodeURIComponent(excludeFilter.value.trim());
+        }
+        if (smartSearchSwitch && smartSearchSwitch.checked) {
+            url += "&smart=1";
         }
         if (getPriceMinValue()) {
             url += "&price_min=" + encodeURIComponent(getPriceMinValue());
@@ -886,6 +898,14 @@
     }
     if (showInactiveSwitch) {
         showInactiveSwitch.addEventListener("change", function () {
+            var url = new URL(window.location.href);
+            setCommonFilters(url);
+            url.searchParams.delete("page");
+            window.location.href = url.toString();
+        });
+    }
+    if (smartSearchSwitch) {
+        smartSearchSwitch.addEventListener("change", function () {
             var url = new URL(window.location.href);
             setCommonFilters(url);
             url.searchParams.delete("page");

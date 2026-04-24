@@ -67,7 +67,7 @@ from .services.email_import_lock import email_import_worker_is_busy
 CRON_MARKER = "PERFUMEX_IMPORT_CRON"
 PRODUCT_REMOVED_EVENT_PREFIX = "SYSTEM_DEACTIVATE:"
 logger = logging.getLogger(__name__)
-FRONT_FILTER_KEYS = ("q", "currency", "supplier", "status", "price_min", "price_max", "exclude")
+FRONT_FILTER_KEYS = ("q", "currency", "supplier", "status", "price_min", "price_max", "exclude", "smart")
 EMAIL_IMPORT_BUSY_MESSAGE = "Another email import is already running. Wait for it to finish or cancel it first."
 
 
@@ -704,6 +704,19 @@ def _apply_supplier_product_token_filter(queryset, include_tokens: list[str]):
             Q(name__icontains=token) | Q(supplier__name__icontains=token)
         )
     return queryset
+
+
+def _smart_search_enabled_from_request(request) -> bool:
+    raw = (request.GET.get("smart") or "").strip().lower()
+    return raw in {"1", "true", "yes", "on"}
+
+
+def _apply_supplier_product_search_filter(queryset, query: str, include_tokens: list[str], request):
+    if query and _smart_search_enabled_from_request(request):
+        from assistant_linking.services.smart_search import apply_smart_supplier_search
+
+        return apply_smart_supplier_search(queryset, query)
+    return _apply_supplier_product_token_filter(queryset, include_tokens)
 
 
 def _parse_supplier_filter_ids(raw: str) -> list[int]:
@@ -1704,7 +1717,7 @@ class SupplierProductSearchView(LoginRequiredMixin, View):
                 display_price_sort=_display_price_expression_for_currency(queryset_currency)
             )
             ordering = f"{prefix}display_price_sort"
-        queryset = _apply_supplier_product_token_filter(queryset, include_tokens)
+        queryset = _apply_supplier_product_search_filter(queryset, query, include_tokens, request)
         for term in inline_exclude_tokens:
             queryset = queryset.exclude(name__icontains=term)
         if supplier_filter_ids:
@@ -2849,7 +2862,7 @@ class SupplierProductListView(BaseListView):
         status_filter = self.request.GET.get("status", "").strip().lower() or "all"
         if status_filter not in {"active", "inactive", "all"}:
             status_filter = "all"
-        queryset = _apply_supplier_product_token_filter(queryset, include_tokens)
+        queryset = _apply_supplier_product_search_filter(queryset, query, include_tokens, self.request)
         for term in inline_exclude_tokens:
             queryset = queryset.exclude(name__icontains=term)
         if supplier_filter_ids:
@@ -2893,6 +2906,7 @@ class SupplierProductListView(BaseListView):
             ]
         context["status_filter"] = status_filter
         context["status_options"] = [("all", "All"), ("active", "Active"), ("inactive", "Inactive")]
+        context["smart_search_enabled"] = _smart_search_enabled_from_request(self.request)
         context["exclude_terms"] = getattr(self, "_exclude_terms_raw", _resolve_supplier_exclude_terms(self.request))
         context["price_min"] = getattr(self, "_price_min_raw", self.request.GET.get("price_min", ""))
         context["price_max"] = getattr(self, "_price_max_raw", self.request.GET.get("price_max", ""))
