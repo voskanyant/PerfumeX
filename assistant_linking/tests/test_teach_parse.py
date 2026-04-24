@@ -5,7 +5,7 @@ from django.urls import reverse
 from assistant_linking.models import BrandAlias, ParsedSupplierProduct, ProductAlias
 from assistant_linking.services.normalizer import save_parse
 from assistant_linking.services.teaching import suggest_product_alias_blockers
-from catalog.models import Brand
+from catalog.models import Brand, Perfume, PerfumeVariant
 from prices.models import Supplier, SupplierProduct
 
 
@@ -110,3 +110,22 @@ class TeachParseTests(TestCase):
         blockers = suggest_product_alias_blockers(classic, "light blue", "dolce gabanna")
 
         self.assertIn("intense", blockers)
+
+    def test_staff_can_accept_catalog_candidate_from_normalization(self):
+        brand = Brand.objects.create(name="Montale")
+        perfume = Perfume.objects.create(brand=brand, name="Vanilla Extasy", concentration="edp")
+        variant = PerfumeVariant.objects.create(perfume=perfume, size_ml="100", variant_type="standard")
+
+        response = self.client.post(
+            reverse("assistant_linking:normalization_accept_candidate", args=[self.product.id]),
+            {"perfume_id": perfume.id, "variant_id": variant.id},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.product.refresh_from_db()
+        parsed = ParsedSupplierProduct.objects.get(supplier_product=self.product)
+        self.assertEqual(self.product.catalog_perfume, perfume)
+        self.assertEqual(self.product.catalog_variant, variant)
+        self.assertEqual(parsed.normalized_brand, brand)
+        self.assertEqual(parsed.product_name_text, "Vanilla Extasy")
+        self.assertTrue(parsed.locked_by_human)

@@ -1,0 +1,29 @@
+{% extends "prices/base.html" %}
+{% block title %}{{ issue_title }}{% endblock %}
+{% block content %}
+<div class="page-head">
+    <div>
+        <span class="page-kicker">Normalisation</span>
+        <h1 class="page-title">{{ issue_title }}</h1>
+    </div>
+    <a class="button ghost" href="{% url 'assistant_linking:normalization_dashboard' %}">Back</a>
+</div>
+<div class="workspace-block">
+    <table class="data-table">
+        <thead><tr><th>Supplier</th><th>Product</th><th>Parsed</th><th>Flags</th><th>Confidence</th></tr></thead>
+        <tbody>
+        {% for parsed in parses %}
+            <tr>
+                <td>{{ parsed.supplier_product.supplier }}</td>
+                <td><a href="{% url 'assistant_linking:normalization_detail' parsed.supplier_product_id %}">{{ parsed.supplier_product.name }}</a></td>
+                <td>{{ parsed.normalized_brand|default:parsed.detected_brand_text }} / {{ parsed.product_name_text }} / {{ parsed.concentration }} / {{ parsed.size_ml }}</td>
+                <td>{{ parsed.modifiers|join:", " }} {{ parsed.warnings|join:", " }}</td>
+                <td>{{ parsed.confidence }}</td>
+            </tr>
+        {% empty %}
+            <tr><td colspan="5">No rows in this queue.</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

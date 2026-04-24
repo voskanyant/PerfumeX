@@ -2,15 +2,21 @@ from __future__ import annotations
 
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
+import re
+from collections import defaultdict
+
+from django.db import transaction
+from django.db.models import Count, Q
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse_lazy
 from django.utils import timezone
-from django.views.generic import CreateView, DetailView, ListView, TemplateView, UpdateView, View
+from django.views.generic import CreateView, DeleteView, DetailView, ListView, TemplateView, UpdateView, View
 
 from assistant_core import forms, models
+from assistant_core.services.catalog_importer import import_catalog_file
 from assistant_core.services.mock_brand_research import run_mock_brand_watch
 from assistant_core.services.mock_description_generator import create_mock_draft
-from catalog.models import AIDraft, FactClaim, Perfume, Source
+from catalog.models import AIDraft, Brand, FactClaim, Perfume, PerfumeVariant, Source
 
 
 class StaffAssistantMixin(LoginRequiredMixin, UserPassesTestMixin):
@@ -28,6 +34,7 @@ class DashboardView(StaffAssistantMixin, TemplateView):
             **super().get_context_data(**kwargs),
             "cards": [
                 ("Normalisation", "assistant_linking:normalization_dashboard", ParsedSupplierProduct.objects.filter(confidence__lt=75).count()),
+                ("Catalogue", "assistant_core:catalog_perfumes", Perfume.objects.count()),
                 ("Linking Workbench", "assistant_linking:group_queue", LinkSuggestion.objects.filter(status=LinkSuggestion.STATUS_PENDING).count()),
                 ("Knowledge Base", "assistant_core:knowledge", models.KnowledgeNote.objects.filter(active=True).count()),
                 ("Brand Managers", "assistant_core:brand_manager_list", models.BrandWatchProfile.objects.filter(active=True).count()),
@@ -133,6 +140,227 @@ class BrandWatchProfileListView(StaffAssistantMixin, ListView):
     model = models.BrandWatchProfile
     template_name = "assistant_core/brand_managers/list.html"
     context_object_name = "profiles"
+
+
+class CatalogContextMixin:
+    def get_context_data(self, **kwargs):
+        return {
+            **super().get_context_data(**kwargs),
+            "concentrations": Perfume.objects.exclude(concentration="").values_list("concentration", flat=True).distinct().order_by("concentration"),
+            "audiences": Perfume.objects.exclude(audience="").values_list("audience", flat=True).distinct().order_by("audience"),
+            "packagings": PerfumeVariant.objects.exclude(packaging="").values_list("packaging", flat=True).distinct().order_by("packaging"),
+            "variant_types": PerfumeVariant.objects.exclude(variant_type="").values_list("variant_type", flat=True).distinct().order_by("variant_type"),
+        }
+
+
+class CatalogBrandListView(StaffAssistantMixin, ListView):
+    model = Brand
+    template_name = "assistant_core/catalog/brands.html"
+    context_object_name = "brands"
+    paginate_by = 50
+
+    def get_queryset(self):
+        queryset = Brand.objects.annotate(perfume_count=Count("perfumes"))
+        query = self.request.GET.get("q", "").strip()
+        if query:
+            queryset = queryset.filter(Q(name__icontains=query) | Q(country_of_origin__icontains=query))
+        return queryset.order_by("name")
+
+
+class CatalogPerfumeListView(StaffAssistantMixin, ListView):
+    model = Perfume
+    template_name = "assistant_core/catalog/perfumes.html"
+    context_object_name = "perfumes"
+    paginate_by = 50
+
+    def get_queryset(self):
+        queryset = Perfume.objects.select_related("brand").annotate(variant_count=Count("variants"))
+        query = self.request.GET.get("q", "").strip()
+        if query:
+            queryset = queryset.filter(
+                Q(name__icontains=query)
+                | Q(brand__name__icontains=query)
+                | Q(concentration__icontains=query)
+                | Q(audience__icontains=query)
+            )
+        return queryset.order_by("brand__name", "name")
+
+
+class CatalogVariantListView(StaffAssistantMixin, ListView):
+    model = PerfumeVariant
+    template_name = "assistant_core/catalog/variants.html"
+    context_object_name = "variants"
+    paginate_by = 50
+
+    def get_queryset(self):
+        queryset = PerfumeVariant.objects.select_related("perfume", "perfume__brand")
+        query = self.request.GET.get("q", "").strip()
+        if query:
+            queryset = queryset.filter(
+                Q(perfume__name__icontains=query)
+                | Q(perfume__brand__name__icontains=query)
+                | Q(packaging__icontains=query)
+                | Q(variant_type__icontains=query)
+                | Q(ean__icontains=query)
+                | Q(sku__icontains=query)
+            )
+        return queryset.order_by("perfume__brand__name", "perfume__name", "size_ml")
+
+
+class CatalogBrandCreateView(StaffAssistantMixin, CreateView):
+    model = Brand
+    form_class = forms.CatalogBrandForm
+    template_name = "assistant_core/catalog/form.html"
+    success_url = reverse_lazy("assistant_core:catalog_brands")
+
+
+class CatalogBrandUpdateView(CatalogBrandCreateView, UpdateView):
+    pass
+
+
+class CatalogBrandDeleteView(StaffAssistantMixin, DeleteView):
+    model = Brand
+    template_name = "assistant_core/catalog/confirm_delete.html"
+    success_url = reverse_lazy("assistant_core:catalog_brands")
+
+
+class CatalogPerfumeCreateView(CatalogContextMixin, StaffAssistantMixin, CreateView):
+    model = Perfume
+    form_class = forms.CatalogPerfumeForm
+    template_name = "assistant_core/catalog/form.html"
+    success_url = reverse_lazy("assistant_core:catalog_perfumes")
+
+
+class CatalogPerfumeUpdateView(CatalogPerfumeCreateView, UpdateView):
+    pass
+
+
+class CatalogPerfumeDeleteView(StaffAssistantMixin, DeleteView):
+    model = Perfume
+    template_name = "assistant_core/catalog/confirm_delete.html"
+    success_url = reverse_lazy("assistant_core:catalog_perfumes")
+
+
+class CatalogVariantCreateView(CatalogContextMixin, StaffAssistantMixin, CreateView):
+    model = PerfumeVariant
+    form_class = forms.CatalogVariantForm
+    template_name = "assistant_core/catalog/form.html"
+    success_url = reverse_lazy("assistant_core:catalog_variants")
+
+
+class CatalogVariantUpdateView(CatalogVariantCreateView, UpdateView):
+    pass
+
+
+class CatalogVariantDeleteView(StaffAssistantMixin, DeleteView):
+    model = PerfumeVariant
+    template_name = "assistant_core/catalog/confirm_delete.html"
+    success_url = reverse_lazy("assistant_core:catalog_variants")
+
+
+class CatalogImportView(StaffAssistantMixin, TemplateView):
+    template_name = "assistant_core/catalog/import.html"
+
+    def get_context_data(self, **kwargs):
+        return {**super().get_context_data(**kwargs), "form": kwargs.get("form") or forms.CatalogImportForm()}
+
+    def post(self, request):
+        form = forms.CatalogImportForm(request.POST, request.FILES)
+        if not form.is_valid():
+            messages.error(request, "Catalogue file was not imported.")
+            return self.render_to_response(self.get_context_data(form=form))
+        try:
+            result = import_catalog_file(
+                form.cleaned_data["file"],
+                create_aliases=form.cleaned_data["create_aliases"],
+                update_existing=form.cleaned_data["update_existing"],
+            )
+        except ValueError as exc:
+            messages.error(request, str(exc))
+            return self.render_to_response(self.get_context_data(form=form))
+        messages.success(request, f"Imported {result.rows_imported} catalogue rows.")
+        return self.render_to_response(self.get_context_data(form=forms.CatalogImportForm(), result=result))
+
+
+def _catalog_key(value: str) -> str:
+    return re.sub(r"[^a-z0-9]+", " ", (value or "").lower()).strip()
+
+
+class CatalogCleanupView(StaffAssistantMixin, TemplateView):
+    template_name = "assistant_core/catalog/cleanup.html"
+
+    def get_context_data(self, **kwargs):
+        brand_groups = defaultdict(list)
+        for brand in Brand.objects.order_by("name"):
+            brand_groups[_catalog_key(brand.name)].append(brand)
+        perfume_groups = defaultdict(list)
+        for perfume in Perfume.objects.select_related("brand").order_by("brand__name", "name"):
+            perfume_groups[(perfume.brand_id, _catalog_key(perfume.name), perfume.concentration or "")].append(perfume)
+        return {
+            **super().get_context_data(**kwargs),
+            "brand_duplicates": [items for items in brand_groups.values() if len(items) > 1],
+            "perfume_duplicates": [items for items in perfume_groups.values() if len(items) > 1],
+            "brand_merge_form": forms.CatalogBrandMergeForm(),
+            "perfume_merge_form": forms.CatalogPerfumeMergeForm(),
+        }
+
+
+class CatalogBrandMergeView(StaffAssistantMixin, View):
+    def post(self, request):
+        form = forms.CatalogBrandMergeForm(request.POST)
+        if not form.is_valid():
+            messages.error(request, "Brand merge was not saved.")
+            return redirect("assistant_core:catalog_cleanup")
+        source = form.cleaned_data["source"]
+        target = form.cleaned_data["target"]
+        with transaction.atomic():
+            source.perfumes.update(brand=target)
+            source.aliases.update(brand=target)
+            source.product_aliases.update(brand=target)
+            models.KnowledgeNote.objects.filter(brand=source).update(brand=target)
+            models.SupplierRule.objects.filter(brand=source).update(brand=target)
+            source.delete()
+        messages.success(request, f"Merged brand into {target.name}.")
+        return redirect("assistant_core:catalog_cleanup")
+
+
+class CatalogPerfumeMergeView(StaffAssistantMixin, View):
+    def post(self, request):
+        form = forms.CatalogPerfumeMergeForm(request.POST)
+        if not form.is_valid():
+            messages.error(request, "Perfume merge was not saved.")
+            return redirect("assistant_core:catalog_cleanup")
+        source = form.cleaned_data["source"]
+        target = form.cleaned_data["target"]
+        with transaction.atomic():
+            for variant in source.variants.all():
+                duplicate = target.variants.filter(
+                    size_ml=variant.size_ml,
+                    packaging=variant.packaging,
+                    variant_type=variant.variant_type,
+                    is_tester=variant.is_tester,
+                ).first()
+                if duplicate:
+                    variant.delete()
+                else:
+                    variant.perfume = target
+                    variant.save(update_fields=["perfume"])
+            source.sources.update(perfume=target)
+            source.fact_claims.update(perfume=target)
+            source.ai_drafts.update(perfume=target)
+            source.perfume_notes.update(perfume=target)
+            source.perfume_accords.update(perfume=target)
+            source.product_aliases.update(perfume=target, brand=target.brand)
+            models.KnowledgeNote.objects.filter(perfume=source).update(perfume=target)
+            from assistant_linking.models import LinkSuggestion, ManualLinkDecision
+            from prices.models import SupplierProduct
+
+            SupplierProduct.objects.filter(catalog_perfume=source).update(catalog_perfume=target)
+            ManualLinkDecision.objects.filter(perfume=source).update(perfume=target)
+            LinkSuggestion.objects.filter(suggested_perfume=source).update(suggested_perfume=target)
+            source.delete()
+        messages.success(request, f"Merged perfume into {target}.")
+        return redirect("assistant_core:catalog_cleanup")
 
 
 class BrandWatchProfileCreateView(StaffAssistantMixin, CreateView):

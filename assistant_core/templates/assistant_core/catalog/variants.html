@@ -1,0 +1,43 @@
+{% extends "prices/base.html" %}
+{% block title %}Assistant Catalogue Variants{% endblock %}
+{% block topbar_label %}Assistant{% endblock %}
+{% block content %}
+<div class="page-head">
+    <div>
+        <span class="page-kicker">Catalogue</span>
+        <h1 class="page-title">Variants</h1>
+        <div class="page-meta">Sizes, tester status, packaging, SKU, and EAN.</div>
+    </div>
+    <div class="page-actions">
+        {% include "assistant_core/catalog/_nav.html" %}
+        <a class="button primary" href="{% url 'assistant_core:catalog_variant_create' %}">Add variant</a>
+    </div>
+</div>
+<div class="workspace-block">
+    <form method="get" class="search-wrap">
+        <input type="text" name="q" value="{{ request.GET.q }}" placeholder="Search perfume, SKU, EAN...">
+        <button class="button ghost" type="submit">Search</button>
+    </form>
+    <table class="data-table">
+        <thead><tr><th>Perfume</th><th>Size</th><th>Type</th><th>Packaging</th><th>Tester</th><th>SKU</th><th></th></tr></thead>
+        <tbody>
+        {% for variant in variants %}
+            <tr>
+                <td>{{ variant.perfume }}</td>
+                <td>{{ variant.size_ml|default:"" }}</td>
+                <td>{{ variant.variant_type }}</td>
+                <td>{{ variant.packaging }}</td>
+                <td>{{ variant.is_tester|yesno:"yes,no" }}</td>
+                <td>{{ variant.sku }}</td>
+                <td>
+                    <a class="button ghost" href="{% url 'assistant_core:catalog_variant_update' variant.pk %}">Edit</a>
+                    <a class="button ghost" href="{% url 'assistant_core:catalog_variant_delete' variant.pk %}">Delete</a>
+                </td>
+            </tr>
+        {% empty %}
+            <tr><td colspan="7">No variants yet.</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

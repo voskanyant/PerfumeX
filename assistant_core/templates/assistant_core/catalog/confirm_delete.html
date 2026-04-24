@@ -1,0 +1,20 @@
+{% extends "prices/base.html" %}
+{% block title %}Delete Catalogue Record{% endblock %}
+{% block topbar_label %}Assistant{% endblock %}
+{% block content %}
+<div class="page-head">
+    <div>
+        <span class="page-kicker">Catalogue</span>
+        <h1 class="page-title">Delete catalogue record</h1>
+        <div class="page-meta">This removes the selected assistant catalogue record. Linked dependent records may also be removed by Django relationships.</div>
+    </div>
+</div>
+<div class="workspace-block">
+    <p>Delete <strong>{{ object }}</strong>?</p>
+    <form method="post">
+        {% csrf_token %}
+        <button class="button danger" type="submit">Delete</button>
+        <a class="button ghost" href="{% url 'assistant_core:catalog_perfumes' %}">Cancel</a>
+    </form>
+</div>
+{% endblock %}

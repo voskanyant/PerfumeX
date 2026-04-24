@@ -1,0 +1,43 @@
+{% extends "prices/base.html" %}
+{% block title %}Assistant Catalogue Perfumes{% endblock %}
+{% block topbar_label %}Assistant{% endblock %}
+{% block content %}
+<div class="page-head">
+    <div>
+        <span class="page-kicker">Catalogue</span>
+        <h1 class="page-title">Perfumes</h1>
+        <div class="page-meta">Canonical scent records used by normalisation and linking.</div>
+    </div>
+    <div class="page-actions">
+        {% include "assistant_core/catalog/_nav.html" %}
+        <a class="button primary" href="{% url 'assistant_core:catalog_perfume_create' %}">Add perfume</a>
+    </div>
+</div>
+<div class="workspace-block">
+    <form method="get" class="search-wrap">
+        <input type="text" name="q" value="{{ request.GET.q }}" placeholder="Search brand, scent, concentration...">
+        <button class="button ghost" type="submit">Search</button>
+    </form>
+    <table class="data-table">
+        <thead><tr><th>Brand</th><th>Scent</th><th>Concentration</th><th>Audience</th><th>Variants</th><th>Status</th><th></th></tr></thead>
+        <tbody>
+        {% for perfume in perfumes %}
+            <tr>
+                <td>{{ perfume.brand.name }}</td>
+                <td>{{ perfume.name }}</td>
+                <td>{{ perfume.concentration }}</td>
+                <td>{{ perfume.audience }}</td>
+                <td>{{ perfume.variant_count }}</td>
+                <td>{{ perfume.verification_status }}</td>
+                <td>
+                    <a class="button ghost" href="{% url 'assistant_core:catalog_perfume_update' perfume.pk %}">Edit</a>
+                    <a class="button ghost" href="{% url 'assistant_core:catalog_perfume_delete' perfume.pk %}">Delete</a>
+                </td>
+            </tr>
+        {% empty %}
+            <tr><td colspan="7">No perfumes yet.</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

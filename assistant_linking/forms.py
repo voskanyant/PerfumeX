@@ -45,9 +45,19 @@ class ParseTeachingForm(forms.Form):
     )
 
     supplier_brand_text = forms.CharField(max_length=255, required=False, label="Supplier brand text")
-    brand_name = forms.CharField(max_length=200, required=True, label="Correct brand")
+    brand_name = forms.CharField(
+        max_length=200,
+        required=True,
+        label="Correct brand",
+        widget=forms.TextInput(attrs={"list": "catalog-brand-options", "autocomplete": "off"}),
+    )
     supplier_product_text = forms.CharField(max_length=255, required=False, label="Supplier scent text")
-    product_name = forms.CharField(max_length=255, required=True, label="Correct scent name")
+    product_name = forms.CharField(
+        max_length=255,
+        required=True,
+        label="Correct scent name",
+        widget=forms.TextInput(attrs={"list": "catalog-perfume-options", "autocomplete": "off"}),
+    )
     product_excluded_terms = forms.CharField(
         required=False,
         label="Do not match when supplier name contains",
@@ -61,9 +71,19 @@ class ParseTeachingForm(forms.Form):
     supplier_audience_text = forms.CharField(max_length=80, required=False, label="Supplier audience text")
     audience = forms.ChoiceField(choices=AUDIENCE_CHOICES, required=False, label="Correct audience")
     supplier_type_text = forms.CharField(max_length=80, required=False, label="Supplier type text")
-    variant_type = forms.CharField(max_length=80, required=False, label="Correct product type")
+    variant_type = forms.CharField(
+        max_length=80,
+        required=False,
+        label="Correct product type",
+        widget=forms.TextInput(attrs={"list": "catalog-variant-type-options"}),
+    )
     supplier_packaging_text = forms.CharField(max_length=80, required=False, label="Supplier packaging text")
-    packaging = forms.CharField(max_length=80, required=False, label="Correct packaging")
+    packaging = forms.CharField(
+        max_length=80,
+        required=False,
+        label="Correct packaging",
+        widget=forms.TextInput(attrs={"list": "catalog-packaging-options"}),
+    )
     alias_scope = forms.ChoiceField(choices=SCOPE_CHOICES, initial=SCOPE_GLOBAL)
     lock_parse = forms.BooleanField(required=False, initial=True)
     reparse_similar = forms.BooleanField(required=False, initial=True)

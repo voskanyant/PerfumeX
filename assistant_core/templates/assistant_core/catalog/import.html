@@ -1,0 +1,59 @@
+{% extends "prices/base.html" %}
+{% block title %}Import Catalogue{% endblock %}
+{% block topbar_label %}Assistant{% endblock %}
+{% block content %}
+<div class="page-head">
+    <div>
+        <span class="page-kicker">Catalogue</span>
+        <h1 class="page-title">Import catalogue</h1>
+        <div class="page-meta">Upload Excel or CSV with brand and scent/name columns. Extra columns are imported when present.</div>
+    </div>
+    {% include "assistant_core/catalog/_nav.html" %}
+</div>
+
+<div class="page-grid-3">
+    <div class="workspace-block">
+        <h2 class="kpi-link-title">Upload</h2>
+        <form method="post" enctype="multipart/form-data" class="form-shell">
+            {% csrf_token %}
+            {{ form.as_p }}
+            <button class="button primary" type="submit">Import catalogue</button>
+        </form>
+    </div>
+    <div class="workspace-block">
+        <h2 class="kpi-link-title">Supported columns</h2>
+        <p>Minimum: <code>brand</code>, <code>name</code> or <code>scent_name</code>.</p>
+        <p>Useful: <code>concentration</code>, <code>size_ml</code>, <code>audience</code>, <code>variant_type</code>, <code>packaging</code>, <code>is_tester</code>, <code>sku</code>, <code>ean</code>.</p>
+    </div>
+    <div class="workspace-block">
+        <h2 class="kpi-link-title">Import behavior</h2>
+        <p>Creates/updates assistant catalogue records only. It does not publish public text and does not overwrite supplier links.</p>
+    </div>
+</div>
+
+{% if result %}
+<div class="workspace-block space-top-md">
+    <h2 class="kpi-link-title">Import result</h2>
+    <div class="run-log-summary">
+        <span>Rows seen: {{ result.rows_seen }}</span>
+        <span>Imported: {{ result.rows_imported }}</span>
+        <span>Brands created: {{ result.brands_created }}</span>
+        <span>Perfumes created: {{ result.perfumes_created }}</span>
+        <span>Perfumes updated: {{ result.perfumes_updated }}</span>
+        <span>Variants created: {{ result.variants_created }}</span>
+        <span>Variants updated: {{ result.variants_updated }}</span>
+        <span>Aliases created: {{ result.aliases_created }}</span>
+    </div>
+    {% if result.skipped_rows %}
+        <h3 class="kpi-link-title space-top-sm">Skipped rows</h3>
+        <table class="data-table">
+            <tbody>
+            {% for row in result.skipped_rows %}
+                <tr><td>{{ row }}</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    {% endif %}
+</div>
+{% endif %}
+{% endblock %}

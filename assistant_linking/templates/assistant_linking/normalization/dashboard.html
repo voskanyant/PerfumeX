@@ -11,5 +11,11 @@
     <a class="metric-card" href="{% url 'assistant_linking:normalization_low_confidence' %}"><div class="metric-label">Low confidence</div><div class="metric-value">{{ low_confidence_count }}</div></a>
     <div class="metric-card"><div class="metric-label">Parsed</div><div class="metric-value">{{ parsed_count }}</div></div>
 </div>
+<div class="page-grid-3 space-top-md">
+    <a class="metric-card" href="{% url 'assistant_linking:normalization_missing_brand' %}"><div class="metric-label">Missing brand</div><div class="metric-value">{{ missing_brand_count }}</div></a>
+    <a class="metric-card" href="{% url 'assistant_linking:normalization_missing_size' %}"><div class="metric-label">Missing size</div><div class="metric-value">{{ missing_size_count }}</div></a>
+    <a class="metric-card" href="{% url 'assistant_linking:normalization_modifiers' %}"><div class="metric-label">Modifiers</div><div class="metric-value">{{ modifier_count }}</div></a>
+    <a class="metric-card" href="{% url 'assistant_linking:normalization_tester_sample' %}"><div class="metric-label">Tester/sample/travel/set</div><div class="metric-value">{{ tester_sample_count }}</div></a>
+</div>
 <div class="workspace-block space-top-md"><table class="data-table"><tbody>{% for parsed in recent %}<tr><td><a href="{% url 'assistant_linking:normalization_detail' parsed.supplier_product_id %}">{{ parsed.supplier_product }}</a></td><td>{{ parsed.normalized_brand }}</td><td>{{ parsed.product_name_text }}</td><td>{{ parsed.confidence }}</td></tr>{% empty %}<tr><td>No parsed rows.</td></tr>{% endfor %}</tbody></table></div>
 {% endblock %}

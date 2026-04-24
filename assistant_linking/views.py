@@ -9,12 +9,13 @@ from django.utils import timezone
 from django.views.generic import DetailView, ListView, TemplateView, View
 
 from assistant_linking import forms, models
+from assistant_linking.services.catalog_matcher import candidate_matches, rule_impact, similar_supplier_rows
 from assistant_linking.services.grouping import rebuild_groups
 from assistant_linking.services.mock_suggester import generate_link_suggestions
 from assistant_linking.services.normalizer import save_parse
 from assistant_linking.services.smart_search import normalize_query
 from assistant_linking.services.teaching import suggest_product_alias_blockers
-from catalog.models import Brand
+from catalog.models import Brand, Perfume, PerfumeVariant
 from prices.models import SupplierProduct
 
 
@@ -32,6 +33,10 @@ class NormalizationDashboardView(StaffAssistantMixin, TemplateView):
             "parsed_count": models.ParsedSupplierProduct.objects.count(),
             "unparsed_count": SupplierProduct.objects.filter(assistant_parse__isnull=True).count(),
             "low_confidence_count": models.ParsedSupplierProduct.objects.filter(confidence__lt=75).count(),
+            "missing_brand_count": models.ParsedSupplierProduct.objects.filter(normalized_brand__isnull=True).count(),
+            "missing_size_count": models.ParsedSupplierProduct.objects.filter(size_ml__isnull=True).count(),
+            "modifier_count": models.ParsedSupplierProduct.objects.exclude(modifiers=[]).count(),
+            "tester_sample_count": models.ParsedSupplierProduct.objects.filter(Q(is_tester=True) | Q(is_sample=True) | Q(is_travel=True) | Q(is_set=True)).count(),
             "recent": models.ParsedSupplierProduct.objects.select_related("supplier_product", "normalized_brand").order_by("-updated_at")[:20],
         }
 
@@ -56,6 +61,42 @@ class LowConfidenceListView(StaffAssistantMixin, ListView):
         return models.ParsedSupplierProduct.objects.select_related("supplier_product", "supplier_product__supplier", "normalized_brand").filter(confidence__lt=75).order_by("confidence")
 
 
+class NormalizationIssueListView(LowConfidenceListView):
+    template_name = "assistant_linking/normalization/issue_list.html"
+    issue_title = "Normalisation issues"
+
+    def get_context_data(self, **kwargs):
+        return {**super().get_context_data(**kwargs), "issue_title": self.issue_title}
+
+
+class MissingBrandListView(NormalizationIssueListView):
+    issue_title = "Missing brand"
+
+    def get_queryset(self):
+        return models.ParsedSupplierProduct.objects.select_related("supplier_product", "supplier_product__supplier", "normalized_brand").filter(normalized_brand__isnull=True).order_by("supplier_product__name")
+
+
+class MissingSizeListView(NormalizationIssueListView):
+    issue_title = "Missing or ambiguous size"
+
+    def get_queryset(self):
+        return models.ParsedSupplierProduct.objects.select_related("supplier_product", "supplier_product__supplier", "normalized_brand").filter(size_ml__isnull=True).order_by("supplier_product__name")
+
+
+class TesterSampleListView(NormalizationIssueListView):
+    issue_title = "Tester, sample, travel, and set rows"
+
+    def get_queryset(self):
+        return models.ParsedSupplierProduct.objects.select_related("supplier_product", "supplier_product__supplier", "normalized_brand").filter(Q(is_tester=True) | Q(is_sample=True) | Q(is_travel=True) | Q(is_set=True)).order_by("supplier_product__name")
+
+
+class ModifierConflictListView(NormalizationIssueListView):
+    issue_title = "Identity modifiers"
+
+    def get_queryset(self):
+        return models.ParsedSupplierProduct.objects.select_related("supplier_product", "supplier_product__supplier", "normalized_brand").exclude(modifiers=[]).order_by("supplier_product__name")
+
+
 class ParsedProductDetailView(StaffAssistantMixin, DetailView):
     model = SupplierProduct
     template_name = "assistant_linking/normalization/detail.html"
@@ -71,10 +112,12 @@ class ParsedProductDetailView(StaffAssistantMixin, DetailView):
             parsed.detected_brand_text or (parsed.normalized_brand.name if parsed.normalized_brand_id else ""),
         )
         excluded_terms = sorted({term for term in [*parsed.modifiers, *suggested_blockers] if term})
+        product_alias_text = parsed.product_name_text or product.name
+        brand_alias_text = parsed.detected_brand_text or product.brand
         teach_initial = {
-            "supplier_brand_text": parsed.detected_brand_text or product.brand,
+            "supplier_brand_text": brand_alias_text,
             "brand_name": parsed.normalized_brand.name if parsed.normalized_brand_id else parsed.detected_brand_text,
-            "supplier_product_text": parsed.product_name_text or product.name,
+            "supplier_product_text": product_alias_text,
             "product_name": parsed.product_name_text,
             "product_excluded_terms": ", ".join(excluded_terms),
             "supplier_concentration_text": parsed.concentration,
@@ -96,7 +139,84 @@ class ParsedProductDetailView(StaffAssistantMixin, DetailView):
             "parsed": parsed,
             "teach_form": forms.ParseTeachingForm(initial=teach_initial),
             "suggested_blockers": suggested_blockers,
+            "catalog_candidates": candidate_matches(parsed),
+            "similar_rows": similar_supplier_rows(product, parsed),
+            "rule_impact": rule_impact(product, brand_alias_text, product_alias_text, ", ".join(excluded_terms)),
+            "catalog_brands": Brand.objects.filter(is_active=True).order_by("name")[:1000],
+            "catalog_perfumes": Perfume.objects.select_related("brand").order_by("brand__name", "name")[:2000],
+            "catalog_packagings": PerfumeVariant.objects.exclude(packaging="").values_list("packaging", flat=True).distinct().order_by("packaging"),
+            "catalog_variant_types": PerfumeVariant.objects.exclude(variant_type="").values_list("variant_type", flat=True).distinct().order_by("variant_type"),
         }
+
+
+class AcceptCatalogCandidateView(StaffAssistantMixin, View):
+    def post(self, request, supplier_product_id):
+        product = get_object_or_404(SupplierProduct.objects.select_related("supplier"), pk=supplier_product_id)
+        parsed = save_parse(product)
+        perfume = get_object_or_404(Perfume.objects.select_related("brand"), pk=request.POST.get("perfume_id"))
+        variant = None
+        if request.POST.get("variant_id"):
+            variant = get_object_or_404(PerfumeVariant, pk=request.POST.get("variant_id"), perfume=perfume)
+
+        brand_alias_text = (parsed.detected_brand_text or product.brand or perfume.brand.name).strip()
+        product_alias_text = (parsed.product_name_text or perfume.name).strip()
+        supplier = product.supplier if request.POST.get("alias_scope") == forms.ParseTeachingForm.SCOPE_SUPPLIER else None
+
+        if brand_alias_text:
+            models.BrandAlias.objects.update_or_create(
+                brand=perfume.brand,
+                supplier=supplier,
+                alias_text=brand_alias_text,
+                defaults={"normalized_alias": normalize_query(brand_alias_text), "priority": 10 if supplier else 50, "active": True},
+            )
+        if product_alias_text:
+            models.ProductAlias.objects.update_or_create(
+                brand=perfume.brand,
+                perfume=perfume,
+                supplier=supplier,
+                alias_text=product_alias_text,
+                defaults={
+                    "canonical_text": perfume.name,
+                    "concentration": perfume.concentration,
+                    "audience": perfume.audience,
+                    "excluded_terms": request.POST.get("excluded_terms", ""),
+                    "priority": 10 if supplier else 50,
+                    "active": True,
+                },
+            )
+
+        parsed.normalized_brand = perfume.brand
+        parsed.detected_brand_text = brand_alias_text or perfume.brand.name
+        parsed.product_name_text = perfume.name
+        parsed.concentration = perfume.concentration
+        parsed.supplier_gender_hint = perfume.audience
+        if variant:
+            parsed.size_ml = variant.size_ml
+            parsed.packaging = variant.packaging
+            parsed.variant_type = variant.variant_type
+            parsed.is_tester = variant.is_tester
+        parsed.confidence = 100
+        parsed.warnings = []
+        parsed.locked_by_human = True
+        parsed.last_parsed_at = timezone.now()
+        parsed.save()
+
+        product.catalog_perfume = perfume
+        if variant:
+            product.catalog_variant = variant
+        product.save(update_fields=["catalog_perfume", "catalog_variant", "updated_at"])
+
+        models.ManualLinkDecision.objects.create(
+            supplier_product=product,
+            perfume=perfume,
+            variant=variant,
+            decision_type=models.ManualLinkDecision.DECISION_APPROVE_VARIANT if variant else models.ManualLinkDecision.DECISION_APPROVE_PERFUME,
+            reason="Accepted from normalization catalogue candidates.",
+            apply_to_similar=False,
+            created_by=request.user,
+        )
+        messages.success(request, "Catalogue candidate accepted and parse locked.")
+        return redirect("assistant_linking:normalization_detail", supplier_product_id=supplier_product_id)
 
 
 class ReparseProductView(StaffAssistantMixin, View):

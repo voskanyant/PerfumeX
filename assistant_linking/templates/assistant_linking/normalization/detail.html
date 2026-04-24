@@ -47,6 +47,37 @@
 </div>
 
 <div class="workspace-block space-top-md">
+    <h2 class="kpi-link-title">Catalogue candidates</h2>
+    <table class="data-table">
+        <thead>
+            <tr><th>Candidate</th><th>Variant</th><th>Score</th><th>Why</th><th>Conflicts</th><th></th></tr>
+        </thead>
+        <tbody>
+        {% for candidate in catalog_candidates %}
+            <tr>
+                <td>{{ candidate.perfume.brand.name }} / {{ candidate.perfume.name }}{% if candidate.perfume.concentration %} / {{ candidate.perfume.concentration }}{% endif %}</td>
+                <td>{{ candidate.variant|default:"" }}</td>
+                <td>{{ candidate.score }}</td>
+                <td>{{ candidate.reasons|join:", " }}</td>
+                <td>{{ candidate.conflicts|join:", " }}</td>
+                <td>
+                    <form method="post" action="{% url 'assistant_linking:normalization_accept_candidate' product.pk %}">
+                        {% csrf_token %}
+                        <input type="hidden" name="perfume_id" value="{{ candidate.perfume.pk }}">
+                        {% if candidate.variant %}<input type="hidden" name="variant_id" value="{{ candidate.variant.pk }}">{% endif %}
+                        <input type="hidden" name="excluded_terms" value="{{ teach_form.product_excluded_terms.value|default:'' }}">
+                        <button class="button ghost" type="submit">Accept</button>
+                    </form>
+                </td>
+            </tr>
+        {% empty %}
+            <tr><td colspan="6">No catalogue candidates yet. Add/import catalogue records first.</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<div class="workspace-block space-top-md">
     <h2 class="kpi-link-title">Teach this product</h2>
     <form method="post" action="{% url 'assistant_linking:normalization_teach' product.pk %}" class="form-shell">
         {% csrf_token %}
@@ -107,6 +138,33 @@
                 </tbody>
             </table>
         </div>
+        <datalist id="catalog-brand-options">
+            {% for brand in catalog_brands %}
+                <option value="{{ brand.name }}"></option>
+            {% endfor %}
+        </datalist>
+        <datalist id="catalog-perfume-options">
+            {% for perfume in catalog_perfumes %}
+                <option value="{{ perfume.name }}" label="{{ perfume.brand.name }}{% if perfume.concentration %} / {{ perfume.concentration }}{% endif %}"></option>
+            {% endfor %}
+        </datalist>
+        <datalist id="catalog-packaging-options">
+            {% for value in catalog_packagings %}
+                <option value="{{ value }}"></option>
+            {% endfor %}
+            <option value="standard"></option>
+            <option value="no_box"></option>
+            <option value="tester"></option>
+        </datalist>
+        <datalist id="catalog-variant-type-options">
+            {% for value in catalog_variant_types %}
+                <option value="{{ value }}"></option>
+            {% endfor %}
+            <option value="standard"></option>
+            <option value="sample"></option>
+            <option value="travel"></option>
+            <option value="set"></option>
+        </datalist>
         <div class="page-grid-3 space-top-md">
             <p>{{ teach_form.alias_scope.label_tag }}{{ teach_form.alias_scope }}</p>
             <p>
@@ -114,7 +172,40 @@
                 <label>{{ teach_form.reparse_similar }} Reparse similar rows now</label>
             </p>
         </div>
+        <div class="flash flash--warning">
+            Rule preview: {{ rule_impact.count }} other rows match these supplier texts. {{ rule_impact.risky }} examples contain current blockers.
+        </div>
+        {% if rule_impact.examples %}
+            <table class="data-table">
+                <tbody>
+                {% for example in rule_impact.examples %}
+                    <tr>
+                        <td>{{ example.product.supplier }}</td>
+                        <td>{{ example.product.name }}</td>
+                        <td>{% if example.blocked %}blocked by term{% else %}would be affected{% endif %}</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        {% endif %}
         <button class="button primary" type="submit">Save teaching</button>
     </form>
+</div>
+
+<div class="workspace-block space-top-md">
+    <h2 class="kpi-link-title">Similar supplier rows</h2>
+    <table class="data-table">
+        <tbody>
+        {% for row in similar_rows %}
+            <tr>
+                <td>{{ row.supplier }}</td>
+                <td><a href="{% url 'assistant_linking:normalization_detail' row.pk %}">{{ row.name }}</a></td>
+                <td>{{ row.is_active|yesno:"active,inactive" }}</td>
+            </tr>
+        {% empty %}
+            <tr><td>No similar supplier rows found.</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
 </div>
 {% endblock %}

@@ -1,0 +1,41 @@
+{% extends "prices/base.html" %}
+{% block title %}Assistant Catalogue Brands{% endblock %}
+{% block topbar_label %}Assistant{% endblock %}
+{% block content %}
+<div class="page-head">
+    <div>
+        <span class="page-kicker">Catalogue</span>
+        <h1 class="page-title">Brands</h1>
+        <div class="page-meta">Clean brand names here before using them in normalisation.</div>
+    </div>
+    <div class="page-actions">
+        {% include "assistant_core/catalog/_nav.html" %}
+        <a class="button primary" href="{% url 'assistant_core:catalog_brand_create' %}">Add brand</a>
+    </div>
+</div>
+<div class="workspace-block">
+    <form method="get" class="search-wrap">
+        <input type="text" name="q" value="{{ request.GET.q }}" placeholder="Search brands...">
+        <button class="button ghost" type="submit">Search</button>
+    </form>
+    <table class="data-table">
+        <thead><tr><th>Brand</th><th>Country</th><th>Perfumes</th><th>Status</th><th></th></tr></thead>
+        <tbody>
+        {% for brand in brands %}
+            <tr>
+                <td>{{ brand.name }}</td>
+                <td>{{ brand.country_of_origin|default:"" }}</td>
+                <td>{{ brand.perfume_count }}</td>
+                <td>{{ brand.is_active|yesno:"active,inactive" }}</td>
+                <td>
+                    <a class="button ghost" href="{% url 'assistant_core:catalog_brand_update' brand.pk %}">Edit</a>
+                    <a class="button ghost" href="{% url 'assistant_core:catalog_brand_delete' brand.pk %}">Delete</a>
+                </td>
+            </tr>
+        {% empty %}
+            <tr><td colspan="5">No brands yet.</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}
