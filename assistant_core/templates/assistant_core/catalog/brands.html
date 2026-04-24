@@ -37,5 +37,12 @@
         {% endfor %}
         </tbody>
     </table>
+    {% if is_paginated %}
+        <div class="pagination">
+            {% if page_obj.has_previous %}<a class="button ghost" href="?q={{ request.GET.q|urlencode }}&page={{ page_obj.previous_page_number }}">Previous</a>{% endif %}
+            <span>Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+            {% if page_obj.has_next %}<a class="button ghost" href="?q={{ request.GET.q|urlencode }}&page={{ page_obj.next_page_number }}">Next</a>{% endif %}
+        </div>
+    {% endif %}
 </div>
 {% endblock %}

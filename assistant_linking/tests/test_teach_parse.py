@@ -99,6 +99,23 @@ class TeachParseTests(TestCase):
         self.assertNotEqual(parsed.product_name_text, "Light Blue")
         self.assertIn("intense", parsed.product_name_text)
 
+    def test_teaching_page_preserves_existing_manual_blockers(self):
+        brand = Brand.objects.create(name="Montale")
+        BrandAlias.objects.create(brand=brand, alias_text="montale", normalized_alias="montale")
+        ProductAlias.objects.create(
+            brand=brand,
+            alias_text="vanilla extasy",
+            canonical_text="Vanilla Extasy",
+            excluded_terms="intense, tester",
+            active=True,
+        )
+        save_parse(self.product, force=True)
+
+        response = self.client.get(reverse("assistant_linking:normalization_detail", args=[self.product.id]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "intense, tester")
+
     def test_blocked_modifier_can_be_taught_as_separate_product(self):
         brand = Brand.objects.create(name="Dolce & Gabbana")
         BrandAlias.objects.create(

@@ -107,12 +107,23 @@ class ParsedProductDetailView(StaffAssistantMixin, DetailView):
         parsed = save_parse(product)
         product_alias_text = parsed.product_name_text or product.name
         brand_alias_text = parsed.detected_brand_text or product.brand
+        existing_alias = None
+        if parsed.normalized_brand_id and product_alias_text:
+            alias_queryset = models.ProductAlias.objects.filter(
+                brand=parsed.normalized_brand,
+                active=True,
+            ).filter(
+                Q(alias_text__iexact=product_alias_text) | Q(canonical_text__iexact=product_alias_text),
+                Q(supplier=product.supplier) | Q(supplier__isnull=True),
+            )
+            existing_alias = alias_queryset.order_by("supplier_id", "priority").first()
+        existing_blockers = existing_alias.excluded_terms if existing_alias else ""
         teach_initial = {
             "supplier_brand_text": brand_alias_text,
             "brand_name": parsed.normalized_brand.name if parsed.normalized_brand_id else parsed.detected_brand_text,
             "supplier_product_text": product_alias_text,
             "product_name": parsed.product_name_text,
-            "product_excluded_terms": "",
+            "product_excluded_terms": existing_blockers,
             "supplier_concentration_text": parsed.concentration,
             "concentration": parsed.concentration,
             "supplier_size_text": parsed.raw_size_text or product.size,
@@ -125,7 +136,7 @@ class ParsedProductDetailView(StaffAssistantMixin, DetailView):
             "packaging": parsed.packaging,
             "alias_scope": forms.ParseTeachingForm.SCOPE_GLOBAL,
             "lock_parse": True,
-            "reparse_similar": True,
+            "reparse_similar": False,
         }
         return {
             **super().get_context_data(**kwargs),
@@ -133,7 +144,7 @@ class ParsedProductDetailView(StaffAssistantMixin, DetailView):
             "teach_form": forms.ParseTeachingForm(initial=teach_initial),
             "catalog_candidates": candidate_matches(parsed),
             "similar_rows": similar_supplier_rows(product, parsed),
-            "rule_impact": rule_impact(product, brand_alias_text, product_alias_text, ""),
+            "rule_impact": rule_impact(product, brand_alias_text, product_alias_text, existing_blockers),
             "catalog_brands": Brand.objects.filter(is_active=True).order_by("name")[:1000],
             "catalog_perfumes": Perfume.objects.select_related("brand").order_by("brand__name", "name")[:2000],
             "catalog_packagings": PerfumeVariant.objects.exclude(packaging="").values_list("packaging", flat=True).distinct().order_by("packaging"),
@@ -262,7 +273,9 @@ class TeachParseView(StaffAssistantMixin, View):
         data = form.cleaned_data
         brand_name = data["brand_name"].strip()
         product_name = data["product_name"].strip()
-        brand, _ = Brand.objects.get_or_create(name=brand_name)
+        brand = Brand.objects.filter(name__iexact=brand_name).first()
+        if not brand:
+            brand = Brand.objects.create(name=brand_name)
         supplier = product.supplier if data["alias_scope"] == forms.ParseTeachingForm.SCOPE_SUPPLIER else None
 
         brand_alias_text = (data.get("supplier_brand_text") or brand_name).strip()
@@ -319,12 +332,11 @@ class TeachParseView(StaffAssistantMixin, View):
             similar_filter = Q()
             for term in [term.strip() for term in similar_terms if term and term.strip()]:
                 similar_filter |= Q(name__icontains=term)
-            similar = SupplierProduct.objects.filter(
-                similar_filter
-            ).exclude(pk=product.pk)[:500]
-            for similar_product in similar:
-                save_parse(similar_product)
-                updated_similar += 1
+            if similar_filter:
+                similar = SupplierProduct.objects.filter(similar_filter).exclude(pk=product.pk)[:500]
+                for similar_product in similar:
+                    save_parse(similar_product)
+                    updated_similar += 1
 
         messages.success(
             request,
@@ -430,6 +442,9 @@ class BulkLinkView(StaffAssistantMixin, View):
         source = get_object_or_404(SupplierProduct, pk=supplier_product_id)
         perfume_id = request.POST.get("perfume_id") or source.catalog_perfume_id
         variant_id = request.POST.get("variant_id") or source.catalog_variant_id
+        if not perfume_id:
+            messages.error(request, "Choose or approve a catalogue perfume before linking rows.")
+            return redirect("assistant_linking:product_workbench", supplier_product_id=supplier_product_id)
         allow_overwrite = request.POST.get("confirm_overwrite") == "1"
         product_ids = request.POST.getlist("supplier_product_ids") or [str(source.id)]
         linked = 0

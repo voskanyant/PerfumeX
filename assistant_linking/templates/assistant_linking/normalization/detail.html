@@ -13,6 +13,11 @@
             {% csrf_token %}
             <button class="button ghost">Reparse</button>
         </form>
+        <form method="post" action="{% url 'assistant_linking:normalization_reparse' product.pk %}">
+            {% csrf_token %}
+            <input type="hidden" name="force" value="1">
+            <button class="button ghost">Force reparse</button>
+        </form>
         <form method="post" action="{% url 'assistant_linking:normalization_lock' product.pk %}">
             {% csrf_token %}
             <button class="button ghost">Lock parse</button>
@@ -170,7 +175,7 @@
             </p>
         </div>
         <div class="flash flash--warning">
-            Rule preview: {{ rule_impact.count }} other rows match these supplier texts. {{ rule_impact.risky }} examples contain current blockers.
+            Rule preview: {{ rule_impact.count }} other rows match these supplier texts. {{ rule_impact.risky }} examples contain typed blockers.
         </div>
         {% if rule_impact.examples %}
             <table class="data-table">

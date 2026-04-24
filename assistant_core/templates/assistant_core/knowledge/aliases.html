@@ -1,7 +1,52 @@
 {% extends "prices/base.html" %}
 {% block title %}Aliases{% endblock %}
+{% block topbar_label %}Assistant / Knowledge{% endblock %}
 {% block content %}
-<div class="page-head"><div><span class="page-kicker">Assistant</span><h1 class="page-title">Alias dictionaries</h1></div></div>
-<div class="workspace-block"><h2 class="kpi-link-title">Brand Aliases</h2><table class="data-table"><tbody>{% for alias in brand_aliases %}<tr><td>{{ alias.alias_text }}</td><td>{{ alias.brand }}</td><td>{{ alias.supplier|default:"global" }}</td><td>{{ alias.active|yesno:"active,inactive" }}</td></tr>{% empty %}<tr><td>No brand aliases.</td></tr>{% endfor %}</tbody></table></div>
-<div class="workspace-block space-top-md"><h2 class="kpi-link-title">Product Aliases</h2><table class="data-table"><tbody>{% for alias in product_aliases %}<tr><td>{{ alias.alias_text }}</td><td>{{ alias.canonical_text }}</td><td>{{ alias.supplier|default:"global" }}</td><td>{{ alias.active|yesno:"active,inactive" }}</td></tr>{% empty %}<tr><td>No product aliases.</td></tr>{% endfor %}</tbody></table></div>
+<div class="page-head">
+    <div>
+        <span class="page-kicker">Assistant</span>
+        <h1 class="page-title">Alias dictionaries</h1>
+        <div class="page-meta">Aliases are used by normalisation, smart search, grouping, and linking suggestions.</div>
+    </div>
+    <a class="button ghost" href="{% url 'assistant_core:knowledge' %}">Knowledge base</a>
+</div>
+<div class="workspace-block">
+    <h2 class="kpi-link-title">Brand Aliases</h2>
+    <table class="data-table">
+        <thead><tr><th>Supplier text</th><th>Brand</th><th>Scope</th><th>Priority</th><th>Status</th></tr></thead>
+        <tbody>
+        {% for alias in brand_aliases %}
+            <tr>
+                <td>{{ alias.alias_text }}</td>
+                <td>{{ alias.brand }}</td>
+                <td>{{ alias.supplier|default:"global" }}</td>
+                <td>{{ alias.priority }}</td>
+                <td>{{ alias.active|yesno:"active,inactive" }}</td>
+            </tr>
+        {% empty %}
+            <tr><td colspan="5">No brand aliases.</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+<div class="workspace-block space-top-md">
+    <h2 class="kpi-link-title">Product Aliases</h2>
+    <table class="data-table">
+        <thead><tr><th>Supplier text</th><th>Brand</th><th>Correct scent</th><th>Blockers</th><th>Scope</th><th>Status</th></tr></thead>
+        <tbody>
+        {% for alias in product_aliases %}
+            <tr>
+                <td>{{ alias.alias_text }}</td>
+                <td>{{ alias.brand|default:"any brand" }}</td>
+                <td>{{ alias.canonical_text }}</td>
+                <td>{{ alias.excluded_terms }}</td>
+                <td>{{ alias.supplier|default:"global" }}</td>
+                <td>{{ alias.active|yesno:"active,inactive" }}</td>
+            </tr>
+        {% empty %}
+            <tr><td colspan="6">No product aliases.</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
 {% endblock %}
