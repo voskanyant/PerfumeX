@@ -28,7 +28,15 @@ class DashboardView(StaffAssistantMixin, TemplateView):
     template_name = "assistant_core/dashboard.html"
 
     def get_context_data(self, **kwargs):
-        from assistant_linking.models import LinkSuggestion, ManualLinkDecision, ParsedSupplierProduct
+        from assistant_linking.models import BrandAlias, LinkSuggestion, ManualLinkDecision, ParsedSupplierProduct, ProductAlias
+
+        knowledge_count = (
+            models.GlobalRule.objects.count()
+            + models.SupplierRule.objects.count()
+            + models.KnowledgeNote.objects.count()
+            + BrandAlias.objects.count()
+            + ProductAlias.objects.count()
+        )
 
         return {
             **super().get_context_data(**kwargs),
@@ -36,7 +44,7 @@ class DashboardView(StaffAssistantMixin, TemplateView):
                 ("Normalisation", "assistant_linking:normalization_dashboard", ParsedSupplierProduct.objects.filter(confidence__lt=75).count()),
                 ("Catalogue", "assistant_core:catalog_perfumes", Perfume.objects.count()),
                 ("Linking Workbench", "assistant_linking:group_queue", LinkSuggestion.objects.filter(status=LinkSuggestion.STATUS_PENDING).count()),
-                ("Knowledge Base", "assistant_core:knowledge", models.KnowledgeNote.objects.filter(active=True).count()),
+                ("Knowledge Base", "assistant_core:knowledge", knowledge_count),
                 ("Brand Managers", "assistant_core:brand_manager_list", models.BrandWatchProfile.objects.filter(active=True).count()),
                 ("Research Review", "assistant_core:research_jobs", models.DetectedChange.objects.filter(status=models.DetectedChange.STATUS_PENDING).count()),
                 ("AI Drafts", "assistant_core:drafts", AIDraft.objects.filter(status=AIDraft.STATUS_PENDING).count()),
@@ -51,11 +59,21 @@ class KnowledgeView(StaffAssistantMixin, TemplateView):
     template_name = "assistant_core/knowledge/index.html"
 
     def get_context_data(self, **kwargs):
+        from assistant_linking.models import BrandAlias, ManualLinkDecision, ProductAlias
+
         return {
             **super().get_context_data(**kwargs),
             "global_rules": models.GlobalRule.objects.order_by("priority", "title"),
             "supplier_rules": models.SupplierRule.objects.select_related("supplier", "brand").order_by("supplier__name", "priority"),
             "notes": models.KnowledgeNote.objects.select_related("supplier", "brand", "perfume").order_by("category", "title"),
+            "brand_aliases": BrandAlias.objects.select_related("brand", "supplier").order_by("supplier__name", "priority", "alias_text"),
+            "product_aliases": ProductAlias.objects.select_related("brand", "perfume", "supplier").order_by("supplier__name", "priority", "alias_text"),
+            "manual_decisions": ManualLinkDecision.objects.select_related(
+                "supplier_product",
+                "supplier_product__supplier",
+                "perfume",
+                "variant",
+            ).order_by("-created_at")[:50],
         }
 
 

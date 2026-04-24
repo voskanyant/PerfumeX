@@ -1,9 +1,11 @@
 from django.contrib.auth import get_user_model
 from django.test import TestCase
+from django.urls import reverse
 
 from assistant_core.models import BrandWatchProfile, DetectedChange, GlobalRule, KnowledgeNote, SupplierRule
 from assistant_core.services.context_builder import build_assistant_context
 from assistant_core.services.mock_brand_research import run_mock_brand_watch
+from assistant_linking.models import BrandAlias, ManualLinkDecision, ProductAlias
 from catalog.models import Brand
 from prices.models import Supplier, SupplierProduct
 
@@ -12,6 +14,38 @@ User = get_user_model()
 
 
 class KnowledgeResearchTests(TestCase):
+    def test_knowledge_page_shows_taught_aliases_and_decisions(self):
+        user = User.objects.create_user(username="staff", password="pass", is_staff=True)
+        self.client.force_login(user)
+        supplier = Supplier.objects.create(name="Supplier", code="sup")
+        product = SupplierProduct.objects.create(supplier=supplier, identity_key="1", name="montale vanilla extasy")
+        brand = Brand.objects.create(name="Montale")
+        BrandAlias.objects.create(brand=brand, supplier=supplier, alias_text="mntl", normalized_alias="mntl")
+        ProductAlias.objects.create(
+            brand=brand,
+            supplier=supplier,
+            alias_text="vanilla extasy",
+            canonical_text="Vanilla Extasy",
+            excluded_terms="tester",
+        )
+        ManualLinkDecision.objects.create(
+            supplier_product=product,
+            decision_type=ManualLinkDecision.DECISION_APPROVE_PERFUME,
+            reason="manual match",
+            created_by=user,
+        )
+
+        response = self.client.get(reverse("assistant_core:knowledge"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Taught Brand Aliases")
+        self.assertContains(response, "mntl")
+        self.assertContains(response, "Taught Product Aliases")
+        self.assertContains(response, "vanilla extasy")
+        self.assertContains(response, "tester")
+        self.assertContains(response, "Recent Manual Decisions")
+        self.assertContains(response, "manual match")
+
     def test_context_builder_includes_only_approved_active_rules(self):
         supplier = Supplier.objects.create(name="Supplier", code="sup")
         product = SupplierProduct.objects.create(supplier=supplier, identity_key="1", name="Name")
