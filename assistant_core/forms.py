@@ -41,6 +41,13 @@ class CatalogBrandForm(forms.ModelForm):
 
 
 class CatalogPerfumeForm(forms.ModelForm):
+    collection_name = forms.CharField(
+        max_length=180,
+        required=False,
+        label="Collection / subname",
+        help_text="Separate product line, for example Secret Garden. Do not include it inside the scent name.",
+    )
+
     class Meta:
         model = catalog_models.Perfume
         fields = (

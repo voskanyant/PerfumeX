@@ -180,6 +180,7 @@ class CatalogPerfumeListView(StaffAssistantMixin, ListView):
             queryset = queryset.filter(
                 Q(name__icontains=query)
                 | Q(brand__name__icontains=query)
+                | Q(collection_name__icontains=query)
                 | Q(concentration__icontains=query)
                 | Q(audience__icontains=query)
             )

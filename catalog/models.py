@@ -2,6 +2,7 @@ from django.conf import settings
 from django.db import models
 from django.utils import timezone
 from django.utils.text import slugify
+from decimal import Decimal, InvalidOperation
 
 
 class TimeStampedModel(models.Model):
@@ -112,6 +113,36 @@ class PerfumeVariant(TimeStampedModel):
         if self.is_tester:
             parts.append("tester")
         return " / ".join([part for part in parts if part])
+
+    def _generated_sku_base(self) -> str:
+        size_text = self.size_label
+        if self.size_ml:
+            try:
+                size_text = f"{Decimal(str(self.size_ml)):g}ml"
+            except (InvalidOperation, ValueError):
+                size_text = str(self.size_ml)
+        parts = [
+            self.perfume.brand.name if self.perfume_id else "",
+            self.perfume.name if self.perfume_id else "",
+            self.perfume.concentration if self.perfume_id else "",
+            size_text,
+            self.variant_type,
+            self.packaging,
+            "tester" if self.is_tester else "",
+        ]
+        return slugify(" ".join([part for part in parts if part])).upper()[:96] or "CATALOG"
+
+    def save(self, *args, **kwargs):
+        if not self.sku:
+            base = self._generated_sku_base()
+            sku = base
+            counter = 2
+            while PerfumeVariant.objects.filter(sku=sku).exclude(pk=self.pk).exists():
+                suffix = f"-{counter}"
+                sku = f"{base[:120 - len(suffix)]}{suffix}"
+                counter += 1
+            self.sku = sku
+        return super().save(*args, **kwargs)
 
 
 class Note(models.Model):

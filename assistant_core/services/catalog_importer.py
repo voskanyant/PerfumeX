@@ -21,11 +21,12 @@ COLUMN_ALIASES = {
     "size_ml": {"size", "size_ml", "ml", "volume", "volume_ml"},
     "audience": {"audience", "gender", "sex", "target"},
     "variant_type": {"variant_type", "variant type", "variant", "format"},
-    "packaging": {"packaging", "package", "box", "presentation"},
+    "packaging": {"packaging", "package", "pack", "box", "presentation"},
     "is_tester": {"is_tester", "tester", "test"},
-    "sku": {"sku", "code", "item_code", "item code"},
+    "sku": {"sku", "our_sku", "our sku", "code", "item_code", "item code"},
     "ean": {"ean", "barcode", "bar_code", "upc"},
-    "collection_name": {"collection", "collection_name", "line"},
+    "comments": {"comments", "comment", "notes", "note"},
+    "collection_name": {"collection", "collection_name", "collection name", "subname", "sub_name", "sub name", "line", "perfume_line", "perfume line"},
     "release_year": {"release_year", "year", "launch_year"},
     "perfumer_name": {"perfumer", "perfumer_name", "nose"},
     "country_of_origin": {"brand_country", "country_of_origin", "origin"},
@@ -42,6 +43,7 @@ CONCENTRATION_MAP = {
     "parfum": "parfum",
     "extrait": "extrait",
     "extrait de parfum": "extrait",
+    "perfume oil": "perfume_oil",
 }
 
 
@@ -97,6 +99,23 @@ def _concentration(value: str) -> str:
     return CONCENTRATION_MAP.get(normalize_text(value), normalize_text(value))
 
 
+def _variant_type_from_comments(value: str) -> str:
+    text = normalize_text(value)
+    if not text:
+        return ""
+    if "sample" in text or "semple" in text:
+        return "sample_set" if "set" in text else "sample"
+    if "travel" in text or "mini" in text:
+        return "travel_set" if "set" in text else "travel"
+    if "refill" in text:
+        return "refill_set" if "set" in text else "refill"
+    if "roll on" in text:
+        return "roll_on"
+    if "set" in text:
+        return "set"
+    return ""
+
+
 def _read_csv(uploaded_file) -> list[dict]:
     content = uploaded_file.read().decode("utf-8-sig")
     reader = csv.DictReader(StringIO(content))
@@ -150,10 +169,12 @@ def import_catalog_file(uploaded_file, *, create_aliases: bool = True, update_ex
 
         concentration = _concentration(_text(row, "concentration"))
         audience = normalize_text(_text(row, "audience"))
+        comments = _text(row, "comments")
+        collection_name = _text(row, "collection_name")
         perfume = Perfume.objects.filter(brand=brand, name__iexact=perfume_name, concentration=concentration, audience=audience).first()
         if perfume:
             if update_existing:
-                perfume.collection_name = _text(row, "collection_name") or perfume.collection_name
+                perfume.collection_name = collection_name or perfume.collection_name
                 perfume.perfumer_name = _text(row, "perfumer_name") or perfume.perfumer_name
                 perfume.country_of_manufacture = _text(row, "country_of_manufacture") or perfume.country_of_manufacture
                 if _text(row, "release_year").isdigit():
@@ -166,7 +187,7 @@ def import_catalog_file(uploaded_file, *, create_aliases: bool = True, update_ex
                 name=perfume_name,
                 concentration=concentration,
                 audience=audience,
-                collection_name=_text(row, "collection_name"),
+                collection_name=collection_name,
                 release_year=int(_text(row, "release_year")) if _text(row, "release_year").isdigit() else None,
                 perfumer_name=_text(row, "perfumer_name"),
                 country_of_manufacture=_text(row, "country_of_manufacture"),
@@ -174,9 +195,15 @@ def import_catalog_file(uploaded_file, *, create_aliases: bool = True, update_ex
             result.perfumes_created += 1
 
         size_ml = _decimal(_text(row, "size_ml"))
-        packaging = normalize_text(_text(row, "packaging"))
-        variant_type = normalize_text(_text(row, "variant_type")) or "standard"
-        is_tester = _bool(_text(row, "is_tester"))
+        raw_packaging = normalize_text(_text(row, "packaging"))
+        variant_type = normalize_text(_text(row, "variant_type")) or _variant_type_from_comments(comments) or "standard"
+        is_tester = (
+            _bool(_text(row, "is_tester"))
+            or raw_packaging == "tester"
+            or "tester" in normalize_text(comments)
+            or "tetser" in normalize_text(comments)
+        )
+        packaging = "" if raw_packaging == "tester" else raw_packaging
         if size_ml or packaging or variant_type or is_tester or _text(row, "sku") or _text(row, "ean"):
             variant, variant_created = PerfumeVariant.objects.get_or_create(
                 perfume=perfume,

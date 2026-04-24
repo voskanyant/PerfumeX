@@ -18,3 +18,20 @@ class CatalogModelTests(TestCase):
         variant = PerfumeVariant.objects.create(perfume=perfume, size_ml="100.00", packaging="box", variant_type="standard")
 
         self.assertEqual(variant.perfume, perfume)
+
+    def test_variant_sku_is_generated_when_blank(self):
+        brand = Brand.objects.create(name="Dolce & Gabbana")
+        perfume = Perfume.objects.create(brand=brand, name="Light Blue", concentration="edt")
+
+        variant = PerfumeVariant.objects.create(perfume=perfume, size_ml="100.00", variant_type="standard")
+
+        self.assertTrue(variant.sku)
+        self.assertIn("DOLCE-GABBANA-LIGHT-BLUE", variant.sku)
+
+    def test_generated_variant_sku_is_unique(self):
+        brand = Brand.objects.create(name="Example")
+        perfume = Perfume.objects.create(brand=brand, name="Example Scent")
+        first = PerfumeVariant.objects.create(perfume=perfume, size_ml="100.00", variant_type="standard")
+        second = PerfumeVariant.objects.create(perfume=perfume, size_ml="100.00", variant_type="standard", packaging="box")
+
+        self.assertNotEqual(first.sku, second.sku)
