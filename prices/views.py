@@ -34,7 +34,7 @@ from django.utils.decorators import method_decorator
 from datetime import datetime, time
 import sys
 
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 import threading
 import re
 import unicodedata
@@ -52,7 +52,7 @@ from django.db.models import (
 )
 from django.db.models.functions import Coalesce, RowNumber, TruncDate
 
-from catalog.models import PerfumeVariant as CatalogPerfumeVariant
+from catalog.models import Brand as CatalogBrand, PerfumeVariant as CatalogPerfumeVariant
 
 from . import forms, models
 from django.shortcuts import get_object_or_404, redirect
@@ -3213,6 +3213,48 @@ class OurProductListView(LoginRequiredMixin, ListView):
         context["total_count"] = context["paginator"].count if context.get("paginator") else len(context["variants"])
         context["search_query"] = self.request.GET.get("q", "").strip()
         return context
+
+
+class OurProductVariantInlineUpdateView(LoginRequiredMixin, View):
+    def post(self, request, pk):
+        next_url = request.POST.get("next") or ""
+        if not url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}):
+            next_url = reverse_lazy("prices:our_product_list")
+        variant = get_object_or_404(
+            CatalogPerfumeVariant.objects.select_related("perfume", "perfume__brand"),
+            pk=pk,
+        )
+        brand_name = request.POST.get("brand_name", "").strip()
+        perfume_name = request.POST.get("perfume_name", "").strip()
+        concentration = request.POST.get("concentration", "").strip()
+        size_text = request.POST.get("size_ml", "").strip().lower().replace("ml", "").replace(",", ".").strip()
+        packaging = request.POST.get("packaging", "").strip()
+
+        if not brand_name or not perfume_name:
+            messages.error(request, "Brand and scent are required.")
+            return redirect(next_url)
+
+        brand = CatalogBrand.objects.filter(name__iexact=brand_name).first()
+        if not brand:
+            brand = CatalogBrand.objects.create(name=brand_name)
+        perfume = variant.perfume
+        perfume.brand = brand
+        perfume.name = perfume_name
+        perfume.concentration = concentration
+        perfume.save(update_fields=["brand", "name", "concentration", "updated_at"])
+
+        variant.size_ml = None
+        variant.size_label = ""
+        if size_text:
+            try:
+                variant.size_ml = Decimal(size_text)
+            except (InvalidOperation, ValueError):
+                variant.size_label = request.POST.get("size_ml", "").strip()
+        variant.is_tester = request.POST.get("is_tester") == "1"
+        variant.packaging = packaging
+        variant.save(update_fields=["size_ml", "size_label", "is_tester", "packaging", "updated_at"])
+        messages.success(request, "Product row updated.")
+        return redirect(next_url)
 
 
 class OurProductCreateView(BaseCreateView):

@@ -80,6 +80,7 @@ urlpatterns = [
     path("products/<int:pk>/edit/", views.SupplierProductUpdateView.as_view(), name="product_update"),
     path("products/<int:pk>/delete/", views.SupplierProductDeleteView.as_view(), name="product_delete"),
     path("our-products/", views.OurProductListView.as_view(), name="our_product_list"),
+    path("our-products/variants/<int:pk>/inline-update/", views.OurProductVariantInlineUpdateView.as_view(), name="our_product_variant_inline_update"),
     path("our-products/new/", views.OurProductCreateView.as_view(), name="our_product_create"),
     path("our-products/<int:pk>/", views.OurProductDetailView.as_view(), name="our_product_detail"),
     path("our-products/<int:pk>/edit/", views.OurProductUpdateView.as_view(), name="our_product_update"),

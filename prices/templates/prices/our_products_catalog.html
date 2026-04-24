@@ -34,14 +34,24 @@
         <tbody>
         {% for variant in variants %}
             <tr>
-                <td>{{ variant.perfume.brand.name }}</td>
-                <td>{{ variant.perfume.name }}</td>
-                <td>{{ variant.perfume.concentration }}</td>
-                <td>{% if variant.size_label %}{{ variant.size_label }}{% elif variant.size_ml %}{{ variant.size_ml|floatformat:"-2" }} ml{% endif %}</td>
-                <td>{% if variant.is_tester %}tester{% endif %}</td>
-                <td>{{ variant.packaging }}</td>
                 <td>
-                    <a class="button ghost" href="{% url 'assistant_core:catalog_variant_update' variant.pk %}">Edit</a>
+                    <form id="variant-form-{{ variant.pk }}" method="post" action="{% url 'prices:our_product_variant_inline_update' variant.pk %}"></form>
+                    <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token }}" form="variant-form-{{ variant.pk }}">
+                    <input type="hidden" name="next" value="{{ request.get_full_path }}" form="variant-form-{{ variant.pk }}">
+                    <input type="text" name="brand_name" value="{{ variant.perfume.brand.name }}" form="variant-form-{{ variant.pk }}">
+                </td>
+                <td><input type="text" name="perfume_name" value="{{ variant.perfume.name }}" form="variant-form-{{ variant.pk }}"></td>
+                <td><input type="text" name="concentration" value="{{ variant.perfume.concentration }}" list="catalog-concentration-options" form="variant-form-{{ variant.pk }}"></td>
+                <td><input type="text" name="size_ml" value="{% if variant.size_label %}{{ variant.size_label }}{% elif variant.size_ml %}{{ variant.size_ml|floatformat:"-2" }}{% endif %}" form="variant-form-{{ variant.pk }}"></td>
+                <td>
+                    <select name="is_tester" form="variant-form-{{ variant.pk }}">
+                        <option value="0"></option>
+                        <option value="1" {% if variant.is_tester %}selected{% endif %}>tester</option>
+                    </select>
+                </td>
+                <td><input type="text" name="packaging" value="{{ variant.packaging }}" form="variant-form-{{ variant.pk }}"></td>
+                <td>
+                    <button class="button ghost" type="submit" form="variant-form-{{ variant.pk }}">Save</button>
                     <a class="button ghost" href="{% url 'assistant_core:catalog_variant_delete' variant.pk %}">Delete</a>
                 </td>
             </tr>
@@ -50,6 +60,14 @@
         {% endfor %}
         </tbody>
     </table>
+    <datalist id="catalog-concentration-options">
+        <option value="Eau de Parfum"></option>
+        <option value="Eau de Toilette"></option>
+        <option value="Eau de Cologne"></option>
+        <option value="Parfum"></option>
+        <option value="Extrait de Parfum"></option>
+        <option value="Perfume Oil"></option>
+    </datalist>
 
     {% if is_paginated %}
         <div class="pagination">
