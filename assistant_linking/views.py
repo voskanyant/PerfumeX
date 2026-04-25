@@ -10,6 +10,7 @@ from django.views.generic import DetailView, ListView, TemplateView, View
 
 from assistant_linking import forms, models
 from assistant_linking.services.catalog_matcher import candidate_matches, rule_impact, similar_supplier_rows
+from assistant_linking.services.garbage import GARBAGE_MODIFIER, normalize_garbage_keyword
 from assistant_linking.services.grouping import rebuild_groups
 from assistant_linking.services.mock_suggester import generate_link_suggestions
 from assistant_linking.services.normalizer import PARSER_VERSION, save_parse
@@ -50,6 +51,10 @@ def _hide_parsed_products(queryset, request):
     )
 
 
+def _exclude_garbage_parses(queryset):
+    return queryset.exclude(modifiers__contains=[GARBAGE_MODIFIER])
+
+
 class StaffAssistantMixin(LoginRequiredMixin, UserPassesTestMixin):
     def test_func(self):
         return bool(self.request.user and self.request.user.is_staff)
@@ -64,22 +69,24 @@ class NormalizationDashboardView(StaffAssistantMixin, TemplateView):
             models.ParsedSupplierProduct.objects.all(),
             self.request,
         )
+        non_garbage_queryset = _exclude_garbage_parses(parsed_queryset)
         unparsed_queryset = _hide_supplier_products(
             SupplierProduct.objects.all(),
             self.request,
         )
         return {
             **super().get_context_data(**kwargs),
-            "parsed_count": parsed_queryset.count(),
+            "parsed_count": non_garbage_queryset.count(),
             "unparsed_count": unparsed_queryset.filter(assistant_parse__isnull=True).count(),
-            "low_confidence_count": parsed_queryset.filter(confidence__lt=75).count(),
-            "missing_brand_count": parsed_queryset.filter(normalized_brand__isnull=True).count(),
-            "missing_size_count": parsed_queryset.filter(size_ml__isnull=True).count(),
-            "modifier_count": parsed_queryset.exclude(modifiers=[]).count(),
-            "tester_sample_count": parsed_queryset.filter(
+            "low_confidence_count": non_garbage_queryset.filter(confidence__lt=75).count(),
+            "missing_brand_count": non_garbage_queryset.filter(normalized_brand__isnull=True).count(),
+            "missing_size_count": non_garbage_queryset.filter(size_ml__isnull=True).count(),
+            "modifier_count": non_garbage_queryset.exclude(modifiers=[]).count(),
+            "garbage_count": parsed_queryset.filter(modifiers__contains=[GARBAGE_MODIFIER]).count(),
+            "tester_sample_count": non_garbage_queryset.filter(
                 Q(is_tester=True) | Q(is_sample=True) | Q(is_travel=True) | Q(is_set=True)
             ).count(),
-            "recent": parsed_queryset.select_related("supplier_product", "normalized_brand").order_by("-updated_at")[:20],
+            "recent": non_garbage_queryset.select_related("supplier_product", "normalized_brand").order_by("-updated_at")[:20],
             "hidden_keywords_active": bool(hidden_keywords),
         }
 
@@ -143,7 +150,7 @@ class LowConfidenceListView(NormalizationSearchMixin, StaffAssistantMixin, ListV
                 | Q(product_name_text__icontains=query)
                 | Q(concentration__icontains=query)
             )
-        queryset = _hide_parsed_products(queryset, self.request)
+        queryset = _exclude_garbage_parses(_hide_parsed_products(queryset, self.request))
         return queryset.order_by("confidence", "supplier_product__supplier__name", "supplier_product__name")
 
     def parse_matches_view(self, parsed):
@@ -200,7 +207,7 @@ class MissingBrandListView(NormalizationIssueListView):
             "supplier_product__supplier",
             "normalized_brand",
         ).filter(normalized_brand__isnull=True)
-        queryset = _hide_parsed_products(queryset, self.request)
+        queryset = _exclude_garbage_parses(_hide_parsed_products(queryset, self.request))
         return queryset.order_by("supplier_product__name")
 
     def parse_matches_view(self, parsed):
@@ -216,7 +223,7 @@ class MissingSizeListView(NormalizationIssueListView):
             "supplier_product__supplier",
             "normalized_brand",
         ).filter(size_ml__isnull=True)
-        queryset = _hide_parsed_products(queryset, self.request)
+        queryset = _exclude_garbage_parses(_hide_parsed_products(queryset, self.request))
         return queryset.order_by("supplier_product__name")
 
     def parse_matches_view(self, parsed):
@@ -232,7 +239,7 @@ class TesterSampleListView(NormalizationIssueListView):
             "supplier_product__supplier",
             "normalized_brand",
         ).filter(Q(is_tester=True) | Q(is_sample=True) | Q(is_travel=True) | Q(is_set=True))
-        queryset = _hide_parsed_products(queryset, self.request)
+        queryset = _exclude_garbage_parses(_hide_parsed_products(queryset, self.request))
         return queryset.order_by("supplier_product__name")
 
     def parse_matches_view(self, parsed):
@@ -248,7 +255,7 @@ class ModifierConflictListView(NormalizationIssueListView):
             "supplier_product__supplier",
             "normalized_brand",
         ).exclude(modifiers=[])
-        queryset = _hide_parsed_products(queryset, self.request)
+        queryset = _exclude_garbage_parses(_hide_parsed_products(queryset, self.request))
         return queryset.order_by("supplier_product__name")
 
     def parse_matches_view(self, parsed):
@@ -283,6 +290,22 @@ class ParsedListView(NormalizationIssueListView):
         return True
 
 
+class GarbageListView(NormalizationIssueListView):
+    issue_title = "Garbage / excluded rows"
+
+    def get_queryset(self):
+        queryset = models.ParsedSupplierProduct.objects.select_related(
+            "supplier_product",
+            "supplier_product__supplier",
+            "normalized_brand",
+        ).filter(modifiers__contains=[GARBAGE_MODIFIER])
+        queryset = _hide_parsed_products(queryset, self.request)
+        return queryset.order_by("supplier_product__supplier__name", "supplier_product__name")
+
+    def parse_matches_view(self, parsed):
+        return GARBAGE_MODIFIER in (parsed.modifiers or [])
+
+
 class ParsedProductDetailView(StaffAssistantMixin, DetailView):
     model = SupplierProduct
     template_name = "assistant_linking/normalization/detail.html"
@@ -301,7 +324,8 @@ class ParsedProductDetailView(StaffAssistantMixin, DetailView):
         parsed = save_parse(product)
         canonical_perfume = product.catalog_perfume
         canonical_variant = product.catalog_variant
-        catalog_candidates = candidate_matches(parsed)
+        is_garbage = GARBAGE_MODIFIER in (parsed.modifiers or [])
+        catalog_candidates = [] if is_garbage else candidate_matches(parsed)
         suggested_candidate = None
         if not canonical_perfume and catalog_candidates:
             best_candidate = catalog_candidates[0]
@@ -347,6 +371,7 @@ class ParsedProductDetailView(StaffAssistantMixin, DetailView):
             "parsed": parsed,
             "teach_form": forms.ParseTeachingForm(initial=teach_initial),
             "catalog_candidates": catalog_candidates,
+            "is_garbage": is_garbage,
             "suggested_catalog_candidate": suggested_candidate,
             "similar_rows": similar_supplier_rows(
                 product,
@@ -442,6 +467,38 @@ class ReparseProductView(StaffAssistantMixin, View):
         product = get_object_or_404(SupplierProduct, pk=supplier_product_id)
         save_parse(product, force=request.POST.get("force") == "1")
         messages.success(request, "Product parsed.")
+        return redirect("assistant_linking:normalization_detail", supplier_product_id=supplier_product_id)
+
+
+class ExcludeGarbageKeywordView(StaffAssistantMixin, View):
+    def post(self, request, supplier_product_id):
+        from assistant_core.models import GlobalRule
+        from assistant_linking.services.garbage import clear_garbage_keyword_cache
+
+        product = get_object_or_404(SupplierProduct.objects.select_related("supplier"), pk=supplier_product_id)
+        keywords = normalize_garbage_keyword(request.POST.get("keywords", ""))
+        if not keywords:
+            messages.error(request, "Add at least one garbage keyword.")
+            return redirect("assistant_linking:normalization_detail", supplier_product_id=supplier_product_id)
+
+        for keyword in keywords.splitlines():
+            GlobalRule.objects.update_or_create(
+                rule_kind="garbage_keyword",
+                scope_type="global",
+                rule_text=keyword,
+                defaults={
+                    "title": f"Garbage keyword: {keyword}",
+                    "scope_value": "",
+                    "priority": 10,
+                    "confidence": 100,
+                    "active": True,
+                    "approved": True,
+                    "created_by": request.user,
+                },
+            )
+        clear_garbage_keyword_cache()
+        save_parse(product, force=True)
+        messages.success(request, "Garbage keyword saved and this row was reparsed.")
         return redirect("assistant_linking:normalization_detail", supplier_product_id=supplier_product_id)
 
 

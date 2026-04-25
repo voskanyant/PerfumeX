@@ -11,6 +11,14 @@ class GlobalRuleForm(forms.ModelForm):
         fields = ("title", "rule_kind", "scope_type", "scope_value", "rule_text", "examples_json", "priority", "confidence", "active", "approved")
         widgets = {"rule_text": forms.Textarea(attrs={"rows": 4}), "examples_json": forms.Textarea(attrs={"rows": 3})}
 
+    def save(self, commit=True):
+        instance = super().save(commit=commit)
+        if instance.rule_kind in {"garbage_keyword", "exclude_keyword"}:
+            from assistant_linking.services.garbage import clear_garbage_keyword_cache
+
+            clear_garbage_keyword_cache()
+        return instance
+
 
 class SupplierRuleForm(forms.ModelForm):
     class Meta:

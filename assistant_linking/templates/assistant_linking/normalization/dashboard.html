@@ -22,6 +22,7 @@
     <a class="metric-card" href="{% url 'assistant_linking:normalization_missing_size' %}"><div class="metric-label">Missing size</div><div class="metric-value">{{ missing_size_count }}</div></a>
     <a class="metric-card" href="{% url 'assistant_linking:normalization_modifiers' %}"><div class="metric-label">Modifiers</div><div class="metric-value">{{ modifier_count }}</div></a>
     <a class="metric-card" href="{% url 'assistant_linking:normalization_tester_sample' %}"><div class="metric-label">Tester/sample/travel/set</div><div class="metric-value">{{ tester_sample_count }}</div></a>
+    <a class="metric-card" href="{% url 'assistant_linking:normalization_garbage' %}"><div class="metric-label">Garbage</div><div class="metric-value">{{ garbage_count }}</div></a>
 </div>
 <div class="workspace-block space-top-md">
     <div class="page-head">

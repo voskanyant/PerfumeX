@@ -1,6 +1,7 @@
 from django.core.cache import cache
 from django.test import TestCase
 
+from assistant_core.models import GlobalRule
 from assistant_linking.models import BrandAlias, ConcentrationAlias, ProductAlias
 from assistant_linking.services.normalizer import parse_supplier_product, save_parse
 from catalog.models import Brand
@@ -93,6 +94,35 @@ class NormalizerTests(TestCase):
         self.assertEqual(parsed.concentration, "Eau de Parfum")
         self.assertEqual(parsed.size_ml, 50)
 
+    def test_compact_size_before_concentration_is_split(self):
+        brand = Brand.objects.create(name="24K")
+        BrandAlias.objects.create(brand=brand, alias_text="24K", normalized_alias="24k")
+        product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="5a",
+            name="24K SUPREME ROUGE 100edp TESTER",
+        )
+
+        parsed = parse_supplier_product(product)
+
+        self.assertEqual(parsed.normalized_brand, brand)
+        self.assertEqual(parsed.product_name_text, "supreme rouge")
+        self.assertEqual(parsed.concentration, "Eau de Parfum")
+        self.assertEqual(parsed.size_ml, 100)
+        self.assertTrue(parsed.is_tester)
+
+    def test_reversed_ml_size_is_parsed(self):
+        product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="5b",
+            name="1916 Agua De Colonia Limon & Tonca ml 100 tester",
+        )
+
+        parsed = parse_supplier_product(product)
+
+        self.assertEqual(parsed.size_ml, 100)
+        self.assertTrue(parsed.is_tester)
+
     def test_no_five_is_not_treated_as_size(self):
         brand = Brand.objects.create(name="Chanel")
         BrandAlias.objects.create(brand=brand, alias_text="Chanel", normalized_alias="chanel")
@@ -106,6 +136,28 @@ class NormalizerTests(TestCase):
 
         self.assertEqual(parsed.normalized_brand, brand)
         self.assertIsNone(parsed.size_ml)
+
+    def test_garbage_keyword_excludes_row_from_normalization(self):
+        GlobalRule.objects.create(
+            title="Garbage keyword: blotters",
+            rule_kind="garbage_keyword",
+            scope_type="global",
+            rule_text="blotters",
+            active=True,
+            approved=True,
+        )
+        product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="6a",
+            name="Escentric Molecules blotters 20pcs",
+        )
+
+        parsed = parse_supplier_product(product)
+
+        self.assertEqual(parsed.modifiers, ["garbage"])
+        self.assertEqual(parsed.confidence, 100)
+        self.assertIn("excluded garbage keyword: blotters", parsed.warnings)
+        self.assertFalse(parsed.product_name_text)
 
     def test_custom_concentration_aliases_can_be_managed_in_database(self):
         brand = Brand.objects.create(name="Montale")

@@ -8,6 +8,7 @@ app_name = "assistant_core"
 urlpatterns = [
     path("", views.DashboardView.as_view(), name="dashboard"),
     path("knowledge/", views.KnowledgeView.as_view(), name="knowledge"),
+    path("knowledge/garbage-keywords/", views.GarbageKeywordCreateView.as_view(), name="garbage_keyword_create"),
     path("rules/", views.RulesView.as_view(), name="rules"),
     path("aliases/", views.AliasesView.as_view(), name="aliases"),
     path("aliases/brands/new/", views.BrandAliasCreateView.as_view(), name="brand_alias_create"),

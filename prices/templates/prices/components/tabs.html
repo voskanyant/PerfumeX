@@ -1,0 +1,5 @@
+<nav class="tabs{% if class_name %} {{ class_name }}{% endif %}"{% if label %} aria-label="{{ label }}"{% endif %}>
+    {% if items_template %}
+        {% include items_template %}
+    {% endif %}
+</nav>

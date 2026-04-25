@@ -16,6 +16,7 @@ from assistant_linking.models import (
     ParsedSupplierProduct,
     ProductAlias,
 )
+from assistant_linking.services.garbage import GARBAGE_MODIFIER, GARBAGE_WARNING_PREFIX, match_garbage_keyword
 from catalog.models import Brand
 from prices.models import SupplierProduct
 
@@ -75,8 +76,10 @@ class ParseResult:
 def normalize_text(value: str) -> str:
     text = unicodedata.normalize("NFKC", value or "").lower()
     text = re.sub(r"\b(edp|edt|edc)(?=\d)", r"\1 ", text)
+    text = re.sub(r"(?<=\d)(edp|edt|edc)\b", r" \1", text)
     text = re.sub(r"\b(eau de parfum|eau de toilette|eau de cologne|extrait de parfum|extrait|parfum)(?=\d)", r"\1 ", text)
-    text = re.sub(r"[\u00a0_/,;:|()\[\]{}]+", " ", text)
+    text = re.sub(r"(?<=\d)(eau de parfum|eau de toilette|eau de cologne|extrait de parfum|extrait|parfum)\b", r" \1", text)
+    text = re.sub(r"[\u00a0_\\/,;:|()\[\]{}+]+", " ", text)
     text = re.sub(r"(?<=\d),(?=\d)", ".", text)
     text = re.sub(r"\s+", " ", text).strip()
     return text
@@ -122,6 +125,11 @@ def _extract_size(text: str) -> tuple[Decimal | None, str, str]:
         raw = ml_match.group(0)
         value = Decimal(ml_match.group(1).replace(",", ".")).quantize(Decimal("0.01"))
         return value, raw, text.replace(raw, " ")
+    reversed_ml_match = re.search(r"\b(?:ml|Ð¼Ð»|Ð¼\.Ð»\.?)\s*(\d+(?:[.,]\d+)?)(?=\s|$)", text)
+    if reversed_ml_match:
+        raw = reversed_ml_match.group(0)
+        value = Decimal(reversed_ml_match.group(1).replace(",", ".")).quantize(Decimal("0.01"))
+        return value, raw, text.replace(raw, " ")
     oz_match = re.search(r"\b(\d+(?:[.,]\d+)?)\s*(?:fl\s*)?oz\b", text)
     if oz_match:
         raw = oz_match.group(0)
@@ -142,7 +150,24 @@ def _extract_size(text: str) -> tuple[Decimal | None, str, str]:
 
 
 def _extract_loose_trailing_size(text: str) -> tuple[Decimal | None, str, str]:
-    match = re.search(r"(?P<prefix>.*?)(?:^|\s)(?P<size>\d+(?:[.,]\d+)?)\s*$", text)
+    trailing_terms = (
+        "tester",
+        "test",
+        "sample",
+        "travel",
+        "set",
+        "mini",
+        "Ñ‚ÐµÑÑ‚ÐµÑ€",
+        "Ñ‚ÐµÑÑ‚",
+        "Ð¿Ñ€Ð¾Ð±Ð½Ð¸Ðº",
+        "Ð¼Ð¸Ð½Ð¸",
+        "Ð½Ð°Ð±Ð¾Ñ€",
+    )
+    trailing_pattern = "|".join(re.escape(term) for term in trailing_terms)
+    match = re.search(
+        rf"(?P<prefix>.*?)(?:^|\s)(?P<size>\d+(?:[.,]\d+)?)(?:\s+(?:{trailing_pattern}))*\s*$",
+        text,
+    )
     if not match:
         return None, "", text
     prefix = (match.group("prefix") or "").strip()
@@ -180,6 +205,13 @@ def parse_supplier_product(product: SupplierProduct) -> ParseResult:
     raw = product.name or ""
     text = normalize_text(" ".join([product.brand or "", raw, product.size or ""]))
     result = ParseResult(raw_name=raw, normalized_text=text)
+
+    garbage_keyword = match_garbage_keyword(text)
+    if garbage_keyword:
+        result.modifiers = [GARBAGE_MODIFIER]
+        result.warnings = [f"{GARBAGE_WARNING_PREFIX}: {garbage_keyword}"]
+        result.confidence = 100
+        return result
 
     size, raw_size, text = _extract_size(text)
     result.size_ml = size

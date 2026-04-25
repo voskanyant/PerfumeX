@@ -62,14 +62,30 @@
     <div class="page-meta space-top-sm">
         Showing {{ page_obj.start_index }}-{{ page_obj.end_index }} of {{ page_obj.paginator.count }} entries.
     </div>
+
+    {% if active_section == "garbage_keywords" %}
+        <form method="post" action="{% url 'assistant_core:garbage_keyword_create' %}" class="space-top-md">
+            {% csrf_token %}
+            <div class="layout-grid-12 gap-md items-end">
+                <div class="span-12 md-span-8">
+                    <label class="form-label" for="garbage-keywords">Add garbage keyword(s)</label>
+                    <textarea id="garbage-keywords" name="keywords" rows="2" placeholder="One keyword per line, for example: Блотеры"></textarea>
+                </div>
+                <div class="span-12 md-span-4">
+                    <button class="button primary" type="submit">Add exclusion keyword</button>
+                    <p class="page-meta space-top-sm">Approved keywords exclude matching rows from normal issue queues after reparse.</p>
+                </div>
+            </div>
+        </form>
+    {% endif %}
 </div>
 
 <div class="workspace-block space-top-md">
     <div class="table-wrap table-scroll-x">
         <table class="data-table">
             <thead>
-                {% if active_section == "global_rules" %}
-                    <tr><th>Title</th><th>Kind</th><th>Scope</th><th>Confidence</th><th>Status</th></tr>
+                {% if active_section == "global_rules" or active_section == "garbage_keywords" %}
+                    <tr><th>Title</th><th>Kind</th><th>Keyword / Rule</th><th>Confidence</th><th>Status</th><th>Actions</th></tr>
                 {% elif active_section == "supplier_rules" %}
                     <tr><th>Supplier</th><th>Brand</th><th>Title</th><th>Kind</th><th>Applies to</th><th>Confidence</th><th>Status</th></tr>
                 {% elif active_section == "notes" %}
@@ -87,12 +103,22 @@
             <tbody>
                 {% for item in items %}
                     <tr>
-                        {% if active_section == "global_rules" %}
+                        {% if active_section == "global_rules" or active_section == "garbage_keywords" %}
                             <td>{{ item.title }}</td>
                             <td>{{ item.rule_kind }}</td>
-                            <td>{{ item.scope_type }}{% if item.scope_value %}: {{ item.scope_value }}{% endif %}</td>
+                            <td>{{ item.rule_text }}</td>
                             <td>{{ item.confidence }}</td>
                             <td>{{ item.active|yesno:"active,inactive" }}</td>
+                            <td class="actions">
+                                {% if item.active %}
+                                    <form method="post" action="{% url 'assistant_core:rule_disable' 'global' item.pk %}">
+                                        {% csrf_token %}
+                                        <button class="button ghost" type="submit">Disable</button>
+                                    </form>
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
                         {% elif active_section == "supplier_rules" %}
                             <td>{{ item.supplier }}</td>
                             <td>{{ item.brand|default:"any brand" }}</td>

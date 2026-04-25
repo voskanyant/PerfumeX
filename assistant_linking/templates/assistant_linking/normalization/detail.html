@@ -57,6 +57,25 @@
 </div>
 
 <div class="workspace-block space-top-md">
+    <div class="page-head">
+        <div>
+            <span class="page-kicker">Garbage exclusion</span>
+            <h2 class="kpi-link-title">{% if is_garbage %}This row is excluded from normalisation{% else %}Exclude non-product rows by keyword{% endif %}</h2>
+            <p class="page-meta">Use this for blotters, bags, marketing materials, candles, or other supplier rows that should not be matched as perfumes.</p>
+        </div>
+        <a class="button ghost" href="{% url 'assistant_core:knowledge' %}?section=garbage_keywords">Manage keywords</a>
+    </div>
+    <form method="post" action="{% url 'assistant_linking:normalization_exclude_garbage' product.pk %}" class="layout-inline gap-sm flex-wrap">
+        {% csrf_token %}
+        <input type="text" name="keywords" placeholder="Keyword, for example: Блотеры" value="">
+        <button class="button primary" type="submit">Add garbage keyword</button>
+    </form>
+    {% if is_garbage %}
+        <div class="flash flash--warning space-top-sm">Catalogue candidates are hidden because this row matched a garbage keyword.</div>
+    {% endif %}
+</div>
+
+<div class="workspace-block space-top-md">
     <h2 class="kpi-link-title">Catalogue candidates</h2>
     <table class="data-table">
         <thead>

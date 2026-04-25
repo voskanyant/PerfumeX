@@ -1,0 +1,18 @@
+<div class="page-header{% if class_name %} {{ class_name }}{% endif %}">
+    <div>
+        {% if kicker %}<span class="page-kicker">{{ kicker }}</span>{% endif %}
+        <h1 class="page-title">{{ title }}</h1>
+        {% if meta %}<div class="page-meta">{{ meta }}</div>{% endif %}
+    </div>
+    {% if actions_template or primary_url or secondary_url %}
+        <div class="page-actions">
+            {% if actions_template %}{% include actions_template %}{% endif %}
+            {% if secondary_url and secondary_label %}
+                <a class="button ghost" href="{{ secondary_url }}">{{ secondary_label }}</a>
+            {% endif %}
+            {% if primary_url and primary_label %}
+                <a class="button primary" href="{{ primary_url }}">{{ primary_label }}</a>
+            {% endif %}
+        </div>
+    {% endif %}
+</div>

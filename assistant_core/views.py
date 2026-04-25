@@ -62,6 +62,7 @@ class KnowledgeView(StaffAssistantMixin, TemplateView):
     template_name = "assistant_core/knowledge/index.html"
     paginate_by = 50
 
+    SECTION_GARBAGE_KEYWORDS = "garbage_keywords"
     SECTION_GLOBAL_RULES = "global_rules"
     SECTION_SUPPLIER_RULES = "supplier_rules"
     SECTION_NOTES = "notes"
@@ -77,6 +78,7 @@ class KnowledgeView(StaffAssistantMixin, TemplateView):
         SECTION_PRODUCT_ALIASES,
         SECTION_CONCENTRATION_ALIASES,
         SECTION_DECISIONS,
+        SECTION_GARBAGE_KEYWORDS,
     }
 
     def _active_section(self):
@@ -102,8 +104,10 @@ class KnowledgeView(StaffAssistantMixin, TemplateView):
     def _queryset_for_section(self, section, query):
         from assistant_linking.models import BrandAlias, ConcentrationAlias, ManualLinkDecision, ProductAlias
 
-        if section == self.SECTION_GLOBAL_RULES:
+        if section in {self.SECTION_GLOBAL_RULES, self.SECTION_GARBAGE_KEYWORDS}:
             queryset = models.GlobalRule.objects.order_by("priority", "title")
+            if section == self.SECTION_GARBAGE_KEYWORDS:
+                queryset = queryset.filter(rule_kind__in=("garbage_keyword", "exclude_keyword"))
             if query:
                 queryset = queryset.filter(
                     Q(title__icontains=query)
@@ -216,6 +220,7 @@ class KnowledgeView(StaffAssistantMixin, TemplateView):
             {"key": self.SECTION_BRAND_ALIASES, "label": "Brand aliases", "count": BrandAlias.objects.count()},
             {"key": self.SECTION_PRODUCT_ALIASES, "label": "Product aliases", "count": ProductAlias.objects.count()},
             {"key": self.SECTION_CONCENTRATION_ALIASES, "label": "Concentration aliases", "count": ConcentrationAlias.objects.count()},
+            {"key": self.SECTION_GARBAGE_KEYWORDS, "label": "Garbage keywords", "count": models.GlobalRule.objects.filter(rule_kind__in=("garbage_keyword", "exclude_keyword")).count()},
             {"key": self.SECTION_GLOBAL_RULES, "label": "Global rules", "count": models.GlobalRule.objects.count()},
             {"key": self.SECTION_SUPPLIER_RULES, "label": "Supplier rules", "count": models.SupplierRule.objects.count()},
             {"key": self.SECTION_NOTES, "label": "Notes", "count": models.KnowledgeNote.objects.count()},
@@ -514,8 +519,43 @@ class RuleDisableView(StaffAssistantMixin, View):
         rule = get_object_or_404(model, pk=pk)
         rule.active = False
         rule.save(update_fields=["active", "updated_at"])
+        if model_name == "global" and rule.rule_kind in {"garbage_keyword", "exclude_keyword"}:
+            from assistant_linking.services.garbage import clear_garbage_keyword_cache
+
+            clear_garbage_keyword_cache()
         messages.success(request, "Rule disabled.")
         return redirect("assistant_core:knowledge")
+
+
+class GarbageKeywordCreateView(StaffAssistantMixin, View):
+    def post(self, request):
+        from assistant_linking.services.garbage import clear_garbage_keyword_cache, normalize_garbage_keyword
+
+        keywords = normalize_garbage_keyword(request.POST.get("keywords", ""))
+        if not keywords:
+            messages.error(request, "Add at least one keyword.")
+            return redirect(f"{reverse_lazy('assistant_core:knowledge')}?section=garbage_keywords")
+
+        created = 0
+        for keyword in keywords.splitlines():
+            _, was_created = models.GlobalRule.objects.update_or_create(
+                rule_kind="garbage_keyword",
+                scope_type="global",
+                rule_text=keyword,
+                defaults={
+                    "title": f"Garbage keyword: {keyword}",
+                    "scope_value": "",
+                    "priority": 10,
+                    "confidence": 100,
+                    "active": True,
+                    "approved": True,
+                    "created_by": request.user,
+                },
+            )
+            created += int(was_created)
+        clear_garbage_keyword_cache()
+        messages.success(request, f"Saved {len(keywords.splitlines())} garbage keyword(s).")
+        return redirect(f"{reverse_lazy('assistant_core:knowledge')}?section=garbage_keywords")
 
 
 class TeachFromDecisionView(StaffAssistantMixin, View):

@@ -3578,21 +3578,37 @@ class OurProductListView(LoginRequiredMixin, ListView):
     context_object_name = "variants"
     paginate_by = 50
 
+    search_fields = (
+        "perfume__name",
+        "perfume__brand__name",
+        "perfume__collection_name",
+        "perfume__concentration",
+        "size_label",
+        "packaging",
+        "variant_type",
+        "sku",
+        "ean",
+    )
+
+    def _catalog_search_tokens(self, query: str) -> list[str]:
+        tokens = [token for token in re.split(r"\s+", query.strip()) if token]
+        return tokens if len(tokens) > 1 else []
+
+    def _token_filter(self, token: str) -> Q:
+        token_filter = Q()
+        for field in self.search_fields:
+            token_filter |= Q(**{f"{field}__icontains": token})
+        return token_filter
+
     def get_queryset(self):
         queryset = CatalogPerfumeVariant.objects.select_related("perfume", "perfume__brand")
         query = self.request.GET.get("q", "").strip()
         if query:
-            queryset = queryset.filter(
-                Q(perfume__name__icontains=query)
-                | Q(perfume__brand__name__icontains=query)
-                | Q(perfume__collection_name__icontains=query)
-                | Q(perfume__concentration__icontains=query)
-                | Q(size_label__icontains=query)
-                | Q(packaging__icontains=query)
-                | Q(variant_type__icontains=query)
-                | Q(sku__icontains=query)
-                | Q(ean__icontains=query)
-            )
+            phrase_filter = self._token_filter(query)
+            token_filter = Q()
+            for token in self._catalog_search_tokens(query):
+                token_filter &= self._token_filter(token)
+            queryset = queryset.filter(phrase_filter | token_filter)
         return queryset.order_by("perfume__brand__name", "perfume__name", "perfume__concentration", "size_ml", "packaging")
 
     def get_context_data(self, **kwargs):
