@@ -152,6 +152,49 @@ class NormalizerTests(TestCase):
                     f"Vilhelm Parfumerie / Modest Mimosa / Eau de Parfum / {expected_label} / Set",
                 )
 
+    def test_russian_hair_mist_beats_linked_perfume_concentration(self):
+        brand = Brand.objects.create(name="Givenchy")
+        BrandAlias.objects.create(brand=brand, alias_text="Givenchy", normalized_alias="givenchy")
+        perfume = brand.perfumes.create(name="L'Interdit", concentration="Eau de Toilette")
+        product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="givenchy-hair-mist",
+            name="Givenchy L'INTERDIT 35ml дымка для волос TESTER",
+            catalog_perfume=perfume,
+        )
+
+        parsed = save_parse(product, force=True)
+
+        self.assertEqual(parsed.product_name_text, "L'Interdit")
+        self.assertEqual(parsed.concentration, "Hair Perfume")
+        self.assertEqual(parsed.size_ml, Decimal("35.00"))
+        self.assertTrue(parsed.is_tester)
+        self.assertEqual(parsed.display_variant_type, "Tester")
+        self.assertEqual(parsed.product_category_label, "Hair Care")
+        self.assertEqual(parsed.display_identity, "Givenchy / L'Interdit / Hair Perfume / 35ml / Tester")
+
+    def test_english_hair_mist_and_hair_perfume_keep_supplier_form(self):
+        brand = Brand.objects.create(name="Givenchy")
+        BrandAlias.objects.create(brand=brand, alias_text="Givenchy", normalized_alias="givenchy")
+        examples = (
+            ("Givenchy L'Interdit hair mist 35ml", "Hair Mist"),
+            ("Givenchy L'Interdit hair perfume 35ml", "Hair Perfume"),
+        )
+
+        for name, expected_concentration in examples:
+            with self.subTest(name=name):
+                product = SupplierProduct.objects.create(
+                    supplier=self.supplier,
+                    identity_key=name,
+                    name=name,
+                )
+
+                parsed = save_parse(product, force=True)
+
+                self.assertEqual(parsed.concentration, expected_concentration)
+                self.assertEqual(parsed.product_category_label, "Hair Care")
+                self.assertEqual(parsed.size_ml, Decimal("35.00"))
+
     def test_standalone_w_and_m_are_audience_aliases_not_product_name(self):
         brand = Brand.objects.create(name="Abercrombie & Fitch")
         BrandAlias.objects.create(brand=brand, alias_text="Abercrombie Fitch", normalized_alias="abercrombie fitch")

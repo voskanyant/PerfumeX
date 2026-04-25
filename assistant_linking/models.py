@@ -10,6 +10,15 @@ from catalog.models import compact_decimal_text
 
 
 CONCENTRATION_ALIAS_CACHE_KEY = "assistant_linking:concentration_aliases:v1"
+PERFUME_CATEGORY_CONCENTRATIONS = {
+    "Eau de Parfum",
+    "Eau de Toilette",
+    "Eau de Cologne",
+    "Parfum",
+    "Extrait de Parfum",
+    "Perfume Oil",
+}
+HAIR_CARE_CATEGORY_CONCENTRATIONS = {"Hair Mist", "Hair Perfume"}
 REDOS_REGEX_SHAPES = (r"(.+)+", r"(.*)*", r"(.+)*", r"(\w+)+")
 TITLECASE_LOWER_WORDS = {
     "a",
@@ -245,6 +254,14 @@ class ParsedSupplierProduct(TimeStampedModel):
         if self.is_set or self.variant_type == "set":
             return "Set"
         return display_label(self.variant_type, default="Standard")
+
+    @property
+    def product_category_label(self) -> str:
+        if self.concentration in HAIR_CARE_CATEGORY_CONCENTRATIONS:
+            return "Hair Care"
+        if self.concentration in PERFUME_CATEGORY_CONCENTRATIONS:
+            return "Perfume"
+        return "Unknown"
 
     @property
     def display_packaging(self) -> str:

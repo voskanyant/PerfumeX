@@ -119,6 +119,9 @@ class ParseTeachingForm(forms.Form):
         ("Eau de Cologne", "Eau de Cologne"),
         ("Parfum", "Parfum"),
         ("Extrait de Parfum", "Extrait de Parfum"),
+        ("Perfume Oil", "Perfume Oil"),
+        ("Hair Mist", "Hair Mist"),
+        ("Hair Perfume", "Hair Perfume"),
     )
     AUDIENCE_CHOICES = (
         ("", "Unknown"),
