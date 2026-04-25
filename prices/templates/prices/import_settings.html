@@ -29,116 +29,172 @@
                     <p class="card-desc">Configure mailbox checks, import rules, and scheduler behavior.</p>
                 </div>
             </div>
-            <div class="settings-body">
-                <form method="post" class="layout-grid-12 gap-md items-end">
-                    {% csrf_token %}
-                    <div class="span-12">
-                        <h6 class="text-semibold space-bottom-none">Schedule</h6>
-                    </div>
-                    <div class="span-12 md-span-6">
-                        <div class="switch-row">
-                            {{ form.enabled }}
-                            <label class="switch-label" for="id_enabled">Enable auto email checks</label>
+            <div class="settings-body settings-body--single">
+                <div class="import-settings-layout">
+                    <form method="post" class="import-settings-form">
+                        {% csrf_token %}
+                        <div class="import-settings-group">
+                            <div class="settings-section-desc">Schedule</div>
+                            <div class="import-settings-grid">
+                                <div class="import-settings-field import-settings-field--switch">
+                                    <div class="switch-row">
+                                        {{ form.enabled }}
+                                        <label class="switch-label" for="id_enabled">Enable auto email checks</label>
+                                    </div>
+                                </div>
+                                <div class="import-settings-field">
+                                    <label class="form-label" for="id_interval_minutes">Check interval (minutes)</label>
+                                    {{ form.interval_minutes }}
+                                    <div class="form-text">How often to check all mailboxes.</div>
+                                </div>
+                                <div class="import-settings-field import-settings-field--switch">
+                                    <div class="switch-row">
+                                        {{ form.auto_mark_seen }}
+                                        <label class="switch-label" for="id_auto_mark_seen">Mark imported emails as seen</label>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-                    </div>
-                    <div class="span-12 md-span-6">
-                        <label class="form-label" for="id_interval_minutes">Check interval (minutes)</label>
-                        {{ form.interval_minutes }}
-                        <div class="form-text">How often to check all mailboxes for new price lists.</div>
-                    </div>
-                    <div class="span-12 md-span-6">
-                        <div class="switch-row">
-                            {{ form.auto_mark_seen }}
-                            <label class="switch-label" for="id_auto_mark_seen">Mark imported emails as seen</label>
+
+                        <div class="import-settings-group">
+                            <div class="settings-section-desc">Run limits</div>
+                            <div class="import-settings-grid">
+                                <div class="import-settings-field">
+                                    <label class="form-label" for="id_max_messages_per_run">Max messages per run</label>
+                                    {{ form.max_messages_per_run }}
+                                    <div class="form-text">Recommended: 50-300.</div>
+                                </div>
+                                <div class="import-settings-field">
+                                    <label class="form-label" for="id_supplier_timeout_minutes">Supplier timeout (minutes)</label>
+                                    {{ form.supplier_timeout_minutes }}
+                                    <div class="form-text">0 disables timeout.</div>
+                                </div>
+                                <div class="import-settings-field">
+                                    <label class="form-label" for="id_deactivate_products_after_days">Deactivate products after (days)</label>
+                                    {{ form.deactivate_products_after_days }}
+                                    <div class="form-text">0 disables deactivation.</div>
+                                </div>
+                                <div class="import-settings-field">
+                                    <label class="form-label" for="id_minimum_price_rows">Minimum price rows</label>
+                                    {{ form.minimum_price_rows }}
+                                    <div class="form-text">Reject tiny non-price files.</div>
+                                </div>
+                            </div>
                         </div>
-                    </div>
-                    <div class="span-12">
-                        <h6 class="text-semibold space-bottom-none space-top-sm">Run limits</h6>
-                    </div>
-                    <div class="span-12 md-span-6">
-                        <label class="form-label" for="id_max_messages_per_run">Max messages per run</label>
-                        {{ form.max_messages_per_run }}
-                        <div class="form-text">Recommended: 50-300 to avoid long IMAP sessions.</div>
-                    </div>
-                    <div class="span-12 md-span-6">
-                        <label class="form-label" for="id_supplier_timeout_minutes">Supplier timeout (minutes)</label>
-                        {{ form.supplier_timeout_minutes }}
-                        <div class="form-text">Stop a supplier import if it exceeds this time. It will retry later.</div>
-                    </div>
-                    <div class="span-12 md-span-6">
-                        <label class="form-label" for="id_deactivate_products_after_days">Deactivate products after no price for (days)</label>
-                        {{ form.deactivate_products_after_days }}
-                        <div class="form-text">Set 0 to disable. Older active supplier products become inactive.</div>
-                    </div>
-                    <div class="span-12">
-                        <h6 class="text-semibold space-bottom-none space-top-sm">Additional rules</h6>
-                    </div>
-                    <div class="span-12 md-span-6">
-                        <label class="form-label" for="id_cbr_markup_percent">CBR markup (%)</label>
-                        {{ form.cbr_markup_percent }}
-                        <div class="form-text">Used for daily USD/RUB auto rates from CBR.</div>
-                    </div>
-                    <div class="span-12 md-span-6">
-                        <label class="form-label" for="id_filename_blacklist_terms">Filename blacklist terms</label>
-                        {{ form.filename_blacklist_terms }}
-                        <div class="form-text">Skip files if filename contains any term. One term per line or comma-separated.</div>
-                    </div>
-                    <div class="span-12">
-                        <button class="button" type="submit">Save settings</button>
-                    </div>
-                </form>
 
-                <div class="form-actions space-top-md">
-                    <form method="post" class="m-0">
-                        {% csrf_token %}
-                        <input type="hidden" name="action" value="run_now">
-                        <button class="button secondary" type="submit">Run now</button>
-                    </form>
-                    <form method="post" class="m-0">
-                        {% csrf_token %}
-                        <input type="hidden" name="action" value="install_cron">
-                        <button class="button secondary" type="submit">Install scheduler</button>
-                    </form>
-                    <form method="post" class="m-0">
-                        {% csrf_token %}
-                        <input type="hidden" name="action" value="remove_cron">
-                        <button class="button danger" type="submit">Remove scheduler</button>
-                    </form>
-                </div>
+                        <div class="import-settings-group">
+                            <div class="settings-section-desc">Media and rules</div>
+                            <div class="import-settings-grid">
+                                <div class="import-settings-field">
+                                    <label class="form-label" for="id_cbr_markup_percent">CBR markup (%)</label>
+                                    {{ form.cbr_markup_percent }}
+                                    <div class="form-text">Used for daily USD/RUB auto rates.</div>
+                                </div>
+                                <div class="import-settings-field">
+                                    <label class="form-label" for="id_quarantine_retention_days">Quarantine retention (days)</label>
+                                    {{ form.quarantine_retention_days }}
+                                    <div class="form-text">Failed price-like files are retained here.</div>
+                                </div>
+                                <div class="import-settings-field">
+                                    <label class="form-label" for="id_skipped_attachment_storage">Skipped attachment storage</label>
+                                    {{ form.skipped_attachment_storage }}
+                                    <div class="form-text">Invoices/images/reports stay log-only.</div>
+                                </div>
+                                <div class="import-settings-field import-settings-field--wide">
+                                    <label class="form-label" for="id_filename_blacklist_terms">Filename blacklist terms</label>
+                                    {{ form.filename_blacklist_terms }}
+                                    <div class="form-text">Skip files if filename contains any term. One term per line or comma-separated.</div>
+                                </div>
+                            </div>
+                        </div>
 
-                <div class="muted space-top-md">
-                    {% if settings_obj.last_run_at %}
-                        Last auto run: {{ settings_obj.last_run_at|timezone:"Europe/Moscow"|date:"d/m/Y H:i" }}
-                    {% else %}
-                        Last auto run: -
-                    {% endif %}
-                    <br>
-                    {% if next_run_at %}
-                        Next run target: {{ next_run_at|timezone:"Europe/Moscow"|date:"d/m/Y H:i" }}
-                    {% endif %}
-                </div>
+                        <div class="import-settings-actions">
+                            <button class="button" type="submit">Save settings</button>
+                        </div>
+                    </form>
 
-                <div class="flash space-top-md">
-                    <div><strong>Scheduler status:</strong>
-                        {% if cron_status.supported %}
-                            {% if cron_status.installed %}Installed{% else %}Not installed{% endif %}
-                        {% else %}
-                            Unavailable
+                    <aside class="scheduler-panel">
+                        <div>
+                            <span class="card-label">Scheduler</span>
+                            <h3 class="settings-section-title">Automatic runner</h3>
+                        </div>
+                        <div class="scheduler-status-grid">
+                            <div>
+                                <span class="import-summary-label">Status</span>
+                                <strong>
+                                    {% if cron_status.supported %}
+                                        {% if cron_status.installed %}Installed{% else %}Not installed{% endif %}
+                                    {% else %}
+                                        Unavailable
+                                    {% endif %}
+                                </strong>
+                            </div>
+                            <div>
+                                <span class="import-summary-label">Last run</span>
+                                <strong>
+                                    {% if settings_obj.last_run_at %}
+                                        {{ settings_obj.last_run_at|timezone:"Europe/Moscow"|date:"d/m/Y H:i" }}
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </strong>
+                            </div>
+                            <div>
+                                <span class="import-summary-label">Next target</span>
+                                <strong>
+                                    {% if next_run_at %}
+                                        {{ next_run_at|timezone:"Europe/Moscow"|date:"d/m/Y H:i" }}
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </strong>
+                            </div>
+                        </div>
+
+                        {% if cron_status.needs_reinstall %}
+                            <div class="scheduler-warning">Scheduler needs reinstall because the cron line does not match current settings.</div>
                         {% endif %}
-                    </div>
-                    <div class="space-top-xs"><strong>Runner script:</strong> <code>{{ cron_status.script_path }}</code> {% if cron_status.script_exists %}(exists){% else %}(missing){% endif %}</div>
-                    {% if cron_status.log_path %}
-                        <div class="space-top-xs"><strong>Runner log:</strong> <code>{{ cron_status.log_path }}</code></div>
-                    {% endif %}
-                    {% if cron_status.line %}
-                        <div class="space-top-xs"><strong>Cron line:</strong> <code>{{ cron_status.line }}</code></div>
-                    {% endif %}
-                    {% if cron_status.needs_reinstall %}
-                        <div class="space-top-xs tone-danger"><strong>Scheduler needs reinstall:</strong> current cron line does not match the saved interval/settings.</div>
-                    {% endif %}
-                    {% if cron_status.error %}
-                        <div class="space-top-xs tone-danger"><strong>Error:</strong> {{ cron_status.error }}</div>
-                    {% endif %}
+                        {% if cron_status.error %}
+                            <div class="scheduler-warning">Scheduler error: {{ cron_status.error }}</div>
+                        {% endif %}
+
+                        <div class="scheduler-actions">
+                            <form method="post" class="m-0">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="run_now">
+                                <button class="button secondary" type="submit">Run now</button>
+                            </form>
+                            <form method="post" class="m-0">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="install_cron">
+                                <button class="button secondary" type="submit">Install scheduler</button>
+                            </form>
+                            <form method="post" class="m-0">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="remove_cron">
+                                <button class="button danger" type="submit">Remove scheduler</button>
+                            </form>
+                        </div>
+
+                        <dl class="scheduler-details">
+                            <div>
+                                <dt>Runner script</dt>
+                                <dd><code>{{ cron_status.script_path }}</code> {% if cron_status.script_exists %}(exists){% else %}(missing){% endif %}</dd>
+                            </div>
+                            {% if cron_status.log_path %}
+                                <div>
+                                    <dt>Runner log</dt>
+                                    <dd><code>{{ cron_status.log_path }}</code></dd>
+                                </div>
+                            {% endif %}
+                            {% if cron_status.line %}
+                                <div>
+                                    <dt>Cron line</dt>
+                                    <dd><code>{{ cron_status.line }}</code></dd>
+                                </div>
+                            {% endif %}
+                        </dl>
+                    </aside>
                 </div>
             </div>
         </div>
@@ -151,7 +207,7 @@
                 </div>
                 <a class="button secondary" href="{% url 'prices:mailbox_create' %}">Add mailbox</a>
             </div>
-            <div class="settings-body">
+            <div class="settings-body settings-body--single">
                 <div class="table-wrap table-scroll-x">
                     <table class="table space-bottom-none">
                         <thead>
