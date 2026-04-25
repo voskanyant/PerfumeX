@@ -477,7 +477,7 @@ def parse_supplier_product(product: SupplierProduct) -> ParseResult:
         result.normalized_brand = perfume.brand
         result.detected_brand_text = perfume.brand.name
         result.product_name_text = perfume.name
-        if perfume.concentration:
+        if perfume.concentration and not result.concentration:
             result.concentration = perfume.concentration
         if perfume.audience:
             result.supplier_gender_hint = perfume.audience

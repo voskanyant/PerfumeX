@@ -215,7 +215,7 @@ class TeachParseTests(TestCase):
         self.assertEqual(parsed.product_name_text, "Vanilla Extasy")
         self.assertTrue(parsed.locked_by_human)
 
-    def test_catalog_link_keeps_canonical_concentration_on_reparse(self):
+    def test_catalog_link_does_not_override_explicit_supplier_concentration(self):
         brand = Brand.objects.create(name="12 Parfumeurs")
         perfume = Perfume.objects.create(brand=brand, name="Malmaison", concentration="Extrait de Parfum")
         variant = PerfumeVariant.objects.create(perfume=perfume, size_ml="100", variant_type="standard")
@@ -228,6 +228,30 @@ class TeachParseTests(TestCase):
             supplier=self.supplier,
             identity_key="malmaison-linked",
             name="12 Parfumeurs Malmaison 100ml EDP",
+            catalog_perfume=perfume,
+            catalog_variant=variant,
+        )
+
+        parsed = save_parse(product, force=True)
+
+        self.assertEqual(parsed.normalized_brand, brand)
+        self.assertEqual(parsed.product_name_text, "Malmaison")
+        self.assertEqual(parsed.concentration, "Eau de Parfum")
+        self.assertEqual(parsed.size_ml, variant.size_ml)
+
+    def test_catalog_link_fills_missing_supplier_concentration(self):
+        brand = Brand.objects.create(name="12 Parfumeurs")
+        perfume = Perfume.objects.create(brand=brand, name="Malmaison", concentration="Extrait de Parfum")
+        variant = PerfumeVariant.objects.create(perfume=perfume, size_ml="100", variant_type="standard")
+        BrandAlias.objects.create(
+            brand=brand,
+            alias_text="12 parfumeurs",
+            normalized_alias="12 parfumeurs",
+        )
+        product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="malmaison-linked-missing-concentration",
+            name="12 Parfumeurs Malmaison 100ml",
             catalog_perfume=perfume,
             catalog_variant=variant,
         )

@@ -131,6 +131,27 @@ class NormalizerTests(TestCase):
         self.assertEqual(parsed.supplier_gender_hint, "Pour Femme")
         self.assertEqual(parsed.product_name_text, "light blue")
 
+    def test_explicit_edp_wins_over_catalogue_link_concentration(self):
+        brand = Brand.objects.create(name="Trussardi")
+        BrandAlias.objects.create(brand=brand, alias_text="Trussardi", normalized_alias="trussardi")
+        perfume = Brand.objects.get(name="Trussardi").perfumes.create(
+            name="Donna",
+            concentration="Eau de Toilette",
+        )
+        product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="trussardi-donna-edp",
+            name="Trussardi Donna edp 100ml",
+            catalog_perfume=perfume,
+        )
+
+        parsed = parse_supplier_product(product)
+
+        self.assertEqual(parsed.normalized_brand, brand)
+        self.assertEqual(parsed.product_name_text, "Donna")
+        self.assertEqual(parsed.concentration, "Eau de Parfum")
+        self.assertEqual(parsed.supplier_gender_hint, "Woman")
+
     def test_locked_human_parse_is_not_overwritten(self):
         product = SupplierProduct.objects.create(supplier=self.supplier, identity_key="2", name="DG Light Blue EDP 100ml")
         parsed = save_parse(product)
