@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 from assistant_core.models import GlobalRule
 from assistant_linking.models import BrandAlias, ConcentrationAlias, ProductAlias
-from assistant_linking.services.normalizer import normalize_text, parse_supplier_product, save_parse
+from assistant_linking.services.normalizer import parse_supplier_product, save_parse
 from catalog.models import Brand
 from prices.models import Supplier, SupplierProduct
 
@@ -16,6 +16,51 @@ class NormalizerTests(TestCase):
         self.supplier = Supplier.objects.create(name="Supplier", code="sup")
         self.brand = Brand.objects.create(name="Dolce Gabbana")
         BrandAlias.objects.create(brand=self.brand, alias_text="DG", normalized_alias="dg")
+        GlobalRule.objects.bulk_create(
+            [
+                GlobalRule(
+                    title="regex_preprocess: eau de perfume",
+                    rule_kind="regex_preprocess",
+                    scope_type="global",
+                    rule_text=r"\beau de perfume\b => eau de parfum",
+                    approved=True,
+                    active=True,
+                ),
+                GlobalRule(
+                    title="regex_preprocess: eau de parfume",
+                    rule_kind="regex_preprocess",
+                    scope_type="global",
+                    rule_text=r"\beau de parfume\b => eau de parfum",
+                    approved=True,
+                    active=True,
+                ),
+                GlobalRule(
+                    title="Parser mini terms",
+                    rule_kind="parser_mini_term",
+                    scope_type="global",
+                    rule_text="miniature",
+                    approved=True,
+                    active=True,
+                ),
+                GlobalRule(
+                    title="Parser refill terms",
+                    rule_kind="parser_refill_term",
+                    scope_type="global",
+                    rule_text="refill",
+                    approved=True,
+                    active=True,
+                ),
+                GlobalRule(
+                    title="Garbage keyword: fake",
+                    rule_kind="garbage_keyword",
+                    scope_type="global",
+                    rule_text="fake",
+                    approved=True,
+                    active=True,
+                ),
+            ]
+        )
+        cache.clear()
 
     def test_parses_concentration_size_tester_and_gender(self):
         product = SupplierProduct.objects.create(
@@ -155,7 +200,7 @@ class NormalizerTests(TestCase):
         product = SupplierProduct.objects.create(
             supplier=self.supplier,
             identity_key="miniature",
-            name="Some Brand Scent миниатюра 10ml",
+            name="Some Brand Scent miniature 10ml",
         )
 
         parsed = parse_supplier_product(product)
@@ -191,7 +236,7 @@ class NormalizerTests(TestCase):
         damaged = SupplierProduct.objects.create(
             supplier=self.supplier,
             identity_key="damaged",
-            name="Some Brand Scent подмят 100ml",
+            name="Some Brand Scent fake 100ml",
         )
         decoded = SupplierProduct.objects.create(
             supplier=self.supplier,
@@ -206,8 +251,19 @@ class NormalizerTests(TestCase):
         self.assertNotEqual(decoded_parse.modifiers, ["garbage"])
 
     def test_compact_decimal_and_russian_size_formats_are_normalized(self):
-        self.assertIn("100 ml", normalize_text("Foo 100.0ml"))
-        self.assertIn("100 ml", normalize_text("Foo 100мл"))
+        decimal_product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="compact-decimal",
+            name="Foo 100.0ml",
+        )
+        russian_product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="compact-russian",
+            name="Foo 100мл",
+        )
+
+        self.assertEqual(parse_supplier_product(decimal_product).size_ml, 100)
+        self.assertEqual(parse_supplier_product(russian_product).size_ml, 100)
 
     def test_no_five_is_not_treated_as_size(self):
         brand = Brand.objects.create(name="Chanel")

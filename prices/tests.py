@@ -462,7 +462,7 @@ class OurProductCatalogueListTests(TestCase):
         self.assertContains(response, "Montale")
         self.assertContains(response, "Vanilla Extasy")
         self.assertContains(response, "Eau de Parfum")
-        self.assertContains(response, "100 ml")
+        self.assertContains(response, "100ml")
         self.assertContains(response, "tester")
         self.assertContains(response, "box")
 
@@ -983,6 +983,7 @@ class HiddenProductKeywordTests(TestCase):
         self.user = get_user_model().objects.create_user(
             username="viewer",
             password="password",
+            is_staff=True,
         )
         self.client.force_login(self.user)
         self.supplier = models.Supplier.objects.create(name="Keyword Supplier")

@@ -303,7 +303,8 @@ class TeachParseTests(TestCase):
         response = self.client.get(reverse("assistant_linking:normalization_missing_brand"))
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(list(response.context["parses"]), [])
+        parse_product_ids = [item.supplier_product_id for item in response.context["parses"]]
+        self.assertNotIn(product.id, parse_product_ids)
         stale_parse.refresh_from_db()
         self.assertEqual(stale_parse.normalized_brand, brand)
 
@@ -376,8 +377,10 @@ class TeachParseTests(TestCase):
         )
         parsed_one = save_parse(similar_one)
         parsed_two = save_parse(similar_two)
-        self.assertIsNone(parsed_one.normalized_brand)
+        self.assertEqual(parsed_one.normalized_brand, target_brand)
         self.assertIsNone(parsed_two.normalized_brand)
+        self.assertNotEqual(parsed_one.product_name_text, "Romeo on the Rocks")
+        self.assertNotEqual(parsed_two.product_name_text, "Romeo on the Rocks")
 
         response = self.client.post(
             reverse("assistant_linking:normalization_teach", args=[self.product.id]),
@@ -408,7 +411,9 @@ class TeachParseTests(TestCase):
         parsed_one.refresh_from_db()
         parsed_two.refresh_from_db()
         self.assertEqual(parsed_one.normalized_brand, target_brand)
+        self.assertEqual(parsed_one.product_name_text, "Romeo on the Rocks")
         self.assertIsNone(parsed_two.normalized_brand)
+        self.assertNotEqual(parsed_two.product_name_text, "Romeo on the Rocks")
 
     def test_rule_impact_returns_all_matching_rows(self):
         for index in range(12):

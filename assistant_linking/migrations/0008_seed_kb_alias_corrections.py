@@ -105,7 +105,6 @@ def seed_aliases(apps, schema_editor):
     for alias_text, brand_name, priority in BRAND_ALIASES:
         brand = Brand.objects.filter(name__iexact=brand_name).first()
         if not brand:
-            print(f"skipped brand alias {alias_text!r}: brand {brand_name!r} missing")
             continue
         BrandAlias.objects.get_or_create(
             alias_text=alias_text,

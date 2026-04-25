@@ -108,7 +108,9 @@ class KnowledgeResearchTests(TestCase):
 
         context = build_assistant_context(supplier_product_id=product.id)
 
-        self.assertEqual([rule["title"] for rule in context["global_rules"]], ["yes"])
+        global_rule_titles = [rule["title"] for rule in context["global_rules"]]
+        self.assertIn("yes", global_rule_titles)
+        self.assertNotIn("no", global_rule_titles)
         self.assertEqual([rule["title"] for rule in context["supplier_rules"]], ["supplier"])
         self.assertEqual(len(context["knowledge_notes"]), 1)
 

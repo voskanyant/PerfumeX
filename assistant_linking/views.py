@@ -19,7 +19,7 @@ from assistant_linking.services.grouping import rebuild_groups
 from assistant_linking.services.mock_suggester import generate_link_suggestions
 from assistant_linking.services.normalizer import PARSER_VERSION, save_parse
 from assistant_linking.services.smart_search import normalize_query
-from catalog.models import Brand, Perfume, PerfumeVariant
+from catalog.models import Brand, Perfume, PerfumeVariant, compact_decimal_text
 from prices.models import SupplierProduct
 from prices.services.product_visibility import (
     apply_hidden_product_keywords,
@@ -367,6 +367,9 @@ class MissingBrandListView(NormalizationIssueListView):
     def parse_matches_view(self, parsed):
         return parsed.normalized_brand_id is None
 
+    def should_refresh_parse(self, parsed) -> bool:
+        return not parsed.locked_by_human
+
 
 class MissingSizeListView(NormalizationIssueListView):
     issue_title = "Missing or ambiguous size"
@@ -509,7 +512,13 @@ class ParsedProductDetailView(StaffAssistantMixin, DetailView):
             "supplier_concentration_text": parsed.concentration,
             "concentration": teaching_perfume.concentration if teaching_perfume else parsed.concentration,
             "supplier_size_text": parsed.raw_size_text or product.size,
-            "size_ml": teaching_variant.size_ml if teaching_variant and teaching_variant.size_ml else parsed.size_ml,
+            "size_ml": (
+                compact_decimal_text(teaching_variant.size_ml)
+                if teaching_variant and teaching_variant.size_ml
+                else compact_decimal_text(parsed.size_ml)
+                if parsed.size_ml
+                else None
+            ),
             "supplier_audience_text": parsed.supplier_gender_hint,
             "audience": teaching_perfume.audience if teaching_perfume and teaching_perfume.audience else parsed.supplier_gender_hint,
             "supplier_type_text": parsed.variant_type,

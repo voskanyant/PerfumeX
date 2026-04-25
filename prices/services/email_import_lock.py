@@ -13,7 +13,7 @@ from django.conf import settings
 
 
 _LOCK_STALE_SECONDS = 6 * 60 * 60
-_LOCK_NAME = "perfumex-email-import-" + hashlib.sha1(
+_LOCK_NAME = "perfumex-email-import-" + hashlib.sha256(
     str(getattr(settings, "BASE_DIR", "")).encode("utf-8", errors="ignore")
 ).hexdigest()[:12] + ".lock"
 _LOCK_PATH = Path(tempfile.gettempdir()) / _LOCK_NAME

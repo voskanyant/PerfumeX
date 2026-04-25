@@ -18,7 +18,7 @@ from assistant_core.services.catalog_importer import import_catalog_file
 from assistant_core.services.mock_brand_research import run_mock_brand_watch
 from assistant_core.services.mock_description_generator import create_mock_draft
 from assistant_linking import forms as linking_forms
-from catalog.models import AIDraft, Brand, FactClaim, Perfume, PerfumeVariant, Source
+from catalog.models import AIDraft, Brand, FactClaim, Perfume, PerfumeVariant
 
 
 class StaffAssistantMixin(LoginRequiredMixin, UserPassesTestMixin):
@@ -510,15 +510,6 @@ class ConcentrationAliasDeleteView(StaffAssistantMixin, DeleteView):
         context = super().get_context_data(**kwargs)
         context["return_url"] = self.get_success_url()
         return context
-
-    def get_context_data(self, **kwargs):
-        from assistant_linking.models import BrandAlias, ProductAlias
-
-        return {
-            **super().get_context_data(**kwargs),
-            "brand_aliases": BrandAlias.objects.select_related("brand", "supplier").order_by("supplier__name", "priority", "alias_text"),
-            "product_aliases": ProductAlias.objects.select_related("brand", "perfume", "supplier").order_by("supplier__name", "priority", "alias_text"),
-        }
 
 
 class GlobalRuleCreateView(StaffAssistantMixin, CreateView):

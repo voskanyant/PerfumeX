@@ -110,16 +110,15 @@ def get_concentration_alias_rows():
     rows = cache.get(CONCENTRATION_ALIAS_CACHE_KEY)
     if rows is not None:
         return rows
-    rows = list(
+    rows = [
+        (None, normalize_alias_value(alias_text), concentration, False, None, 100)
+        for alias_text, concentration in DEFAULT_CONCENTRATION_ALIASES
+    ]
+    rows.extend(
         ConcentrationAlias.objects.filter(active=True)
         .order_by("supplier__name", "priority", "alias_text")
         .values_list("supplier_id", "normalized_alias", "concentration", "is_regex", "id", "priority")
     )
-    if not rows:
-        rows = [
-            (None, normalize_alias_value(alias_text), concentration, False, None, 100)
-            for alias_text, concentration in DEFAULT_CONCENTRATION_ALIASES
-        ]
     rows = sorted(rows, key=lambda row: (row[5], -len(row[1] or ""), row[1] or ""))
     cache.set(CONCENTRATION_ALIAS_CACHE_KEY, rows, 300)
     return rows
