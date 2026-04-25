@@ -1,4 +1,5 @@
-﻿(function () {
+﻿/* global Chart */
+(function () {
     var labels = JSON.parse(document.getElementById("chart-labels").textContent || "[]");
     var values = JSON.parse(document.getElementById("chart-values").textContent || "[]");
     var currencySymbol = JSON.parse(document.getElementById("chart-currency-symbol").textContent || "\"\"");
