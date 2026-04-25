@@ -121,6 +121,37 @@ class NormalizerTests(TestCase):
         self.assertEqual(parsed.concentration, "Eau de Parfum")
         self.assertEqual(parsed.size_ml, Decimal("1.50"))
 
+    def test_parses_multi_pack_sizes_as_set_size_label(self):
+        brand = Brand.objects.create(name="Vilhelm Parfumerie")
+        BrandAlias.objects.create(brand=brand, alias_text="Vilhelm Parfumerie", normalized_alias="vilhelm parfumerie")
+        examples = (
+            ("Vilhelm Parfumerie MODEST MIMOSA edp 3 x 10ml", "3*10ml", Decimal("10.00")),
+            ("Vilhelm Parfumerie MODEST MIMOSA edp 3*10ml", "3*10ml", Decimal("10.00")),
+            ("Vilhelm Parfumerie MODEST MIMOSA edp 5 * 7,5 ml", "5*7.5ml", Decimal("7.50")),
+            ("Vilhelm Parfumerie MODEST MIMOSA edp 5x7.5", "5*7.5ml", Decimal("7.50")),
+        )
+
+        for name, expected_label, expected_size in examples:
+            with self.subTest(name=name):
+                product = SupplierProduct.objects.create(
+                    supplier=self.supplier,
+                    identity_key=name,
+                    name=name,
+                )
+
+                parsed = save_parse(product, force=True)
+
+                self.assertEqual(parsed.concentration, "Eau de Parfum")
+                self.assertEqual(parsed.size_ml, expected_size)
+                self.assertEqual(parsed.raw_size_text, expected_label)
+                self.assertEqual(parsed.display_size, expected_label)
+                self.assertTrue(parsed.is_set)
+                self.assertEqual(parsed.variant_type, "set")
+                self.assertEqual(
+                    parsed.display_identity,
+                    f"Vilhelm Parfumerie / Modest Mimosa / Eau de Parfum / {expected_label} / Set",
+                )
+
     def test_standalone_w_and_m_are_audience_aliases_not_product_name(self):
         brand = Brand.objects.create(name="Abercrombie & Fitch")
         BrandAlias.objects.create(brand=brand, alias_text="Abercrombie Fitch", normalized_alias="abercrombie fitch")

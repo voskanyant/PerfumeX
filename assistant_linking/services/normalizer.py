@@ -22,7 +22,7 @@ from assistant_linking.models import (
 from assistant_linking.services.garbage import GARBAGE_MODIFIER, GARBAGE_WARNING_PREFIX, match_garbage_keyword
 from assistant_linking.services.parser_rules import get_audience_alias_rules, get_parser_terms, get_regex_preprocess_rules
 from assistant_linking.utils.text import normalize_alias_value
-from catalog.models import Brand
+from catalog.models import Brand, compact_decimal_text
 from prices.models import SupplierProduct
 
 
@@ -297,6 +297,19 @@ def _strip_known_terms(text: str, terms: list[str]) -> str:
 
 
 def _extract_size(text: str) -> tuple[Decimal | None, str, str]:
+    multi_pack_match = re.search(
+        r"\b(?P<count>\d{1,2})\s*(?:x|х|×|\*)\s*(?P<size>\d+(?:[.,]\d+)?)\s*(?:ml|мл|м\.л\.?)?\b",
+        text,
+    )
+    if multi_pack_match:
+        raw = multi_pack_match.group(0)
+        value = Decimal(multi_pack_match.group("size").replace(",", ".")).quantize(Decimal("0.01"))
+        count = int(multi_pack_match.group("count"))
+        if count < 2 or count > 20:
+            return None, "", text
+        normalized_raw = f"{count}*{compact_decimal_text(value)}ml"
+        return value, normalized_raw, text.replace(raw, " ")
+
     ml_match = re.search(r"\b(\d+(?:[.,]\d+)?)\s*(?:ml|мл|м\.л\.?)(?=\s|$)", text)
     if ml_match:
         raw = ml_match.group(0)
@@ -432,6 +445,8 @@ def parse_supplier_product(product: SupplierProduct) -> ParseResult:
     result.is_travel = _contains_any_phrase(text, travel_terms)
     is_mini = _contains_any_phrase(text, mini_terms)
     result.is_set = _contains_any_phrase(text, set_terms)
+    if result.raw_size_text and "*" in result.raw_size_text:
+        result.is_set = True
     result.packaging = "no_box" if _contains_any_phrase(text, NO_BOX_TERMS) else ""
     result.variant_type = "sample" if result.is_sample else ("travel" if result.is_travel else ("mini" if is_mini else ("set" if result.is_set else ("tester" if result.is_tester else "standard"))))
     result.modifiers = [term for term in MODIFIER_TERMS if re.search(rf"(^|\s){re.escape(term)}($|\s)", text)]

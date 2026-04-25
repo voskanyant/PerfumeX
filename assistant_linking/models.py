@@ -224,6 +224,8 @@ class ParsedSupplierProduct(TimeStampedModel):
 
     @property
     def display_size(self) -> str:
+        if self.raw_size_text and "*" in self.raw_size_text:
+            return self.raw_size_text
         if self.size_ml is None:
             return ""
         return f"{compact_decimal_text(self.size_ml)}ml"
