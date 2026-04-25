@@ -416,6 +416,39 @@ class TeachParseTests(TestCase):
         self.assertNotIn(missing_concentration.id, parse_product_ids)
         self.assertNotIn(missing_name.id, parse_product_ids)
 
+    def test_set_rows_are_not_complete_parsed_products(self):
+        brand = Brand.objects.create(name="Abercrombie & Fitch")
+        BrandAlias.objects.create(
+            brand=brand,
+            alias_text="abercrombie fitch",
+            normalized_alias="abercrombie fitch",
+        )
+        set_product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="set-row",
+            name="Abercrombie Fitch First Instinct Woman набор 2пр edp100ml+200л",
+        )
+        regular_product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="regular-row",
+            name="Abercrombie Fitch First Instinct Woman edp100ml",
+        )
+        set_parse = save_parse(set_product)
+        save_parse(regular_product)
+
+        parsed_response = self.client.get(reverse("assistant_linking:normalization_parsed"))
+        set_response = self.client.get(reverse("assistant_linking:normalization_sets"))
+
+        self.assertTrue(set_parse.is_set)
+        self.assertEqual(parsed_response.status_code, 200)
+        parsed_product_ids = {item.supplier_product_id for item in parsed_response.context["parses"]}
+        self.assertNotIn(set_product.id, parsed_product_ids)
+        self.assertIn(regular_product.id, parsed_product_ids)
+        self.assertEqual(set_response.status_code, 200)
+        set_product_ids = {item.supplier_product_id for item in set_response.context["parses"]}
+        self.assertIn(set_product.id, set_product_ids)
+        self.assertNotIn(regular_product.id, set_product_ids)
+
     def test_dashboard_counts_only_complete_rows_as_parsed(self):
         brand = Brand.objects.create(name="Montale")
         BrandAlias.objects.create(
@@ -443,13 +476,19 @@ class TeachParseTests(TestCase):
             identity_key="dashboard-missing-name",
             name="Montale EDP 100ml",
         )
-        for product in [complete, missing_size, missing_concentration, missing_name]:
+        set_product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="dashboard-set",
+            name="Montale Arabians Tonka gift set EDP 100ml",
+        )
+        for product in [complete, missing_size, missing_concentration, missing_name, set_product]:
             save_parse(product)
 
         response = self.client.get(reverse("assistant_linking:normalization_dashboard"))
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.context["parsed_count"], 1)
+        self.assertEqual(response.context["set_count"], 1)
         self.assertEqual(response.context["missing_size_count"], 1)
         self.assertEqual(response.context["missing_concentration_count"], 1)
         self.assertEqual(response.context["missing_name_count"], 1)

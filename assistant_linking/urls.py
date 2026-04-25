@@ -15,6 +15,7 @@ urlpatterns = [
     path("normalization/missing-concentration/", views.MissingConcentrationListView.as_view(), name="normalization_missing_concentration"),
     path("normalization/missing-size/", views.MissingSizeListView.as_view(), name="normalization_missing_size"),
     path("normalization/tester-sample/", views.TesterSampleListView.as_view(), name="normalization_tester_sample"),
+    path("normalization/sets/", views.SetListView.as_view(), name="normalization_sets"),
     path("normalization/modifiers/", views.ModifierConflictListView.as_view(), name="normalization_modifiers"),
     path("normalization/garbage/", views.GarbageListView.as_view(), name="normalization_garbage"),
     path("normalization/<int:supplier_product_id>/", views.ParsedProductDetailView.as_view(), name="normalization_detail"),

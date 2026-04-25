@@ -25,7 +25,8 @@
 </div>
 <div class="page-grid-3 space-top-md">
     <a class="metric-card" href="{% url 'assistant_linking:normalization_modifiers' %}"><div class="metric-label">Modifiers</div><div class="metric-value">{{ modifier_count }}</div></a>
-    <a class="metric-card" href="{% url 'assistant_linking:normalization_tester_sample' %}"><div class="metric-label">Tester/sample/travel/set</div><div class="metric-value">{{ tester_sample_count }}</div></a>
+    <a class="metric-card" href="{% url 'assistant_linking:normalization_tester_sample' %}"><div class="metric-label">Tester/sample/travel</div><div class="metric-value">{{ tester_sample_count }}</div></a>
+    <a class="metric-card" href="{% url 'assistant_linking:normalization_sets' %}"><div class="metric-label">Sets</div><div class="metric-value">{{ set_count }}</div></a>
     <a class="metric-card" href="{% url 'assistant_linking:normalization_garbage' %}"><div class="metric-label">Garbage</div><div class="metric-value">{{ garbage_count }}</div></a>
 </div>
 <div class="workspace-block space-top-md">

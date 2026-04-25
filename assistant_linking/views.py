@@ -61,12 +61,17 @@ def _exclude_garbage_parses(queryset):
     return queryset.exclude(modifiers__contains=[GARBAGE_MODIFIER])
 
 
+def _exclude_set_parses(queryset):
+    return queryset.exclude(is_set=True)
+
+
 def _complete_parse_query():
     return (
         Q(normalized_brand__isnull=False)
         & ~Q(product_name_text="")
         & ~Q(concentration="")
         & Q(size_ml__isnull=False)
+        & Q(is_set=False)
     )
 
 
@@ -252,25 +257,27 @@ class NormalizationDashboardView(StaffAssistantMixin, TemplateView):
             self.request,
         )
         non_garbage_queryset = _exclude_garbage_parses(parsed_queryset)
+        normal_product_queryset = _exclude_set_parses(non_garbage_queryset)
         unparsed_queryset = _hide_supplier_products(
             SupplierProduct.objects.all(),
             self.request,
         )
         return {
             **super().get_context_data(**kwargs),
-            "parsed_count": _complete_parses(non_garbage_queryset).count(),
+            "parsed_count": _complete_parses(normal_product_queryset).count(),
             "unparsed_count": unparsed_queryset.filter(assistant_parse__isnull=True).count(),
-            "low_confidence_count": non_garbage_queryset.filter(confidence__lt=75).count(),
-            "missing_brand_count": non_garbage_queryset.filter(normalized_brand__isnull=True).count(),
-            "missing_name_count": non_garbage_queryset.filter(product_name_text="").count(),
-            "missing_concentration_count": non_garbage_queryset.filter(concentration="").count(),
-            "missing_size_count": non_garbage_queryset.filter(size_ml__isnull=True).count(),
-            "modifier_count": non_garbage_queryset.exclude(modifiers=[]).count(),
+            "low_confidence_count": normal_product_queryset.filter(confidence__lt=75).count(),
+            "missing_brand_count": normal_product_queryset.filter(normalized_brand__isnull=True).count(),
+            "missing_name_count": normal_product_queryset.filter(product_name_text="").count(),
+            "missing_concentration_count": normal_product_queryset.filter(concentration="").count(),
+            "missing_size_count": normal_product_queryset.filter(size_ml__isnull=True).count(),
+            "modifier_count": normal_product_queryset.exclude(modifiers=[]).count(),
             "garbage_count": parsed_queryset.filter(modifiers__contains=[GARBAGE_MODIFIER]).count(),
-            "tester_sample_count": non_garbage_queryset.filter(
-                Q(is_tester=True) | Q(is_sample=True) | Q(is_travel=True) | Q(is_set=True)
+            "tester_sample_count": normal_product_queryset.filter(
+                Q(is_tester=True) | Q(is_sample=True) | Q(is_travel=True)
             ).count(),
-            "recent": _complete_parses(non_garbage_queryset)
+            "set_count": non_garbage_queryset.filter(is_set=True).count(),
+            "recent": _complete_parses(normal_product_queryset)
             .select_related("supplier_product", "normalized_brand")
             .order_by("-updated_at")[:20],
             "hidden_keywords_active": bool(hidden_keywords),
@@ -325,11 +332,11 @@ class LowConfidenceListView(NormalizationSearchMixin, StaffAssistantMixin, ListV
             "normalized_brand",
         ).filter(confidence__lt=75)
         queryset = _apply_parsed_search(queryset, self.get_search_query())
-        queryset = _exclude_garbage_parses(_hide_parsed_products(queryset, self.request))
+        queryset = _exclude_set_parses(_exclude_garbage_parses(_hide_parsed_products(queryset, self.request)))
         return queryset.order_by("confidence", "supplier_product__supplier__name", "supplier_product__name")
 
     def parse_matches_view(self, parsed):
-        return parsed.confidence < 75
+        return parsed.confidence < 75 and not parsed.is_set
 
     def should_refresh_parse(self, parsed) -> bool:
         if parsed.locked_by_human:
@@ -383,11 +390,11 @@ class MissingBrandListView(NormalizationIssueListView):
             "normalized_brand",
         ).filter(normalized_brand__isnull=True)
         queryset = _apply_parsed_search(queryset, self.get_search_query())
-        queryset = _exclude_garbage_parses(_hide_parsed_products(queryset, self.request))
+        queryset = _exclude_set_parses(_exclude_garbage_parses(_hide_parsed_products(queryset, self.request)))
         return queryset.order_by("supplier_product__name")
 
     def parse_matches_view(self, parsed):
-        return parsed.normalized_brand_id is None
+        return parsed.normalized_brand_id is None and not parsed.is_set
 
     def should_refresh_parse(self, parsed) -> bool:
         return not parsed.locked_by_human
@@ -403,11 +410,11 @@ class MissingNameListView(NormalizationIssueListView):
             "normalized_brand",
         ).filter(product_name_text="")
         queryset = _apply_parsed_search(queryset, self.get_search_query())
-        queryset = _exclude_garbage_parses(_hide_parsed_products(queryset, self.request))
+        queryset = _exclude_set_parses(_exclude_garbage_parses(_hide_parsed_products(queryset, self.request)))
         return queryset.order_by("supplier_product__name")
 
     def parse_matches_view(self, parsed):
-        return not parsed.product_name_text
+        return not parsed.product_name_text and not parsed.is_set
 
 
 class MissingConcentrationListView(NormalizationIssueListView):
@@ -420,11 +427,11 @@ class MissingConcentrationListView(NormalizationIssueListView):
             "normalized_brand",
         ).filter(concentration="")
         queryset = _apply_parsed_search(queryset, self.get_search_query())
-        queryset = _exclude_garbage_parses(_hide_parsed_products(queryset, self.request))
+        queryset = _exclude_set_parses(_exclude_garbage_parses(_hide_parsed_products(queryset, self.request)))
         return queryset.order_by("supplier_product__name")
 
     def parse_matches_view(self, parsed):
-        return not parsed.concentration
+        return not parsed.concentration and not parsed.is_set
 
 
 class MissingSizeListView(NormalizationIssueListView):
@@ -437,28 +444,45 @@ class MissingSizeListView(NormalizationIssueListView):
             "normalized_brand",
         ).filter(size_ml__isnull=True)
         queryset = _apply_parsed_search(queryset, self.get_search_query())
-        queryset = _exclude_garbage_parses(_hide_parsed_products(queryset, self.request))
+        queryset = _exclude_set_parses(_exclude_garbage_parses(_hide_parsed_products(queryset, self.request)))
         return queryset.order_by("supplier_product__name")
 
     def parse_matches_view(self, parsed):
-        return parsed.size_ml is None
+        return parsed.size_ml is None and not parsed.is_set
 
 
 class TesterSampleListView(NormalizationIssueListView):
-    issue_title = "Tester, sample, travel, and set rows"
+    issue_title = "Tester, sample, and travel rows"
 
     def get_queryset(self):
         queryset = models.ParsedSupplierProduct.objects.select_related(
             "supplier_product",
             "supplier_product__supplier",
             "normalized_brand",
-        ).filter(Q(is_tester=True) | Q(is_sample=True) | Q(is_travel=True) | Q(is_set=True))
+        ).filter(Q(is_tester=True) | Q(is_sample=True) | Q(is_travel=True), is_set=False)
         queryset = _apply_parsed_search(queryset, self.get_search_query())
         queryset = _exclude_garbage_parses(_hide_parsed_products(queryset, self.request))
         return queryset.order_by("supplier_product__name")
 
     def parse_matches_view(self, parsed):
-        return bool(parsed.is_tester or parsed.is_sample or parsed.is_travel or parsed.is_set)
+        return bool((parsed.is_tester or parsed.is_sample or parsed.is_travel) and not parsed.is_set)
+
+
+class SetListView(NormalizationIssueListView):
+    issue_title = "Set rows"
+
+    def get_queryset(self):
+        queryset = models.ParsedSupplierProduct.objects.select_related(
+            "supplier_product",
+            "supplier_product__supplier",
+            "normalized_brand",
+        ).filter(is_set=True)
+        queryset = _apply_parsed_search(queryset, self.get_search_query())
+        queryset = _exclude_garbage_parses(_hide_parsed_products(queryset, self.request))
+        return queryset.order_by("supplier_product__supplier__name", "supplier_product__name")
+
+    def parse_matches_view(self, parsed):
+        return bool(parsed.is_set)
 
 
 class ModifierConflictListView(NormalizationIssueListView):
@@ -471,11 +495,11 @@ class ModifierConflictListView(NormalizationIssueListView):
             "normalized_brand",
         ).exclude(modifiers=[])
         queryset = _apply_parsed_search(queryset, self.get_search_query())
-        queryset = _exclude_garbage_parses(_hide_parsed_products(queryset, self.request))
+        queryset = _exclude_set_parses(_exclude_garbage_parses(_hide_parsed_products(queryset, self.request)))
         return queryset.order_by("supplier_product__name")
 
     def parse_matches_view(self, parsed):
-        return bool(parsed.modifiers)
+        return bool(parsed.modifiers and not parsed.is_set)
 
 
 class ParsedListView(NormalizationIssueListView):
@@ -498,6 +522,7 @@ class ParsedListView(NormalizationIssueListView):
             and bool(parsed.product_name_text)
             and bool(parsed.concentration)
             and parsed.size_ml is not None
+            and not parsed.is_set
             and GARBAGE_MODIFIER not in (parsed.modifiers or [])
         )
 
@@ -538,7 +563,7 @@ class ParsedProductDetailView(StaffAssistantMixin, DetailView):
         canonical_perfume = product.catalog_perfume
         canonical_variant = product.catalog_variant
         is_garbage = GARBAGE_MODIFIER in (parsed.modifiers or [])
-        catalog_candidates = [] if is_garbage else candidate_matches(parsed)
+        catalog_candidates = [] if is_garbage or parsed.is_set else candidate_matches(parsed)
         suggested_candidate = None
         if not canonical_perfume and catalog_candidates:
             best_candidate = catalog_candidates[0]
