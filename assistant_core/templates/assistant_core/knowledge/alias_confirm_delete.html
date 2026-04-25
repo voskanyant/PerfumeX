@@ -1,0 +1,22 @@
+{% extends "prices/base.html" %}
+{% block title %}Delete Alias{% endblock %}
+{% block topbar_label %}Assistant / Knowledge{% endblock %}
+{% block content %}
+<div class="page-head">
+    <div>
+        <span class="page-kicker">Assistant</span>
+        <h1 class="page-title">Delete dictionary entry</h1>
+        <div class="page-meta">This removes the selected alias from the assistant normalization dictionary.</div>
+    </div>
+</div>
+<div class="workspace-block">
+    <p>Delete <strong>{{ object }}</strong>?</p>
+    <form method="post">
+        {% csrf_token %}
+        <div class="layout-inline gap-sm">
+            <button class="button danger" type="submit">Delete</button>
+            <a class="button ghost" href="{{ return_url }}">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

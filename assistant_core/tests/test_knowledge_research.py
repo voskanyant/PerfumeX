@@ -5,7 +5,7 @@ from django.urls import reverse
 from assistant_core.models import BrandWatchProfile, DetectedChange, GlobalRule, KnowledgeNote, SupplierRule
 from assistant_core.services.context_builder import build_assistant_context
 from assistant_core.services.mock_brand_research import run_mock_brand_watch
-from assistant_linking.models import BrandAlias, ManualLinkDecision, ProductAlias
+from assistant_linking.models import BrandAlias, ConcentrationAlias, ManualLinkDecision, ProductAlias
 from catalog.models import Brand
 from prices.models import Supplier, SupplierProduct
 
@@ -45,6 +45,32 @@ class KnowledgeResearchTests(TestCase):
         self.assertContains(response, "tester")
         self.assertContains(response, "Recent Manual Decisions")
         self.assertContains(response, "manual match")
+
+    def test_aliases_page_supports_sections_search_and_concentration_entries(self):
+        user = User.objects.create_user(username="staff2", password="pass", is_staff=True)
+        self.client.force_login(user)
+        supplier = Supplier.objects.create(name="Supplier", code="sup")
+        brand = Brand.objects.create(name="Montale")
+        BrandAlias.objects.create(brand=brand, supplier=supplier, alias_text="mntl", normalized_alias="mntl")
+        ProductAlias.objects.create(
+            brand=brand,
+            supplier=supplier,
+            alias_text="vanilla extasy",
+            canonical_text="Vanilla Extasy",
+            excluded_terms="tester",
+        )
+        ConcentrationAlias.objects.create(
+            concentration="Eau de Parfum",
+            alias_text="парфюмированная вода",
+            normalized_alias="парфюмированная вода",
+        )
+
+        response = self.client.get(reverse("assistant_core:aliases"), {"section": "concentrations", "q": "парфюмированная"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Concentration aliases")
+        self.assertContains(response, "парфюмированная вода")
+        self.assertContains(response, "Eau de Parfum")
 
     def test_context_builder_includes_only_approved_active_rules(self):
         supplier = Supplier.objects.create(name="Supplier", code="sup")

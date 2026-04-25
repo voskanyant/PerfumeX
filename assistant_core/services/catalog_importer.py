@@ -9,8 +9,8 @@ from pathlib import Path
 from django.db import transaction
 from openpyxl import load_workbook
 
-from assistant_linking.models import BrandAlias, ProductAlias
-from assistant_linking.services.normalizer import normalize_text
+from assistant_linking.models import BrandAlias, ConcentrationAlias, ProductAlias
+from assistant_linking.services.normalizer import DEFAULT_CONCENTRATION_ALIASES, normalize_text
 from catalog.models import Brand, Perfume, PerfumeVariant
 
 
@@ -32,20 +32,6 @@ COLUMN_ALIASES = {
     "country_of_origin": {"brand_country", "country_of_origin", "origin"},
     "country_of_manufacture": {"made_in", "country_of_manufacture", "manufacture_country"},
 }
-
-CONCENTRATION_MAP = {
-    "eau de parfum": "Eau de Parfum",
-    "edp": "Eau de Parfum",
-    "eau de toilette": "Eau de Toilette",
-    "edt": "Eau de Toilette",
-    "eau de cologne": "Eau de Cologne",
-    "edc": "Eau de Cologne",
-    "parfum": "Parfum",
-    "extrait": "Extrait de Parfum",
-    "extrait de parfum": "Extrait de Parfum",
-    "perfume oil": "Perfume Oil",
-}
-
 
 @dataclass
 class CatalogImportResult:
@@ -95,8 +81,20 @@ def _bool(value: str) -> bool:
     return normalize_text(value) in {"1", "yes", "true", "y", "tester", "test"}
 
 
-def _concentration(value: str) -> str:
-    return CONCENTRATION_MAP.get(normalize_text(value), normalize_text(value))
+def _build_concentration_map() -> dict[str, str]:
+    aliases = list(
+        ConcentrationAlias.objects.filter(active=True, supplier__isnull=True)
+        .order_by("priority", "alias_text")
+        .values_list("normalized_alias", "concentration")
+    )
+    if not aliases:
+        aliases = [(normalize_text(alias_text), concentration) for alias_text, concentration in DEFAULT_CONCENTRATION_ALIASES]
+        aliases.append((normalize_text("perfume oil"), "Perfume Oil"))
+    return {alias_text: concentration for alias_text, concentration in aliases}
+
+
+def _concentration(value: str, alias_map: dict[str, str]) -> str:
+    return alias_map.get(normalize_text(value), normalize_text(value))
 
 
 def _identity(value: str) -> str:
@@ -153,6 +151,7 @@ def read_catalog_rows(uploaded_file) -> list[dict]:
 def import_catalog_file(uploaded_file, *, create_aliases: bool = True, update_existing: bool = True) -> CatalogImportResult:
     result = CatalogImportResult()
     rows = read_catalog_rows(uploaded_file)
+    concentration_map = _build_concentration_map()
     brand_cache = {_identity(brand.name): brand for brand in Brand.objects.all()}
     perfume_cache = {
         (perfume.brand_id, _identity(perfume.name), perfume.concentration or "", perfume.audience or ""): perfume
@@ -189,7 +188,7 @@ def import_catalog_file(uploaded_file, *, create_aliases: bool = True, update_ex
             brand.country_of_origin = _text(row, "country_of_origin")
             brand.save(update_fields=["country_of_origin", "updated_at"])
 
-        concentration = _concentration(_text(row, "concentration"))
+        concentration = _concentration(_text(row, "concentration"), concentration_map)
         audience = normalize_text(_text(row, "audience"))
         comments = _text(row, "comments")
         collection_name = _text(row, "collection_name")

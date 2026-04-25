@@ -10,12 +10,14 @@ from django.db.models import Count, Q
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse_lazy
 from django.utils import timezone
+from django.core.paginator import Paginator
 from django.views.generic import CreateView, DeleteView, DetailView, ListView, RedirectView, TemplateView, UpdateView, View
 
 from assistant_core import forms, models
 from assistant_core.services.catalog_importer import import_catalog_file
 from assistant_core.services.mock_brand_research import run_mock_brand_watch
 from assistant_core.services.mock_description_generator import create_mock_draft
+from assistant_linking import forms as linking_forms
 from catalog.models import AIDraft, Brand, FactClaim, Perfume, PerfumeVariant, Source
 
 
@@ -28,7 +30,7 @@ class DashboardView(StaffAssistantMixin, TemplateView):
     template_name = "assistant_core/dashboard.html"
 
     def get_context_data(self, **kwargs):
-        from assistant_linking.models import BrandAlias, LinkSuggestion, ManualLinkDecision, ParsedSupplierProduct, ProductAlias
+        from assistant_linking.models import BrandAlias, ConcentrationAlias, LinkSuggestion, ManualLinkDecision, ParsedSupplierProduct, ProductAlias
 
         knowledge_count = (
             models.GlobalRule.objects.count()
@@ -36,6 +38,7 @@ class DashboardView(StaffAssistantMixin, TemplateView):
             + models.KnowledgeNote.objects.count()
             + BrandAlias.objects.count()
             + ProductAlias.objects.count()
+            + ConcentrationAlias.objects.count()
         )
 
         return {
@@ -59,7 +62,7 @@ class KnowledgeView(StaffAssistantMixin, TemplateView):
     template_name = "assistant_core/knowledge/index.html"
 
     def get_context_data(self, **kwargs):
-        from assistant_linking.models import BrandAlias, ManualLinkDecision, ProductAlias
+        from assistant_linking.models import BrandAlias, ConcentrationAlias, ManualLinkDecision, ProductAlias
 
         return {
             **super().get_context_data(**kwargs),
@@ -68,6 +71,7 @@ class KnowledgeView(StaffAssistantMixin, TemplateView):
             "notes": models.KnowledgeNote.objects.select_related("supplier", "brand", "perfume").order_by("category", "title"),
             "brand_aliases": BrandAlias.objects.select_related("brand", "supplier").order_by("supplier__name", "priority", "alias_text"),
             "product_aliases": ProductAlias.objects.select_related("brand", "perfume", "supplier").order_by("supplier__name", "priority", "alias_text"),
+            "concentration_alias_count": ConcentrationAlias.objects.count(),
             "manual_decisions": ManualLinkDecision.objects.select_related(
                 "supplier_product",
                 "supplier_product__supplier",
@@ -83,6 +87,237 @@ class RulesView(KnowledgeView):
 
 class AliasesView(StaffAssistantMixin, TemplateView):
     template_name = "assistant_core/knowledge/aliases.html"
+    paginate_by = 50
+
+    SECTION_BRANDS = "brands"
+    SECTION_PRODUCTS = "products"
+    SECTION_CONCENTRATIONS = "concentrations"
+    SECTION_CHOICES = {SECTION_BRANDS, SECTION_PRODUCTS, SECTION_CONCENTRATIONS}
+
+    def _active_section(self):
+        section = self.request.GET.get("section", self.SECTION_BRANDS).strip()
+        return section if section in self.SECTION_CHOICES else self.SECTION_BRANDS
+
+    def _filter_scope(self, queryset):
+        scope = self.request.GET.get("scope", "all").strip()
+        if scope == "global":
+            queryset = queryset.filter(supplier__isnull=True)
+        elif scope == "supplier":
+            queryset = queryset.filter(supplier__isnull=False)
+        return queryset, scope
+
+    def _filter_status(self, queryset):
+        status = self.request.GET.get("status", "active").strip()
+        if status == "active":
+            queryset = queryset.filter(active=True)
+        elif status == "inactive":
+            queryset = queryset.filter(active=False)
+        return queryset, status
+
+    def _brand_queryset(self, query):
+        from assistant_linking.models import BrandAlias
+
+        queryset = BrandAlias.objects.select_related("brand", "supplier").order_by("supplier__name", "priority", "alias_text")
+        if query:
+            queryset = queryset.filter(
+                Q(alias_text__icontains=query)
+                | Q(normalized_alias__icontains=query)
+                | Q(brand__name__icontains=query)
+                | Q(supplier__name__icontains=query)
+            )
+        return queryset
+
+    def _product_queryset(self, query):
+        from assistant_linking.models import ProductAlias
+
+        queryset = ProductAlias.objects.select_related("brand", "perfume", "supplier").order_by("supplier__name", "priority", "alias_text")
+        if query:
+            queryset = queryset.filter(
+                Q(alias_text__icontains=query)
+                | Q(canonical_text__icontains=query)
+                | Q(excluded_terms__icontains=query)
+                | Q(concentration__icontains=query)
+                | Q(audience__icontains=query)
+                | Q(brand__name__icontains=query)
+                | Q(perfume__name__icontains=query)
+                | Q(supplier__name__icontains=query)
+            )
+        return queryset
+
+    def _concentration_queryset(self, query):
+        from assistant_linking.models import ConcentrationAlias
+
+        queryset = ConcentrationAlias.objects.select_related("supplier").order_by("supplier__name", "priority", "alias_text")
+        if query:
+            queryset = queryset.filter(
+                Q(alias_text__icontains=query)
+                | Q(normalized_alias__icontains=query)
+                | Q(concentration__icontains=query)
+                | Q(supplier__name__icontains=query)
+            )
+        return queryset
+
+    def get_context_data(self, **kwargs):
+        from assistant_linking.models import BrandAlias, ConcentrationAlias, ProductAlias
+
+        context = super().get_context_data(**kwargs)
+        section = self._active_section()
+        query = self.request.GET.get("q", "").strip()
+
+        if section == self.SECTION_PRODUCTS:
+            queryset = self._product_queryset(query)
+        elif section == self.SECTION_CONCENTRATIONS:
+            queryset = self._concentration_queryset(query)
+        else:
+            queryset = self._brand_queryset(query)
+
+        queryset, scope = self._filter_scope(queryset)
+        queryset, status = self._filter_status(queryset)
+        page_obj = Paginator(queryset, self.paginate_by).get_page(self.request.GET.get("page") or 1)
+
+        sections = [
+            {
+                "key": self.SECTION_BRANDS,
+                "label": "Brand aliases",
+                "count": BrandAlias.objects.count(),
+                "create_url": reverse_lazy("assistant_core:brand_alias_create"),
+            },
+            {
+                "key": self.SECTION_PRODUCTS,
+                "label": "Product aliases",
+                "count": ProductAlias.objects.count(),
+                "create_url": reverse_lazy("assistant_core:product_alias_create"),
+            },
+            {
+                "key": self.SECTION_CONCENTRATIONS,
+                "label": "Concentration aliases",
+                "count": ConcentrationAlias.objects.count(),
+                "create_url": reverse_lazy("assistant_core:concentration_alias_create"),
+            },
+        ]
+
+        context.update(
+            {
+                "active_section": section,
+                "sections": sections,
+                "query": query,
+                "scope": scope,
+                "status": status,
+                "page_obj": page_obj,
+                "items": page_obj.object_list,
+                "create_url": next(item["create_url"] for item in sections if item["key"] == section),
+            }
+        )
+        return context
+
+
+class AliasManageMixin(StaffAssistantMixin):
+    template_name = "assistant_core/knowledge/alias_form.html"
+    success_section = "brands"
+
+    def get_success_url(self):
+        return f"{reverse_lazy('assistant_core:aliases')}?section={self.success_section}"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["return_url"] = self.get_success_url()
+        context["active_section"] = self.success_section
+        return context
+
+
+class BrandAliasCreateView(AliasManageMixin, CreateView):
+    from assistant_linking.models import BrandAlias as _BrandAlias
+
+    model = _BrandAlias
+    form_class = linking_forms.BrandAliasForm
+    template_name = "assistant_core/knowledge/alias_form.html"
+    success_section = "brands"
+
+
+class BrandAliasUpdateView(AliasManageMixin, UpdateView):
+    from assistant_linking.models import BrandAlias as _BrandAlias
+
+    model = _BrandAlias
+    form_class = linking_forms.BrandAliasForm
+    template_name = "assistant_core/knowledge/alias_form.html"
+    success_section = "brands"
+
+
+class BrandAliasDeleteView(StaffAssistantMixin, DeleteView):
+    from assistant_linking.models import BrandAlias as _BrandAlias
+
+    model = _BrandAlias
+    template_name = "assistant_core/knowledge/alias_confirm_delete.html"
+
+    def get_success_url(self):
+        return f"{reverse_lazy('assistant_core:aliases')}?section=brands"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["return_url"] = self.get_success_url()
+        return context
+
+
+class ProductAliasCreateView(AliasManageMixin, CreateView):
+    from assistant_linking.models import ProductAlias as _ProductAlias
+
+    model = _ProductAlias
+    form_class = linking_forms.ProductAliasForm
+    success_section = "products"
+
+
+class ProductAliasUpdateView(AliasManageMixin, UpdateView):
+    from assistant_linking.models import ProductAlias as _ProductAlias
+
+    model = _ProductAlias
+    form_class = linking_forms.ProductAliasForm
+    success_section = "products"
+
+
+class ProductAliasDeleteView(StaffAssistantMixin, DeleteView):
+    from assistant_linking.models import ProductAlias as _ProductAlias
+
+    model = _ProductAlias
+    template_name = "assistant_core/knowledge/alias_confirm_delete.html"
+
+    def get_success_url(self):
+        return f"{reverse_lazy('assistant_core:aliases')}?section=products"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["return_url"] = self.get_success_url()
+        return context
+
+
+class ConcentrationAliasCreateView(AliasManageMixin, CreateView):
+    from assistant_linking.models import ConcentrationAlias as _ConcentrationAlias
+
+    model = _ConcentrationAlias
+    form_class = linking_forms.ConcentrationAliasForm
+    success_section = "concentrations"
+
+
+class ConcentrationAliasUpdateView(AliasManageMixin, UpdateView):
+    from assistant_linking.models import ConcentrationAlias as _ConcentrationAlias
+
+    model = _ConcentrationAlias
+    form_class = linking_forms.ConcentrationAliasForm
+    success_section = "concentrations"
+
+
+class ConcentrationAliasDeleteView(StaffAssistantMixin, DeleteView):
+    from assistant_linking.models import ConcentrationAlias as _ConcentrationAlias
+
+    model = _ConcentrationAlias
+    template_name = "assistant_core/knowledge/alias_confirm_delete.html"
+
+    def get_success_url(self):
+        return f"{reverse_lazy('assistant_core:aliases')}?section=concentrations"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["return_url"] = self.get_success_url()
+        return context
 
     def get_context_data(self, **kwargs):
         from assistant_linking.models import BrandAlias, ProductAlias

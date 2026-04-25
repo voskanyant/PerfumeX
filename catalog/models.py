@@ -24,6 +24,17 @@ def unique_slug(instance, source: str) -> str:
     return slug
 
 
+def compact_decimal_text(value) -> str:
+    try:
+        dec = Decimal(str(value))
+    except (InvalidOperation, ValueError, TypeError):
+        return str(value or "")
+    text = format(dec.normalize(), "f")
+    if "." in text:
+        text = text.rstrip("0").rstrip(".")
+    return text or "0"
+
+
 class Brand(TimeStampedModel):
     name = models.CharField(max_length=200, unique=True, db_index=True)
     slug = models.SlugField(max_length=220, unique=True, db_index=True, blank=True)
@@ -113,10 +124,7 @@ class PerfumeVariant(TimeStampedModel):
         if self.size_label:
             return self.size_label
         if self.size_ml:
-            try:
-                return f"{Decimal(str(self.size_ml)):g}ml"
-            except (InvalidOperation, ValueError):
-                return f"{self.size_ml}ml"
+            return f"{compact_decimal_text(self.size_ml)}ml"
         return ""
 
     def __str__(self) -> str:
@@ -134,10 +142,7 @@ class PerfumeVariant(TimeStampedModel):
     def _generated_sku_base(self) -> str:
         size_text = self.size_label
         if self.size_ml:
-            try:
-                size_text = f"{Decimal(str(self.size_ml)):g}ml"
-            except (InvalidOperation, ValueError):
-                size_text = str(self.size_ml)
+            size_text = f"{compact_decimal_text(self.size_ml)}ml"
         parts = [
             self.perfume.brand.name if self.perfume_id else "",
             self.perfume.name if self.perfume_id else "",

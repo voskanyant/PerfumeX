@@ -17,6 +17,13 @@ class ProductAliasAdmin(admin.ModelAdmin):
     list_filter = ("active", "supplier", "brand")
 
 
+@admin.register(models.ConcentrationAlias)
+class ConcentrationAliasAdmin(admin.ModelAdmin):
+    list_display = ("alias_text", "concentration", "supplier", "priority", "active", "is_regex")
+    search_fields = ("alias_text", "normalized_alias", "concentration", "supplier__name")
+    list_filter = ("active", "is_regex", "supplier", "concentration")
+
+
 @admin.register(models.ParsedSupplierProduct)
 class ParsedSupplierProductAdmin(admin.ModelAdmin):
     list_display = ("supplier_product", "normalized_brand", "product_name_text", "concentration", "size_ml", "confidence", "locked_by_human")

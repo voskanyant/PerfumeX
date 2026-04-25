@@ -1,0 +1,22 @@
+{% extends "prices/base.html" %}
+{% block title %}Edit Alias{% endblock %}
+{% block topbar_label %}Assistant / Knowledge{% endblock %}
+{% block content %}
+<div class="page-head">
+    <div>
+        <span class="page-kicker">Assistant</span>
+        <h1 class="page-title">{% if object %}Edit{% else %}Add{% endif %} dictionary entry</h1>
+        <div class="page-meta">Use this screen to manage assistant normalization aliases directly.</div>
+    </div>
+</div>
+<div class="workspace-block form-shell">
+    <form method="post">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <div class="layout-inline gap-sm">
+            <button class="button primary" type="submit">Save</button>
+            <a class="button ghost" href="{{ return_url }}">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

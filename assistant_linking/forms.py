@@ -1,18 +1,100 @@
 from django import forms
 
+from catalog.models import Brand, Perfume
+from prices.models import Supplier
+
 from . import models
 
 
 class BrandAliasForm(forms.ModelForm):
+    brand = forms.CharField(help_text="Existing brand name from Our Products.")
+    normalized_alias = forms.CharField(required=False, help_text="Leave blank to auto-normalize from supplier text.")
+    supplier = forms.ModelChoiceField(queryset=Supplier.objects.order_by("name"), required=False)
+
     class Meta:
         model = models.BrandAlias
         fields = ("brand", "alias_text", "normalized_alias", "supplier", "priority", "is_regex", "active")
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance.pk and self.instance.brand_id:
+            self.fields["brand"].initial = self.instance.brand.name
+
+    def clean_brand(self):
+        brand_name = (self.cleaned_data.get("brand") or "").strip()
+        brand = Brand.objects.filter(name__iexact=brand_name).first()
+        if not brand:
+            raise forms.ValidationError("Choose an existing brand name.")
+        return brand
+
+    def clean(self):
+        cleaned = super().clean()
+        if not cleaned.get("normalized_alias") and cleaned.get("alias_text"):
+            cleaned["normalized_alias"] = models.normalize_alias_value(cleaned["alias_text"])
+        return cleaned
+
 
 class ProductAliasForm(forms.ModelForm):
+    perfume = forms.CharField(required=False, help_text="Existing perfume name from Our Products. Optional.")
+    brand = forms.CharField(required=False, help_text="Existing brand name from Our Products. Optional.")
+    supplier = forms.ModelChoiceField(queryset=Supplier.objects.order_by("name"), required=False)
+
     class Meta:
         model = models.ProductAlias
-        fields = ("perfume", "brand", "alias_text", "canonical_text", "supplier", "concentration", "audience", "priority", "active")
+        fields = ("perfume", "brand", "alias_text", "canonical_text", "supplier", "concentration", "audience", "excluded_terms", "priority", "active")
+        widgets = {"excluded_terms": forms.Textarea(attrs={"rows": 2})}
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance.pk and self.instance.brand_id:
+            self.fields["brand"].initial = self.instance.brand.name
+        if self.instance.pk and self.instance.perfume_id:
+            self.fields["perfume"].initial = self.instance.perfume.name
+
+    def clean_brand(self):
+        brand_name = (self.cleaned_data.get("brand") or "").strip()
+        if not brand_name:
+            return None
+        brand = Brand.objects.filter(name__iexact=brand_name).first()
+        if not brand:
+            raise forms.ValidationError("Choose an existing brand name or leave it blank.")
+        return brand
+
+    def clean_perfume(self):
+        perfume_name = (self.cleaned_data.get("perfume") or "").strip()
+        if not perfume_name:
+            return None
+        queryset = Perfume.objects.select_related("brand").filter(name__iexact=perfume_name)
+        brand = self.cleaned_data.get("brand")
+        if brand:
+            queryset = queryset.filter(brand=brand)
+        perfume = queryset.first()
+        if not perfume:
+            raise forms.ValidationError("Choose an existing perfume name or leave it blank.")
+        if queryset.count() > 1:
+            raise forms.ValidationError("Multiple catalogue perfumes use this name. Fill brand too to narrow it down.")
+        return perfume
+
+    def clean(self):
+        cleaned = super().clean()
+        if cleaned.get("perfume") and not cleaned.get("brand"):
+            cleaned["brand"] = cleaned["perfume"].brand
+        return cleaned
+
+
+class ConcentrationAliasForm(forms.ModelForm):
+    normalized_alias = forms.CharField(required=False, help_text="Leave blank to auto-normalize from supplier text.")
+    supplier = forms.ModelChoiceField(queryset=Supplier.objects.order_by("name"), required=False)
+
+    class Meta:
+        model = models.ConcentrationAlias
+        fields = ("concentration", "alias_text", "normalized_alias", "supplier", "priority", "is_regex", "active")
+
+    def clean(self):
+        cleaned = super().clean()
+        if not cleaned.get("normalized_alias") and cleaned.get("alias_text"):
+            cleaned["normalized_alias"] = models.normalize_alias_value(cleaned["alias_text"])
+        return cleaned
 
 
 class ManualDecisionForm(forms.ModelForm):

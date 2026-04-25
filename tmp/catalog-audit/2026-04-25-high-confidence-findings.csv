@@ -1,0 +1,6 @@
+status,brand,perfume_id,name,concentration,issue_type,paired_perfume_id,paired_name,paired_concentration,evidence
+high-confidence,Initio,8076,Musk Therapy,Eau de Parfum,wrong concentration,5636,Musk Therapy,Extrait de Parfum,https://us.initioparfums.com/products/musk-therapy
+high-confidence,Clive Christian,10779,Noble XXI: Art Deco - Blonde Amber,Extrait de Parfum,duplicate naming split,6598,Blonde Amber,Extrait de Parfum,https://us.clivechristian.com/products/art-deco-blonde-amber-1
+high-confidence,Dolce & Gabbana,8058,Q Intense Pour Homme,Eau de Parfum,wrong gender/line,8059,Q Intense,Eau de Parfum,https://www.dolcegabbana.com/en-us/beauty/perfumes-for-her/q-by-dolceandgabbana/q-by-dolceandgabbana-eau-de-parfum-intense---158057971187843.html
+high-confidence,Dolce & Gabbana,18662,Light Blue Eau Intense Pour Femme,Eau de Parfum,duplicate/inconsistent female naming,5102,Light Blue Eau Intense,Eau de Parfum,https://www.dolcegabbana.com/en-us/beauty/perfumes-for-her/light-blue/
+high-confidence,Initio,5357,"Paragon, Musk Therapy, Rehab",Extrait de Parfum,bundle/set contamination,,,,https://us.initioparfums.com/products/paragon

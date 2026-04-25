@@ -6,47 +6,189 @@
     <div>
         <span class="page-kicker">Assistant</span>
         <h1 class="page-title">Alias dictionaries</h1>
-        <div class="page-meta">Aliases are used by normalisation, smart search, grouping, and linking suggestions.</div>
+        <div class="page-meta">Manage taught normalization dictionaries with search, filters, and direct editing.</div>
     </div>
-    <a class="button ghost" href="{% url 'assistant_core:knowledge' %}">Knowledge base</a>
+    <div class="page-actions">
+        <a class="button primary" href="{{ create_url }}">Add entry</a>
+        <a class="button ghost" href="{% url 'assistant_core:knowledge' %}">Knowledge base</a>
+    </div>
 </div>
+
 <div class="workspace-block">
-    <h2 class="kpi-link-title">Brand Aliases</h2>
-    <table class="data-table">
-        <thead><tr><th>Supplier text</th><th>Brand</th><th>Scope</th><th>Priority</th><th>Status</th></tr></thead>
-        <tbody>
-        {% for alias in brand_aliases %}
-            <tr>
-                <td>{{ alias.alias_text }}</td>
-                <td>{{ alias.brand }}</td>
-                <td>{{ alias.supplier|default:"global" }}</td>
-                <td>{{ alias.priority }}</td>
-                <td>{{ alias.active|yesno:"active,inactive" }}</td>
-            </tr>
-        {% empty %}
-            <tr><td colspan="5">No brand aliases.</td></tr>
+    <div class="layout-inline gap-sm flex-wrap">
+        {% for item in sections %}
+            {% if item.key == active_section %}
+                <span class="button">{{ item.label }} · {{ item.count }}</span>
+            {% else %}
+                <a class="button ghost" href="{% url 'assistant_core:aliases' %}?section={{ item.key }}">{{ item.label }} · {{ item.count }}</a>
+            {% endif %}
         {% endfor %}
-        </tbody>
-    </table>
+    </div>
+
+    <form method="get" class="space-top-md">
+        <input type="hidden" name="section" value="{{ active_section }}">
+        <div class="layout-grid-12 gap-md items-end">
+            <div class="span-12 md-span-5">
+                <label class="form-label" for="aliases-search">Search</label>
+                <input id="aliases-search" type="text" name="q" value="{{ query }}" placeholder="Search alias text, brand, supplier, blockers, concentration">
+            </div>
+            <div class="span-6 md-span-2">
+                <label class="form-label" for="aliases-scope">Scope</label>
+                <select id="aliases-scope" name="scope">
+                    <option value="all"{% if scope == "all" %} selected{% endif %}>All</option>
+                    <option value="global"{% if scope == "global" %} selected{% endif %}>Global</option>
+                    <option value="supplier"{% if scope == "supplier" %} selected{% endif %}>Supplier-only</option>
+                </select>
+            </div>
+            <div class="span-6 md-span-2">
+                <label class="form-label" for="aliases-status">Status</label>
+                <select id="aliases-status" name="status">
+                    <option value="active"{% if status == "active" %} selected{% endif %}>Active</option>
+                    <option value="inactive"{% if status == "inactive" %} selected{% endif %}>Inactive</option>
+                    <option value="all"{% if status == "all" %} selected{% endif %}>All</option>
+                </select>
+            </div>
+            <div class="span-12 md-span-3">
+                <div class="layout-inline gap-sm">
+                    <button class="button" type="submit">Apply</button>
+                    <a class="button ghost" href="{% url 'assistant_core:aliases' %}?section={{ active_section }}">Reset</a>
+                </div>
+            </div>
+        </div>
+    </form>
+
+    <div class="page-meta space-top-sm">
+        Showing {{ page_obj.start_index }}-{{ page_obj.end_index }} of {{ page_obj.paginator.count }} {{ active_section }} entries.
+    </div>
 </div>
+
 <div class="workspace-block space-top-md">
-    <h2 class="kpi-link-title">Product Aliases</h2>
-    <table class="data-table">
-        <thead><tr><th>Supplier text</th><th>Brand</th><th>Correct scent</th><th>Blockers</th><th>Scope</th><th>Status</th></tr></thead>
-        <tbody>
-        {% for alias in product_aliases %}
-            <tr>
-                <td>{{ alias.alias_text }}</td>
-                <td>{{ alias.brand|default:"any brand" }}</td>
-                <td>{{ alias.canonical_text }}</td>
-                <td>{{ alias.excluded_terms }}</td>
-                <td>{{ alias.supplier|default:"global" }}</td>
-                <td>{{ alias.active|yesno:"active,inactive" }}</td>
-            </tr>
-        {% empty %}
-            <tr><td colspan="6">No product aliases.</td></tr>
-        {% endfor %}
-        </tbody>
-    </table>
+    <div class="table-wrap table-scroll-x">
+        <table class="data-table">
+            <thead>
+                {% if active_section == "brands" %}
+                    <tr>
+                        <th>Supplier text</th>
+                        <th>Brand</th>
+                        <th>Scope</th>
+                        <th>Priority</th>
+                        <th>Matcher</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                {% elif active_section == "products" %}
+                    <tr>
+                        <th>Supplier text</th>
+                        <th>Correct scent</th>
+                        <th>Brand</th>
+                        <th>Concentration</th>
+                        <th>Audience</th>
+                        <th>Blockers</th>
+                        <th>Scope</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                {% else %}
+                    <tr>
+                        <th>Supplier text</th>
+                        <th>Normalized alias</th>
+                        <th>Correct concentration</th>
+                        <th>Scope</th>
+                        <th>Priority</th>
+                        <th>Matcher</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                {% endif %}
+            </thead>
+            <tbody>
+                {% for item in items %}
+                    <tr>
+                        {% if active_section == "brands" %}
+                            <td>{{ item.alias_text }}</td>
+                            <td>{{ item.brand }}</td>
+                            <td>{{ item.supplier|default:"global" }}</td>
+                            <td>{{ item.priority }}</td>
+                            <td>{% if item.is_regex %}regex{% else %}phrase{% endif %}</td>
+                            <td>{{ item.active|yesno:"active,inactive" }}</td>
+                            <td class="actions">
+                                <div class="layout-inline gap-sm">
+                                    <a class="button ghost" href="{% url 'assistant_core:brand_alias_update' item.pk %}">Edit</a>
+                                    <a class="button ghost" href="{% url 'assistant_core:brand_alias_delete' item.pk %}">Delete</a>
+                                </div>
+                            </td>
+                        {% elif active_section == "products" %}
+                            <td>{{ item.alias_text }}</td>
+                            <td>{{ item.canonical_text }}</td>
+                            <td>{{ item.brand|default:"any brand" }}</td>
+                            <td>{{ item.concentration|default:"-" }}</td>
+                            <td>{{ item.audience|default:"-" }}</td>
+                            <td>{{ item.excluded_terms|default:"-" }}</td>
+                            <td>{{ item.supplier|default:"global" }}</td>
+                            <td>{{ item.active|yesno:"active,inactive" }}</td>
+                            <td class="actions">
+                                <div class="layout-inline gap-sm">
+                                    <a class="button ghost" href="{% url 'assistant_core:product_alias_update' item.pk %}">Edit</a>
+                                    <a class="button ghost" href="{% url 'assistant_core:product_alias_delete' item.pk %}">Delete</a>
+                                </div>
+                            </td>
+                        {% else %}
+                            <td>{{ item.alias_text }}</td>
+                            <td>{{ item.normalized_alias }}</td>
+                            <td>{{ item.concentration }}</td>
+                            <td>{{ item.supplier|default:"global" }}</td>
+                            <td>{{ item.priority }}</td>
+                            <td>{% if item.is_regex %}regex{% else %}phrase{% endif %}</td>
+                            <td>{{ item.active|yesno:"active,inactive" }}</td>
+                            <td class="actions">
+                                <div class="layout-inline gap-sm">
+                                    <a class="button ghost" href="{% url 'assistant_core:concentration_alias_update' item.pk %}">Edit</a>
+                                    <a class="button ghost" href="{% url 'assistant_core:concentration_alias_delete' item.pk %}">Delete</a>
+                                </div>
+                            </td>
+                        {% endif %}
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="{% if active_section == 'products' %}9{% elif active_section == 'concentrations' %}8{% else %}7{% endif %}">
+                            No entries match the current filters.
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% if page_obj.paginator.num_pages > 1 %}
+        <nav class="pagination-shell space-top-md" aria-label="Alias pagination">
+            <div class="pagination-list">
+                {% if page_obj.has_previous %}
+                    <a class="page-link" href="?section={{ active_section }}&q={{ query|urlencode }}&scope={{ scope }}&status={{ status }}&page={{ page_obj.previous_page_number }}">Previous</a>
+                {% endif %}
+                {% for page_num in page_obj.paginator.page_range %}
+                    {% if page_num <= 5 or page_num > page_obj.paginator.num_pages|add:-3 %}
+                        {% if page_num == page_obj.number %}
+                            <span class="page-link is-active">{{ page_num }}</span>
+                        {% else %}
+                            <a class="page-link" href="?section={{ active_section }}&q={{ query|urlencode }}&scope={{ scope }}&status={{ status }}&page={{ page_num }}">{{ page_num }}</a>
+                        {% endif %}
+                    {% endif %}
+                {% endfor %}
+                {% if page_obj.has_next %}
+                    <a class="page-link" href="?section={{ active_section }}&q={{ query|urlencode }}&scope={{ scope }}&status={{ status }}&page={{ page_obj.next_page_number }}">Next</a>
+                {% endif %}
+            </div>
+            <form class="pagination-jump" method="get">
+                <input type="hidden" name="section" value="{{ active_section }}">
+                <input type="hidden" name="q" value="{{ query }}">
+                <input type="hidden" name="scope" value="{{ scope }}">
+                <input type="hidden" name="status" value="{{ status }}">
+                <label for="aliases-page-jump">Page</label>
+                <input id="aliases-page-jump" type="number" name="page" min="1" max="{{ page_obj.paginator.num_pages }}" value="{{ page_obj.number }}">
+                <button class="button secondary" type="submit">Go</button>
+            </form>
+            <div class="pagination-summary">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</div>
+        </nav>
+    {% endif %}
 </div>
 {% endblock %}

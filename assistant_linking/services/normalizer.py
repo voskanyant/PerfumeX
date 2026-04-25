@@ -5,17 +5,24 @@ import unicodedata
 from dataclasses import dataclass, field
 from decimal import Decimal, ROUND_HALF_UP
 
+from django.core.cache import cache
 from django.db.models import Q
 from django.utils import timezone
 
-from assistant_linking.models import BrandAlias, ParsedSupplierProduct, ProductAlias
+from assistant_linking.models import (
+    CONCENTRATION_ALIAS_CACHE_KEY,
+    BrandAlias,
+    ConcentrationAlias,
+    ParsedSupplierProduct,
+    ProductAlias,
+)
 from catalog.models import Brand
 from prices.models import SupplierProduct
 
 
 PARSER_VERSION = "deterministic-v1"
 
-CONCENTRATION_ALIASES = (
+DEFAULT_CONCENTRATION_ALIASES = (
     ("extrait de parfum", "Extrait de Parfum"),
     ("extrait", "Extrait de Parfum"),
     ("eau de parfum", "Eau de Parfum"),
@@ -25,6 +32,7 @@ CONCENTRATION_ALIASES = (
     ("eau de cologne", "Eau de Cologne"),
     ("edc", "Eau de Cologne"),
     ("parfum", "Parfum"),
+    ("perfume oil", "Perfume Oil"),
 )
 
 GENDER_ALIASES = (
@@ -68,6 +76,21 @@ def normalize_text(value: str) -> str:
     return text
 
 
+def get_concentration_alias_rows():
+    rows = cache.get(CONCENTRATION_ALIAS_CACHE_KEY)
+    if rows is not None:
+        return rows
+    rows = list(
+        ConcentrationAlias.objects.filter(active=True)
+        .order_by("supplier__name", "priority", "alias_text")
+        .values_list("supplier_id", "normalized_alias", "concentration", "is_regex")
+    )
+    if not rows:
+        rows = [(None, normalize_text(alias_text), concentration, False) for alias_text, concentration in DEFAULT_CONCENTRATION_ALIASES]
+    cache.set(CONCENTRATION_ALIAS_CACHE_KEY, rows, 300)
+    return rows
+
+
 def _split_terms(value: str) -> list[str]:
     return [normalize_text(term) for term in re.split(r"[,;\n]+", value or "") if normalize_text(term)]
 
@@ -101,6 +124,23 @@ def _extract_size(text: str) -> tuple[Decimal | None, str, str]:
     return None, "", text
 
 
+def _extract_loose_trailing_size(text: str) -> tuple[Decimal | None, str, str]:
+    match = re.search(r"(?P<prefix>.*?)(?:^|\s)(?P<size>\d+(?:[.,]\d+)?)\s*$", text)
+    if not match:
+        return None, "", text
+    prefix = (match.group("prefix") or "").strip()
+    if prefix.endswith((" no", " number")):
+        return None, "", text
+    raw = match.group("size")
+    try:
+        value = Decimal(raw.replace(",", ".")).quantize(Decimal("0.01"))
+    except Exception:
+        return None, "", text
+    if value < Decimal("7"):
+        return None, "", text
+    return value, raw, prefix
+
+
 def _match_aliases(text: str, supplier_id: int | None):
     aliases = BrandAlias.objects.filter(active=True).select_related("brand").order_by("supplier_id", "priority", "-normalized_alias")
     supplier_aliases = [alias for alias in aliases if alias.supplier_id == supplier_id]
@@ -128,7 +168,17 @@ def parse_supplier_product(product: SupplierProduct) -> ParseResult:
     result.size_ml = size
     result.raw_size_text = raw_size
 
-    for needle, value in CONCENTRATION_ALIASES:
+    concentration_alias_rows = get_concentration_alias_rows()
+    supplier_aliases = [row for row in concentration_alias_rows if row[0] == product.supplier_id]
+    global_aliases = [row for row in concentration_alias_rows if row[0] is None]
+    for _, needle, value, is_regex in supplier_aliases + global_aliases:
+        if is_regex:
+            matched = re.search(needle, text)
+            if not matched:
+                continue
+            result.concentration = value
+            text = re.sub(needle, " ", text).strip()
+            break
         if re.search(rf"(^|\s){re.escape(needle)}($|\s)", text):
             result.concentration = value
             text = re.sub(rf"(^|\s){re.escape(needle)}($|\s)", " ", text).strip()
@@ -156,6 +206,13 @@ def parse_supplier_product(product: SupplierProduct) -> ParseResult:
         if alias and alias.supplier_id:
             result.warnings.append("supplier-specific alias overrode global alias")
 
+    if not result.size_ml:
+        size, raw_size, compact_text = _extract_loose_trailing_size(text)
+        if size is not None:
+            result.size_ml = size
+            result.raw_size_text = raw_size
+            text = compact_text
+
     product_aliases = ProductAlias.objects.filter(active=True).order_by("supplier_id", "priority", "-alias_text")
     if result.normalized_brand:
         product_aliases = product_aliases.filter(Q(brand_id=result.normalized_brand.id) | Q(brand__isnull=True))
@@ -164,9 +221,9 @@ def parse_supplier_product(product: SupplierProduct) -> ParseResult:
         excluded_terms = _split_terms(product_alias.excluded_terms)
         if alias_text and _contains_phrase(text, alias_text) and not any(_contains_phrase(text, term) for term in excluded_terms):
             result.product_name_text = product_alias.canonical_text
-            if product_alias.concentration and not result.concentration:
+            if product_alias.concentration:
                 result.concentration = product_alias.concentration
-            if product_alias.audience and not result.supplier_gender_hint:
+            if product_alias.audience:
                 result.supplier_gender_hint = product_alias.audience
             break
 

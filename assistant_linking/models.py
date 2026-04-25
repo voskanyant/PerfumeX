@@ -1,5 +1,22 @@
+import re
+import unicodedata
+
 from django.conf import settings
+from django.core.cache import cache
 from django.db import models
+
+
+CONCENTRATION_ALIAS_CACHE_KEY = "assistant_linking:concentration_aliases:v1"
+
+
+def normalize_alias_value(value: str) -> str:
+    text = unicodedata.normalize("NFKC", value or "").lower()
+    text = re.sub(r"\b(edp|edt|edc)(?=\d)", r"\1 ", text)
+    text = re.sub(r"\b(eau de parfum|eau de toilette|eau de cologne|extrait de parfum|extrait|parfum)(?=\d)", r"\1 ", text)
+    text = re.sub(r"[\u00a0_/,;:|()\[\]{}]+", " ", text)
+    text = re.sub(r"(?<=\d),(?=\d)", ".", text)
+    text = re.sub(r"\s+", " ", text).strip()
+    return text
 
 
 class TimeStampedModel(models.Model):
@@ -47,6 +64,36 @@ class ProductAlias(TimeStampedModel):
 
     def __str__(self) -> str:
         return f"{self.alias_text} -> {self.canonical_text}"
+
+
+class ConcentrationAlias(TimeStampedModel):
+    concentration = models.CharField(max_length=80, db_index=True)
+    alias_text = models.CharField(max_length=255, db_index=True)
+    normalized_alias = models.CharField(max_length=255, db_index=True)
+    supplier = models.ForeignKey("prices.Supplier", on_delete=models.CASCADE, null=True, blank=True, related_name="concentration_aliases", db_index=True)
+    active = models.BooleanField(default=True, db_index=True)
+    priority = models.IntegerField(default=100, db_index=True)
+    is_regex = models.BooleanField(default=False, db_index=True)
+
+    class Meta:
+        ordering = ("supplier__name", "priority", "alias_text")
+        constraints = [
+            models.UniqueConstraint(fields=["alias_text", "supplier", "concentration"], name="uniq_assistant_concentration_alias")
+        ]
+
+    def save(self, *args, **kwargs):
+        if not self.normalized_alias:
+            self.normalized_alias = normalize_alias_value(self.alias_text)
+        super().save(*args, **kwargs)
+        cache.delete(CONCENTRATION_ALIAS_CACHE_KEY)
+
+    def delete(self, *args, **kwargs):
+        cache.delete(CONCENTRATION_ALIAS_CACHE_KEY)
+        return super().delete(*args, **kwargs)
+
+    def __str__(self) -> str:
+        scope = self.supplier.name if self.supplier_id else "global"
+        return f"{self.alias_text} -> {self.concentration} ({scope})"
 
 
 class ParsedSupplierProduct(TimeStampedModel):

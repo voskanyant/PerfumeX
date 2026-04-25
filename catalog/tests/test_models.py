@@ -47,3 +47,15 @@ class CatalogModelTests(TestCase):
 
         self.assertEqual(variant.display_size, "100ml")
         self.assertEqual(str(variant), "Example / Example Scent / 100ml")
+
+    def test_variant_display_size_trims_trailing_zeroes(self):
+        brand = Brand.objects.create(name="Example")
+        perfume = Perfume.objects.create(brand=brand, name="Example Scent")
+        variant = PerfumeVariant.objects.create(
+            perfume=perfume,
+            size_ml="50.00",
+            variant_type="standard",
+        )
+
+        self.assertEqual(variant.display_size, "50ml")
+        self.assertEqual(str(variant), "Example / Example Scent / 50ml")

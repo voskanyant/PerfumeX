@@ -146,6 +146,33 @@ class TeachParseTests(TestCase):
 
         self.assertEqual(parsed.product_name_text, "Light Blue Eau Intense")
 
+    def test_product_alias_can_override_wrong_supplier_concentration(self):
+        brand = Brand.objects.create(name="12 Parfumeurs")
+        BrandAlias.objects.create(
+            brand=brand,
+            alias_text="12 parfumeurs",
+            normalized_alias="12 parfumeurs",
+        )
+        ProductAlias.objects.create(
+            brand=brand,
+            alias_text="malmaison",
+            canonical_text="Malmaison",
+            concentration="Extrait de Parfum",
+            priority=40,
+            active=True,
+        )
+        product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="malmaison-1",
+            name="12 Parfumeurs Malmaison 100ml EDP",
+        )
+
+        parsed = save_parse(product, force=True)
+
+        self.assertEqual(parsed.normalized_brand, brand)
+        self.assertEqual(parsed.product_name_text, "Malmaison")
+        self.assertEqual(parsed.concentration, "Extrait de Parfum")
+
     def test_product_aliases_are_limited_to_detected_brand(self):
         dolce = Brand.objects.create(name="Dolce & Gabbana")
         montale = Brand.objects.create(name="Montale")

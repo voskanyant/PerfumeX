@@ -1,0 +1,6492 @@
+{
+  "combo_count": 61,
+  "contain_count": 302,
+  "multi_concentration_count": 1000,
+  "missing_gender_count": 118,
+  "combo_examples": [
+    {
+      "id": "12337",
+      "brand": "Ariana Grande",
+      "name": "Thank U, Next",
+      "concentration": "Eau de Parfum",
+      "audience": "",
+      "collection_name": "",
+      "release_year": "",
+      "is_published": "0",
+      "verification_status": "review",
+      "variant_count": "4",
+      "supplier_link_count": "0"
+    },
+    {
+      "id": "11459",
+      "brand": "Dior",
+      "name": "Me, Me Not",
+      "concentration": "Eau de Toilette",
+      "audience": "",
+      "collection_name": "",
+      "release_year": "",
+      "is_published": "0",
+      "verification_status": "review",
+      "variant_count": "1",
+      "supplier_link_count": "0"
+    },
+    {
+      "id": "7353",
+      "brand": "Etat Libre d'Orange",
+      "name": "Don't Get Me Wrong Baby, Yes I Do",
+      "concentration": "Eau de Parfum",
+      "audience": "",
+      "collection_name": "",
+      "release_year": "",
+      "is_published": "0",
+      "verification_status": "review",
+      "variant_count": "4",
+      "supplier_link_count": "0"
+    },
+    {
+      "id": "20265",
+      "brand": "Gabriella Chieffo",
+      "name": "1,2,3, Stella!",
+      "concentration": "Eau de Parfum",
+      "audience": "",
+      "collection_name": "",
+      "release_year": "",
+      "is_published": "0",
+      "verification_status": "review",
+      "variant_count": "1",
+      "supplier_link_count": "0"
+    },
+    {
+      "id": "5357",
+      "brand": "Initio",
+      "name": "Paragon, Musk Therapy, Rehab",
+      "concentration": "Extrait de Parfum",
+      "audience": "",
+      "collection_name": "",
+      "release_year": "",
+      "is_published": "0",
+      "verification_status": "review",
+      "variant_count": "1",
+      "supplier_link_count": "0"
+    },
+    {
+      "id": "8063",
+      "brand": "Juicy Couture",
+      "name": "Peace, Love and",
+      "concentration": "Eau de Parfum",
+      "audience": "",
+      "collection_name": "",
+      "release_year": "",
+      "is_published": "0",
+      "verification_status": "review",
+      "variant_count": "2",
+      "supplier_link_count": "0"
+    },
+    {
+      "id": "7809",
+      "brand": "Kilian",
+      "name": "Back to Black, Aphrodisiac",
+      "concentration": "Eau de Parfum",
+      "audience": "",
+      "collection_name": "",
+      "release_year": "",
+      "is_published": "0",
+      "verification_status": "review",
+      "variant_count": "6",
+      "supplier_link_count": "0"
+    },
+    {
+      "id": "4225",
+      "brand": "Kilian",
+      "name": "Black Phantom, Memento Mori",
+      "concentration": "Eau de Parfum",
+      "audience": "",
+      "collection_name": "",
+      "release_year": "",
+      "is_published": "0",
+      "verification_status": "review",
+      "variant_count": "12",
+      "supplier_link_count": "0"
+    },
+    {
+      "id": "7808",
+      "brand": "Kilian",
+      "name": "Dark Lord, Ex Tenebris Lux",
+      "concentration": "Eau de Parfum",
+      "audience": "",
+      "collection_name": "",
+      "release_year": "",
+      "is_published": "0",
+      "verification_status": "review",
+      "variant_count": "5",
+      "supplier_link_count": "0"
+    },
+    {
+      "id": "13175",
+      "brand": "Kilian",
+      "name": "I Never Make The Same Mistake Twice, Unless They're Crazy Hot",
+      "concentration": "Eau de Parfum",
+      "audience": "",
+      "collection_name": "",
+      "release_year": "",
+      "is_published": "0",
+      "verification_status": "review",
+      "variant_count": "3",
+      "supplier_link_count": "0"
+    },
+    {
+      "id": "6132",
+      "brand": "Kilian",
+      "name": "Kologne, Shield of Protection",
+      "concentration": "Eau de Parfum",
+      "audience": "",
+      "collection_name": "",
+      "release_year": "",
+      "is_published": "0",
+      "verification_status": "review",
+      "variant_count": "5",
+      "supplier_link_count": "0"
+    },
+    {
+      "id": "8090",
+      "brand": "Kilian",
+      "name": "Let's Settle This Argument Like Adults, In The Bedroom, Naked",
+      "concentration": "Eau de Parfum",
+      "audience": "",
+      "collection_name": "",
+      "release_year": "",
+      "is_published": "0",
+      "verification_status": "review",
+      "variant_count": "7",
+      "supplier_link_count": "0"
+    },
+    {
+      "id": "4396",
+      "brand": "Kilian",
+      "name": "Liaisons Dangereuses, Typical Me",
+      "concentration": "Eau de Parfum",
+      "audience": "",
+      "collection_name": "",
+      "release_year": "",
+      "is_published": "0",
+      "verification_status": "review",
+      "variant_count": "8",
+      "supplier_link_count": "0"
+    },
+    {
+      "id": "4199",
+      "brand": "Kilian",
+      "name": "Love, Don't be Shy",
+      "concentration": "Eau de Parfum",
+      "audience": "",
+      "collection_name": "",
+      "release_year": "",
+      "is_published": "0",
+      "verification_status": "review",
+      "variant_count": "12",
+      "supplier_link_count": "0"
+    },
+    {
+      "id": "8229",
+      "brand": "Kilian",
+      "name": "Love, Don't be Shy Anniversary Edition",
+      "concentration": "Eau de Parfum",
+      "audience": "",
+      "collection_name": "",
+      "release_year": "",
+      "is_published": "0",
+      "verification_status": "review",
+      "variant_count": "1",
+      "supplier_link_count": "0"
+    },
+    {
+      "id": "6091",
+      "brand": "Kilian",
+      "name": "Love, Don't be Shy Eau Fraiche",
+      "concentration": "Eau de Parfum",
+      "audience": "",
+      "collection_name": "",
+      "release_year": "",
+      "is_published": "0",
+      "verification_status": "review",
+      "variant_count": "6",
+      "supplier_link_count": "0"
+    },
+    {
+      "id": "7863",
+      "brand": "Kilian",
+      "name": "Love, Don't be Shy Extreme",
+      "concentration": "Eau de Parfum",
+      "audience": "",
+      "collection_name": "",
+      "release_year": "",
+      "is_published": "0",
+      "verification_status": "review",
+      "variant_count": "5",
+      "supplier_link_count": "0"
+    },
+    {
+      "id": "7862",
+      "brand": "Kilian",
+      "name": "Love, Don't be Shy Fraiche",
+      "concentration": "Eau de Parfum",
+      "audience": "",
+      "collection_name": "",
+      "release_year": "",
+      "is_published": "0",
+      "verification_status": "review",
+      "variant_count": "2",
+      "supplier_link_count": "0"
+    },
+    {
+      "id": "7855",
+      "brand": "Kilian",
+      "name": "Prelude to Love, Invitation",
+      "concentration": "Eau de Parfum",
+      "audience": "",
+      "collection_name": "",
+      "release_year": "",
+      "is_published": "0",
+      "verification_status": "review",
+      "variant_count": "2",
+      "supplier_link_count": "0"
+    },
+    {
+      "id": "12387",
+      "brand": "Kilian",
+      "name": "Straight to Heaven, Splash Of Lemon",
+      "concentration": "Eau de Parfum",
+      "audience": "",
+      "collection_name": "",
+      "release_year": "",
+      "is_published": "0",
+      "verification_status": "review",
+      "variant_count": "1",
+      "supplier_link_count": "0"
+    },
+    {
+      "id": "4186",
+      "brand": "Kilian",
+      "name": "Straight to Heaven, White Cristal",
+      "concentration": "Eau de Parfum",
+      "audience": "",
+      "collection_name": "",
+      "release_year": "",
+      "is_published": "0",
+      "verification_status": "review",
+      "variant_count": "15",
+      "supplier_link_count": "0"
+    },
+    {
+      "id": "18490",
+      "brand": "L'Arc",
+      "name": "Memoire, Carnet de Voyage",
+      "concentration": "Eau de Parfum",
+      "audience": "",
+      "collection_name": "",
+      "release_year": "",
+      "is_published": "0",
+      "verification_status": "review",
+      "variant_count": "1",
+      "supplier_link_count": "0"
+    },
+    {
+      "id": "17880",
+      "brand": "Loewe",
+      "name": "Quizas, Quizas, Quizas",
+      "concentration": "Eau de Parfum",
+      "audience": "",
+      "collection_name": "",
+      "release_year": "",
+      "is_published": "0",
+      "verification_status": "review",
+      "variant_count": "1",
+      "supplier_link_count": "0"
+    },
+    {
+      "id": "16198",
+      "brand": "Loewe",
+      "name": "Quizas, Quizas, Quizas Matador",
+      "concentration": "Eau de Toilette",
+      "audience": "",
+      "collection_name": "",
+      "release_year": "",
+      "is_published": "0",
+      "verification_status": "review",
+      "variant_count": "1",
+      "supplier_link_count": "0"
+    },
+    {
+      "id": "16197",
+      "brand": "Loewe",
+      "name": "Quizas, Quizas, Quizas Pasion",
+      "concentration": "Eau de Toilette",
+      "audience": "",
+      "collection_name": "",
+      "release_year": "",
+      "is_published": "0",
+      "verification_status": "review",
+      "variant_count": "1",
+      "supplier_link_count": "0"
+    },
+    {
+      "id": "20271",
+      "brand": "Miller et Bertaux",
+      "name": "#3 Green, Green, Green and... Green",
+      "concentration": "Eau de Parfum",
+      "audience": "",
+      "collection_name": "",
+      "release_year": "",
+      "is_published": "0",
+      "verification_status": "review",
+      "variant_count": "2",
+      "supplier_link_count": "0"
+    },
+    {
+      "id": "19638",
+      "brand": "Miller et Bertaux",
+      "name": "Close Your Eyes, And... /Bois de Gaiac et Poire",
+      "concentration": "Eau de Parfum",
+      "audience": "",
+      "collection_name": "",
+      "release_year": "",
+      "is_published": "0",
+      "verification_status": "review",
+      "variant_count": "2",
+      "supplier_link_count": "0"
+    },
+    {
+      "id": "18197",
+      "brand": "Miller et Bertaux",
+      "name": "Oh, ooOoh ...oh",
+      "concentration": "Eau de Parfum",
+      "audience": "",
+      "collection_name": "",
+      "release_year": "",
+      "is_published": "0",
+      "verification_status": "review",
+      "variant_count": "2",
+      "supplier_link_count": "0"
+    },
+    {
+      "id": "5263",
+      "brand": "Parfums de Marly",
+      "name": "Delina, Delina Exclusif, Delina La Rosee",
+      "concentration": "Eau de Parfum",
+      "audience": "",
+      "collection_name": "",
+      "release_year": "",
+      "is_published": "0",
+      "verification_status": "review",
+      "variant_count": "1",
+      "supplier_link_count": "0"
+    },
+    {
+      "id": "5366",
+      "brand": "Parfums de Marly",
+      "name": "Delina, Delina La Rosee, Delina Exclusif",
+      "concentration": "Eau de Parfum",
+      "audience": "",
+      "collection_name": "",
+      "release_year": "",
+      "is_published": "0",
+      "verification_status": "review",
+      "variant_count": "1",
+      "supplier_link_count": "0"
+    },
+    {
+      "id": "5361",
+      "brand": "Parfums de Marly",
+      "name": "Perseus, Percival, Greenley",
+      "concentration": "Eau de Parfum",
+      "audience": "",
+      "collection_name": "",
+      "release_year": "",
+      "is_published": "0",
+      "verification_status": "review",
+      "variant_count": "1",
+      "supplier_link_count": "0"
+    },
+    {
+      "id": "7070",
+      "brand": "Rosendo Mateu",
+      "name": "Nº 1 Bergamot, Tea Leaf, Sandalwood",
+      "concentration": "Eau de Parfum",
+      "audience": "",
+      "collection_name": "",
+      "release_year": "",
+      "is_published": "0",
+      "verification_status": "review",
+      "variant_count": "4",
+      "supplier_link_count": "0"
+    },
+    {
+      "id": "8071",
+      "brand": "Rosendo Mateu",
+      "name": "Nº 2 Citrus, Wood, Suede Leather",
+      "concentration": "Eau de Parfum",
+      "audience": "",
+      "collection_name": "",
+      "release_year": "",
+      "is_published": "0",
+      "verification_status": "review",
+      "variant_count": "3",
+      "supplier_link_count": "0"
+    },
+    {
+      "id": "8070",
+      "brand": "Rosendo Mateu",
+      "name": "Nº 3 Neroli, Iris, White Musk",
+      "concentration": "Eau de Parfum",
+      "audience": "",
+      "collection_name": "",
+      "release_year": "",
+      "is_published": "0",
+      "verification_status": "review",
+      "variant_count": "3",
+      "supplier_link_count": "0"
+    },
+    {
+      "id": "18272",
+      "brand": "Rosendo Mateu",
+      "name": "Nº 4 Saffron, Oud, Vanilla",
+      "concentration": "Eau de Parfum",
+      "audience": "",
+      "collection_name": "",
+      "release_year": "",
+      "is_published": "0",
+      "verification_status": "review",
+      "variant_count": "2",
+      "supplier_link_count": "0"
+    },
+    {
+      "id": "7069",
+      "brand": "Rosendo Mateu",
+      "name": "Nº 5 Floral, Amber, Sensual Musk",
+      "concentration": "Eau de Parfum",
+      "audience": "",
+      "collection_name": "",
+      "release_year": "",
+      "is_published": "0",
+      "verification_status": "review",
+      "variant_count": "3",
+      "supplier_link_count": "0"
+    },
+    {
+      "id": "7068",
+      "brand": "Rosendo Mateu",
+      "name": "Nº 6 Jasmin, Sandalwood, Oriental Musk",
+      "concentration": "Eau de Parfum",
+      "audience": "",
+      "collection_name": "",
+      "release_year": "",
+      "is_published": "0",
+      "verification_status": "review",
+      "variant_count": "4",
+      "supplier_link_count": "0"
+    },
+    {
+      "id": "7067",
+      "brand": "Rosendo Mateu",
+      "name": "Nº 7 Patchouli, Oud, Vanilla",
+      "concentration": "Eau de Parfum",
+      "audience": "",
+      "collection_name": "",
+      "release_year": "",
+      "is_published": "0",
+      "verification_status": "review",
+      "variant_count": "4",
+      "supplier_link_count": "0"
+    },
+    {
+      "id": "7066",
+      "brand": "Rosendo Mateu",
+      "name": "Nº 8 Fruity, Amber, Exotic Musk",
+      "concentration": "Eau de Parfum",
+      "audience": "",
+      "collection_name": "",
+      "release_year": "",
+      "is_published": "0",
+      "verification_status": "review",
+      "variant_count": "3",
+      "supplier_link_count": "0"
+    },
+    {
+      "id": "4555",
+      "brand": "The Different Company",
+      "name": "Santo Incienso, Sillage Sacre",
+      "concentration": "Extrait de Parfum",
+      "audience": "",
+      "collection_name": "",
+      "release_year": "",
+      "is_published": "0",
+      "verification_status": "review",
+      "variant_count": "4",
+      "supplier_link_count": "0"
+    },
+    {
+      "id": "11020",
+      "brand": "Zielinski & Rozen",
+      "name": "Bergamot & Neroli, Orange",
+      "concentration": "Extrait de Parfum",
+      "audience": "",
+      "collection_name": "",
+      "release_year": "",
+      "is_published": "0",
+      "verification_status": "review",
+      "variant_count": "1",
+      "supplier_link_count": "0"
+    },
+    {
+      "id": "11011",
+      "brand": "Zielinski & Rozen",
+      "name": "Black Pepper & Amber, Neroli",
+      "concentration": "Extrait de Parfum",
+      "audience": "",
+      "collection_name": "",
+      "release_year": "",
+      "is_published": "0",
+      "verification_status": "review",
+      "variant_count": "4",
+      "supplier_link_count": "0"
+    },
+    {
+      "id": "10996",
+      "brand": "Zielinski & Rozen",
+      "name": "Caramel, Musk, Vanilla",
+      "concentration": "Extrait de Parfum",
+      "audience": "",
+      "collection_name": "",
+      "release_year": "",
+      "is_published": "0",
+      "verification_status": "review",
+      "variant_count": "1",
+      "supplier_link_count": "0"
+    },
+    {
+      "id": "10993",
+      "brand": "Zielinski & Rozen",
+      "name": "Cedarwood & Sandalwood & Amber, Patchouli",
+      "concentration": "Extrait de Parfum",
+      "audience": "",
+      "collection_name": "",
+      "release_year": "",
+      "is_published": "0",
+      "verification_status": "review",
+      "variant_count": "1",
+      "supplier_link_count": "0"
+    },
+    {
+      "id": "10897",
+      "brand": "Zielinski & Rozen",
+      "name": "Grapefruit, Basil, Petitgrain",
+      "concentration": "Extrait de Parfum",
+      "audience": "",
+      "collection_name": "",
+      "release_year": "",
+      "is_published": "0",
+      "verification_status": "review",
+      "variant_count": "1",
+      "supplier_link_count": "0"
+    },
+    {
+      "id": "10840",
+      "brand": "Zielinski & Rozen",
+      "name": "Lavender, Vanilla, Amber, Musk",
+      "concentration": "Extrait de Parfum",
+      "audience": "",
+      "collection_name": "",
+      "release_year": "",
+      "is_published": "0",
+      "verification_status": "review",
+      "variant_count": "1",
+      "supplier_link_count": "0"
+    },
+    {
+      "id": "10832",
+      "brand": "Zielinski & Rozen",
+      "name": "Leather, Black Pepper, Tobacco",
+      "concentration": "Extrait de Parfum",
+      "audience": "",
+      "collection_name": "",
+      "release_year": "",
+      "is_published": "0",
+      "verification_status": "review",
+      "variant_count": "1",
+      "supplier_link_count": "0"
+    },
+    {
+      "id": "10831",
+      "brand": "Zielinski & Rozen",
+      "name": "Leather, Sandalwood, Amber",
+      "concentration": "Extrait de Parfum",
+      "audience": "",
+      "collection_name": "",
+      "release_year": "",
+      "is_published": "0",
+      "verification_status": "review",
+      "variant_count": "1",
+      "supplier_link_count": "0"
+    },
+    {
+      "id": "10830",
+      "brand": "Zielinski & Rozen",
+      "name": "Lemongrass & Vetiver, Amber",
+      "concentration": "Extrait de Parfum",
+      "audience": "",
+      "collection_name": "",
+      "release_year": "",
+      "is_published": "0",
+      "verification_status": "review",
+      "variant_count": "1",
+      "supplier_link_count": "0"
+    },
+    {
+      "id": "10785",
+      "brand": "Zielinski & Rozen",
+      "name": "Neroli & Grapefruit, Vetiver",
+      "concentration": "Extrait de Parfum",
+      "audience": "",
+      "collection_name": "",
+      "release_year": "",
+      "is_published": "0",
+      "verification_status": "review",
+      "variant_count": "1",
+      "supplier_link_count": "0"
+    },
+    {
+      "id": "10771",
+      "brand": "Zielinski & Rozen",
+      "name": "Orange & Jasmine, Vanilla",
+      "concentration": "Extrait de Parfum",
+      "audience": "",
+      "collection_name": "",
+      "release_year": "",
+      "is_published": "0",
+      "verification_status": "review",
+      "variant_count": "1",
+      "supplier_link_count": "0"
+    },
+    {
+      "id": "10770",
+      "brand": "Zielinski & Rozen",
+      "name": "Orchid & Vanilla, Amber",
+      "concentration": "Extrait de Parfum",
+      "audience": "",
+      "collection_name": "",
+      "release_year": "",
+      "is_published": "0",
+      "verification_status": "review",
+      "variant_count": "1",
+      "supplier_link_count": "0"
+    },
+    {
+      "id": "10750",
+      "brand": "Zielinski & Rozen",
+      "name": "Patchouli & Jasmine, Lemon",
+      "concentration": "Extrait de Parfum",
+      "audience": "",
+      "collection_name": "",
+      "release_year": "",
+      "is_published": "0",
+      "verification_status": "review",
+      "variant_count": "1",
+      "supplier_link_count": "0"
+    },
+    {
+      "id": "10711",
+      "brand": "Zielinski & Rozen",
+      "name": "Rosemary & Lemon, Neroli",
+      "concentration": "Extrait de Parfum",
+      "audience": "",
+      "collection_name": "",
+      "release_year": "",
+      "is_published": "0",
+      "verification_status": "review",
+      "variant_count": "1",
+      "supplier_link_count": "0"
+    },
+    {
+      "id": "10710",
+      "brand": "Zielinski & Rozen",
+      "name": "Rosewood & Sandalwood, Сedarwood",
+      "concentration": "Extrait de Parfum",
+      "audience": "",
+      "collection_name": "",
+      "release_year": "",
+      "is_published": "0",
+      "verification_status": "review",
+      "variant_count": "1",
+      "supplier_link_count": "0"
+    },
+    {
+      "id": "10702",
+      "brand": "Zielinski & Rozen",
+      "name": "Sandalwood & Cedarwood, Vetiver, Amber",
+      "concentration": "Extrait de Parfum",
+      "audience": "",
+      "collection_name": "",
+      "release_year": "",
+      "is_published": "0",
+      "verification_status": "review",
+      "variant_count": "1",
+      "supplier_link_count": "0"
+    },
+    {
+      "id": "10644",
+      "brand": "Zielinski & Rozen",
+      "name": "Tobacco, Amber, Patchouli",
+      "concentration": "Extrait de Parfum",
+      "audience": "",
+      "collection_name": "",
+      "release_year": "",
+      "is_published": "0",
+      "verification_status": "review",
+      "variant_count": "1",
+      "supplier_link_count": "0"
+    },
+    {
+      "id": "10643",
+      "brand": "Zielinski & Rozen",
+      "name": "Tobacco, Vetiver & Amber",
+      "concentration": "Extrait de Parfum",
+      "audience": "",
+      "collection_name": "",
+      "release_year": "",
+      "is_published": "0",
+      "verification_status": "review",
+      "variant_count": "1",
+      "supplier_link_count": "0"
+    },
+    {
+      "id": "10615",
+      "brand": "Zielinski & Rozen",
+      "name": "Vetiver & Lemon, Bergamot",
+      "concentration": "Extrait de Parfum",
+      "audience": "",
+      "collection_name": "",
+      "release_year": "",
+      "is_published": "0",
+      "verification_status": "review",
+      "variant_count": "1",
+      "supplier_link_count": "0"
+    },
+    {
+      "id": "10613",
+      "brand": "Zielinski & Rozen",
+      "name": "Vetiver, Neroli, Orange",
+      "concentration": "Extrait de Parfum",
+      "audience": "",
+      "collection_name": "",
+      "release_year": "",
+      "is_published": "0",
+      "verification_status": "review",
+      "variant_count": "1",
+      "supplier_link_count": "0"
+    },
+    {
+      "id": "10598",
+      "brand": "Zielinski & Rozen",
+      "name": "Ylang Ylang, Jasmine, Neroli",
+      "concentration": "Extrait de Parfum",
+      "audience": "",
+      "collection_name": "",
+      "release_year": "",
+      "is_published": "0",
+      "verification_status": "review",
+      "variant_count": "1",
+      "supplier_link_count": "0"
+    }
+  ],
+  "contain_examples": [
+    {
+      "brand": "4711",
+      "concentration": "Eau de Cologne",
+      "id1": "5239",
+      "name1": "Acqua Colonia Intense Pure Breeze Of Himalaya",
+      "variants1": "2",
+      "id2": "14851",
+      "name2": "Acqua Colonia Pure Breeze Of Himalaya",
+      "variants2": "1",
+      "ratio": 0.902,
+      "delta": [
+        "intense"
+      ]
+    },
+    {
+      "brand": "Abercrombie & Fitch",
+      "concentration": "Eau de Parfum",
+      "id1": "14610",
+      "name1": "Authentic Self Woman",
+      "variants1": "3",
+      "id2": "13751",
+      "name2": "Authentic Woman",
+      "variants2": "3",
+      "ratio": 0.857,
+      "delta": [
+        "self"
+      ]
+    },
+    {
+      "brand": "Abercrombie & Fitch",
+      "concentration": "Eau de Parfum",
+      "id1": "13330",
+      "name1": "First Instinct Blue for Her",
+      "variants1": "4",
+      "id2": "13329",
+      "name2": "First Instinct for Her",
+      "variants2": "3",
+      "ratio": 0.898,
+      "delta": [
+        "blue"
+      ]
+    },
+    {
+      "brand": "Abercrombie & Fitch",
+      "concentration": "Eau de Toilette",
+      "id1": "11761",
+      "name1": "First Instinct Blue for Him",
+      "variants1": "4",
+      "id2": "16666",
+      "name2": "First Instinct For Him",
+      "variants2": "1",
+      "ratio": 0.898,
+      "delta": [
+        "blue"
+      ]
+    },
+    {
+      "brand": "Adidas",
+      "concentration": "Eau de Toilette",
+      "id1": "11148",
+      "name1": "UEFA Champions League",
+      "variants1": "1",
+      "id2": "16010",
+      "name2": "UEFA Champions League Edition",
+      "variants2": "1",
+      "ratio": 0.84,
+      "delta": [
+        "edition"
+      ]
+    },
+    {
+      "brand": "Aerin Lauder",
+      "concentration": "Eau de Parfum",
+      "id1": "13361",
+      "name1": "Evening Rose",
+      "variants1": "4",
+      "id2": "19297",
+      "name2": "Evening Rose D'Or",
+      "variants2": "2",
+      "ratio": 0.857,
+      "delta": [
+        "dor"
+      ]
+    },
+    {
+      "brand": "Aerin Lauder",
+      "concentration": "Eau de Parfum",
+      "id1": "17432",
+      "name1": "Tangier Vanille",
+      "variants1": "1",
+      "id2": "17431",
+      "name2": "Tangier Vanille D'Or",
+      "variants2": "2",
+      "ratio": 0.882,
+      "delta": [
+        "dor"
+      ]
+    },
+    {
+      "brand": "Afnan",
+      "concentration": "Eau de Parfum",
+      "id1": "17327",
+      "name1": "Tribute Blue (Clutch)",
+      "variants1": "2",
+      "id2": "17326",
+      "name2": "Tribute Blue (No Clutch)",
+      "variants2": "1",
+      "ratio": 0.927,
+      "delta": [
+        "no"
+      ]
+    },
+    {
+      "brand": "Ajmal",
+      "concentration": "Eau de Parfum",
+      "id1": "6206",
+      "name1": "Evoke Midnight Edition for Him",
+      "variants1": "3",
+      "id2": "8579",
+      "name2": "Evoke Midnight for Him",
+      "variants2": "1",
+      "ratio": 0.846,
+      "delta": [
+        "edition"
+      ]
+    },
+    {
+      "brand": "Alexandre J.",
+      "concentration": "Eau de Parfum",
+      "id1": "5370",
+      "name1": "The Majestic",
+      "variants1": "1",
+      "id2": "17378",
+      "name2": "The Majestic Oud",
+      "variants2": "2",
+      "ratio": 0.857,
+      "delta": [
+        "oud"
+      ]
+    },
+    {
+      "brand": "Alfred Dunhill",
+      "concentration": "Eau de Parfum",
+      "id1": "18985",
+      "name1": "Icon Racing",
+      "variants1": "1",
+      "id2": "18983",
+      "name2": "Icon Racing Red",
+      "variants2": "2",
+      "ratio": 0.846,
+      "delta": [
+        "red"
+      ]
+    },
+    {
+      "brand": "Al Haramain",
+      "concentration": "Eau de Parfum",
+      "id1": "4550",
+      "name1": "Amber Oud Gold Edition",
+      "variants1": "6",
+      "id2": "4549",
+      "name2": "Amber Oud Gold Edition Extreme",
+      "variants2": "7",
+      "ratio": 0.846,
+      "delta": [
+        "extreme"
+      ]
+    },
+    {
+      "brand": "Antonio Banderas",
+      "concentration": "Eau de Toilette",
+      "id1": "12001",
+      "name1": "Black Seduction for Men",
+      "variants1": "3",
+      "id2": "16242",
+      "name2": "Play In Black Seduction for Men",
+      "variants2": "1",
+      "ratio": 0.852,
+      "delta": [
+        "in",
+        "play"
+      ]
+    },
+    {
+      "brand": "Antonio Banderas",
+      "concentration": "Eau de Toilette",
+      "id1": "11991",
+      "name1": "Blue Seduction for Men",
+      "variants1": "6",
+      "id2": "16241",
+      "name2": "Play In Blue Seduction for Men",
+      "variants2": "1",
+      "ratio": 0.846,
+      "delta": [
+        "in",
+        "play"
+      ]
+    },
+    {
+      "brand": "Arabian Oud",
+      "concentration": "Eau de Parfum",
+      "id1": "20028",
+      "name1": "Arabian Leather",
+      "variants1": "1",
+      "id2": "20027",
+      "name2": "Arabian Leather Musk",
+      "variants2": "1",
+      "ratio": 0.857,
+      "delta": [
+        "musk"
+      ]
+    },
+    {
+      "brand": "Armaf",
+      "concentration": "Eau de Parfum",
+      "id1": "15419",
+      "name1": "Club de Nuit Imperiale",
+      "variants1": "1",
+      "id2": "14818",
+      "name2": "Club de Nuit White Imperiale",
+      "variants2": "4",
+      "ratio": 0.88,
+      "delta": [
+        "white"
+      ]
+    },
+    {
+      "brand": "Armaf",
+      "concentration": "Eau de Parfum",
+      "id1": "15411",
+      "name1": "Club de Nuit Urban Elixir Men",
+      "variants1": "1",
+      "id2": "15410",
+      "name2": "Club de Nuit Urban Men",
+      "variants2": "2",
+      "ratio": 0.863,
+      "delta": [
+        "elixir"
+      ]
+    },
+    {
+      "brand": "Armaf",
+      "concentration": "Eau de Parfum",
+      "id1": "18716",
+      "name1": "Le Parfait Azure Pour Femme",
+      "variants1": "2",
+      "id2": "18714",
+      "name2": "Le Parfait Pour Femme",
+      "variants2": "1",
+      "ratio": 0.875,
+      "delta": [
+        "azure"
+      ]
+    },
+    {
+      "brand": "Armani",
+      "concentration": "Eau de Toilette",
+      "id1": "9477",
+      "name1": "Code Ice Pour Homme",
+      "variants1": "3",
+      "id2": "9475",
+      "name2": "Code Pour Homme",
+      "variants2": "4",
+      "ratio": 0.882,
+      "delta": [
+        "ice"
+      ]
+    },
+    {
+      "brand": "Armani",
+      "concentration": "Eau de Toilette",
+      "id1": "11890",
+      "name1": "Cypres Pantelleria",
+      "variants1": "1",
+      "id2": "11320",
+      "name2": "Prive Cypres Pantelleria",
+      "variants2": "3",
+      "ratio": 0.857,
+      "delta": [
+        "prive"
+      ]
+    },
+    {
+      "brand": "Armani",
+      "concentration": "Eau de Toilette",
+      "id1": "11803",
+      "name1": "Emporio Stronger With You",
+      "variants1": "3",
+      "id2": "11802",
+      "name2": "Emporio Stronger With You Only",
+      "variants2": "4",
+      "ratio": 0.909,
+      "delta": [
+        "only"
+      ]
+    },
+    {
+      "brand": "Armani",
+      "concentration": "Eau de Toilette",
+      "id1": "11802",
+      "name1": "Emporio Stronger With You Only",
+      "variants1": "4",
+      "id2": "14928",
+      "name2": "Stronger With You Only",
+      "variants2": "3",
+      "ratio": 0.846,
+      "delta": [
+        "emporio"
+      ]
+    },
+    {
+      "brand": "Armani",
+      "concentration": "Eau de Toilette",
+      "id1": "16616",
+      "name1": "Gardenia Antigua",
+      "variants1": "2",
+      "id2": "6641",
+      "name2": "Prive Gardenia Antigua",
+      "variants2": "3",
+      "ratio": 0.842,
+      "delta": [
+        "prive"
+      ]
+    },
+    {
+      "brand": "Armani",
+      "concentration": "Eau de Toilette",
+      "id1": "6648",
+      "name1": "Orangerie Venise",
+      "variants1": "4",
+      "id2": "11318",
+      "name2": "Prive Orangerie Venise",
+      "variants2": "2",
+      "ratio": 0.842,
+      "delta": [
+        "prive"
+      ]
+    },
+    {
+      "brand": "Armani",
+      "concentration": "Eau de Toilette",
+      "id1": "15038",
+      "name1": "Stronger With You",
+      "variants1": "3",
+      "id2": "14928",
+      "name2": "Stronger With You Only",
+      "variants2": "3",
+      "ratio": 0.872,
+      "delta": [
+        "only"
+      ]
+    },
+    {
+      "brand": "Armani",
+      "concentration": "Eau de Parfum",
+      "id1": "10192",
+      "name1": "Acqua di Gio Essenza Pour Homme",
+      "variants1": "2",
+      "id2": "7825",
+      "name2": "Acqua Di Gio Pour Homme",
+      "variants2": "8",
+      "ratio": 0.852,
+      "delta": [
+        "essenza"
+      ]
+    },
+    {
+      "brand": "Armani",
+      "concentration": "Eau de Parfum",
+      "id1": "14630",
+      "name1": "Acqua Di Gioia Jasmine",
+      "variants1": "1",
+      "id2": "20193",
+      "name2": "Acqua Di Gioia Jasmine Edition",
+      "variants2": "1",
+      "ratio": 0.846,
+      "delta": [
+        "edition"
+      ]
+    },
+    {
+      "brand": "Armani",
+      "concentration": "Eau de Parfum",
+      "id1": "7893",
+      "name1": "Acqua di Gio Profondo",
+      "variants1": "8",
+      "id2": "7570",
+      "name2": "Acqua Di Gio Profondo Lights",
+      "variants2": "3",
+      "ratio": 0.857,
+      "delta": [
+        "lights"
+      ]
+    },
+    {
+      "brand": "Armani",
+      "concentration": "Eau de Parfum",
+      "id1": "20111",
+      "name1": "Ambre Eccentrico",
+      "variants1": "1",
+      "id2": "17931",
+      "name2": "Prive Ambre Eccentrico",
+      "variants2": "2",
+      "ratio": 0.842,
+      "delta": [
+        "prive"
+      ]
+    },
+    {
+      "brand": "Armani",
+      "concentration": "Eau de Parfum",
+      "id1": "19558",
+      "name1": "Cypres Pantelleria",
+      "variants1": "2",
+      "id2": "17926",
+      "name2": "Prive Cypres Pantelleria",
+      "variants2": "1",
+      "ratio": 0.857,
+      "delta": [
+        "prive"
+      ]
+    },
+    {
+      "brand": "Armani",
+      "concentration": "Eau de Parfum",
+      "id1": "19373",
+      "name1": "Emporio In Love With You",
+      "variants1": "2",
+      "id2": "13392",
+      "name2": "Emporio In Love With You Freeze",
+      "variants2": "2",
+      "ratio": 0.873,
+      "delta": [
+        "freeze"
+      ]
+    },
+    {
+      "brand": "Armani",
+      "concentration": "Eau de Parfum",
+      "id1": "13392",
+      "name1": "Emporio In Love With You Freeze",
+      "variants1": "2",
+      "id2": "7933",
+      "name2": "In Love With You Freeze",
+      "variants2": "1",
+      "ratio": 0.852,
+      "delta": [
+        "emporio"
+      ]
+    },
+    {
+      "brand": "Armani",
+      "concentration": "Eau de Parfum",
+      "id1": "13389",
+      "name1": "Emporio Stronger With You Absolutely",
+      "variants1": "2",
+      "id2": "12385",
+      "name2": "Stronger With You Absolutely",
+      "variants2": "4",
+      "ratio": 0.875,
+      "delta": [
+        "emporio"
+      ]
+    },
+    {
+      "brand": "Armani",
+      "concentration": "Eau de Parfum",
+      "id1": "13388",
+      "name1": "Emporio Stronger With You Amber",
+      "variants1": "3",
+      "id2": "17497",
+      "name2": "Stronger With You Amber",
+      "variants2": "2",
+      "ratio": 0.852,
+      "delta": [
+        "emporio"
+      ]
+    },
+    {
+      "brand": "Armani",
+      "concentration": "Eau de Parfum",
+      "id1": "18950",
+      "name1": "Indigo Tanzanite",
+      "variants1": "2",
+      "id2": "17922",
+      "name2": "Prive Indigo Tanzanite",
+      "variants2": "2",
+      "ratio": 0.842,
+      "delta": [
+        "prive"
+      ]
+    },
+    {
+      "brand": "Armani",
+      "concentration": "Eau de Parfum",
+      "id1": "18550",
+      "name1": "Magenta Tanzanite",
+      "variants1": "1",
+      "id2": "17920",
+      "name2": "Prive Magenta Tanzanite",
+      "variants2": "2",
+      "ratio": 0.85,
+      "delta": [
+        "prive"
+      ]
+    },
+    {
+      "brand": "Armani",
+      "concentration": "Extrait de Parfum",
+      "id1": "11058",
+      "name1": "Acqua Di Gio Elixir Pour Homme",
+      "variants1": "1",
+      "id2": "7785",
+      "name2": "Acqua Di Gio Pour Homme",
+      "variants2": "6",
+      "ratio": 0.868,
+      "delta": [
+        "elixir"
+      ]
+    },
+    {
+      "brand": "Atelier Cologne",
+      "concentration": "Eau de Cologne",
+      "id1": "5225",
+      "name1": "Clementine California",
+      "variants1": "8",
+      "id2": "20361",
+      "name2": "Clementine California Absolue",
+      "variants2": "1",
+      "ratio": 0.84,
+      "delta": [
+        "absolue"
+      ]
+    },
+    {
+      "brand": "Atkinsons",
+      "concentration": "Eau de Cologne",
+      "id1": "20379",
+      "name1": "24 Old Bond Street Triple",
+      "variants1": "1",
+      "id2": "7619",
+      "name2": "24 Old Bond Street Triple Extract",
+      "variants2": "3",
+      "ratio": 0.862,
+      "delta": [
+        "extract"
+      ]
+    },
+    {
+      "brand": "BDK",
+      "concentration": "Eau de Parfum",
+      "id1": "5213",
+      "name1": "312 Saint-Honore",
+      "variants1": "3",
+      "id2": "7550",
+      "name2": "Ambre 312 Saint-Honore",
+      "variants2": "1",
+      "ratio": 0.842,
+      "delta": [
+        "ambre"
+      ]
+    },
+    {
+      "brand": "Burberry",
+      "concentration": "Eau de Toilette",
+      "id1": "9198",
+      "name1": "Sport for Her",
+      "variants1": "2",
+      "id2": "9196",
+      "name2": "Sport Ice for Her",
+      "variants2": "2",
+      "ratio": 0.867,
+      "delta": [
+        "ice"
+      ]
+    },
+    {
+      "brand": "Bvlgari",
+      "concentration": "Eau de Parfum",
+      "id1": "13109",
+      "name1": "Jasmin Noir",
+      "variants1": "3",
+      "id2": "8077",
+      "name2": "Mon Jasmin Noir",
+      "variants2": "4",
+      "ratio": 0.846,
+      "delta": [
+        "mon"
+      ]
+    },
+    {
+      "brand": "Bvlgari",
+      "concentration": "Eau de Parfum",
+      "id1": "13108",
+      "name1": "Jasmin Noir L'Elixir",
+      "variants1": "2",
+      "id2": "12870",
+      "name2": "Mon Jasmin Noir L'Elixir",
+      "variants2": "1",
+      "ratio": 0.905,
+      "delta": [
+        "mon"
+      ]
+    },
+    {
+      "brand": "Bvlgari",
+      "concentration": "Eau de Parfum",
+      "id1": "12398",
+      "name1": "Splendida Jasmin Noir",
+      "variants1": "5",
+      "id2": "9638",
+      "name2": "Splendida Jasmin Noir Mon",
+      "variants2": "1",
+      "ratio": 0.913,
+      "delta": [
+        "mon"
+      ]
+    },
+    {
+      "brand": "Bvlgari",
+      "concentration": "Eau de Toilette",
+      "id1": "12052",
+      "name1": "Aqva Marine Pour Homme",
+      "variants1": "7",
+      "id2": "12051",
+      "name2": "Aqva Marine Toniq Pour Homme",
+      "variants2": "1",
+      "ratio": 0.88,
+      "delta": [
+        "toniq"
+      ]
+    },
+    {
+      "brand": "Bvlgari",
+      "concentration": "Eau de Toilette",
+      "id1": "12051",
+      "name1": "Aqva Marine Toniq Pour Homme",
+      "variants1": "1",
+      "id2": "12049",
+      "name2": "Aqva Toniq Pour Homme",
+      "variants2": "2",
+      "ratio": 0.857,
+      "delta": [
+        "marine"
+      ]
+    },
+    {
+      "brand": "Calvin Klein",
+      "concentration": "Eau de Parfum",
+      "id1": "13550",
+      "name1": "CK Euphoria",
+      "variants1": "6",
+      "id2": "13363",
+      "name2": "Euphoria",
+      "variants2": "5",
+      "ratio": 0.842,
+      "delta": [
+        "ck"
+      ]
+    },
+    {
+      "brand": "Calvin Klein",
+      "concentration": "Eau de Parfum",
+      "id1": "19648",
+      "name1": "CK Euphoria Pure Gold",
+      "variants1": "1",
+      "id2": "19647",
+      "name2": "CK Euphoria Pure Gold For Man",
+      "variants2": "1",
+      "ratio": 0.84,
+      "delta": [
+        "for",
+        "man"
+      ]
+    },
+    {
+      "brand": "Calvin Klein",
+      "concentration": "Eau de Parfum",
+      "id1": "19646",
+      "name1": "CK Euphoria Spring Temptation",
+      "variants1": "2",
+      "id2": "13362",
+      "name2": "Euphoria Spring Temptation",
+      "variants2": "2",
+      "ratio": 0.945,
+      "delta": [
+        "ck"
+      ]
+    },
+    {
+      "brand": "Calvin Klein",
+      "concentration": "Eau de Parfum",
+      "id1": "19315",
+      "name1": "Eternity Air For Men",
+      "variants1": "1",
+      "id2": "13368",
+      "name2": "Eternity for Men",
+      "variants2": "3",
+      "ratio": 0.889,
+      "delta": [
+        "air"
+      ]
+    },
+    {
+      "brand": "Calvin Klein",
+      "concentration": "Eau de Parfum",
+      "id1": "19312",
+      "name1": "Eternity Flame For Woman",
+      "variants1": "2",
+      "id2": "14543",
+      "name2": "Eternity for Woman",
+      "variants2": "3",
+      "ratio": 0.857,
+      "delta": [
+        "flame"
+      ]
+    },
+    {
+      "brand": "Calvin Klein",
+      "concentration": "Eau de Parfum",
+      "id1": "19310",
+      "name1": "Eternity Summer",
+      "variants1": "1",
+      "id2": "19309",
+      "name2": "Eternity Summer 2014",
+      "variants2": "1",
+      "ratio": 0.857,
+      "delta": [
+        "2014"
+      ]
+    },
+    {
+      "brand": "Calvin Klein",
+      "concentration": "Eau de Parfum",
+      "id1": "19310",
+      "name1": "Eternity Summer",
+      "variants1": "1",
+      "id2": "19308",
+      "name2": "Eternity Summer 2020",
+      "variants2": "1",
+      "ratio": 0.857,
+      "delta": [
+        "2020"
+      ]
+    },
+    {
+      "brand": "Calvin Klein",
+      "concentration": "Eau de Parfum",
+      "id1": "13363",
+      "name1": "Euphoria",
+      "variants1": "5",
+      "id2": "12835",
+      "name2": "My Euphoria",
+      "variants2": "2",
+      "ratio": 0.842,
+      "delta": [
+        "my"
+      ]
+    },
+    {
+      "brand": "Calvin Klein",
+      "concentration": "Eau de Toilette",
+      "id1": "11925",
+      "name1": "CK Euphoria",
+      "variants1": "3",
+      "id2": "11783",
+      "name2": "Euphoria",
+      "variants2": "3",
+      "ratio": 0.842,
+      "delta": [
+        "ck"
+      ]
+    },
+    {
+      "brand": "Calvin Klein",
+      "concentration": "Eau de Toilette",
+      "id1": "16869",
+      "name1": "CK Euphoria Intense",
+      "variants1": "1",
+      "id2": "16688",
+      "name2": "Euphoria Intense",
+      "variants2": "2",
+      "ratio": 0.914,
+      "delta": [
+        "ck"
+      ]
+    },
+    {
+      "brand": "Calvin Klein",
+      "concentration": "Eau de Toilette",
+      "id1": "11924",
+      "name1": "CK Everyone",
+      "variants1": "3",
+      "id2": "14783",
+      "name2": "Everyone",
+      "variants2": "1",
+      "ratio": 0.842,
+      "delta": [
+        "ck"
+      ]
+    },
+    {
+      "brand": "Calvin Klein",
+      "concentration": "Eau de Toilette",
+      "id1": "11921",
+      "name1": "CK IN2U for Him",
+      "variants1": "4",
+      "id2": "16866",
+      "name2": "CK IN2U Pop for Him",
+      "variants2": "1",
+      "ratio": 0.882,
+      "delta": [
+        "pop"
+      ]
+    },
+    {
+      "brand": "Calvin Klein",
+      "concentration": "Eau de Toilette",
+      "id1": "16698",
+      "name1": "Eternity Air For Men",
+      "variants1": "2",
+      "id2": "11784",
+      "name2": "Eternity for Men",
+      "variants2": "3",
+      "ratio": 0.889,
+      "delta": [
+        "air"
+      ]
+    },
+    {
+      "brand": "Calvin Klein",
+      "concentration": "Eau de Toilette",
+      "id1": "14310",
+      "name1": "Eternity Aqua For Men",
+      "variants1": "5",
+      "id2": "11784",
+      "name2": "Eternity for Men",
+      "variants2": "3",
+      "ratio": 0.865,
+      "delta": [
+        "aqua"
+      ]
+    },
+    {
+      "brand": "Calvin Klein",
+      "concentration": "Eau de Toilette",
+      "id1": "11785",
+      "name1": "Eternity Flame For Men",
+      "variants1": "3",
+      "id2": "16697",
+      "name2": "Eternity Flame For Men Cologne",
+      "variants2": "1",
+      "ratio": 0.846,
+      "delta": [
+        "cologne"
+      ]
+    },
+    {
+      "brand": "Calvin Klein",
+      "concentration": "Eau de Toilette",
+      "id1": "11785",
+      "name1": "Eternity Flame For Men",
+      "variants1": "3",
+      "id2": "11784",
+      "name2": "Eternity for Men",
+      "variants2": "3",
+      "ratio": 0.842,
+      "delta": [
+        "flame"
+      ]
+    },
+    {
+      "brand": "Calvin Klein",
+      "concentration": "Eau de Toilette",
+      "id1": "11784",
+      "name1": "Eternity for Men",
+      "variants1": "3",
+      "id2": "16695",
+      "name2": "Eternity Now for Men",
+      "variants2": "1",
+      "ratio": 0.889,
+      "delta": [
+        "now"
+      ]
+    },
+    {
+      "brand": "Calvin Klein",
+      "concentration": "Eau de Toilette",
+      "id1": "9280",
+      "name1": "Obsession for Men",
+      "variants1": "4",
+      "id2": "15147",
+      "name2": "Obsession Night for Men",
+      "variants2": "2",
+      "ratio": 0.85,
+      "delta": [
+        "night"
+      ]
+    },
+    {
+      "brand": "Carolina Herrera",
+      "concentration": "Eau de Toilette",
+      "id1": "17058",
+      "name1": "212 Summer For Men",
+      "variants1": "2",
+      "id2": "17057",
+      "name2": "212 Summer For Men (2013)",
+      "variants2": "1",
+      "ratio": 0.878,
+      "delta": [
+        "2013"
+      ]
+    },
+    {
+      "brand": "Carolina Herrera",
+      "concentration": "Eau de Toilette",
+      "id1": "12132",
+      "name1": "212 VIP for Men",
+      "variants1": "4",
+      "id2": "12131",
+      "name2": "212 VIP Men",
+      "variants2": "1",
+      "ratio": 0.846,
+      "delta": [
+        "for"
+      ]
+    },
+    {
+      "brand": "Carolina Herrera",
+      "concentration": "Eau de Parfum",
+      "id1": "13889",
+      "name1": "212 VIP Black",
+      "variants1": "3",
+      "id2": "20246",
+      "name2": "212 VIP Black Red",
+      "variants2": "1",
+      "ratio": 0.867,
+      "delta": [
+        "red"
+      ]
+    },
+    {
+      "brand": "Carolina Herrera",
+      "concentration": "Eau de Parfum",
+      "id1": "8962",
+      "name1": "Good Girl Blush",
+      "variants1": "4",
+      "id2": "9040",
+      "name2": "Very Good Girl Blush",
+      "variants2": "1",
+      "ratio": 0.857,
+      "delta": [
+        "very"
+      ]
+    },
+    {
+      "brand": "Carolina Herrera",
+      "concentration": "Eau de Parfum",
+      "id1": "14523",
+      "name1": "Good Girl Very",
+      "variants1": "1",
+      "id2": "8955",
+      "name2": "Good Girl Very Glam",
+      "variants2": "1",
+      "ratio": 0.848,
+      "delta": [
+        "glam"
+      ]
+    },
+    {
+      "brand": "Carolina Herrera",
+      "concentration": "Eau de Parfum",
+      "id1": "8832",
+      "name1": "Very Good Girl",
+      "variants1": "5",
+      "id2": "4511",
+      "name2": "Very Good Girl Glam",
+      "variants2": "5",
+      "ratio": 0.848,
+      "delta": [
+        "glam"
+      ]
+    },
+    {
+      "brand": "Caron",
+      "concentration": "Extrait de Parfum",
+      "id1": "10247",
+      "name1": "Fleurs de Rocaille",
+      "variants1": "3",
+      "id2": "8278",
+      "name2": "Fleurs de Rocaille 1993",
+      "variants2": "1",
+      "ratio": 0.878,
+      "delta": [
+        "1993"
+      ]
+    },
+    {
+      "brand": "Caron",
+      "concentration": "Eau de Toilette",
+      "id1": "9247",
+      "name1": "Pour Un Homme de",
+      "variants1": "5",
+      "id2": "15137",
+      "name2": "Pour Un Homme De Sport",
+      "variants2": "1",
+      "ratio": 0.842,
+      "delta": [
+        "sport"
+      ]
+    },
+    {
+      "brand": "Cartier",
+      "concentration": "Eau de Toilette",
+      "id1": "4966",
+      "name1": "Declaration Fraicheur",
+      "variants1": "1",
+      "id2": "11867",
+      "name2": "Declaration Haute Fraicheur",
+      "variants2": "3",
+      "ratio": 0.875,
+      "delta": [
+        "haute"
+      ]
+    },
+    {
+      "brand": "Cartier",
+      "concentration": "Eau de Toilette",
+      "id1": "4953",
+      "name1": "Pasha de Edition Noire",
+      "variants1": "7",
+      "id2": "11380",
+      "name2": "Pasha de Edition Noire Sport",
+      "variants2": "3",
+      "ratio": 0.88,
+      "delta": [
+        "sport"
+      ]
+    },
+    {
+      "brand": "Castelbajac",
+      "concentration": "Eau de Parfum",
+      "id1": "19932",
+      "name1": "Beautiful Day Bonheur",
+      "variants1": "1",
+      "id2": "19931",
+      "name2": "Beautiful Day L'Eau Bonheur",
+      "variants2": "1",
+      "ratio": 0.894,
+      "delta": [
+        "leau"
+      ]
+    },
+    {
+      "brand": "Charriol",
+      "concentration": "Eau de Parfum",
+      "id1": "18013",
+      "name1": "Philippe",
+      "variants1": "1",
+      "id2": "18012",
+      "name2": "Philippe II",
+      "variants2": "1",
+      "ratio": 0.842,
+      "delta": [
+        "ii"
+      ]
+    },
+    {
+      "brand": "Charriol",
+      "concentration": "Eau de Parfum",
+      "id1": "18011",
+      "name1": "Philippe II Pour Homme",
+      "variants1": "2",
+      "id2": "18010",
+      "name2": "Philippe Pour Homme",
+      "variants2": "2",
+      "ratio": 0.927,
+      "delta": [
+        "ii"
+      ]
+    },
+    {
+      "brand": "Chloe",
+      "concentration": "Eau de Parfum",
+      "id1": "13783",
+      "name1": "Atelier Des Fleurs",
+      "variants1": "1",
+      "id2": "13781",
+      "name2": "Atelier Des Fleurs Chene",
+      "variants2": "2",
+      "ratio": 0.857,
+      "delta": [
+        "chene"
+      ]
+    },
+    {
+      "brand": "Chloe",
+      "concentration": "Eau de Parfum",
+      "id1": "13783",
+      "name1": "Atelier Des Fleurs",
+      "variants1": "1",
+      "id2": "13776",
+      "name2": "Atelier Des Fleurs Iris",
+      "variants2": "4",
+      "ratio": 0.878,
+      "delta": [
+        "iris"
+      ]
+    },
+    {
+      "brand": "Chloe",
+      "concentration": "Eau de Parfum",
+      "id1": "9798",
+      "name1": "Nomade Jasmin Naturel",
+      "variants1": "1",
+      "id2": "4650",
+      "name2": "Nomade Jasmin Naturel Intense",
+      "variants2": "5",
+      "ratio": 0.84,
+      "delta": [
+        "intense"
+      ]
+    },
+    {
+      "brand": "Davidoff",
+      "concentration": "Eau de Toilette",
+      "id1": "9464",
+      "name1": "Cool Water for Men",
+      "variants1": "5",
+      "id2": "9462",
+      "name2": "Cool Water Wave for Men",
+      "variants2": "3",
+      "ratio": 0.878,
+      "delta": [
+        "wave"
+      ]
+    },
+    {
+      "brand": "Davidoff",
+      "concentration": "Eau de Toilette",
+      "id1": "11903",
+      "name1": "Cool Water for Woman",
+      "variants1": "6",
+      "id2": "11901",
+      "name2": "Cool Water Reborn for Woman",
+      "variants2": "1",
+      "ratio": 0.851,
+      "delta": [
+        "reborn"
+      ]
+    },
+    {
+      "brand": "Diesel",
+      "concentration": "Eau de Toilette",
+      "id1": "9275",
+      "name1": "Only The Brave",
+      "variants1": "4",
+      "id2": "9273",
+      "name2": "Only The Brave High",
+      "variants2": "1",
+      "ratio": 0.848,
+      "delta": [
+        "high"
+      ]
+    },
+    {
+      "brand": "Diesel",
+      "concentration": "Eau de Toilette",
+      "id1": "9275",
+      "name1": "Only The Brave",
+      "variants1": "4",
+      "id2": "9269",
+      "name2": "Only The Brave Wild",
+      "variants2": "1",
+      "ratio": 0.848,
+      "delta": [
+        "wild"
+      ]
+    },
+    {
+      "brand": "Diesel",
+      "concentration": "Eau de Parfum",
+      "id1": "10004",
+      "name1": "Fuel for Life Femme",
+      "variants1": "1",
+      "id2": "13278",
+      "name2": "Fuel For Life Pour Femme",
+      "variants2": "2",
+      "ratio": 0.884,
+      "delta": [
+        "pour"
+      ]
+    },
+    {
+      "brand": "Dior",
+      "concentration": "Eau de Toilette",
+      "id1": "12106",
+      "name1": "Addict 2 Eau Fraiche",
+      "variants1": "3",
+      "id2": "12102",
+      "name2": "Addict Eau Fraiche",
+      "variants2": "4",
+      "ratio": 0.947,
+      "delta": [
+        "2"
+      ]
+    },
+    {
+      "brand": "Dior",
+      "concentration": "Eau de Toilette",
+      "id1": "12102",
+      "name1": "Addict Eau Fraiche",
+      "variants1": "4",
+      "id2": "17031",
+      "name2": "Addict Eau Fraiche 2014",
+      "variants2": "1",
+      "ratio": 0.878,
+      "delta": [
+        "2014"
+      ]
+    },
+    {
+      "brand": "Dior",
+      "concentration": "Eau de Toilette",
+      "id1": "7647",
+      "name1": "Miss Rose N'Roses",
+      "variants1": "5",
+      "id2": "7745",
+      "name2": "Miss Rose N'Roses Pearl",
+      "variants2": "1",
+      "ratio": 0.842,
+      "delta": [
+        "pearl"
+      ]
+    },
+    {
+      "brand": "Dolce & Gabbana",
+      "concentration": "Eau de Toilette",
+      "id1": "12129",
+      "name1": "3 L'Imperatrice",
+      "variants1": "3",
+      "id2": "4955",
+      "name2": "L'Imperatrice",
+      "variants2": "7",
+      "ratio": 0.923,
+      "delta": [
+        "3"
+      ]
+    },
+    {
+      "brand": "Dolce & Gabbana",
+      "concentration": "Eau de Toilette",
+      "id1": "12128",
+      "name1": "3 L'Imperatrice Limited Edition",
+      "variants1": "1",
+      "id2": "11508",
+      "name2": "L'Imperatrice Limited Edition",
+      "variants2": "3",
+      "ratio": 0.966,
+      "delta": [
+        "3"
+      ]
+    },
+    {
+      "brand": "Dolce & Gabbana",
+      "concentration": "Eau de Toilette",
+      "id1": "4956",
+      "name1": "Light Blue Pour Homme",
+      "variants1": "13",
+      "id2": "15161",
+      "name2": "Light Blue Sun Pour Homme",
+      "variants2": "1",
+      "ratio": 0.913,
+      "delta": [
+        "sun"
+      ]
+    },
+    {
+      "brand": "Dolce & Gabbana",
+      "concentration": "Eau de Parfum",
+      "id1": "12320",
+      "name1": "The One for Men",
+      "variants1": "4",
+      "id2": "12319",
+      "name2": "The One for Men Gold",
+      "variants2": "1",
+      "ratio": 0.857,
+      "delta": [
+        "gold"
+      ]
+    },
+    {
+      "brand": "Dolce & Gabbana",
+      "concentration": "Eau de Parfum",
+      "id1": "12320",
+      "name1": "The One for Men",
+      "variants1": "4",
+      "id2": "12318",
+      "name2": "The One Gold for Men",
+      "variants2": "4",
+      "ratio": 0.857,
+      "delta": [
+        "gold"
+      ]
+    },
+    {
+      "brand": "Dolce & Gabbana",
+      "concentration": "Eau de Parfum",
+      "id1": "12317",
+      "name1": "The One Gold Intense for Men",
+      "variants1": "3",
+      "id2": "17371",
+      "name2": "The One Intense for Men",
+      "variants2": "1",
+      "ratio": 0.902,
+      "delta": [
+        "gold"
+      ]
+    },
+    {
+      "brand": "Dolce & Gabbana",
+      "concentration": "Eau de Parfum",
+      "id1": "5869",
+      "name1": "The Only One",
+      "variants1": "7",
+      "id2": "7672",
+      "name2": "The Only One 2",
+      "variants2": "2",
+      "ratio": 0.923,
+      "delta": [
+        "2"
+      ]
+    },
+    {
+      "brand": "Dolce & Gabbana",
+      "concentration": "Eau de Parfum",
+      "id1": "5836",
+      "name1": "Velvet Black Patchouli",
+      "variants1": "6",
+      "id2": "5830",
+      "name2": "Velvet Patchouli",
+      "variants2": "2",
+      "ratio": 0.842,
+      "delta": [
+        "black"
+      ]
+    },
+    {
+      "brand": "Donna Karan",
+      "concentration": "Eau de Parfum",
+      "id1": "13722",
+      "name1": "Be 100% Delicious",
+      "variants1": "4",
+      "id2": "7936",
+      "name2": "Be Delicious",
+      "variants2": "5",
+      "ratio": 0.857,
+      "delta": [
+        "100"
+      ]
+    },
+    {
+      "brand": "Donna Karan",
+      "concentration": "Eau de Parfum",
+      "id1": "13722",
+      "name1": "Be 100% Delicious",
+      "variants1": "4",
+      "id2": "14557",
+      "name2": "DKNY Be 100% Delicious",
+      "variants2": "2",
+      "ratio": 0.865,
+      "delta": [
+        "dkny"
+      ]
+    },
+    {
+      "brand": "Donna Karan",
+      "concentration": "Eau de Parfum",
+      "id1": "13457",
+      "name1": "DKNY Energy for Women",
+      "variants1": "1",
+      "id2": "19354",
+      "name2": "Energy for Women",
+      "variants2": "1",
+      "ratio": 0.865,
+      "delta": [
+        "dkny"
+      ]
+    },
+    {
+      "brand": "Dsquared2",
+      "concentration": "Eau de Toilette",
+      "id1": "12138",
+      "name1": "2 Wood Pour Femme",
+      "variants1": "4",
+      "id2": "7956",
+      "name2": "Wood Pour Femme",
+      "variants2": "5",
+      "ratio": 0.938,
+      "delta": [
+        "2"
+      ]
+    },
+    {
+      "brand": "Dsquared2",
+      "concentration": "Eau de Toilette",
+      "id1": "17062",
+      "name1": "2 Wood Pour Homme",
+      "variants1": "1",
+      "id2": "7955",
+      "name2": "Wood Pour Homme",
+      "variants2": "5",
+      "ratio": 0.938,
+      "delta": [
+        "2"
+      ]
+    },
+    {
+      "brand": "Dsquared2",
+      "concentration": "Eau de Toilette",
+      "id1": "16568",
+      "name1": "He Wood Pour Homme",
+      "variants1": "1",
+      "id2": "7955",
+      "name2": "Wood Pour Homme",
+      "variants2": "5",
+      "ratio": 0.909,
+      "delta": [
+        "he"
+      ]
+    },
+    {
+      "brand": "Elie Saab",
+      "concentration": "Eau de Toilette",
+      "id1": "8347",
+      "name1": "Le Parfum Resort Collection",
+      "variants1": "2",
+      "id2": "8346",
+      "name2": "Le Parfum Resort Collection 2017",
+      "variants2": "1",
+      "ratio": 0.915,
+      "delta": [
+        "2017"
+      ]
+    },
+    {
+      "brand": "Elizabeth Arden",
+      "concentration": "Eau de Parfum",
+      "id1": "10202",
+      "name1": "5th Avenue NYC",
+      "variants1": "1",
+      "id2": "10200",
+      "name2": "5th Avenue Only NYC",
+      "variants2": "1",
+      "ratio": 0.848,
+      "delta": [
+        "only"
+      ]
+    },
+    {
+      "brand": "Escentric Molecules",
+      "concentration": "Eau de Toilette",
+      "id1": "7986",
+      "name1": "M+ Molecule 01 + Black Tea",
+      "variants1": "2",
+      "id2": "6665",
+      "name2": "Molecule 01 + Black Tea",
+      "variants2": "3",
+      "ratio": 0.955,
+      "delta": [
+        "m"
+      ]
+    },
+    {
+      "brand": "Escentric Molecules",
+      "concentration": "Eau de Toilette",
+      "id1": "7985",
+      "name1": "M+ Molecule 01 + Ginger",
+      "variants1": "2",
+      "id2": "6664",
+      "name2": "Molecule 01 + Ginger",
+      "variants2": "3",
+      "ratio": 0.947,
+      "delta": [
+        "m"
+      ]
+    },
+    {
+      "brand": "Escentric Molecules",
+      "concentration": "Eau de Toilette",
+      "id1": "7984",
+      "name1": "M+ Molecule 01 + Guaiac Wood",
+      "variants1": "2",
+      "id2": "6663",
+      "name2": "Molecule 01 + Guaiac Wood",
+      "variants2": "3",
+      "ratio": 0.958,
+      "delta": [
+        "m"
+      ]
+    },
+    {
+      "brand": "Escentric Molecules",
+      "concentration": "Eau de Toilette",
+      "id1": "7983",
+      "name1": "M+ Molecule 01 + Iris",
+      "variants1": "2",
+      "id2": "6662",
+      "name2": "Molecule 01 + Iris",
+      "variants2": "5",
+      "ratio": 0.941,
+      "delta": [
+        "m"
+      ]
+    },
+    {
+      "brand": "Escentric Molecules",
+      "concentration": "Eau de Toilette",
+      "id1": "7982",
+      "name1": "M+ Molecule 01 + Patchouli",
+      "variants1": "1",
+      "id2": "6661",
+      "name2": "Molecule 01 + Patchouli",
+      "variants2": "5",
+      "ratio": 0.955,
+      "delta": [
+        "m"
+      ]
+    },
+    {
+      "brand": "Escentric Molecules",
+      "concentration": "Eau de Toilette",
+      "id1": "6662",
+      "name1": "Molecule 01 + Iris",
+      "variants1": "5",
+      "id2": "6660",
+      "name2": "Molecule 01 M + Iris",
+      "variants2": "1",
+      "ratio": 0.941,
+      "delta": [
+        "m"
+      ]
+    },
+    {
+      "brand": "Escentric Molecules",
+      "concentration": "Eau de Toilette",
+      "id1": "6659",
+      "name1": "Molecule 01 M + Patchouli",
+      "variants1": "1",
+      "id2": "6661",
+      "name2": "Molecule 01 + Patchouli",
+      "variants2": "5",
+      "ratio": 0.955,
+      "delta": [
+        "m"
+      ]
+    },
+    {
+      "brand": "Estee Lauder",
+      "concentration": "Eau de Parfum",
+      "id1": "13711",
+      "name1": "Beautiful Belle",
+      "variants1": "5",
+      "id2": "13710",
+      "name2": "Beautiful Belle Love",
+      "variants2": "3",
+      "ratio": 0.857,
+      "delta": [
+        "love"
+      ]
+    },
+    {
+      "brand": "Estee Lauder",
+      "concentration": "Eau de Parfum",
+      "id1": "13691",
+      "name1": "Beyond Paradise",
+      "variants1": "4",
+      "id2": "13690",
+      "name2": "Beyond Paradise Blue",
+      "variants2": "3",
+      "ratio": 0.857,
+      "delta": [
+        "blue"
+      ]
+    },
+    {
+      "brand": "Estee Lauder",
+      "concentration": "Eau de Parfum",
+      "id1": "13620",
+      "name1": "Bronze Goddess",
+      "variants1": "4",
+      "id2": "13619",
+      "name2": "Bronze Goddess 2019",
+      "variants2": "2",
+      "ratio": 0.848,
+      "delta": [
+        "2019"
+      ]
+    },
+    {
+      "brand": "Estee Lauder",
+      "concentration": "Eau de Parfum",
+      "id1": "13620",
+      "name1": "Bronze Goddess",
+      "variants1": "4",
+      "id2": "13617",
+      "name2": "Bronze Goddess Nuit",
+      "variants2": "2",
+      "ratio": 0.848,
+      "delta": [
+        "nuit"
+      ]
+    },
+    {
+      "brand": "Estee Lauder",
+      "concentration": "Eau de Parfum",
+      "id1": "12878",
+      "name1": "Modern Muse Le Rouge",
+      "variants1": "4",
+      "id2": "12877",
+      "name2": "Modern Muse Le Rouge Gloss",
+      "variants2": "1",
+      "ratio": 0.87,
+      "delta": [
+        "gloss"
+      ]
+    },
+    {
+      "brand": "Estee Lauder",
+      "concentration": "Eau de Parfum",
+      "id1": "12604",
+      "name1": "Pure White Linen Light Breeze",
+      "variants1": "4",
+      "id2": "12183",
+      "name2": "White Linen Light Breeze",
+      "variants2": "2",
+      "ratio": 0.906,
+      "delta": [
+        "pure"
+      ]
+    },
+    {
+      "brand": "Estee Lauder",
+      "concentration": "Eau de Toilette",
+      "id1": "12013",
+      "name1": "Beautiful Magnolia",
+      "variants1": "1",
+      "id2": "5798",
+      "name2": "Beautiful Magnolia L'Eau",
+      "variants2": "4",
+      "ratio": 0.878,
+      "delta": [
+        "leau"
+      ]
+    },
+    {
+      "brand": "Ex Nihilo",
+      "concentration": "Eau de Parfum",
+      "id1": "4215",
+      "name1": "Fleur Narcotique",
+      "variants1": "9",
+      "id2": "19224",
+      "name2": "Fleur Narcotique Musc",
+      "variants2": "2",
+      "ratio": 0.865,
+      "delta": [
+        "musc"
+      ]
+    },
+    {
+      "brand": "Ex Nihilo",
+      "concentration": "Eau de Parfum",
+      "id1": "4213",
+      "name1": "Gold Immortals",
+      "variants1": "8",
+      "id2": "19111",
+      "name2": "Gold Immortals Musc",
+      "variants2": "2",
+      "ratio": 0.848,
+      "delta": [
+        "musc"
+      ]
+    }
+  ],
+  "multi_concentration_examples": [
+    {
+      "brand": "100 Bon",
+      "normalized_name": "mirage du desert",
+      "names": [
+        "Mirage du Desert"
+      ],
+      "concentrations": [
+        "Eau de Parfum",
+        "Eau de Toilette"
+      ],
+      "rows": [
+        {
+          "id": "18444",
+          "name": "Mirage du Desert",
+          "concentration": "Eau de Parfum",
+          "variant_count": "1"
+        },
+        {
+          "id": "11452",
+          "name": "Mirage du Desert",
+          "concentration": "Eau de Toilette",
+          "variant_count": "2"
+        }
+      ]
+    },
+    {
+      "brand": "12 Parfumeurs",
+      "normalized_name": "intrigue de l amour",
+      "names": [
+        "Intrigue de l’Amour"
+      ],
+      "concentrations": [
+        "Eau de Parfum",
+        "Extrait de Parfum"
+      ],
+      "rows": [
+        {
+          "id": "18914",
+          "name": "Intrigue de l’Amour",
+          "concentration": "Eau de Parfum",
+          "variant_count": "2"
+        },
+        {
+          "id": "10876",
+          "name": "Intrigue de l’Amour",
+          "concentration": "Extrait de Parfum",
+          "variant_count": "1"
+        }
+      ]
+    },
+    {
+      "brand": "12 Parfumeurs",
+      "normalized_name": "la destinee",
+      "names": [
+        "La Destinee"
+      ],
+      "concentrations": [
+        "Eau de Parfum",
+        "Extrait de Parfum"
+      ],
+      "rows": [
+        {
+          "id": "18775",
+          "name": "La Destinee",
+          "concentration": "Eau de Parfum",
+          "variant_count": "2"
+        },
+        {
+          "id": "10845",
+          "name": "La Destinee",
+          "concentration": "Extrait de Parfum",
+          "variant_count": "3"
+        }
+      ]
+    },
+    {
+      "brand": "12 Parfumeurs",
+      "normalized_name": "madame royale",
+      "names": [
+        "Madame Royale"
+      ],
+      "concentrations": [
+        "Eau de Parfum",
+        "Extrait de Parfum"
+      ],
+      "rows": [
+        {
+          "id": "18558",
+          "name": "Madame Royale",
+          "concentration": "Eau de Parfum",
+          "variant_count": "1"
+        },
+        {
+          "id": "15658",
+          "name": "Madame Royale",
+          "concentration": "Extrait de Parfum",
+          "variant_count": "2"
+        }
+      ]
+    },
+    {
+      "brand": "12 Parfumeurs",
+      "normalized_name": "vaux le vicomte",
+      "names": [
+        "Vaux Le Vicomte"
+      ],
+      "concentrations": [
+        "Eau de Parfum",
+        "Extrait de Parfum"
+      ],
+      "rows": [
+        {
+          "id": "17256",
+          "name": "Vaux Le Vicomte",
+          "concentration": "Eau de Parfum",
+          "variant_count": "2"
+        },
+        {
+          "id": "10619",
+          "name": "Vaux Le Vicomte",
+          "concentration": "Extrait de Parfum",
+          "variant_count": "2"
+        }
+      ]
+    },
+    {
+      "brand": "Abercrombie & Fitch",
+      "normalized_name": "authentic",
+      "names": [
+        "Authentic"
+      ],
+      "concentrations": [
+        "Eau de Parfum",
+        "Eau de Toilette"
+      ],
+      "rows": [
+        {
+          "id": "5348",
+          "name": "Authentic",
+          "concentration": "Eau de Parfum",
+          "variant_count": "2"
+        },
+        {
+          "id": "12041",
+          "name": "Authentic",
+          "concentration": "Eau de Toilette",
+          "variant_count": "1"
+        }
+      ]
+    },
+    {
+      "brand": "Abercrombie & Fitch",
+      "normalized_name": "authentic moment man",
+      "names": [
+        "Authentic Moment Man"
+      ],
+      "concentrations": [
+        "Eau de Parfum",
+        "Eau de Toilette"
+      ],
+      "rows": [
+        {
+          "id": "19974",
+          "name": "Authentic Moment Man",
+          "concentration": "Eau de Parfum",
+          "variant_count": "1"
+        },
+        {
+          "id": "14354",
+          "name": "Authentic Moment Man",
+          "concentration": "Eau de Toilette",
+          "variant_count": "2"
+        }
+      ]
+    },
+    {
+      "brand": "Abercrombie & Fitch",
+      "normalized_name": "ezra",
+      "names": [
+        "Ezra"
+      ],
+      "concentrations": [
+        "Eau de Cologne",
+        "Eau de Parfum"
+      ],
+      "rows": [
+        {
+          "id": "20347",
+          "name": "Ezra",
+          "concentration": "Eau de Cologne",
+          "variant_count": "2"
+        },
+        {
+          "id": "19287",
+          "name": "Ezra",
+          "concentration": "Eau de Parfum",
+          "variant_count": "2"
+        }
+      ]
+    },
+    {
+      "brand": "Abercrombie & Fitch",
+      "normalized_name": "first instinct",
+      "names": [
+        "First Instinct"
+      ],
+      "concentrations": [
+        "Eau de Parfum",
+        "Eau de Toilette"
+      ],
+      "rows": [
+        {
+          "id": "19241",
+          "name": "First Instinct",
+          "concentration": "Eau de Parfum",
+          "variant_count": "1"
+        },
+        {
+          "id": "11762",
+          "name": "First Instinct",
+          "concentration": "Eau de Toilette",
+          "variant_count": "4"
+        }
+      ]
+    },
+    {
+      "brand": "Abercrombie & Fitch",
+      "normalized_name": "first instinct blue for her",
+      "names": [
+        "First Instinct Blue for Her"
+      ],
+      "concentrations": [
+        "Eau de Parfum",
+        "Eau de Toilette"
+      ],
+      "rows": [
+        {
+          "id": "13330",
+          "name": "First Instinct Blue for Her",
+          "concentration": "Eau de Parfum",
+          "variant_count": "4"
+        },
+        {
+          "id": "16667",
+          "name": "First Instinct Blue for Her",
+          "concentration": "Eau de Toilette",
+          "variant_count": "2"
+        }
+      ]
+    },
+    {
+      "brand": "Aesop",
+      "normalized_name": "marrakech intense",
+      "names": [
+        "Marrakech Intense"
+      ],
+      "concentrations": [
+        "Eau de Parfum",
+        "Extrait de Parfum"
+      ],
+      "rows": [
+        {
+          "id": "12916",
+          "name": "Marrakech Intense",
+          "concentration": "Eau de Parfum",
+          "variant_count": "2"
+        },
+        {
+          "id": "4927",
+          "name": "Marrakech Intense",
+          "concentration": "Extrait de Parfum",
+          "variant_count": "2"
+        }
+      ]
+    },
+    {
+      "brand": "Agonist",
+      "normalized_name": "no 10 white oud",
+      "names": [
+        "No 10 White Oud"
+      ],
+      "concentrations": [
+        "Eau de Parfum",
+        "Extrait de Parfum"
+      ],
+      "rows": [
+        {
+          "id": "12807",
+          "name": "No 10 White Oud",
+          "concentration": "Eau de Parfum",
+          "variant_count": "2"
+        },
+        {
+          "id": "10782",
+          "name": "No 10 White Oud",
+          "concentration": "Extrait de Parfum",
+          "variant_count": "1"
+        }
+      ]
+    },
+    {
+      "brand": "Agonist",
+      "normalized_name": "wind rose",
+      "names": [
+        "Wind Rose"
+      ],
+      "concentrations": [
+        "Eau de Parfum",
+        "Extrait de Parfum"
+      ],
+      "rows": [
+        {
+          "id": "12172",
+          "name": "Wind Rose",
+          "concentration": "Eau de Parfum",
+          "variant_count": "1"
+        },
+        {
+          "id": "10605",
+          "name": "Wind Rose",
+          "concentration": "Extrait de Parfum",
+          "variant_count": "1"
+        }
+      ]
+    },
+    {
+      "brand": "Alex Simone",
+      "normalized_name": "tellement bleu",
+      "names": [
+        "Tellement Bleu"
+      ],
+      "concentrations": [
+        "Eau de Parfum",
+        "Extrait de Parfum"
+      ],
+      "rows": [
+        {
+          "id": "12346",
+          "name": "Tellement Bleu",
+          "concentration": "Eau de Parfum",
+          "variant_count": "5"
+        },
+        {
+          "id": "14128",
+          "name": "Tellement Bleu",
+          "concentration": "Extrait de Parfum",
+          "variant_count": "1"
+        }
+      ]
+    },
+    {
+      "brand": "Amouroud",
+      "normalized_name": "lunar vetiver",
+      "names": [
+        "Lunar Vetiver"
+      ],
+      "concentrations": [
+        "Eau de Parfum",
+        "Extrait de Parfum"
+      ],
+      "rows": [
+        {
+          "id": "18585",
+          "name": "Lunar Vetiver",
+          "concentration": "Eau de Parfum",
+          "variant_count": "1"
+        },
+        {
+          "id": "15664",
+          "name": "Lunar Vetiver",
+          "concentration": "Extrait de Parfum",
+          "variant_count": "2"
+        }
+      ]
+    },
+    {
+      "brand": "Amouroud",
+      "normalized_name": "silver birch",
+      "names": [
+        "Silver Birch"
+      ],
+      "concentrations": [
+        "Eau de Parfum",
+        "Extrait de Parfum"
+      ],
+      "rows": [
+        {
+          "id": "17590",
+          "name": "Silver Birch",
+          "concentration": "Eau de Parfum",
+          "variant_count": "2"
+        },
+        {
+          "id": "15501",
+          "name": "Silver Birch",
+          "concentration": "Extrait de Parfum",
+          "variant_count": "1"
+        }
+      ]
+    },
+    {
+      "brand": "Amouroud",
+      "normalized_name": "wet stone",
+      "names": [
+        "Wet Stone"
+      ],
+      "concentrations": [
+        "Eau de Parfum",
+        "Extrait de Parfum"
+      ],
+      "rows": [
+        {
+          "id": "17147",
+          "name": "Wet Stone",
+          "concentration": "Eau de Parfum",
+          "variant_count": "1"
+        },
+        {
+          "id": "15432",
+          "name": "Wet Stone",
+          "concentration": "Extrait de Parfum",
+          "variant_count": "1"
+        }
+      ]
+    },
+    {
+      "brand": "Amouroud",
+      "normalized_name": "white hinoki",
+      "names": [
+        "White Hinoki"
+      ],
+      "concentrations": [
+        "Eau de Parfum",
+        "Extrait de Parfum"
+      ],
+      "rows": [
+        {
+          "id": "17142",
+          "name": "White Hinoki",
+          "concentration": "Eau de Parfum",
+          "variant_count": "2"
+        },
+        {
+          "id": "15429",
+          "name": "White Hinoki",
+          "concentration": "Extrait de Parfum",
+          "variant_count": "1"
+        }
+      ]
+    },
+    {
+      "brand": "Anfas",
+      "normalized_name": "ghala",
+      "names": [
+        "Ghala"
+      ],
+      "concentrations": [
+        "Eau de Parfum",
+        "Extrait de Parfum"
+      ],
+      "rows": [
+        {
+          "id": "10000",
+          "name": "Ghala",
+          "concentration": "Eau de Parfum",
+          "variant_count": "1"
+        },
+        {
+          "id": "9121",
+          "name": "Ghala",
+          "concentration": "Extrait de Parfum",
+          "variant_count": "2"
+        }
+      ]
+    },
+    {
+      "brand": "Angel Schlesser",
+      "normalized_name": "pour elle",
+      "names": [
+        "Pour Elle"
+      ],
+      "concentrations": [
+        "Eau de Parfum",
+        "Eau de Toilette"
+      ],
+      "rows": [
+        {
+          "id": "12637",
+          "name": "Pour Elle",
+          "concentration": "Eau de Parfum",
+          "variant_count": "4"
+        },
+        {
+          "id": "16235",
+          "name": "Pour Elle",
+          "concentration": "Eau de Toilette",
+          "variant_count": "2"
+        }
+      ]
+    },
+    {
+      "brand": "Anna Sui",
+      "normalized_name": "l amour rose",
+      "names": [
+        "L’Amour Rose"
+      ],
+      "concentrations": [
+        "Eau de Parfum",
+        "Eau de Toilette"
+      ],
+      "rows": [
+        {
+          "id": "13075",
+          "name": "L’Amour Rose",
+          "concentration": "Eau de Parfum",
+          "variant_count": "1"
+        },
+        {
+          "id": "9359",
+          "name": "L’Amour Rose",
+          "concentration": "Eau de Toilette",
+          "variant_count": "3"
+        }
+      ]
+    },
+    {
+      "brand": "Annick Gooutal",
+      "normalized_name": "annick goutal ce soir ou jamais",
+      "names": [
+        "Annick Goutal Ce Soir Ou Jamais"
+      ],
+      "concentrations": [
+        "Eau de Parfum",
+        "Eau de Toilette"
+      ],
+      "rows": [
+        {
+          "id": "20070",
+          "name": "Annick Goutal Ce Soir Ou Jamais",
+          "concentration": "Eau de Parfum",
+          "variant_count": "2"
+        },
+        {
+          "id": "16997",
+          "name": "Annick Goutal Ce Soir Ou Jamais",
+          "concentration": "Eau de Toilette",
+          "variant_count": "1"
+        }
+      ]
+    },
+    {
+      "brand": "Annick Gooutal",
+      "normalized_name": "annick goutal eau dhadrien",
+      "names": [
+        "Annick Goutal Eau d'Hadrien"
+      ],
+      "concentrations": [
+        "Eau de Parfum",
+        "Eau de Toilette"
+      ],
+      "rows": [
+        {
+          "id": "13805",
+          "name": "Annick Goutal Eau d'Hadrien",
+          "concentration": "Eau de Parfum",
+          "variant_count": "1"
+        },
+        {
+          "id": "16994",
+          "name": "Annick Goutal Eau d'Hadrien",
+          "concentration": "Eau de Toilette",
+          "variant_count": "1"
+        }
+      ]
+    },
+    {
+      "brand": "Annick Gooutal",
+      "normalized_name": "annick goutal petite cherie",
+      "names": [
+        "Annick Goutal Petite Cherie"
+      ],
+      "concentrations": [
+        "Eau de Parfum",
+        "Eau de Toilette"
+      ],
+      "rows": [
+        {
+          "id": "20063",
+          "name": "Annick Goutal Petite Cherie",
+          "concentration": "Eau de Parfum",
+          "variant_count": "2"
+        },
+        {
+          "id": "16989",
+          "name": "Annick Goutal Petite Cherie",
+          "concentration": "Eau de Toilette",
+          "variant_count": "1"
+        }
+      ]
+    },
+    {
+      "brand": "Annick Gooutal",
+      "normalized_name": "annick goutal rose oud absolu",
+      "names": [
+        "Annick Goutal Rose Oud Absolu"
+      ],
+      "concentrations": [
+        "Eau de Parfum",
+        "Extrait de Parfum"
+      ],
+      "rows": [
+        {
+          "id": "20062",
+          "name": "Annick Goutal Rose Oud Absolu",
+          "concentration": "Eau de Parfum",
+          "variant_count": "1"
+        },
+        {
+          "id": "15901",
+          "name": "Annick Goutal Rose Oud Absolu",
+          "concentration": "Extrait de Parfum",
+          "variant_count": "1"
+        }
+      ]
+    },
+    {
+      "brand": "Annick Gooutal",
+      "normalized_name": "annick goutal rose pompon",
+      "names": [
+        "Annick Goutal Rose Pompon"
+      ],
+      "concentrations": [
+        "Eau de Parfum",
+        "Eau de Toilette"
+      ],
+      "rows": [
+        {
+          "id": "13803",
+          "name": "Annick Goutal Rose Pompon",
+          "concentration": "Eau de Parfum",
+          "variant_count": "3"
+        },
+        {
+          "id": "5803",
+          "name": "Annick Goutal Rose Pompon",
+          "concentration": "Eau de Toilette",
+          "variant_count": "5"
+        }
+      ]
+    },
+    {
+      "brand": "Annick Gooutal",
+      "normalized_name": "annick goutal un matin dorage",
+      "names": [
+        "Annick Goutal Un Matin d'Orage"
+      ],
+      "concentrations": [
+        "Eau de Parfum",
+        "Eau de Toilette"
+      ],
+      "rows": [
+        {
+          "id": "20060",
+          "name": "Annick Goutal Un Matin d'Orage",
+          "concentration": "Eau de Parfum",
+          "variant_count": "2"
+        },
+        {
+          "id": "16986",
+          "name": "Annick Goutal Un Matin d'Orage",
+          "concentration": "Eau de Toilette",
+          "variant_count": "2"
+        }
+      ]
+    },
+    {
+      "brand": "Antonio Banderas",
+      "normalized_name": "the icon",
+      "names": [
+        "The Icon"
+      ],
+      "concentrations": [
+        "Eau de Parfum",
+        "Eau de Toilette"
+      ],
+      "rows": [
+        {
+          "id": "12332",
+          "name": "The Icon",
+          "concentration": "Eau de Parfum",
+          "variant_count": "3"
+        },
+        {
+          "id": "11191",
+          "name": "The Icon",
+          "concentration": "Eau de Toilette",
+          "variant_count": "3"
+        }
+      ]
+    },
+    {
+      "brand": "Antonio Banderas",
+      "normalized_name": "the icon for men",
+      "names": [
+        "The Icon for Men"
+      ],
+      "concentrations": [
+        "Eau de Parfum",
+        "Eau de Toilette"
+      ],
+      "rows": [
+        {
+          "id": "12330",
+          "name": "The Icon for Men",
+          "concentration": "Eau de Parfum",
+          "variant_count": "2"
+        },
+        {
+          "id": "11190",
+          "name": "The Icon for Men",
+          "concentration": "Eau de Toilette",
+          "variant_count": "3"
+        }
+      ]
+    },
+    {
+      "brand": "Ariana Grande",
+      "normalized_name": "r e m",
+      "names": [
+        "R.E.M."
+      ],
+      "concentrations": [
+        "Eau de Parfum",
+        "Extrait de Parfum"
+      ],
+      "rows": [
+        {
+          "id": "12598",
+          "name": "R.E.M.",
+          "concentration": "Eau de Parfum",
+          "variant_count": "3"
+        },
+        {
+          "id": "7942",
+          "name": "R.E.M.",
+          "concentration": "Extrait de Parfum",
+          "variant_count": "1"
+        }
+      ]
+    },
+    {
+      "brand": "Armaf",
+      "normalized_name": "club de nuit intense men",
+      "names": [
+        "Club de Nuit Intense Men"
+      ],
+      "concentrations": [
+        "Eau de Parfum",
+        "Eau de Toilette"
+      ],
+      "rows": [
+        {
+          "id": "14821",
+          "name": "Club de Nuit Intense Men",
+          "concentration": "Eau de Parfum",
+          "variant_count": "2"
+        },
+        {
+          "id": "4968",
+          "name": "Club de Nuit Intense Men",
+          "concentration": "Eau de Toilette",
+          "variant_count": "5"
+        }
+      ]
+    },
+    {
+      "brand": "Armaf",
+      "normalized_name": "tag him",
+      "names": [
+        "Tag-Him"
+      ],
+      "concentrations": [
+        "Eau de Parfum",
+        "Eau de Toilette"
+      ],
+      "rows": [
+        {
+          "id": "17436",
+          "name": "Tag-Him",
+          "concentration": "Eau de Parfum",
+          "variant_count": "2"
+        },
+        {
+          "id": "16057",
+          "name": "Tag-Him",
+          "concentration": "Eau de Toilette",
+          "variant_count": "1"
+        }
+      ]
+    },
+    {
+      "brand": "Armand Basi",
+      "normalized_name": "in red",
+      "names": [
+        "In Red"
+      ],
+      "concentrations": [
+        "Eau de Parfum",
+        "Eau de Toilette"
+      ],
+      "rows": [
+        {
+          "id": "13151",
+          "name": "In Red",
+          "concentration": "Eau de Parfum",
+          "variant_count": "4"
+        },
+        {
+          "id": "11641",
+          "name": "In Red",
+          "concentration": "Eau de Toilette",
+          "variant_count": "4"
+        }
+      ]
+    },
+    {
+      "brand": "Armani",
+      "normalized_name": "acqua di gio absolu",
+      "names": [
+        "Acqua Di Gio Absolu",
+        "Acqua di Gio Absolu"
+      ],
+      "concentrations": [
+        "Eau de Parfum",
+        "Eau de Toilette"
+      ],
+      "rows": [
+        {
+          "id": "7571",
+          "name": "Acqua di Gio Absolu",
+          "concentration": "Eau de Parfum",
+          "variant_count": "2"
+        },
+        {
+          "id": "15234",
+          "name": "Acqua Di Gio Absolu",
+          "concentration": "Eau de Toilette",
+          "variant_count": "1"
+        }
+      ]
+    },
+    {
+      "brand": "Armani",
+      "normalized_name": "acqua di gio pour homme",
+      "names": [
+        "Acqua Di Gio Pour Homme"
+      ],
+      "concentrations": [
+        "Eau de Parfum",
+        "Eau de Toilette",
+        "Extrait de Parfum"
+      ],
+      "rows": [
+        {
+          "id": "7825",
+          "name": "Acqua Di Gio Pour Homme",
+          "concentration": "Eau de Parfum",
+          "variant_count": "8"
+        },
+        {
+          "id": "6724",
+          "name": "Acqua Di Gio Pour Homme",
+          "concentration": "Eau de Toilette",
+          "variant_count": "9"
+        },
+        {
+          "id": "7785",
+          "name": "Acqua Di Gio Pour Homme",
+          "concentration": "Extrait de Parfum",
+          "variant_count": "6"
+        }
+      ]
+    },
+    {
+      "brand": "Armani",
+      "normalized_name": "acqua di gio profondo",
+      "names": [
+        "Acqua di Gio Profondo"
+      ],
+      "concentrations": [
+        "Eau de Parfum",
+        "Eau de Toilette",
+        "Extrait de Parfum"
+      ],
+      "rows": [
+        {
+          "id": "7893",
+          "name": "Acqua di Gio Profondo",
+          "concentration": "Eau de Parfum",
+          "variant_count": "8"
+        },
+        {
+          "id": "12111",
+          "name": "Acqua di Gio Profondo",
+          "concentration": "Eau de Toilette",
+          "variant_count": "2"
+        },
+        {
+          "id": "11057",
+          "name": "Acqua di Gio Profondo",
+          "concentration": "Extrait de Parfum",
+          "variant_count": "4"
+        }
+      ]
+    },
+    {
+      "brand": "Armani",
+      "normalized_name": "code",
+      "names": [
+        "Code"
+      ],
+      "concentrations": [
+        "Eau de Parfum",
+        "Eau de Toilette",
+        "Extrait de Parfum"
+      ],
+      "rows": [
+        {
+          "id": "8163",
+          "name": "Code",
+          "concentration": "Eau de Parfum",
+          "variant_count": "4"
+        },
+        {
+          "id": "9481",
+          "name": "Code",
+          "concentration": "Eau de Toilette",
+          "variant_count": "1"
+        },
+        {
+          "id": "6588",
+          "name": "Code",
+          "concentration": "Extrait de Parfum",
+          "variant_count": "7"
+        }
+      ]
+    },
+    {
+      "brand": "Armani",
+      "normalized_name": "code absolu",
+      "names": [
+        "Code Absolu"
+      ],
+      "concentrations": [
+        "Eau de Parfum",
+        "Eau de Toilette",
+        "Extrait de Parfum"
+      ],
+      "rows": [
+        {
+          "id": "10103",
+          "name": "Code Absolu",
+          "concentration": "Eau de Parfum",
+          "variant_count": "4"
+        },
+        {
+          "id": "9480",
+          "name": "Code Absolu",
+          "concentration": "Eau de Toilette",
+          "variant_count": "1"
+        },
+        {
+          "id": "10291",
+          "name": "Code Absolu",
+          "concentration": "Extrait de Parfum",
+          "variant_count": "1"
+        }
+      ]
+    },
+    {
+      "brand": "Armani",
+      "normalized_name": "code for men",
+      "names": [
+        "Code for Men",
+        "Code for men"
+      ],
+      "concentrations": [
+        "Eau de Parfum",
+        "Eau de Toilette"
+      ],
+      "rows": [
+        {
+          "id": "10100",
+          "name": "Code for men",
+          "concentration": "Eau de Parfum",
+          "variant_count": "5"
+        },
+        {
+          "id": "7822",
+          "name": "Code for Men",
+          "concentration": "Eau de Toilette",
+          "variant_count": "7"
+        }
+      ]
+    },
+    {
+      "brand": "Armani",
+      "normalized_name": "code pour femme",
+      "names": [
+        "Code Pour Femme"
+      ],
+      "concentrations": [
+        "Eau de Parfum",
+        "Eau de Toilette",
+        "Extrait de Parfum"
+      ],
+      "rows": [
+        {
+          "id": "10099",
+          "name": "Code Pour Femme",
+          "concentration": "Eau de Parfum",
+          "variant_count": "3"
+        },
+        {
+          "id": "15201",
+          "name": "Code Pour Femme",
+          "concentration": "Eau de Toilette",
+          "variant_count": "1"
+        },
+        {
+          "id": "9135",
+          "name": "Code Pour Femme",
+          "concentration": "Extrait de Parfum",
+          "variant_count": "1"
+        }
+      ]
+    },
+    {
+      "brand": "Armani",
+      "normalized_name": "code pour homme",
+      "names": [
+        "Code Pour Homme"
+      ],
+      "concentrations": [
+        "Eau de Parfum",
+        "Eau de Toilette",
+        "Extrait de Parfum"
+      ],
+      "rows": [
+        {
+          "id": "7411",
+          "name": "Code Pour Homme",
+          "concentration": "Eau de Parfum",
+          "variant_count": "5"
+        },
+        {
+          "id": "9475",
+          "name": "Code Pour Homme",
+          "concentration": "Eau de Toilette",
+          "variant_count": "4"
+        },
+        {
+          "id": "7821",
+          "name": "Code Pour Homme",
+          "concentration": "Extrait de Parfum",
+          "variant_count": "3"
+        }
+      ]
+    },
+    {
+      "brand": "Armani",
+      "normalized_name": "cypres pantelleria",
+      "names": [
+        "Cypres Pantelleria"
+      ],
+      "concentrations": [
+        "Eau de Parfum",
+        "Eau de Toilette"
+      ],
+      "rows": [
+        {
+          "id": "19558",
+          "name": "Cypres Pantelleria",
+          "concentration": "Eau de Parfum",
+          "variant_count": "2"
+        },
+        {
+          "id": "11890",
+          "name": "Cypres Pantelleria",
+          "concentration": "Eau de Toilette",
+          "variant_count": "1"
+        }
+      ]
+    },
+    {
+      "brand": "Armani",
+      "normalized_name": "diamonds",
+      "names": [
+        "Diamonds"
+      ],
+      "concentrations": [
+        "Eau de Parfum",
+        "Eau de Toilette"
+      ],
+      "rows": [
+        {
+          "id": "13469",
+          "name": "Diamonds",
+          "concentration": "Eau de Parfum",
+          "variant_count": "3"
+        },
+        {
+          "id": "11861",
+          "name": "Diamonds",
+          "concentration": "Eau de Toilette",
+          "variant_count": "1"
+        }
+      ]
+    },
+    {
+      "brand": "Armani",
+      "normalized_name": "emporio diamonds",
+      "names": [
+        "Emporio Diamonds"
+      ],
+      "concentrations": [
+        "Eau de Parfum",
+        "Eau de Toilette"
+      ],
+      "rows": [
+        {
+          "id": "19374",
+          "name": "Emporio Diamonds",
+          "concentration": "Eau de Parfum",
+          "variant_count": "1"
+        },
+        {
+          "id": "14313",
+          "name": "Emporio Diamonds",
+          "concentration": "Eau de Toilette",
+          "variant_count": "3"
+        }
+      ]
+    },
+    {
+      "brand": "Armani",
+      "normalized_name": "emporio night",
+      "names": [
+        "Emporio Night"
+      ],
+      "concentrations": [
+        "Eau de Parfum",
+        "Eau de Toilette"
+      ],
+      "rows": [
+        {
+          "id": "13391",
+          "name": "Emporio Night",
+          "concentration": "Eau de Parfum",
+          "variant_count": "2"
+        },
+        {
+          "id": "11805",
+          "name": "Emporio Night",
+          "concentration": "Eau de Toilette",
+          "variant_count": "1"
+        }
+      ]
+    },
+    {
+      "brand": "Armani",
+      "normalized_name": "idole d",
+      "names": [
+        "Idole D'"
+      ],
+      "concentrations": [
+        "Eau de Parfum",
+        "Eau de Toilette"
+      ],
+      "rows": [
+        {
+          "id": "9961",
+          "name": "Idole D'",
+          "concentration": "Eau de Parfum",
+          "variant_count": "6"
+        },
+        {
+          "id": "9381",
+          "name": "Idole D'",
+          "concentration": "Eau de Toilette",
+          "variant_count": "1"
+        }
+      ]
+    },
+    {
+      "brand": "Armani",
+      "normalized_name": "my way",
+      "names": [
+        "My Way"
+      ],
+      "concentrations": [
+        "Eau de Parfum",
+        "Extrait de Parfum"
+      ],
+      "rows": [
+        {
+          "id": "7932",
+          "name": "My Way",
+          "concentration": "Eau de Parfum",
+          "variant_count": "6"
+        },
+        {
+          "id": "7781",
+          "name": "My Way",
+          "concentration": "Extrait de Parfum",
+          "variant_count": "8"
+        }
+      ]
+    },
+    {
+      "brand": "Armani",
+      "normalized_name": "prive cypres pantelleria",
+      "names": [
+        "Prive Cypres Pantelleria"
+      ],
+      "concentrations": [
+        "Eau de Parfum",
+        "Eau de Toilette"
+      ],
+      "rows": [
+        {
+          "id": "17926",
+          "name": "Prive Cypres Pantelleria",
+          "concentration": "Eau de Parfum",
+          "variant_count": "1"
+        },
+        {
+          "id": "11320",
+          "name": "Prive Cypres Pantelleria",
+          "concentration": "Eau de Toilette",
+          "variant_count": "3"
+        }
+      ]
+    },
+    {
+      "brand": "Armani",
+      "normalized_name": "prive gardenia antigua",
+      "names": [
+        "Prive Gardenia Antigua"
+      ],
+      "concentrations": [
+        "Eau de Parfum",
+        "Eau de Toilette"
+      ],
+      "rows": [
+        {
+          "id": "6963",
+          "name": "Prive Gardenia Antigua",
+          "concentration": "Eau de Parfum",
+          "variant_count": "3"
+        },
+        {
+          "id": "6641",
+          "name": "Prive Gardenia Antigua",
+          "concentration": "Eau de Toilette",
+          "variant_count": "3"
+        }
+      ]
+    },
+    {
+      "brand": "Armani",
+      "normalized_name": "prive jasmin kusamono",
+      "names": [
+        "Prive Jasmin Kusamono"
+      ],
+      "concentrations": [
+        "Eau de Parfum",
+        "Eau de Toilette"
+      ],
+      "rows": [
+        {
+          "id": "6962",
+          "name": "Prive Jasmin Kusamono",
+          "concentration": "Eau de Parfum",
+          "variant_count": "2"
+        },
+        {
+          "id": "6640",
+          "name": "Prive Jasmin Kusamono",
+          "concentration": "Eau de Toilette",
+          "variant_count": "3"
+        }
+      ]
+    },
+    {
+      "brand": "Armani",
+      "normalized_name": "prive musc shamal",
+      "names": [
+        "Prive Musc Shamal"
+      ],
+      "concentrations": [
+        "Eau de Parfum",
+        "Eau de Toilette"
+      ],
+      "rows": [
+        {
+          "id": "17919",
+          "name": "Prive Musc Shamal",
+          "concentration": "Eau de Parfum",
+          "variant_count": "2"
+        },
+        {
+          "id": "11319",
+          "name": "Prive Musc Shamal",
+          "concentration": "Eau de Toilette",
+          "variant_count": "2"
+        }
+      ]
+    },
+    {
+      "brand": "Armani",
+      "normalized_name": "prive oranger alhambra",
+      "names": [
+        "Prive Oranger Alhambra"
+      ],
+      "concentrations": [
+        "Eau de Parfum",
+        "Eau de Toilette"
+      ],
+      "rows": [
+        {
+          "id": "17918",
+          "name": "Prive Oranger Alhambra",
+          "concentration": "Eau de Parfum",
+          "variant_count": "1"
+        },
+        {
+          "id": "16208",
+          "name": "Prive Oranger Alhambra",
+          "concentration": "Eau de Toilette",
+          "variant_count": "2"
+        }
+      ]
+    },
+    {
+      "brand": "Armani",
+      "normalized_name": "prive orangerie venise",
+      "names": [
+        "Prive Orangerie Venise"
+      ],
+      "concentrations": [
+        "Eau de Parfum",
+        "Eau de Toilette"
+      ],
+      "rows": [
+        {
+          "id": "6960",
+          "name": "Prive Orangerie Venise",
+          "concentration": "Eau de Parfum",
+          "variant_count": "3"
+        },
+        {
+          "id": "11318",
+          "name": "Prive Orangerie Venise",
+          "concentration": "Eau de Toilette",
+          "variant_count": "2"
+        }
+      ]
+    },
+    {
+      "brand": "Armani",
+      "normalized_name": "prive santal dan sha",
+      "names": [
+        "Prive Santal Dan Sha"
+      ],
+      "concentrations": [
+        "Eau de Parfum",
+        "Eau de Toilette"
+      ],
+      "rows": [
+        {
+          "id": "17913",
+          "name": "Prive Santal Dan Sha",
+          "concentration": "Eau de Parfum",
+          "variant_count": "1"
+        },
+        {
+          "id": "11316",
+          "name": "Prive Santal Dan Sha",
+          "concentration": "Eau de Toilette",
+          "variant_count": "2"
+        }
+      ]
+    },
+    {
+      "brand": "Armani",
+      "normalized_name": "prive th yulong",
+      "names": [
+        "Prive Thé Yulong"
+      ],
+      "concentrations": [
+        "Eau de Parfum",
+        "Eau de Toilette"
+      ],
+      "rows": [
+        {
+          "id": "17912",
+          "name": "Prive Thé Yulong",
+          "concentration": "Eau de Parfum",
+          "variant_count": "1"
+        },
+        {
+          "id": "16206",
+          "name": "Prive Thé Yulong",
+          "concentration": "Eau de Toilette",
+          "variant_count": "1"
+        }
+      ]
+    },
+    {
+      "brand": "Armani",
+      "normalized_name": "si",
+      "names": [
+        "Si"
+      ],
+      "concentrations": [
+        "Eau de Parfum",
+        "Eau de Toilette"
+      ],
+      "rows": [
+        {
+          "id": "6875",
+          "name": "Si",
+          "concentration": "Eau de Parfum",
+          "variant_count": "8"
+        },
+        {
+          "id": "11254",
+          "name": "Si",
+          "concentration": "Eau de Toilette",
+          "variant_count": "3"
+        }
+      ]
+    },
+    {
+      "brand": "Armani",
+      "normalized_name": "si le parfum",
+      "names": [
+        "Si Le Parfum"
+      ],
+      "concentrations": [
+        "Eau de Parfum",
+        "Extrait de Parfum"
+      ],
+      "rows": [
+        {
+          "id": "14021",
+          "name": "Si Le Parfum",
+          "concentration": "Eau de Parfum",
+          "variant_count": "1"
+        },
+        {
+          "id": "13971",
+          "name": "Si Le Parfum",
+          "concentration": "Extrait de Parfum",
+          "variant_count": "1"
+        }
+      ]
+    },
+    {
+      "brand": "Armani",
+      "normalized_name": "stronger with you",
+      "names": [
+        "Stronger With You"
+      ],
+      "concentrations": [
+        "Eau de Toilette",
+        "Extrait de Parfum"
+      ],
+      "rows": [
+        {
+          "id": "15038",
+          "name": "Stronger With You",
+          "concentration": "Eau de Toilette",
+          "variant_count": "3"
+        },
+        {
+          "id": "15485",
+          "name": "Stronger With You",
+          "concentration": "Extrait de Parfum",
+          "variant_count": "2"
+        }
+      ]
+    },
+    {
+      "brand": "Armani",
+      "normalized_name": "stronger with you absolutely",
+      "names": [
+        "Stronger With You Absolutely"
+      ],
+      "concentrations": [
+        "Eau de Parfum",
+        "Extrait de Parfum"
+      ],
+      "rows": [
+        {
+          "id": "12385",
+          "name": "Stronger With You Absolutely",
+          "concentration": "Eau de Parfum",
+          "variant_count": "4"
+        },
+        {
+          "id": "15484",
+          "name": "Stronger With You Absolutely",
+          "concentration": "Extrait de Parfum",
+          "variant_count": "1"
+        }
+      ]
+    },
+    {
+      "brand": "Armani",
+      "normalized_name": "the yulong",
+      "names": [
+        "The Yulong"
+      ],
+      "concentrations": [
+        "Eau de Parfum",
+        "Eau de Toilette"
+      ],
+      "rows": [
+        {
+          "id": "17358",
+          "name": "The Yulong",
+          "concentration": "Eau de Parfum",
+          "variant_count": "2"
+        },
+        {
+          "id": "16039",
+          "name": "The Yulong",
+          "concentration": "Eau de Toilette",
+          "variant_count": "1"
+        }
+      ]
+    },
+    {
+      "brand": "Atelier Cologne",
+      "normalized_name": "bohemian orange blossom",
+      "names": [
+        "Bohemian Orange Blossom"
+      ],
+      "concentrations": [
+        "Eau de Cologne",
+        "Eau de Parfum"
+      ],
+      "rows": [
+        {
+          "id": "5536",
+          "name": "Bohemian Orange Blossom",
+          "concentration": "Eau de Cologne",
+          "variant_count": "4"
+        },
+        {
+          "id": "19818",
+          "name": "Bohemian Orange Blossom",
+          "concentration": "Eau de Parfum",
+          "variant_count": "1"
+        }
+      ]
+    },
+    {
+      "brand": "Atelier Cologne",
+      "normalized_name": "bois blonds",
+      "names": [
+        "Bois Blonds"
+      ],
+      "concentrations": [
+        "Eau de Cologne",
+        "Eau de Parfum"
+      ],
+      "rows": [
+        {
+          "id": "5300",
+          "name": "Bois Blonds",
+          "concentration": "Eau de Cologne",
+          "variant_count": "2"
+        },
+        {
+          "id": "14594",
+          "name": "Bois Blonds",
+          "concentration": "Eau de Parfum",
+          "variant_count": "1"
+        }
+      ]
+    },
+    {
+      "brand": "Atelier Cologne",
+      "normalized_name": "cafe tuberosa",
+      "names": [
+        "Cafe Tuberosa"
+      ],
+      "concentrations": [
+        "Eau de Cologne",
+        "Eau de Parfum"
+      ],
+      "rows": [
+        {
+          "id": "7615",
+          "name": "Cafe Tuberosa",
+          "concentration": "Eau de Cologne",
+          "variant_count": "3"
+        },
+        {
+          "id": "7439",
+          "name": "Cafe Tuberosa",
+          "concentration": "Eau de Parfum",
+          "variant_count": "3"
+        }
+      ]
+    },
+    {
+      "brand": "Atelier Cologne",
+      "normalized_name": "camelia intrepide",
+      "names": [
+        "Camelia Intrepide"
+      ],
+      "concentrations": [
+        "Eau de Cologne",
+        "Eau de Parfum"
+      ],
+      "rows": [
+        {
+          "id": "5535",
+          "name": "Camelia Intrepide",
+          "concentration": "Eau de Cologne",
+          "variant_count": "1"
+        },
+        {
+          "id": "14583",
+          "name": "Camelia Intrepide",
+          "concentration": "Eau de Parfum",
+          "variant_count": "1"
+        }
+      ]
+    },
+    {
+      "brand": "Atelier Cologne",
+      "normalized_name": "clementine california",
+      "names": [
+        "Clementine California"
+      ],
+      "concentrations": [
+        "Eau de Cologne",
+        "Eau de Parfum"
+      ],
+      "rows": [
+        {
+          "id": "5225",
+          "name": "Clementine California",
+          "concentration": "Eau de Cologne",
+          "variant_count": "8"
+        },
+        {
+          "id": "5504",
+          "name": "Clementine California",
+          "concentration": "Eau de Parfum",
+          "variant_count": "1"
+        }
+      ]
+    },
+    {
+      "brand": "Atelier Cologne",
+      "normalized_name": "encens jinhae",
+      "names": [
+        "Encens Jinhae"
+      ],
+      "concentrations": [
+        "Eau de Cologne",
+        "Eau de Parfum"
+      ],
+      "rows": [
+        {
+          "id": "14660",
+          "name": "Encens Jinhae",
+          "concentration": "Eau de Cologne",
+          "variant_count": "1"
+        },
+        {
+          "id": "19364",
+          "name": "Encens Jinhae",
+          "concentration": "Eau de Parfum",
+          "variant_count": "1"
+        }
+      ]
+    },
+    {
+      "brand": "Atelier Cologne",
+      "normalized_name": "gaiac eternel",
+      "names": [
+        "Gaiac Eternel"
+      ],
+      "concentrations": [
+        "Eau de Cologne",
+        "Eau de Parfum"
+      ],
+      "rows": [
+        {
+          "id": "5533",
+          "name": "Gaiac Eternel",
+          "concentration": "Eau de Cologne",
+          "variant_count": "1"
+        },
+        {
+          "id": "19163",
+          "name": "Gaiac Eternel",
+          "concentration": "Eau de Parfum",
+          "variant_count": "2"
+        }
+      ]
+    },
+    {
+      "brand": "Atelier Cologne",
+      "normalized_name": "grand neroli",
+      "names": [
+        "Grand Neroli"
+      ],
+      "concentrations": [
+        "Eau de Cologne",
+        "Eau de Parfum"
+      ],
+      "rows": [
+        {
+          "id": "5531",
+          "name": "Grand Neroli",
+          "concentration": "Eau de Cologne",
+          "variant_count": "4"
+        },
+        {
+          "id": "19096",
+          "name": "Grand Neroli",
+          "concentration": "Eau de Parfum",
+          "variant_count": "1"
+        }
+      ]
+    },
+    {
+      "brand": "Atelier Cologne",
+      "normalized_name": "pacific lime",
+      "names": [
+        "Pacific Lime"
+      ],
+      "concentrations": [
+        "Eau de Cologne",
+        "Eau de Parfum"
+      ],
+      "rows": [
+        {
+          "id": "5525",
+          "name": "Pacific Lime",
+          "concentration": "Eau de Cologne",
+          "variant_count": "3"
+        },
+        {
+          "id": "14802",
+          "name": "Pacific Lime",
+          "concentration": "Eau de Parfum",
+          "variant_count": "1"
+        }
+      ]
+    },
+    {
+      "brand": "Atelier Cologne",
+      "normalized_name": "patchouli riviera",
+      "names": [
+        "Patchouli Riviera"
+      ],
+      "concentrations": [
+        "Eau de Cologne",
+        "Eau de Parfum"
+      ],
+      "rows": [
+        {
+          "id": "20306",
+          "name": "Patchouli Riviera",
+          "concentration": "Eau de Cologne",
+          "variant_count": "1"
+        },
+        {
+          "id": "14439",
+          "name": "Patchouli Riviera",
+          "concentration": "Eau de Parfum",
+          "variant_count": "3"
+        }
+      ]
+    },
+    {
+      "brand": "Atelier Cologne",
+      "normalized_name": "pomelo paradis",
+      "names": [
+        "Pomelo Paradis"
+      ],
+      "concentrations": [
+        "Eau de Cologne",
+        "Eau de Parfum"
+      ],
+      "rows": [
+        {
+          "id": "5221",
+          "name": "Pomelo Paradis",
+          "concentration": "Eau de Cologne",
+          "variant_count": "6"
+        },
+        {
+          "id": "14431",
+          "name": "Pomelo Paradis",
+          "concentration": "Eau de Parfum",
+          "variant_count": "3"
+        }
+      ]
+    },
+    {
+      "brand": "Atelier Cologne",
+      "normalized_name": "rose anonyme",
+      "names": [
+        "Rose Anonyme"
+      ],
+      "concentrations": [
+        "Eau de Cologne",
+        "Extrait de Parfum"
+      ],
+      "rows": [
+        {
+          "id": "5524",
+          "name": "Rose Anonyme",
+          "concentration": "Eau de Cologne",
+          "variant_count": "4"
+        },
+        {
+          "id": "14139",
+          "name": "Rose Anonyme",
+          "concentration": "Extrait de Parfum",
+          "variant_count": "3"
+        }
+      ]
+    },
+    {
+      "brand": "Atelier Cologne",
+      "normalized_name": "trefle pur",
+      "names": [
+        "Trefle Pur"
+      ],
+      "concentrations": [
+        "Eau de Cologne",
+        "Eau de Parfum"
+      ],
+      "rows": [
+        {
+          "id": "14825",
+          "name": "Trefle Pur",
+          "concentration": "Eau de Cologne",
+          "variant_count": "2"
+        },
+        {
+          "id": "14798",
+          "name": "Trefle Pur",
+          "concentration": "Eau de Parfum",
+          "variant_count": "1"
+        }
+      ]
+    },
+    {
+      "brand": "Atelier Cologne",
+      "normalized_name": "vanille insensee",
+      "names": [
+        "Vanille Insensee"
+      ],
+      "concentrations": [
+        "Eau de Cologne",
+        "Eau de Parfum"
+      ],
+      "rows": [
+        {
+          "id": "20284",
+          "name": "Vanille Insensee",
+          "concentration": "Eau de Cologne",
+          "variant_count": "2"
+        },
+        {
+          "id": "5464",
+          "name": "Vanille Insensee",
+          "concentration": "Eau de Parfum",
+          "variant_count": "1"
+        }
+      ]
+    },
+    {
+      "brand": "Atelier des Ors",
+      "normalized_name": "nuda veritas",
+      "names": [
+        "Nuda Veritas"
+      ],
+      "concentrations": [
+        "Eau de Parfum",
+        "Extrait de Parfum"
+      ],
+      "rows": [
+        {
+          "id": "6034",
+          "name": "Nuda Veritas",
+          "concentration": "Eau de Parfum",
+          "variant_count": "3"
+        },
+        {
+          "id": "5629",
+          "name": "Nuda Veritas",
+          "concentration": "Extrait de Parfum",
+          "variant_count": "1"
+        }
+      ]
+    },
+    {
+      "brand": "Atelier des Ors",
+      "normalized_name": "rose omeyyade",
+      "names": [
+        "Rose Omeyyade"
+      ],
+      "concentrations": [
+        "Eau de Parfum",
+        "Extrait de Parfum"
+      ],
+      "rows": [
+        {
+          "id": "5938",
+          "name": "Rose Omeyyade",
+          "concentration": "Eau de Parfum",
+          "variant_count": "3"
+        },
+        {
+          "id": "5608",
+          "name": "Rose Omeyyade",
+          "concentration": "Extrait de Parfum",
+          "variant_count": "1"
+        }
+      ]
+    },
+    {
+      "brand": "Atkinsons",
+      "normalized_name": "the excelsior bouquet",
+      "names": [
+        "The Excelsior Bouquet"
+      ],
+      "concentrations": [
+        "Eau de Parfum",
+        "Eau de Toilette"
+      ],
+      "rows": [
+        {
+          "id": "6822",
+          "name": "The Excelsior Bouquet",
+          "concentration": "Eau de Parfum",
+          "variant_count": "1"
+        },
+        {
+          "id": "16047",
+          "name": "The Excelsior Bouquet",
+          "concentration": "Eau de Toilette",
+          "variant_count": "1"
+        }
+      ]
+    },
+    {
+      "brand": "Atkinsons",
+      "normalized_name": "tulipe noire",
+      "names": [
+        "Tulipe Noire"
+      ],
+      "concentrations": [
+        "Eau de Parfum",
+        "Eau de Toilette"
+      ],
+      "rows": [
+        {
+          "id": "6792",
+          "name": "Tulipe Noire",
+          "concentration": "Eau de Parfum",
+          "variant_count": "3"
+        },
+        {
+          "id": "16014",
+          "name": "Tulipe Noire",
+          "concentration": "Eau de Toilette",
+          "variant_count": "1"
+        }
+      ]
+    },
+    {
+      "brand": "Attar Collection",
+      "normalized_name": "musk kashmir",
+      "names": [
+        "Musk Kashmir"
+      ],
+      "concentrations": [
+        "Eau de Parfum",
+        "Extrait de Parfum"
+      ],
+      "rows": [
+        {
+          "id": "18365",
+          "name": "Musk Kashmir",
+          "concentration": "Eau de Parfum",
+          "variant_count": "2"
+        },
+        {
+          "id": "8726",
+          "name": "Musk Kashmir",
+          "concentration": "Extrait de Parfum",
+          "variant_count": "3"
+        }
+      ]
+    },
+    {
+      "brand": "Attar Collection",
+      "normalized_name": "purple garnet crystal",
+      "names": [
+        "Purple Garnet Crystal"
+      ],
+      "concentrations": [
+        "Eau de Parfum",
+        "Perfume Oil"
+      ],
+      "rows": [
+        {
+          "id": "17891",
+          "name": "Purple Garnet Crystal",
+          "concentration": "Eau de Parfum",
+          "variant_count": "1"
+        },
+        {
+          "id": "15388",
+          "name": "Purple Garnet Crystal",
+          "concentration": "Perfume Oil",
+          "variant_count": "1"
+        }
+      ]
+    },
+    {
+      "brand": "Azzaro",
+      "normalized_name": "azzura",
+      "names": [
+        "Azzura"
+      ],
+      "concentrations": [
+        "Eau de Parfum",
+        "Eau de Toilette"
+      ],
+      "rows": [
+        {
+          "id": "13742",
+          "name": "Azzura",
+          "concentration": "Eau de Parfum",
+          "variant_count": "2"
+        },
+        {
+          "id": "8022",
+          "name": "Azzura",
+          "concentration": "Eau de Toilette",
+          "variant_count": "2"
+        }
+      ]
+    },
+    {
+      "brand": "Azzaro",
+      "normalized_name": "chrome",
+      "names": [
+        "Chrome"
+      ],
+      "concentrations": [
+        "Eau de Parfum",
+        "Eau de Toilette",
+        "Extrait de Parfum"
+      ],
+      "rows": [
+        {
+          "id": "13561",
+          "name": "Chrome",
+          "concentration": "Eau de Parfum",
+          "variant_count": "2"
+        },
+        {
+          "id": "11932",
+          "name": "Chrome",
+          "concentration": "Eau de Toilette",
+          "variant_count": "8"
+        },
+        {
+          "id": "10987",
+          "name": "Chrome",
+          "concentration": "Extrait de Parfum",
+          "variant_count": "3"
+        }
+      ]
+    },
+    {
+      "brand": "Azzaro",
+      "normalized_name": "the most wanted intense",
+      "names": [
+        "The Most Wanted Intense"
+      ],
+      "concentrations": [
+        "Eau de Parfum",
+        "Eau de Toilette"
+      ],
+      "rows": [
+        {
+          "id": "17373",
+          "name": "The Most Wanted Intense",
+          "concentration": "Eau de Parfum",
+          "variant_count": "2"
+        },
+        {
+          "id": "11186",
+          "name": "The Most Wanted Intense",
+          "concentration": "Eau de Toilette",
+          "variant_count": "4"
+        }
+      ]
+    },
+    {
+      "brand": "Azzaro",
+      "normalized_name": "visit for men",
+      "names": [
+        "Visit for Men"
+      ],
+      "concentrations": [
+        "Eau de Parfum",
+        "Eau de Toilette"
+      ],
+      "rows": [
+        {
+          "id": "12213",
+          "name": "Visit for Men",
+          "concentration": "Eau de Parfum",
+          "variant_count": "1"
+        },
+        {
+          "id": "15972",
+          "name": "Visit for Men",
+          "concentration": "Eau de Toilette",
+          "variant_count": "1"
+        }
+      ]
+    },
+    {
+      "brand": "Azzaro",
+      "normalized_name": "visit for women",
+      "names": [
+        "Visit for Women"
+      ],
+      "concentrations": [
+        "Eau de Parfum",
+        "Eau de Toilette"
+      ],
+      "rows": [
+        {
+          "id": "9568",
+          "name": "Visit for Women",
+          "concentration": "Eau de Parfum",
+          "variant_count": "4"
+        },
+        {
+          "id": "11115",
+          "name": "Visit for Women",
+          "concentration": "Eau de Toilette",
+          "variant_count": "1"
+        }
+      ]
+    },
+    {
+      "brand": "Azzaro",
+      "normalized_name": "wanted",
+      "names": [
+        "Wanted"
+      ],
+      "concentrations": [
+        "Eau de Parfum",
+        "Eau de Toilette"
+      ],
+      "rows": [
+        {
+          "id": "17157",
+          "name": "Wanted",
+          "concentration": "Eau de Parfum",
+          "variant_count": "1"
+        },
+        {
+          "id": "6629",
+          "name": "Wanted",
+          "concentration": "Eau de Toilette",
+          "variant_count": "5"
+        }
+      ]
+    },
+    {
+      "brand": "Azzaro",
+      "normalized_name": "wanted men",
+      "names": [
+        "Wanted Men"
+      ],
+      "concentrations": [
+        "Eau de Parfum",
+        "Eau de Toilette"
+      ],
+      "rows": [
+        {
+          "id": "12195",
+          "name": "Wanted Men",
+          "concentration": "Eau de Parfum",
+          "variant_count": "2"
+        },
+        {
+          "id": "15963",
+          "name": "Wanted Men",
+          "concentration": "Eau de Toilette",
+          "variant_count": "1"
+        }
+      ]
+    },
+    {
+      "brand": "Baldinini",
+      "normalized_name": "or noir for women",
+      "names": [
+        "Or Noir For women"
+      ],
+      "concentrations": [
+        "Eau de Parfum",
+        "Eau de Toilette"
+      ],
+      "rows": [
+        {
+          "id": "9787",
+          "name": "Or Noir For women",
+          "concentration": "Eau de Parfum",
+          "variant_count": "4"
+        },
+        {
+          "id": "16273",
+          "name": "Or Noir For women",
+          "concentration": "Eau de Toilette",
+          "variant_count": "1"
+        }
+      ]
+    },
+    {
+      "brand": "Balenciaga",
+      "normalized_name": "le dix",
+      "names": [
+        "Le Dix"
+      ],
+      "concentrations": [
+        "Eau de Toilette",
+        "Extrait de Parfum"
+      ],
+      "rows": [
+        {
+          "id": "11563",
+          "name": "Le Dix",
+          "concentration": "Eau de Toilette",
+          "variant_count": "2"
+        },
+        {
+          "id": "14884",
+          "name": "Le Dix",
+          "concentration": "Extrait de Parfum",
+          "variant_count": "1"
+        }
+      ]
+    },
+    {
+      "brand": "Balenciaga",
+      "normalized_name": "michelle",
+      "names": [
+        "Michelle"
+      ],
+      "concentrations": [
+        "Eau de Toilette",
+        "Extrait de Parfum"
+      ],
+      "rows": [
+        {
+          "id": "11455",
+          "name": "Michelle",
+          "concentration": "Eau de Toilette",
+          "variant_count": "1"
+        },
+        {
+          "id": "14877",
+          "name": "Michelle",
+          "concentration": "Extrait de Parfum",
+          "variant_count": "1"
+        }
+      ]
+    },
+    {
+      "brand": "Balmain",
+      "normalized_name": "carbone de",
+      "names": [
+        "Carbone de"
+      ],
+      "concentrations": [
+        "Eau de Parfum",
+        "Eau de Toilette"
+      ],
+      "rows": [
+        {
+          "id": "13597",
+          "name": "Carbone de",
+          "concentration": "Eau de Parfum",
+          "variant_count": "1"
+        },
+        {
+          "id": "16897",
+          "name": "Carbone de",
+          "concentration": "Eau de Toilette",
+          "variant_count": "1"
+        }
+      ]
+    },
+    {
+      "brand": "Balmain",
+      "normalized_name": "ebene",
+      "names": [
+        "Ebene"
+      ],
+      "concentrations": [
+        "Eau de Parfum",
+        "Eau de Toilette"
+      ],
+      "rows": [
+        {
+          "id": "13428",
+          "name": "Ebene",
+          "concentration": "Eau de Parfum",
+          "variant_count": "1"
+        },
+        {
+          "id": "8013",
+          "name": "Ebene",
+          "concentration": "Eau de Toilette",
+          "variant_count": "1"
+        }
+      ]
+    },
+    {
+      "brand": "Balmain",
+      "normalized_name": "extatic",
+      "names": [
+        "Extatic"
+      ],
+      "concentrations": [
+        "Eau de Parfum",
+        "Eau de Toilette"
+      ],
+      "rows": [
+        {
+          "id": "10454",
+          "name": "Extatic",
+          "concentration": "Eau de Parfum",
+          "variant_count": "2"
+        },
+        {
+          "id": "8383",
+          "name": "Extatic",
+          "concentration": "Eau de Toilette",
+          "variant_count": "2"
+        }
+      ]
+    },
+    {
+      "brand": "Balmain",
+      "normalized_name": "ivoire de",
+      "names": [
+        "Ivoire de"
+      ],
+      "concentrations": [
+        "Eau de Parfum",
+        "Eau de Toilette",
+        "Extrait de Parfum"
+      ],
+      "rows": [
+        {
+          "id": "13120",
+          "name": "Ivoire de",
+          "concentration": "Eau de Parfum",
+          "variant_count": "1"
+        },
+        {
+          "id": "16504",
+          "name": "Ivoire de",
+          "concentration": "Eau de Toilette",
+          "variant_count": "1"
+        },
+        {
+          "id": "8636",
+          "name": "Ivoire de",
+          "concentration": "Extrait de Parfum",
+          "variant_count": "2"
+        }
+      ]
+    },
+    {
+      "brand": "Balmain",
+      "normalized_name": "vent vert",
+      "names": [
+        "Vent Vert"
+      ],
+      "concentrations": [
+        "Eau de Toilette",
+        "Extrait de Parfum"
+      ],
+      "rows": [
+        {
+          "id": "8137",
+          "name": "Vent Vert",
+          "concentration": "Eau de Toilette",
+          "variant_count": "1"
+        },
+        {
+          "id": "14860",
+          "name": "Vent Vert",
+          "concentration": "Extrait de Parfum",
+          "variant_count": "1"
+        }
+      ]
+    },
+    {
+      "brand": "Banana Republic",
+      "normalized_name": "black walnut legend",
+      "names": [
+        "Black Walnut Legend"
+      ],
+      "concentrations": [
+        "Eau de Parfum",
+        "Eau de Toilette"
+      ],
+      "rows": [
+        {
+          "id": "19865",
+          "name": "Black Walnut Legend",
+          "concentration": "Eau de Parfum",
+          "variant_count": "1"
+        },
+        {
+          "id": "16943",
+          "name": "Black Walnut Legend",
+          "concentration": "Eau de Toilette",
+          "variant_count": "2"
+        }
+      ]
+    },
+    {
+      "brand": "Banana Republic",
+      "normalized_name": "classic",
+      "names": [
+        "Classic"
+      ],
+      "concentrations": [
+        "Eau de Parfum",
+        "Eau de Toilette"
+      ],
+      "rows": [
+        {
+          "id": "15310",
+          "name": "Classic",
+          "concentration": "Eau de Parfum",
+          "variant_count": "1"
+        },
+        {
+          "id": "11920",
+          "name": "Classic",
+          "concentration": "Eau de Toilette",
+          "variant_count": "3"
+        }
+      ]
+    },
+    {
+      "brand": "Banana Republic",
+      "normalized_name": "cordovan",
+      "names": [
+        "Cordovan"
+      ],
+      "concentrations": [
+        "Eau de Parfum",
+        "Eau de Toilette"
+      ],
+      "rows": [
+        {
+          "id": "19602",
+          "name": "Cordovan",
+          "concentration": "Eau de Parfum",
+          "variant_count": "1"
+        },
+        {
+          "id": "16830",
+          "name": "Cordovan",
+          "concentration": "Eau de Toilette",
+          "variant_count": "2"
+        }
+      ]
+    },
+    {
+      "brand": "Banana Republic",
+      "normalized_name": "slate arctic",
+      "names": [
+        "Slate Arctic"
+      ],
+      "concentrations": [
+        "Eau de Parfum",
+        "Eau de Toilette"
+      ],
+      "rows": [
+        {
+          "id": "17576",
+          "name": "Slate Arctic",
+          "concentration": "Eau de Parfum",
+          "variant_count": "1"
+        },
+        {
+          "id": "16110",
+          "name": "Slate Arctic",
+          "concentration": "Eau de Toilette",
+          "variant_count": "1"
+        }
+      ]
+    },
+    {
+      "brand": "BDK",
+      "normalized_name": "gris charnel",
+      "names": [
+        "Gris Charnel"
+      ],
+      "concentrations": [
+        "Eau de Parfum",
+        "Extrait de Parfum"
+      ],
+      "rows": [
+        {
+          "id": "5130",
+          "name": "Gris Charnel",
+          "concentration": "Eau de Parfum",
+          "variant_count": "4"
+        },
+        {
+          "id": "6565",
+          "name": "Gris Charnel",
+          "concentration": "Extrait de Parfum",
+          "variant_count": "3"
+        }
+      ]
+    },
+    {
+      "brand": "BDK",
+      "normalized_name": "pas ce soir",
+      "names": [
+        "Pas Ce Soir"
+      ],
+      "concentrations": [
+        "Eau de Parfum",
+        "Extrait de Parfum"
+      ],
+      "rows": [
+        {
+          "id": "5057",
+          "name": "Pas Ce Soir",
+          "concentration": "Eau de Parfum",
+          "variant_count": "1"
+        },
+        {
+          "id": "15581",
+          "name": "Pas Ce Soir",
+          "concentration": "Extrait de Parfum",
+          "variant_count": "2"
+        }
+      ]
+    },
+    {
+      "brand": "BDK",
+      "normalized_name": "pas e soir",
+      "names": [
+        "Pas Сe Soir"
+      ],
+      "concentrations": [
+        "Eau de Parfum",
+        "Extrait de Parfum"
+      ],
+      "rows": [
+        {
+          "id": "7001",
+          "name": "Pas Сe Soir",
+          "concentration": "Eau de Parfum",
+          "variant_count": "3"
+        },
+        {
+          "id": "15580",
+          "name": "Pas Сe Soir",
+          "concentration": "Extrait de Parfum",
+          "variant_count": "2"
+        }
+      ]
+    },
+    {
+      "brand": "BDK",
+      "normalized_name": "rouge smoking",
+      "names": [
+        "Rouge Smoking"
+      ],
+      "concentrations": [
+        "Eau de Parfum",
+        "Extrait de Parfum"
+      ],
+      "rows": [
+        {
+          "id": "5035",
+          "name": "Rouge Smoking",
+          "concentration": "Eau de Parfum",
+          "variant_count": "4"
+        },
+        {
+          "id": "15526",
+          "name": "Rouge Smoking",
+          "concentration": "Extrait de Parfum",
+          "variant_count": "2"
+        }
+      ]
+    },
+    {
+      "brand": "Benetton",
+      "normalized_name": "tribu",
+      "names": [
+        "Tribu"
+      ],
+      "concentrations": [
+        "Eau de Parfum",
+        "Eau de Toilette"
+      ],
+      "rows": [
+        {
+          "id": "8149",
+          "name": "Tribu",
+          "concentration": "Eau de Parfum",
+          "variant_count": "2"
+        },
+        {
+          "id": "16021",
+          "name": "Tribu",
+          "concentration": "Eau de Toilette",
+          "variant_count": "2"
+        }
+      ]
+    },
+    {
+      "brand": "Bentley",
+      "normalized_name": "black edition for men",
+      "names": [
+        "Black Edition for Men"
+      ],
+      "concentrations": [
+        "Eau de Parfum",
+        "Eau de Toilette"
+      ],
+      "rows": [
+        {
+          "id": "19881",
+          "name": "Black Edition for Men",
+          "concentration": "Eau de Parfum",
+          "variant_count": "2"
+        },
+        {
+          "id": "16951",
+          "name": "Black Edition for Men",
+          "concentration": "Eau de Toilette",
+          "variant_count": "1"
+        }
+      ]
+    },
+    {
+      "brand": "Beyonce",
+      "normalized_name": "heat rush",
+      "names": [
+        "Heat Rush"
+      ],
+      "concentrations": [
+        "Eau de Parfum",
+        "Eau de Toilette"
+      ],
+      "rows": [
+        {
+          "id": "19056",
+          "name": "Heat Rush",
+          "concentration": "Eau de Parfum",
+          "variant_count": "1"
+        },
+        {
+          "id": "11679",
+          "name": "Heat Rush",
+          "concentration": "Eau de Toilette",
+          "variant_count": "2"
+        }
+      ]
+    },
+    {
+      "brand": "Bill Blass",
+      "normalized_name": "for women",
+      "names": [
+        "for Women"
+      ],
+      "concentrations": [
+        "Eau de Parfum",
+        "Eau de Toilette"
+      ],
+      "rows": [
+        {
+          "id": "8965",
+          "name": "for Women",
+          "concentration": "Eau de Parfum",
+          "variant_count": "5"
+        },
+        {
+          "id": "16634",
+          "name": "for Women",
+          "concentration": "Eau de Toilette",
+          "variant_count": "1"
+        }
+      ]
+    },
+    {
+      "brand": "Boadicea the Victorious",
+      "normalized_name": "aqua sapphire",
+      "names": [
+        "Aqua Sapphire"
+      ],
+      "concentrations": [
+        "Eau de Parfum",
+        "Extrait de Parfum"
+      ],
+      "rows": [
+        {
+          "id": "5196",
+          "name": "Aqua Sapphire",
+          "concentration": "Eau de Parfum",
+          "variant_count": "4"
+        },
+        {
+          "id": "15895",
+          "name": "Aqua Sapphire",
+          "concentration": "Extrait de Parfum",
+          "variant_count": "1"
+        }
+      ]
+    },
+    {
+      "brand": "Boadicea the Victorious",
+      "normalized_name": "blue sapphire",
+      "names": [
+        "Blue Sapphire"
+      ],
+      "concentrations": [
+        "Eau de Parfum",
+        "Extrait de Parfum"
+      ],
+      "rows": [
+        {
+          "id": "5186",
+          "name": "Blue Sapphire",
+          "concentration": "Eau de Parfum",
+          "variant_count": "4"
+        },
+        {
+          "id": "15869",
+          "name": "Blue Sapphire",
+          "concentration": "Extrait de Parfum",
+          "variant_count": "2"
+        }
+      ]
+    },
+    {
+      "brand": "Boadicea the Victorious",
+      "normalized_name": "blue sapphire supercharged",
+      "names": [
+        "Blue Sapphire Supercharged"
+      ],
+      "concentrations": [
+        "Eau de Parfum",
+        "Extrait de Parfum"
+      ],
+      "rows": [
+        {
+          "id": "19828",
+          "name": "Blue Sapphire Supercharged",
+          "concentration": "Eau de Parfum",
+          "variant_count": "2"
+        },
+        {
+          "id": "15868",
+          "name": "Blue Sapphire Supercharged",
+          "concentration": "Extrait de Parfum",
+          "variant_count": "2"
+        }
+      ]
+    },
+    {
+      "brand": "Boadicea the Victorious",
+      "normalized_name": "dragon",
+      "names": [
+        "Dragon"
+      ],
+      "concentrations": [
+        "Eau de Parfum",
+        "Extrait de Parfum"
+      ],
+      "rows": [
+        {
+          "id": "19457",
+          "name": "Dragon",
+          "concentration": "Eau de Parfum",
+          "variant_count": "2"
+        },
+        {
+          "id": "15800",
+          "name": "Dragon",
+          "concentration": "Extrait de Parfum",
+          "variant_count": "2"
+        }
+      ]
+    },
+    {
+      "brand": "Boadicea the Victorious",
+      "normalized_name": "hanuman",
+      "names": [
+        "Hanuman"
+      ],
+      "concentrations": [
+        "Eau de Parfum",
+        "Extrait de Parfum"
+      ],
+      "rows": [
+        {
+          "id": "19069",
+          "name": "Hanuman",
+          "concentration": "Eau de Parfum",
+          "variant_count": "2"
+        },
+        {
+          "id": "15749",
+          "name": "Hanuman",
+          "concentration": "Extrait de Parfum",
+          "variant_count": "1"
+        }
+      ]
+    },
+    {
+      "brand": "Boadicea the Victorious",
+      "normalized_name": "harmonious",
+      "names": [
+        "Harmonious"
+      ],
+      "concentrations": [
+        "Eau de Parfum",
+        "Extrait de Parfum"
+      ],
+      "rows": [
+        {
+          "id": "19067",
+          "name": "Harmonious",
+          "concentration": "Eau de Parfum",
+          "variant_count": "2"
+        },
+        {
+          "id": "15746",
+          "name": "Harmonious",
+          "concentration": "Extrait de Parfum",
+          "variant_count": "1"
+        }
+      ]
+    },
+    {
+      "brand": "Boadicea the Victorious",
+      "normalized_name": "hasu",
+      "names": [
+        "Hasu"
+      ],
+      "concentrations": [
+        "Eau de Parfum",
+        "Extrait de Parfum"
+      ],
+      "rows": [
+        {
+          "id": "5128",
+          "name": "Hasu",
+          "concentration": "Eau de Parfum",
+          "variant_count": "2"
+        },
+        {
+          "id": "4932",
+          "name": "Hasu",
+          "concentration": "Extrait de Parfum",
+          "variant_count": "3"
+        }
+      ]
+    },
+    {
+      "brand": "Boadicea the Victorious",
+      "normalized_name": "tiangou",
+      "names": [
+        "Tiangou"
+      ],
+      "concentrations": [
+        "Eau de Parfum",
+        "Extrait de Parfum"
+      ],
+      "rows": [
+        {
+          "id": "5866",
+          "name": "Tiangou",
+          "concentration": "Eau de Parfum",
+          "variant_count": "1"
+        },
+        {
+          "id": "15466",
+          "name": "Tiangou",
+          "concentration": "Extrait de Parfum",
+          "variant_count": "1"
+        }
+      ]
+    },
+    {
+      "brand": "Boadicea the Victorious",
+      "normalized_name": "tobacco sapphire",
+      "names": [
+        "Tobacco Sapphire"
+      ],
+      "concentrations": [
+        "Eau de Parfum",
+        "Extrait de Parfum"
+      ],
+      "rows": [
+        {
+          "id": "17342",
+          "name": "Tobacco Sapphire",
+          "concentration": "Eau de Parfum",
+          "variant_count": "2"
+        },
+        {
+          "id": "15463",
+          "name": "Tobacco Sapphire",
+          "concentration": "Extrait de Parfum",
+          "variant_count": "2"
+        }
+      ]
+    },
+    {
+      "brand": "Boadicea the Victorious",
+      "normalized_name": "violet sapphire",
+      "names": [
+        "Violet Sapphire"
+      ],
+      "concentrations": [
+        "Eau de Parfum",
+        "Extrait de Parfum"
+      ],
+      "rows": [
+        {
+          "id": "4978",
+          "name": "Violet Sapphire",
+          "concentration": "Eau de Parfum",
+          "variant_count": "3"
+        },
+        {
+          "id": "15435",
+          "name": "Violet Sapphire",
+          "concentration": "Extrait de Parfum",
+          "variant_count": "1"
+        }
+      ]
+    },
+    {
+      "brand": "Bois 1920",
+      "normalized_name": "real patchouly",
+      "names": [
+        "Real Patchouly"
+      ],
+      "concentrations": [
+        "Eau de Parfum",
+        "Eau de Toilette"
+      ],
+      "rows": [
+        {
+          "id": "17853",
+          "name": "Real Patchouly",
+          "concentration": "Eau de Parfum",
+          "variant_count": "1"
+        },
+        {
+          "id": "16189",
+          "name": "Real Patchouly",
+          "concentration": "Eau de Toilette",
+          "variant_count": "1"
+        }
+      ]
+    },
+    {
+      "brand": "Bois 1920",
+      "normalized_name": "sandalo e the",
+      "names": [
+        "Sandalo e The"
+      ],
+      "concentrations": [
+        "Eau de Parfum",
+        "Eau de Toilette"
+      ],
+      "rows": [
+        {
+          "id": "17688",
+          "name": "Sandalo e The",
+          "concentration": "Eau de Parfum",
+          "variant_count": "1"
+        },
+        {
+          "id": "16148",
+          "name": "Sandalo e The",
+          "concentration": "Eau de Toilette",
+          "variant_count": "1"
+        }
+      ]
+    },
+    {
+      "brand": "Bois 1920",
+      "normalized_name": "scorzaforza",
+      "names": [
+        "Scorzaforza"
+      ],
+      "concentrations": [
+        "Eau de Parfum",
+        "Extrait de Parfum"
+      ],
+      "rows": [
+        {
+          "id": "6888",
+          "name": "Scorzaforza",
+          "concentration": "Eau de Parfum",
+          "variant_count": "2"
+        },
+        {
+          "id": "6486",
+          "name": "Scorzaforza",
+          "concentration": "Extrait de Parfum",
+          "variant_count": "4"
+        }
+      ]
+    }
+  ],
+  "missing_gender_examples": [
+    {
+      "brand": "Alessandro Dell",
+      "plain_id": "17038",
+      "plain_name": "Acqua",
+      "concentration": "Eau de Toilette",
+      "male_id": "17036",
+      "male_name": "Acqua For Men"
+    },
+    {
+      "brand": "Alfred Dunhill",
+      "plain_id": "11862",
+      "plain_name": "Desire",
+      "concentration": "Eau de Toilette",
+      "male_id": "15052",
+      "male_name": "Desire for Men"
+    },
+    {
+      "brand": "Angel Schlesser",
+      "plain_id": "11792",
+      "plain_name": "Esprit de Gingembre",
+      "concentration": "Eau de Toilette",
+      "male_id": "11791",
+      "male_name": "Esprit de Gingembre Pour Homme"
+    },
+    {
+      "brand": "Antonio Banderas",
+      "plain_id": "12332",
+      "plain_name": "The Icon",
+      "concentration": "Eau de Parfum",
+      "male_id": "12330",
+      "male_name": "The Icon for Men"
+    },
+    {
+      "brand": "Antonio Banderas",
+      "plain_id": "11191",
+      "plain_name": "The Icon",
+      "concentration": "Eau de Toilette",
+      "male_id": "11190",
+      "male_name": "The Icon for Men"
+    },
+    {
+      "brand": "Armani",
+      "plain_id": "14102",
+      "plain_name": "Acqua Di Gio",
+      "concentration": "Eau de Toilette",
+      "male_id": "6724",
+      "male_name": "Acqua Di Gio Pour Homme"
+    },
+    {
+      "brand": "Armani",
+      "plain_id": "13872",
+      "plain_name": "Acqua di Gio Essenza",
+      "concentration": "Eau de Parfum",
+      "male_id": "10192",
+      "male_name": "Acqua di Gio Essenza Pour Homme"
+    },
+    {
+      "brand": "Armani",
+      "plain_id": "8163",
+      "plain_name": "Code",
+      "concentration": "Eau de Parfum",
+      "male_id": "7411",
+      "male_name": "Code Pour Homme"
+    },
+    {
+      "brand": "Armani",
+      "plain_id": "9481",
+      "plain_name": "Code",
+      "concentration": "Eau de Toilette",
+      "male_id": "9475",
+      "male_name": "Code Pour Homme"
+    },
+    {
+      "brand": "Armani",
+      "plain_id": "6588",
+      "plain_name": "Code",
+      "concentration": "Extrait de Parfum",
+      "male_id": "7821",
+      "male_name": "Code Pour Homme"
+    },
+    {
+      "brand": "Armani",
+      "plain_id": "9480",
+      "plain_name": "Code Absolu",
+      "concentration": "Eau de Toilette",
+      "male_id": "10347",
+      "male_name": "Code Absolu for men"
+    },
+    {
+      "brand": "Armani",
+      "plain_id": "11861",
+      "plain_name": "Diamonds",
+      "concentration": "Eau de Toilette",
+      "male_id": "9444",
+      "male_name": "Diamonds Pour Homme"
+    },
+    {
+      "brand": "Armani",
+      "plain_id": "14313",
+      "plain_name": "Emporio Diamonds",
+      "concentration": "Eau de Toilette",
+      "male_id": "8144",
+      "male_name": "Emporio Diamonds for Men"
+    },
+    {
+      "brand": "Baldessarini",
+      "plain_id": "11866",
+      "plain_name": "Del Mar Marbella",
+      "concentration": "Eau de Toilette",
+      "male_id": "8395",
+      "male_name": "Del Mar Marbella For Men"
+    },
+    {
+      "brand": "Bentley",
+      "plain_id": "18947",
+      "plain_name": "Infinite Intense",
+      "concentration": "Eau de Parfum",
+      "male_id": "18946",
+      "male_name": "Infinite Intense for Men"
+    },
+    {
+      "brand": "Burberry",
+      "plain_id": "16916",
+      "plain_name": "Brit",
+      "concentration": "Eau de Toilette",
+      "male_id": "14339",
+      "male_name": "Brit for Men"
+    },
+    {
+      "brand": "Burberry",
+      "plain_id": "16377",
+      "plain_name": "London",
+      "concentration": "Eau de Toilette",
+      "male_id": "11501",
+      "male_name": "London For Men"
+    },
+    {
+      "brand": "Burberry",
+      "plain_id": "9183",
+      "plain_name": "The Beat",
+      "concentration": "Eau de Toilette",
+      "male_id": "11196",
+      "male_name": "The Beat For Men"
+    },
+    {
+      "brand": "Byredo",
+      "plain_id": "7109",
+      "plain_name": "Mister Marvelous",
+      "concentration": "Eau de Parfum",
+      "male_id": "12881",
+      "male_name": "Mister Marvelous For Men"
+    },
+    {
+      "brand": "Cafe-Cafe",
+      "plain_id": "11649",
+      "plain_name": "Iced",
+      "concentration": "Eau de Toilette",
+      "male_id": "11648",
+      "male_name": "Iced Pour Homme"
+    },
+    {
+      "brand": "Calvin Klein",
+      "plain_id": "11905",
+      "plain_name": "Contradiction",
+      "concentration": "Eau de Toilette",
+      "male_id": "16837",
+      "male_name": "Contradiction For Men"
+    },
+    {
+      "brand": "Calvin Klein",
+      "plain_id": "19310",
+      "plain_name": "Eternity Summer",
+      "concentration": "Eau de Parfum",
+      "male_id": "19307",
+      "male_name": "Eternity Summer For Men"
+    },
+    {
+      "brand": "Canali",
+      "plain_id": "13677",
+      "plain_name": "Black Diamond",
+      "concentration": "Eau de Parfum",
+      "male_id": "14598",
+      "male_name": "Black Diamond For Men"
+    },
+    {
+      "brand": "Canali",
+      "plain_id": "16080",
+      "plain_name": "Summer Night",
+      "concentration": "Eau de Toilette",
+      "male_id": "11214",
+      "male_name": "Summer Night For Men"
+    },
+    {
+      "brand": "Carolina Herrera",
+      "plain_id": "11947",
+      "plain_name": "CH",
+      "concentration": "Eau de Toilette",
+      "male_id": "11946",
+      "male_name": "CH for Men"
+    },
+    {
+      "brand": "Cartier",
+      "plain_id": "10971",
+      "plain_name": "Declaration",
+      "concentration": "Extrait de Parfum",
+      "male_id": "6579",
+      "male_name": "Declaration For Men"
+    },
+    {
+      "brand": "Cartier",
+      "plain_id": "8791",
+      "plain_name": "L'Envol de",
+      "concentration": "Eau de Toilette",
+      "male_id": "11522",
+      "male_name": "L'Envol de Pour homme"
+    },
+    {
+      "brand": "Cartier",
+      "plain_id": "11433",
+      "plain_name": "Must de",
+      "concentration": "Eau de Toilette",
+      "male_id": "16308",
+      "male_name": "Must de Pour Homme"
+    },
+    {
+      "brand": "Charriol",
+      "plain_id": "18013",
+      "plain_name": "Philippe",
+      "concentration": "Eau de Parfum",
+      "male_id": "18010",
+      "male_name": "Philippe Pour Homme"
+    },
+    {
+      "brand": "Charriol",
+      "plain_id": "18012",
+      "plain_name": "Philippe II",
+      "concentration": "Eau de Parfum",
+      "male_id": "18011",
+      "male_name": "Philippe II Pour Homme"
+    },
+    {
+      "brand": "Christian Lacroix",
+      "plain_id": "12021",
+      "plain_name": "Bazar",
+      "concentration": "Eau de Toilette",
+      "male_id": "12020",
+      "male_name": "Bazar Pour Homme"
+    },
+    {
+      "brand": "Coach",
+      "plain_id": "16935",
+      "plain_name": "Blue",
+      "concentration": "Eau de Toilette",
+      "male_id": "16933",
+      "male_name": "Blue For Men"
+    },
+    {
+      "brand": "Davidoff",
+      "plain_id": "11900",
+      "plain_name": "Cool Water Wave",
+      "concentration": "Eau de Toilette",
+      "male_id": "9462",
+      "male_name": "Cool Water Wave for Men"
+    },
+    {
+      "brand": "Davidoff",
+      "plain_id": "7969",
+      "plain_name": "Relax",
+      "concentration": "Eau de Toilette",
+      "male_id": "7968",
+      "male_name": "Relax For Men"
+    },
+    {
+      "brand": "Diesel",
+      "plain_id": "9275",
+      "plain_name": "Only The Brave",
+      "concentration": "Eau de Toilette",
+      "male_id": "9274",
+      "male_name": "Only The Brave For Men"
+    },
+    {
+      "brand": "Dior",
+      "plain_id": "11845",
+      "plain_name": "Dune",
+      "concentration": "Eau de Toilette",
+      "male_id": "16778",
+      "male_name": "Dune Pour Homme"
+    },
+    {
+      "brand": "Dior",
+      "plain_id": "16739",
+      "plain_name": "Eau Sauvage Extreme",
+      "concentration": "Eau de Toilette",
+      "male_id": "11817",
+      "male_name": "Eau Sauvage Extreme For Men"
+    },
+    {
+      "brand": "Dolce & Gabbana",
+      "plain_id": "5160",
+      "plain_name": "Devotion",
+      "concentration": "Eau de Parfum",
+      "male_id": "5158",
+      "male_name": "Devotion Pour Homme"
+    },
+    {
+      "brand": "Dolce & Gabbana",
+      "plain_id": "4957",
+      "plain_name": "Light Blue",
+      "concentration": "Eau de Toilette",
+      "male_id": "4956",
+      "male_name": "Light Blue Pour Homme"
+    },
+    {
+      "brand": "Dolce & Gabbana",
+      "plain_id": "5102",
+      "plain_name": "Light Blue Eau Intense",
+      "concentration": "Eau de Parfum",
+      "male_id": "6096",
+      "male_name": "Light Blue Eau Intense Pour Homme"
+    },
+    {
+      "brand": "Dolce & Gabbana",
+      "plain_id": "16389",
+      "plain_name": "Light Blue Love is Love",
+      "concentration": "Eau de Toilette",
+      "male_id": "9326",
+      "male_name": "Light Blue Love is Love Pour Homme"
+    },
+    {
+      "brand": "Dolce & Gabbana",
+      "plain_id": "16388",
+      "plain_name": "Light Blue Sun",
+      "concentration": "Eau de Toilette",
+      "male_id": "15161",
+      "male_name": "Light Blue Sun Pour Homme"
+    },
+    {
+      "brand": "Dolce & Gabbana",
+      "plain_id": "8059",
+      "plain_name": "Q Intense",
+      "concentration": "Eau de Parfum",
+      "male_id": "8058",
+      "male_name": "Q Intense Pour Homme"
+    },
+    {
+      "brand": "Dolce & Gabbana",
+      "plain_id": "4993",
+      "plain_name": "The One",
+      "concentration": "Eau de Parfum",
+      "male_id": "12320",
+      "male_name": "The One for Men"
+    },
+    {
+      "brand": "Dolce & Gabbana",
+      "plain_id": "11185",
+      "plain_name": "The One",
+      "concentration": "Eau de Toilette",
+      "male_id": "4947",
+      "male_name": "The One for Men"
+    },
+    {
+      "brand": "Dolce & Gabbana",
+      "plain_id": "9611",
+      "plain_name": "The One Gold",
+      "concentration": "Eau de Parfum",
+      "male_id": "12318",
+      "male_name": "The One Gold for Men"
+    },
+    {
+      "brand": "Donna Karan",
+      "plain_id": "14351",
+      "plain_name": "Be Delicious",
+      "concentration": "Eau de Toilette",
+      "male_id": "12018",
+      "male_name": "Be Delicious for Men"
+    },
+    {
+      "brand": "Dsquared2",
+      "plain_id": "8023",
+      "plain_name": "2 Wood",
+      "concentration": "Eau de Toilette",
+      "male_id": "17062",
+      "male_name": "2 Wood Pour Homme"
+    },
+    {
+      "brand": "Dsquared2",
+      "plain_id": "11683",
+      "plain_name": "He Wood",
+      "concentration": "Eau de Toilette",
+      "male_id": "16568",
+      "male_name": "He Wood Pour Homme"
+    },
+    {
+      "brand": "Dsquared2",
+      "plain_id": "16510",
+      "plain_name": "Intense He Wood",
+      "concentration": "Eau de Toilette",
+      "male_id": "16509",
+      "male_name": "Intense He Wood Pour Homme"
+    },
+    {
+      "brand": "Dsquared2",
+      "plain_id": "14713",
+      "plain_name": "Potion",
+      "concentration": "Eau de Parfum",
+      "male_id": "12638",
+      "male_name": "Potion Pour Homme"
+    },
+    {
+      "brand": "Dsquared2",
+      "plain_id": "17964",
+      "plain_name": "Potion Royal Black",
+      "concentration": "Eau de Parfum",
+      "male_id": "17963",
+      "male_name": "Potion Royal Black Pour Homme"
+    },
+    {
+      "brand": "Dsquared2",
+      "plain_id": "11100",
+      "plain_name": "Wild",
+      "concentration": "Eau de Toilette",
+      "male_id": "4862",
+      "male_name": "Wild Pour Homme"
+    },
+    {
+      "brand": "Eisenberg",
+      "plain_id": "19800",
+      "plain_name": "Bois Precieux Secret II",
+      "concentration": "Eau de Parfum",
+      "male_id": "13646",
+      "male_name": "Bois Precieux Secret II Pour Homme"
+    },
+    {
+      "brand": "Eisenberg",
+      "plain_id": "19498",
+      "plain_name": "Diabolique",
+      "concentration": "Eau de Parfum",
+      "male_id": "13472",
+      "male_name": "Diabolique Pour Homme"
+    },
+    {
+      "brand": "Eisenberg",
+      "plain_id": "18711",
+      "plain_name": "Le Peche",
+      "concentration": "Eau de Parfum",
+      "male_id": "13026",
+      "male_name": "Le Peche Pour Homme"
+    },
+    {
+      "brand": "Eisenberg",
+      "plain_id": "18616",
+      "plain_name": "Love Affair",
+      "concentration": "Eau de Parfum",
+      "male_id": "12961",
+      "male_name": "Love Affair Pour Homme"
+    },
+    {
+      "brand": "Eisenberg",
+      "plain_id": "18042",
+      "plain_name": "Patchouli Noble Secret III",
+      "concentration": "Eau de Parfum",
+      "male_id": "12692",
+      "male_name": "Patchouli Noble Secret III Pour Homme"
+    },
+    {
+      "brand": "Escada",
+      "plain_id": "14258",
+      "plain_name": "Moon Sparkle",
+      "concentration": "Eau de Toilette",
+      "male_id": "11441",
+      "male_name": "Moon Sparkle For Men"
+    },
+    {
+      "brand": "Escada",
+      "plain_id": "9213",
+      "plain_name": "Sentiment",
+      "concentration": "Eau de Toilette",
+      "male_id": "11266",
+      "male_name": "Sentiment Pour Homme"
+    },
+    {
+      "brand": "Fendi",
+      "plain_id": "9425",
+      "plain_name": "Fan di",
+      "concentration": "Eau de Toilette",
+      "male_id": "8008",
+      "male_name": "Fan di pour Homme"
+    },
+    {
+      "brand": "Francis Kurkdjian",
+      "plain_id": "10244",
+      "plain_name": "Apom",
+      "concentration": "Eau de Parfum",
+      "male_id": "7528",
+      "male_name": "Apom Pour Homme"
+    },
+    {
+      "brand": "Gianfranco Ferre",
+      "plain_id": "12113",
+      "plain_name": "Acqua Azzurra",
+      "concentration": "Eau de Toilette",
+      "male_id": "14366",
+      "male_name": "Acqua Azzurra for Men"
+    },
+    {
+      "brand": "Givenchy",
+      "plain_id": "9175",
+      "plain_name": "Very Irresistible",
+      "concentration": "Eau de Toilette",
+      "male_id": "11126",
+      "male_name": "Very Irresistible for Men"
+    },
+    {
+      "brand": "Gucci",
+      "plain_id": "9496",
+      "plain_name": "By",
+      "concentration": "Eau de Toilette",
+      "male_id": "8414",
+      "male_name": "by Pour Homme"
+    },
+    {
+      "brand": "Gucci",
+      "plain_id": "11798",
+      "plain_name": "Envy",
+      "concentration": "Eau de Toilette",
+      "male_id": "11797",
+      "male_name": "Envy for Men"
+    },
+    {
+      "brand": "Gucci",
+      "plain_id": "8555",
+      "plain_name": "Guilty",
+      "concentration": "Eau de Parfum",
+      "male_id": "8546",
+      "male_name": "Guilty Pour Homme"
+    },
+    {
+      "brand": "Gucci",
+      "plain_id": "8372",
+      "plain_name": "Guilty",
+      "concentration": "Eau de Toilette",
+      "male_id": "8366",
+      "male_name": "Guilty Pour Homme"
+    },
+    {
+      "brand": "Gucci",
+      "plain_id": "8334",
+      "plain_name": "Made to Measure",
+      "concentration": "Eau de Toilette",
+      "male_id": "8333",
+      "male_name": "Made to Measure Pour Homme"
+    },
+    {
+      "brand": "Guerlain",
+      "plain_id": "8929",
+      "plain_name": "L'Instant",
+      "concentration": "Eau de Parfum",
+      "male_id": "18644",
+      "male_name": "L'Instant For Men"
+    },
+    {
+      "brand": "Guerlain",
+      "plain_id": "16380",
+      "plain_name": "L'Instant",
+      "concentration": "Eau de Toilette",
+      "male_id": "9321",
+      "male_name": "L'Instant For Men"
+    },
+    {
+      "brand": "Guerlain",
+      "plain_id": "8786",
+      "plain_name": "L'Instant de",
+      "concentration": "Eau de Toilette",
+      "male_id": "15157",
+      "male_name": "L'Instant de Pour Homme"
+    },
+    {
+      "brand": "Guerlain",
+      "plain_id": "15037",
+      "plain_name": "Vetiver",
+      "concentration": "Eau de Toilette",
+      "male_id": "15111",
+      "male_name": "Vetiver For Men"
+    },
+    {
+      "brand": "Guess",
+      "plain_id": "11870",
+      "plain_name": "Dare",
+      "concentration": "Eau de Toilette",
+      "male_id": "16809",
+      "male_name": "Dare for Men"
+    },
+    {
+      "brand": "Iceberg Twice",
+      "plain_id": "14286",
+      "plain_name": "Iceberg Light Fluid",
+      "concentration": "Eau de Toilette",
+      "male_id": "16534",
+      "male_name": "Iceberg Light Fluid For Men"
+    },
+    {
+      "brand": "Issey Miyake",
+      "plain_id": "15168",
+      "plain_name": "L'Eau Bleue d'Issey Eau Fraiche",
+      "concentration": "Eau de Toilette",
+      "male_id": "9346",
+      "male_name": "L'Eau Bleue d'Issey Eau Fraiche Pour Homme"
+    },
+    {
+      "brand": "Issey Miyake",
+      "plain_id": "4864",
+      "plain_name": "L'eau d'Issey",
+      "concentration": "Eau de Toilette",
+      "male_id": "9343",
+      "male_name": "L'Eau d'Issey Pour Homme"
+    },
+    {
+      "brand": "Issey Miyake",
+      "plain_id": "16423",
+      "plain_name": "L'Eau d'Issey Majeure",
+      "concentration": "Eau de Toilette",
+      "male_id": "16422",
+      "male_name": "L'Eau d'Issey Majeure Pour Homme"
+    },
+    {
+      "brand": "Issey Miyake",
+      "plain_id": "15105",
+      "plain_name": "Nuit d’Issey",
+      "concentration": "Extrait de Parfum",
+      "male_id": "15104",
+      "male_name": "Nuit d’Issey Pour Homme"
+    },
+    {
+      "brand": "Jacques Bogart",
+      "plain_id": "8418",
+      "plain_name": "Bogart",
+      "concentration": "Eau de Toilette",
+      "male_id": "14722",
+      "male_name": "Bogart Pour Homme"
+    },
+    {
+      "brand": "Jean Paul Gaultier",
+      "plain_id": "8871",
+      "plain_name": "Scandal Le Parfum",
+      "concentration": "Eau de Parfum",
+      "male_id": "12497",
+      "male_name": "Scandal Le Parfum Pour Homme"
+    },
+    {
+      "brand": "Karl Lagerfeld",
+      "plain_id": "14278",
+      "plain_name": "Jako",
+      "concentration": "Eau de Toilette",
+      "male_id": "15176",
+      "male_name": "Jako Pour Homme"
+    },
+    {
+      "brand": "Karl Lagerfeld",
+      "plain_id": "10302",
+      "plain_name": "Vienna Opera",
+      "concentration": "Eau de Toilette",
+      "male_id": "15976",
+      "male_name": "Vienna Opera Pour Homme"
+    },
+    {
+      "brand": "Kenneth Cole",
+      "plain_id": "13680",
+      "plain_name": "Black Bold",
+      "concentration": "Eau de Parfum",
+      "male_id": "19885",
+      "male_name": "Black Bold for Men"
+    },
+    {
+      "brand": "Kenzo",
+      "plain_id": "7653",
+      "plain_name": "L'Eau Boisee",
+      "concentration": "Eau de Toilette",
+      "male_id": "11551",
+      "male_name": "L'Eau Boisee Pour Homme"
+    },
+    {
+      "brand": "Kenzo",
+      "plain_id": "11541",
+      "plain_name": "L'Eau par",
+      "concentration": "Eau de Toilette",
+      "male_id": "11534",
+      "male_name": "L'Eau par pour Homme"
+    },
+    {
+      "brand": "Lacoste",
+      "plain_id": "6697",
+      "plain_name": "Eau De L.12.12 Blanc",
+      "concentration": "Eau de Toilette",
+      "male_id": "11831",
+      "male_name": "Eau De L.12.12 Blanc Pour Homme"
+    },
+    {
+      "brand": "Lanvin",
+      "plain_id": "14316",
+      "plain_name": "Eclat D'Arpege",
+      "concentration": "Eau de Toilette",
+      "male_id": "11813",
+      "male_name": "Eclat d'Arpege Pour Homme"
+    },
+    {
+      "brand": "Lanvin",
+      "plain_id": "11121",
+      "plain_name": "Vetyver",
+      "concentration": "Eau de Toilette",
+      "male_id": "15981",
+      "male_name": "Vetyver Pour Homme"
+    },
+    {
+      "brand": "Laura Biagiotti",
+      "plain_id": "8393",
+      "plain_name": "Due Uomo",
+      "concentration": "Eau de Toilette",
+      "male_id": "8392",
+      "male_name": "Due Uomo Pour Homme"
+    },
+    {
+      "brand": "Laura Biagiotti",
+      "plain_id": "7967",
+      "plain_name": "Roma",
+      "concentration": "Eau de Toilette",
+      "male_id": "15128",
+      "male_name": "Roma Pour Homme"
+    },
+    {
+      "brand": "Les Contes",
+      "plain_id": "7729",
+      "plain_name": "Bonheur",
+      "concentration": "Eau de Parfum",
+      "male_id": "19790",
+      "male_name": "Bonheur Pour Homme"
+    },
+    {
+      "brand": "Loewe",
+      "plain_id": "13909",
+      "plain_name": "Solo",
+      "concentration": "Eau de Cologne",
+      "male_id": "10207",
+      "male_name": "Solo For Men"
+    },
+    {
+      "brand": "Louis Feraud",
+      "plain_id": "13962",
+      "plain_name": "Nuit des Sens",
+      "concentration": "Eau de Toilette",
+      "male_id": "8319",
+      "male_name": "Nuit des Sens For Men"
+    },
+    {
+      "brand": "Mexx",
+      "plain_id": "14930",
+      "plain_name": "Ice Touch",
+      "concentration": "Eau de Toilette",
+      "male_id": "11654",
+      "male_name": "Ice Touch For Men"
+    },
+    {
+      "brand": "Nobile 1942",
+      "plain_id": "9737",
+      "plain_name": "Pontevecchio",
+      "concentration": "Eau de Parfum",
+      "male_id": "9736",
+      "male_name": "Pontevecchio for Men"
+    },
+    {
+      "brand": "Paco Rabanne",
+      "plain_id": "9156",
+      "plain_name": "XS",
+      "concentration": "Eau de Toilette",
+      "male_id": "11082",
+      "male_name": "XS Pour Homme"
+    },
+    {
+      "brand": "Prada",
+      "plain_id": "9015",
+      "plain_name": "Amber",
+      "concentration": "Eau de Parfum",
+      "male_id": "20134",
+      "male_name": "Amber For Men"
+    },
+    {
+      "brand": "Ralph Lauren",
+      "plain_id": "11292",
+      "plain_name": "Romance",
+      "concentration": "Eau de Toilette",
+      "male_id": "11291",
+      "male_name": "Romance for Men"
+    },
+    {
+      "brand": "Replay",
+      "plain_id": "10328",
+      "plain_name": "Jeans Original",
+      "concentration": "Eau de Toilette",
+      "male_id": "9368",
+      "male_name": "Jeans Original For Men"
+    },
+    {
+      "brand": "Revillon",
+      "plain_id": "11304",
+      "plain_name": "R",
+      "concentration": "Eau de Toilette",
+      "male_id": "14776",
+      "male_name": "R Pour Homme"
+    },
+    {
+      "brand": "Salvador Dali",
+      "plain_id": "4423",
+      "plain_name": "Laguna",
+      "concentration": "Eau de Toilette",
+      "male_id": "16445",
+      "male_name": "Laguna For Men"
+    },
+    {
+      "brand": "Salvador Dali",
+      "plain_id": "11207",
+      "plain_name": "Sunrise in Cadaques",
+      "concentration": "Eau de Toilette",
+      "male_id": "11206",
+      "male_name": "Sunrise in Cadaques Pour Homme"
+    },
+    {
+      "brand": "Salvatore Ferragamo",
+      "plain_id": "8427",
+      "plain_name": "Acqua Essenziale",
+      "concentration": "Eau de Toilette",
+      "male_id": "12108",
+      "male_name": "Acqua Essenziale Pour Homme"
+    },
+    {
+      "brand": "Salvatore Ferragamo",
+      "plain_id": "16681",
+      "plain_name": "F by Ferragamo",
+      "concentration": "Eau de Toilette",
+      "male_id": "16679",
+      "male_name": "F by Ferragamo Pour Homme"
+    },
+    {
+      "brand": "Salvatore Ferragamo",
+      "plain_id": "11779",
+      "plain_name": "F by Ferragamo Black",
+      "concentration": "Eau de Toilette",
+      "male_id": "11778",
+      "male_name": "F by Ferragamo Black Pour Homme"
+    },
+    {
+      "brand": "Tom Ford",
+      "plain_id": "12784",
+      "plain_name": "Noir",
+      "concentration": "Eau de Parfum",
+      "male_id": "12781",
+      "male_name": "Noir Pour Homme"
+    },
+    {
+      "brand": "Tom Ford",
+      "plain_id": "11407",
+      "plain_name": "Noir",
+      "concentration": "Eau de Toilette",
+      "male_id": "11406",
+      "male_name": "Noir Pour Homme"
+    },
+    {
+      "brand": "Tom Ford",
+      "plain_id": "12783",
+      "plain_name": "Noir Anthracite",
+      "concentration": "Eau de Parfum",
+      "male_id": "18240",
+      "male_name": "Noir Anthracite For Men"
+    },
+    {
+      "brand": "Trussardi",
+      "plain_id": "9370",
+      "plain_name": "Jeans",
+      "concentration": "Eau de Toilette",
+      "male_id": "11594",
+      "male_name": "Jeans For Men"
+    },
+    {
+      "brand": "Trussardi",
+      "plain_id": "11306",
+      "plain_name": "Python",
+      "concentration": "Eau de Toilette",
+      "male_id": "16201",
+      "male_name": "Python For Men"
+    },
+    {
+      "brand": "Versace",
+      "plain_id": "14815",
+      "plain_name": "Eros",
+      "concentration": "Eau de Parfum",
+      "male_id": "13376",
+      "male_name": "Eros Pour Homme"
+    },
+    {
+      "brand": "Versace",
+      "plain_id": "14784",
+      "plain_name": "Eros",
+      "concentration": "Eau de Toilette",
+      "male_id": "8009",
+      "male_name": "Eros Pour Homme"
+    },
+    {
+      "brand": "Versace",
+      "plain_id": "7641",
+      "plain_name": "Eros",
+      "concentration": "Extrait de Parfum",
+      "male_id": "15780",
+      "male_name": "Eros Pour Homme"
+    },
+    {
+      "brand": "Yohji Yamamoto",
+      "plain_id": "16001",
+      "plain_name": "Unravel 21/38",
+      "concentration": "Eau de Toilette",
+      "male_id": "11142",
+      "male_name": "Unravel 21/38 Pour Homme"
+    },
+    {
+      "brand": "Yves Saint Laurent",
+      "plain_id": "8420",
+      "plain_name": "Black Opium",
+      "concentration": "Eau de Toilette",
+      "male_id": "16949",
+      "male_name": "Black Opium Pour Homme"
+    },
+    {
+      "brand": "Yves Saint Laurent",
+      "plain_id": "8317",
+      "plain_name": "Opium",
+      "concentration": "Eau de Toilette",
+      "male_id": "11393",
+      "male_name": "Opium Pour Homme"
+    },
+    {
+      "brand": "Yves Saint Laurent",
+      "plain_id": "16171",
+      "plain_name": "Rive Gauche",
+      "concentration": "Eau de Toilette",
+      "male_id": "15130",
+      "male_name": "Rive Gauche For Men"
+    }
+  ]
+}

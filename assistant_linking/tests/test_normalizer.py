@@ -1,6 +1,6 @@
 from django.test import TestCase
 
-from assistant_linking.models import BrandAlias, ProductAlias
+from assistant_linking.models import BrandAlias, ConcentrationAlias, ProductAlias
 from assistant_linking.services.normalizer import parse_supplier_product, save_parse
 from catalog.models import Brand
 from prices.models import Supplier, SupplierProduct
@@ -74,3 +74,54 @@ class NormalizerTests(TestCase):
         self.assertEqual(parsed.concentration, "Eau de Parfum")
         self.assertEqual(parsed.size_ml, 100)
         self.assertTrue(parsed.is_tester)
+
+    def test_bare_trailing_size_is_inferred_after_brand_and_concentration(self):
+        brand = Brand.objects.create(name="100 Bon")
+        BrandAlias.objects.create(brand=brand, alias_text="100 BON", normalized_alias="100 bon")
+        product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="5",
+            name="100 BON BOIS DE MANGROVE 50 EDP",
+        )
+
+        parsed = parse_supplier_product(product)
+
+        self.assertEqual(parsed.normalized_brand, brand)
+        self.assertEqual(parsed.product_name_text, "bois de mangrove")
+        self.assertEqual(parsed.concentration, "Eau de Parfum")
+        self.assertEqual(parsed.size_ml, 50)
+
+    def test_no_five_is_not_treated_as_size(self):
+        brand = Brand.objects.create(name="Chanel")
+        BrandAlias.objects.create(brand=brand, alias_text="Chanel", normalized_alias="chanel")
+        product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="6",
+            name="Chanel No 5 Eau de Parfum",
+        )
+
+        parsed = parse_supplier_product(product)
+
+        self.assertEqual(parsed.normalized_brand, brand)
+        self.assertIsNone(parsed.size_ml)
+
+    def test_custom_concentration_aliases_can_be_managed_in_database(self):
+        brand = Brand.objects.create(name="Montale")
+        BrandAlias.objects.create(brand=brand, alias_text="Montale", normalized_alias="montale")
+        ConcentrationAlias.objects.create(
+            concentration="Eau de Parfum",
+            alias_text="парфюмированная вода",
+            normalized_alias="парфюмированная вода",
+            priority=40,
+            active=True,
+        )
+        product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="7",
+            name="Montale Arabians Tonka парфюмированная вода 100ml",
+        )
+
+        parsed = parse_supplier_product(product)
+
+        self.assertEqual(parsed.normalized_brand, brand)
+        self.assertEqual(parsed.concentration, "Eau de Parfum")
