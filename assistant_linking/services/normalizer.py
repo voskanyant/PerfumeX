@@ -486,7 +486,7 @@ def parse_supplier_product(product: SupplierProduct) -> ParseResult:
         excluded_terms = _split_terms(product_alias.excluded_terms)
         if alias_text and _contains_phrase(text, alias_text) and not any(_contains_phrase(text, term) for term in excluded_terms):
             result.product_name_text = product_alias.canonical_text
-            if product_alias.concentration:
+            if product_alias.concentration and (not result.concentration or product_alias.supplier_id == product.supplier_id):
                 result.concentration = product_alias.concentration
             if product_alias.audience:
                 result.supplier_gender_hint = product_alias.audience

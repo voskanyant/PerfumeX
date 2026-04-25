@@ -157,6 +157,7 @@ class TeachParseTests(TestCase):
         )
         ProductAlias.objects.create(
             brand=brand,
+            supplier=self.supplier,
             alias_text="malmaison",
             canonical_text="Malmaison",
             concentration="Extrait de Parfum",

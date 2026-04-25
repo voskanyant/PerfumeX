@@ -121,6 +121,30 @@ class NormalizerTests(TestCase):
         self.assertEqual(parsed.concentration, "Eau de Parfum")
         self.assertEqual(parsed.size_ml, Decimal("1.50"))
 
+    def test_global_product_alias_does_not_override_explicit_supplier_concentration(self):
+        brand = Brand.objects.create(name="Nina Ricci")
+        BrandAlias.objects.create(brand=brand, alias_text="Nina Ricci", normalized_alias="nina ricci")
+        ProductAlias.objects.create(
+            brand=brand,
+            alias_text="nina",
+            canonical_text="Nina",
+            concentration="Extrait de Parfum",
+            priority=40,
+            active=True,
+        )
+        product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="nina-edt",
+            name="Nina Ricci NINA 50ml edt tester",
+        )
+
+        parsed = parse_supplier_product(product)
+
+        self.assertEqual(parsed.product_name_text, "Nina")
+        self.assertEqual(parsed.concentration, "Eau de Toilette")
+        self.assertEqual(parsed.size_ml, Decimal("50.00"))
+        self.assertTrue(parsed.is_tester)
+
     def test_parses_multi_pack_sizes_as_set_size_label(self):
         brand = Brand.objects.create(name="Vilhelm Parfumerie")
         BrandAlias.objects.create(brand=brand, alias_text="Vilhelm Parfumerie", normalized_alias="vilhelm parfumerie")
