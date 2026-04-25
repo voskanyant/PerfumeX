@@ -27,7 +27,7 @@ from prices.models import SupplierProduct
 
 
 logger = logging.getLogger(__name__)
-PARSER_VERSION = "deterministic-v1"
+PARSER_VERSION = "deterministic-v2"
 REGEX_ALIAS_TIMEOUT_SECONDS = 1.0
 
 DEFAULT_CONCENTRATION_ALIASES = (
@@ -38,8 +38,12 @@ DEFAULT_CONCENTRATION_ALIASES = (
     ("parfume", "Extrait de Parfum"),
     ("parfum", "Extrait de Parfum"),
     ("духи", "Extrait de Parfum"),
+    ("парфюмерная вода", "Eau de Parfum"),
     ("парфюмированная вода", "Eau de Parfum"),
     ("парфюмированная", "Eau de Parfum"),
+    ("туалетная вода", "Eau de Toilette"),
+    ("туалетная", "Eau de Toilette"),
+    ("одеколон", "Eau de Cologne"),
     ("eau de parfum", "Eau de Parfum"),
     ("edp", "Eau de Parfum"),
     ("eau de toilette", "Eau de Toilette"),
@@ -47,6 +51,12 @@ DEFAULT_CONCENTRATION_ALIASES = (
     ("eau de cologne", "Eau de Cologne"),
     ("edc", "Eau de Cologne"),
     ("perfume oil", "Perfume Oil"),
+    ("parfum oil", "Perfume Oil"),
+    ("масляные духи", "Perfume Oil"),
+    ("духи масляные", "Perfume Oil"),
+    ("парфюмированное масло", "Perfume Oil"),
+    ("attar", "Perfume Oil"),
+    ("аттар", "Perfume Oil"),
 )
 
 GENDER_ALIASES = (
@@ -244,7 +254,7 @@ def _extract_size(text: str) -> tuple[Decimal | None, str, str]:
         raw = ml_match.group(0)
         value = Decimal(ml_match.group(1).replace(",", ".")).quantize(Decimal("0.01"))
         return value, raw, text.replace(raw, " ")
-    reversed_ml_match = re.search(r"\b(?:ml|Ð¼Ð»|Ð¼\.Ð»\.?)\s*(\d+(?:[.,]\d+)?)(?=\s|$)", text)
+    reversed_ml_match = re.search(r"\b(?:ml|мл|м\.л\.?)\s*(\d+(?:[.,]\d+)?)(?=\s|$)", text)
     if reversed_ml_match:
         raw = reversed_ml_match.group(0)
         value = Decimal(reversed_ml_match.group(1).replace(",", ".")).quantize(Decimal("0.01"))
@@ -276,11 +286,11 @@ def _extract_loose_trailing_size(text: str) -> tuple[Decimal | None, str, str]:
         "travel",
         "set",
         "mini",
-        "Ñ‚ÐµÑÑ‚ÐµÑ€",
-        "Ñ‚ÐµÑÑ‚",
-        "Ð¿Ñ€Ð¾Ð±Ð½Ð¸Ðº",
-        "Ð¼Ð¸Ð½Ð¸",
-        "Ð½Ð°Ð±Ð¾Ñ€",
+        "тестер",
+        "тест",
+        "пробник",
+        "мини",
+        "набор",
     )
     trailing_terms = tuple({*trailing_terms, *_tester_terms(), *_sample_terms(), *_travel_terms(), *_mini_terms(), *_set_terms(), *_refill_terms()})
     trailing_pattern = "|".join(re.escape(term) for term in trailing_terms)

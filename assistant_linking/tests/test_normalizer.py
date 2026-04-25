@@ -159,16 +159,22 @@ class NormalizerTests(TestCase):
         self.assertTrue(parsed.is_tester)
 
     def test_reversed_ml_size_is_parsed(self):
-        product = SupplierProduct.objects.create(
-            supplier=self.supplier,
-            identity_key="5b",
-            name="1916 Agua De Colonia Limon & Tonca ml 100 tester",
+        cases = (
+            ("reversed-ml-latin", "1916 Agua De Colonia Limon & Tonca ml 100 tester"),
+            ("reversed-ml-cyrillic", "1916 Agua De Colonia Limon & Tonca мл 100 тестер"),
         )
+        for identity_key, name in cases:
+            with self.subTest(name=name):
+                product = SupplierProduct.objects.create(
+                    supplier=self.supplier,
+                    identity_key=identity_key,
+                    name=name,
+                )
 
-        parsed = parse_supplier_product(product)
+                parsed = parse_supplier_product(product)
 
-        self.assertEqual(parsed.size_ml, 100)
-        self.assertTrue(parsed.is_tester)
+                self.assertEqual(parsed.size_ml, 100)
+                self.assertTrue(parsed.is_tester)
 
     def test_kb_regex_preprocess_handles_eau_de_perfume_as_eau_de_parfum(self):
         for index, raw in enumerate(("eau de perfume", "eau de parfume", "eau de parf"), start=1):
@@ -347,6 +353,30 @@ class NormalizerTests(TestCase):
         self.assertEqual(parsed.variant_type, "tester")
         self.assertEqual(parsed.supplier_gender_hint, "unisex")
         self.assertEqual(parsed.product_name_text, "ambre and tonka")
+
+    def test_builtin_russian_concentration_aliases_work_without_database_seed(self):
+        product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="ru-default-concentration",
+            name="Some Brand Scent парфюмерная вода 50мл",
+        )
+
+        parsed = parse_supplier_product(product)
+
+        self.assertEqual(parsed.concentration, "Eau de Parfum")
+        self.assertEqual(parsed.size_ml, 50)
+
+    def test_builtin_russian_oil_aliases_work_without_database_seed(self):
+        product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="ru-oil-concentration",
+            name="Some Brand Scent масляные духи 10мл",
+        )
+
+        parsed = parse_supplier_product(product)
+
+        self.assertEqual(parsed.concentration, "Perfume Oil")
+        self.assertEqual(parsed.size_ml, 10)
 
     def test_brand_alias_rejects_bad_regex(self):
         alias = BrandAlias(

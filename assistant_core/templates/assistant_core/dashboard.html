@@ -21,6 +21,7 @@
     {% url 'assistant_linking:group_queue' as linking_queue_url %}
     <div class="run-log-summary">
         <span>Pending approvals: {{ pending_approvals }}</span>
+        <span>Incomplete normalization: {{ normalization_issue_count }}</span>
         <span>Low-confidence parses: {{ low_confidence }}</span>
     </div>
     <h3 class="kpi-link-title space-top-sm">Recent manual decisions</h3>
