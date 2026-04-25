@@ -73,6 +73,10 @@ def _get_part_filename(part):
     return ""
 
 
+def _is_unnamed_body_part(part) -> bool:
+    return (part.get_content_disposition() or "").lower() != "attachment"
+
+
 def _infer_extension(content_type):
     if not content_type:
         return ""
@@ -915,6 +919,8 @@ def run_import(
                     filename = _get_part_filename(part)
                     content_type = (part.get_content_type() or "").lower()
                     if not filename:
+                        if _is_unnamed_body_part(part):
+                            continue
                         ext = _infer_extension(content_type)
                         if ext and part.get_content_maintype() != "text":
                             filename = f"attachment_{timezone.now():%Y%m%d_%H%M%S}{ext}"
@@ -938,7 +944,7 @@ def run_import(
                                 content_type=content_type,
                             )
                             _log_line(
-                                f"{mailbox.name}/{item_folder}: SKIP attachment in message {_uid_display(msg_id)} - no filename."
+                                f"{mailbox.name}/{item_folder}: SKIP unnamed attachment in message {_uid_display(msg_id)} content_type={content_type or '-'}."
                             )
                             continue
                     summary["attachments_seen"] += 1

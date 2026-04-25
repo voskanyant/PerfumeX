@@ -2,6 +2,7 @@ import io
 import shutil
 import tempfile
 from datetime import datetime, timedelta
+from email.message import EmailMessage
 from pathlib import Path
 from unittest.mock import patch
 
@@ -20,6 +21,7 @@ from prices import models
 from prices.management.commands.import_emails import _get_supplier_latest_batch_time
 from prices.services.email_importer import (
     _is_non_price_filename,
+    _is_unnamed_body_part,
     _reason_from_error,
     _validate_spreadsheet_payload,
 )
@@ -310,6 +312,21 @@ class SupplierImportBoundaryTests(TestCase):
 
 
 class ImportAttachmentPreflightTests(TestCase):
+    def test_unnamed_body_parts_are_not_treated_as_attachments(self):
+        body_part = EmailMessage()
+        body_part.set_content("plain body")
+        self.assertTrue(_is_unnamed_body_part(body_part))
+
+        inline_part = EmailMessage()
+        inline_part.set_content("inline text")
+        inline_part["Content-Disposition"] = "inline"
+        self.assertTrue(_is_unnamed_body_part(inline_part))
+
+        unnamed_attachment = EmailMessage()
+        unnamed_attachment.set_content(b"abc", maintype="application", subtype="octet-stream")
+        unnamed_attachment["Content-Disposition"] = "attachment"
+        self.assertFalse(_is_unnamed_body_part(unnamed_attachment))
+
     def test_non_price_classifier_rejects_images_invoices_and_reports(self):
         self.assertTrue(_is_non_price_filename("photo.png", "image/png"))
         self.assertTrue(_is_non_price_filename("invoice_123.xlsx", "application/vnd.ms-excel"))
