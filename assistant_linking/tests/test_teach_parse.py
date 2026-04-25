@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
@@ -237,7 +239,7 @@ class TeachParseTests(TestCase):
         self.assertEqual(parsed.normalized_brand, brand)
         self.assertEqual(parsed.product_name_text, "Malmaison")
         self.assertEqual(parsed.concentration, "Eau de Parfum")
-        self.assertEqual(parsed.size_ml, variant.size_ml)
+        self.assertEqual(parsed.size_ml, Decimal(variant.size_ml))
 
     def test_catalog_link_fills_missing_supplier_concentration(self):
         brand = Brand.objects.create(name="12 Parfumeurs")
@@ -261,7 +263,7 @@ class TeachParseTests(TestCase):
         self.assertEqual(parsed.normalized_brand, brand)
         self.assertEqual(parsed.product_name_text, "Malmaison")
         self.assertEqual(parsed.concentration, "Extrait de Parfum")
-        self.assertEqual(parsed.size_ml, variant.size_ml)
+        self.assertEqual(parsed.size_ml, Decimal(variant.size_ml))
 
     def test_normalization_detail_prefills_teaching_from_catalog_link(self):
         brand = Brand.objects.create(name="12 Parfumeurs")

@@ -129,6 +129,7 @@ def normalize_text(value: str) -> str:
         text = _safe_regex_sub(pattern, replacement, text)
     text = re.sub(r"\beau de (?:parfum(?:e|ume)?|perfume)\b", "eau de parfum", text)
     text = re.sub(r"\beau de parf\b(?!um)", "eau de parfum", text)
+    text = re.sub(r"(?<=\d),(?=\d)", ".", text)
     text = re.sub(r"(\d+)\.0\s*(?=мл|ml)", r"\1 ", text)
     text = re.sub(r"(\d+)\s*мл\.?", r"\1 ml", text)
     text = re.sub(r"\b(edp|edt|edc)(?=\d)", r"\1 ", text)
@@ -136,7 +137,6 @@ def normalize_text(value: str) -> str:
     text = re.sub(r"\b(eau de parfum|eau de toilette|eau de cologne|extrait de parfum|extrait|parfum)(?=\d)", r"\1 ", text)
     text = re.sub(r"(?<=\d)(eau de parfum|eau de toilette|eau de cologne|extrait de parfum|extrait|parfum)\b", r" \1", text)
     text = re.sub(r"[\u00a0_\\/,;:|()\[\]{}+]+", " ", text)
-    text = re.sub(r"(?<=\d),(?=\d)", ".", text)
     text = re.sub(r"\s+", " ", text).strip()
     return text
 
@@ -483,7 +483,7 @@ def parse_supplier_product(product: SupplierProduct) -> ParseResult:
             result.supplier_gender_hint = perfume.audience
         if product.catalog_variant_id:
             variant = product.catalog_variant
-            if variant.size_ml:
+            if variant.size_ml and not result.size_ml:
                 result.size_ml = variant.size_ml
             result.packaging = variant.packaging or ""
             result.variant_type = variant.variant_type or "standard"

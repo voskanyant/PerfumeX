@@ -1,7 +1,9 @@
+from decimal import Decimal
+from unittest.mock import patch
+
 from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.test import TestCase
-from unittest.mock import patch
 
 from assistant_core.models import GlobalRule
 from assistant_linking.models import BrandAlias, ConcentrationAlias, ParsedSupplierProduct, ProductAlias
@@ -76,6 +78,48 @@ class NormalizerTests(TestCase):
         self.assertTrue(parsed.is_tester)
         self.assertEqual(parsed.supplier_gender_hint, "Pour Homme")
         self.assertEqual(parsed.normalized_brand, self.brand)
+
+    def test_parses_decimal_ml_with_comma_or_dot(self):
+        brand = Brand.objects.create(name="Tiziana Terenzi")
+        BrandAlias.objects.create(brand=brand, alias_text="Tiziana Terenzi", normalized_alias="tiziana terenzi")
+        examples = (
+            ("TIZIANA TERENZI CABIRIA EDP 1,5 ML", Decimal("1.50")),
+            ("TIZIANA TERENZI CABIRIA EDP 1.5 ML", Decimal("1.50")),
+            ("TIZIANA TERENZI CABIRIA EDP 7.5ML", Decimal("7.50")),
+        )
+
+        for name, expected_size in examples:
+            with self.subTest(name=name):
+                product = SupplierProduct.objects.create(
+                    supplier=self.supplier,
+                    identity_key=name,
+                    name=name,
+                )
+
+                parsed = parse_supplier_product(product)
+
+                self.assertEqual(parsed.concentration, "Eau de Parfum")
+                self.assertEqual(parsed.size_ml, expected_size)
+                self.assertEqual(parsed.product_name_text, "cabiria")
+
+    def test_catalog_variant_does_not_override_explicit_supplier_size(self):
+        brand = Brand.objects.create(name="Tiziana Terenzi")
+        BrandAlias.objects.create(brand=brand, alias_text="Tiziana Terenzi", normalized_alias="tiziana terenzi")
+        perfume = brand.perfumes.create(name="Cabiria", concentration="Extrait de Parfum")
+        variant = perfume.variants.create(size_ml=Decimal("5.00"), variant_type="standard")
+        product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="cabiria-linked-decimal",
+            name="TIZIANA TERENZI CABIRIA EDP 1,5 ML",
+            catalog_perfume=perfume,
+            catalog_variant=variant,
+        )
+
+        parsed = parse_supplier_product(product)
+
+        self.assertEqual(parsed.product_name_text, "Cabiria")
+        self.assertEqual(parsed.concentration, "Eau de Parfum")
+        self.assertEqual(parsed.size_ml, Decimal("1.50"))
 
     def test_standalone_w_and_m_are_audience_aliases_not_product_name(self):
         brand = Brand.objects.create(name="Abercrombie & Fitch")
