@@ -111,6 +111,23 @@
 
 .progress-thin .progress-bar {
   background: var(--black);
+  min-width: 8%;
+  transition: width 220ms ease;
+}
+
+.supplier-import-table tr.is-row-pending .progress-thin .progress-bar {
+  background: linear-gradient(90deg, var(--black), var(--grey-500), var(--black));
+  background-size: 200% 100%;
+  animation: import-progress-scan 1.2s linear infinite;
+}
+
+@keyframes import-progress-scan {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: 0 0;
+  }
 }
 
 .import-status,

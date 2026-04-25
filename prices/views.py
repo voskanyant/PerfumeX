@@ -255,12 +255,21 @@ def _build_email_run_status(run) -> dict[str, str | int | None]:
         progress = None
         if run.total_messages:
             progress = int((run.processed_messages / run.total_messages) * 100)
-        if progress is not None:
+        activity = (run.last_message or "").strip()
+        if len(activity) > 140:
+            activity = f"{activity[:137]}..."
+        if progress is not None and activity:
+            note = f"{activity} - {run.processed_messages}/{run.total_messages} messages"
+        elif progress is not None:
             note = f"{progress}% complete"
+        elif activity:
+            note = activity
+            progress = 8
         elif run.total_messages:
             note = f"{run.processed_messages}/{run.total_messages} messages"
         else:
             note = "Checking mailbox"
+            progress = 8
         return {
             "label": "updating",
             "class_name": "is-running",

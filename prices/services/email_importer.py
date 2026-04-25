@@ -516,9 +516,16 @@ def run_import(
             return text
         return f"{text[: limit - 1]}…"
 
-    def note(msg):
+    def set_run_message(msg):
         nonlocal last_message
-        last_message = msg
+        last_message = _short(msg, 220)
+        if run_id:
+            models.EmailImportRun.objects.filter(id=run_id).update(
+                last_message=last_message
+            )
+
+    def note(msg):
+        set_run_message(msg)
         _log_line(msg)
 
     def run_was_canceled() -> bool:
@@ -820,10 +827,16 @@ def run_import(
                             continue
                     selected_folder = item_folder
                 summary["messages_scanned"] += 1
+                current_message_label = (
+                    f"Scanning {mailbox.name}/{item_folder} message {_uid_display(msg_id)}"
+                )
                 if run_id:
                     models.EmailImportRun.objects.filter(id=run_id).update(
-                        processed_messages=F("processed_messages") + 1
+                        processed_messages=F("processed_messages") + 1,
+                        last_message=current_message_label,
                     )
+                else:
+                    last_message = current_message_label
                 status, meta, client = _imap_fetch(
                     client,
                     mailbox,
@@ -847,10 +860,7 @@ def run_import(
                                 size = None
                 if size and size > max_bytes:
                     note(f"Skipping message {item_folder}/{_uid_display(msg_id)}: size {size} bytes.")
-                    if run_id:
-                        models.EmailImportRun.objects.filter(id=run_id).update(
-                            last_message=f"Skipped large message {item_folder}/{_uid_display(msg_id)}"
-                        )
+                    set_run_message(f"Skipped large message {item_folder}/{_uid_display(msg_id)}")
                     continue
                 received_at = _extract_internaldate(meta)
                 if received_at and timezone.is_naive(received_at):
@@ -864,14 +874,7 @@ def run_import(
                     and received_at
                     and received_at <= min_received_at
                 ):
-                    if run_id:
-                        models.EmailImportRun.objects.filter(id=run_id).update(
-                            last_message=(
-                                "Skipped old email at "
-                                f"{timezone.localtime(received_at).strftime('%d/%m/%Y %H:%M')}"
-                            )
-                        )
-                    last_message = (
+                    set_run_message(
                         "Skipped old email at "
                         f"{timezone.localtime(received_at).strftime('%d/%m/%Y %H:%M')}"
                     )
@@ -903,6 +906,9 @@ def run_import(
                 subject = _decode_header(message.get("Subject", ""))
                 from_addr = parseaddr(message.get("From", ""))[1]
                 message_id = (message.get("Message-ID") or "").strip()
+                set_run_message(
+                    f"Scanning email from {_short(from_addr, 48) or 'unknown'}: {_short(subject, 90) or '(no subject)'}"
+                )
                 _log_line(
                     "Message "
                     f"{mailbox.name}/{item_folder}/{_uid_display(msg_id)} "
@@ -1157,6 +1163,9 @@ def run_import(
                                     )
                                     continue
                             summary["matched_files"] += 1
+                            set_run_message(
+                                f"Found {matched_supplier.name}: {_short(filename, 90)}"
+                            )
                             _log_line(
                                 f"{mailbox.name}: MATCH supplier='{matched_supplier.name}' file='{filename}'."
                             )
@@ -1218,6 +1227,9 @@ def run_import(
                             if exists:
                                 summary["skipped_duplicates"] += 1
                                 summary["skipped_files"] += 1
+                                set_run_message(
+                                    f"Duplicate skipped: {matched_supplier.name} / {_short(filename, 90)}"
+                                )
                                 _log_line(
                                     f"{mailbox.name}: SKIP duplicate '{filename}' (supplier={matched_supplier.name}, hash={content_hash[:10]}...)."
                                 )
@@ -1242,7 +1254,6 @@ def run_import(
                                     models.EmailImportRun.objects.filter(id=run_id).update(
                                         skipped_duplicates=F("skipped_duplicates") + 1
                                     )
-                                last_message = f"Skipped duplicate file: {filename}"
                                 stats["duplicates"] = stats.get("duplicates", 0) + 1
                                 continue
 
@@ -1257,6 +1268,9 @@ def run_import(
                                         summary["skipped_duplicates"] += 1
                                         summary["skipped_files"] += 1
                                         stats["duplicates"] = stats.get("duplicates", 0) + 1
+                                        set_run_message(
+                                            f"Duplicate email skipped: {matched_supplier.name} / {_short(filename, 90)}"
+                                        )
                                         _log_line(
                                             f"{mailbox.name}: SKIP duplicate message_id={_short(message_id, 80)} existing_batch_id={existing_batch.id}."
                                         )
@@ -1323,6 +1337,9 @@ def run_import(
                                 summary["quarantined_files"] += 1
                                 stats["errors"] = stats.get("errors", 0) + 1
                                 stats["last_message"] = "Mapping is missing."
+                                set_run_message(
+                                    f"Mapping missing: {matched_supplier.name} / {_short(filename, 90)}"
+                                )
                                 record_diagnostic(
                                     decision=models.AttachmentDecision.QUARANTINED,
                                     reason_code=models.AttachmentReason.MAPPING_MISSING,
@@ -1345,10 +1362,13 @@ def run_import(
                                 if run_id:
                                     models.EmailImportRun.objects.filter(id=run_id).update(
                                         errors=F("errors") + 1,
-                                        last_message="Mapping is missing.",
+                                        last_message=last_message,
                                     )
                                 continue
                             import_file.file.save(filename, ContentFile(payload), save=True)
+                            set_run_message(
+                                f"Importing {matched_supplier.name}: {_short(filename, 90)}"
+                            )
                             _log_line(
                                 f"{mailbox.name}: PROCESS file='{filename}' supplier='{matched_supplier.name}' kind={file_kind} import_file_id={import_file.id}."
                             )
@@ -1380,9 +1400,13 @@ def run_import(
                                     import_file=import_file,
                                 )
                                 stats["processed"] = stats.get("processed", 0) + 1
+                                set_run_message(
+                                    f"Imported {matched_supplier.name}: {_short(filename, 90)}"
+                                )
                                 if run_id:
                                     models.EmailImportRun.objects.filter(id=run_id).update(
-                                        processed_files=F("processed_files") + 1
+                                        processed_files=F("processed_files") + 1,
+                                        last_message=last_message,
                                     )
                             except Exception as exc:
                                 reason_code = _reason_from_error(str(exc))
@@ -1439,12 +1463,14 @@ def run_import(
                                     import_file=import_file,
                                 )
                                 stats["errors"] = stats.get("errors", 0) + 1
+                                set_run_message(
+                                    f"Failed {matched_supplier.name}: {_short(filename, 90)}"
+                                )
                                 if run_id:
                                     models.EmailImportRun.objects.filter(id=run_id).update(
                                         errors=F("errors") + 1,
-                                        last_message=str(exc),
+                                        last_message=last_message,
                                     )
-                                last_message = f"Import failed: {filename} (see detailed log)."
                                 stats["last_message"] = str(exc)
 
                         for batch in batch_by_supplier.values():

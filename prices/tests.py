@@ -39,6 +39,7 @@ from prices.views import (
     _batch_activity_datetime,
     _build_autoimport_scan_status,
     _build_cron_line,
+    _build_email_run_status,
     _build_supplier_board_row,
     _collect_latest_successful_imports,
     _get_cron_status,
@@ -749,6 +750,19 @@ class SupplierImportBoundaryTests(TestCase):
 
         self.assertEqual(summary, "No change - duplicate price file")
         self.assertNotIn("1597", summary)
+
+    def test_running_email_status_shows_live_activity(self):
+        run = models.EmailImportRun.objects.create(
+            supplier=self.supplier,
+            status=models.EmailImportStatus.RUNNING,
+            last_message="Importing Supplier: price_24_04.xlsx",
+        )
+
+        status = _build_email_run_status(run)
+
+        self.assertEqual(status["code"], "running")
+        self.assertEqual(status["progress"], 8)
+        self.assertIn("price_24_04.xlsx", status["note"])
 
 
 class ImportAttachmentPreflightTests(TestCase):
