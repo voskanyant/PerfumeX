@@ -19,6 +19,7 @@ from django.db import IntegrityError, transaction
 from django.db.models import F
 
 from prices import models
+from prices.services import link_importer
 from prices.services.importer import process_import_file
 
 
@@ -1472,6 +1473,352 @@ def run_import(
                                         last_message=last_message,
                                     )
                                 stats["last_message"] = str(exc)
+
+                        if not valid_attachment_processed:
+                            email_links = link_importer.extract_links_from_email(message)
+                            if email_links:
+                                source_qs = models.SupplierPriceSource.objects.filter(
+                                    source_type=models.PriceSourceType.EMAIL_LINK,
+                                    is_active=True,
+                                ).select_related("supplier")
+                                if supplier:
+                                    source_qs = source_qs.filter(supplier=supplier)
+                                for source in source_qs:
+                                    matched_links = link_importer.source_matches_email(
+                                        source,
+                                        from_addr=from_addr,
+                                        subject=subject,
+                                        links=email_links,
+                                    )
+                                    if not matched_links:
+                                        continue
+                                    source_link = matched_links[0]
+                                    matched_supplier = source.supplier
+                                    try:
+                                        downloaded = link_importer.download_price_source(
+                                            source, url=source_link
+                                        )
+                                    except Exception as exc:
+                                        summary["skipped_files"] += 1
+                                        source.last_checked_at = timezone.now()
+                                        source.last_status = "failed"
+                                        source.last_message = str(exc)
+                                        source.save(
+                                            update_fields=[
+                                                "last_checked_at",
+                                                "last_status",
+                                                "last_message",
+                                            ]
+                                        )
+                                        record_diagnostic(
+                                            decision=models.AttachmentDecision.SKIPPED,
+                                            reason_code=models.AttachmentReason.LINK_DOWNLOAD_FAILED,
+                                            message=f"Price link download failed: {_short(exc, 220)}",
+                                            mailbox=mailbox,
+                                            folder=item_folder,
+                                            msg_id=msg_id,
+                                            email_message_id=message_id,
+                                            message_date=received_at,
+                                            sender=from_addr,
+                                            subject=subject,
+                                            filename=source_link[:255],
+                                            content_type="text/uri-list",
+                                            supplier_obj=matched_supplier,
+                                        )
+                                        continue
+
+                                    filename = downloaded.filename
+                                    payload = downloaded.payload
+                                    content_type = downloaded.content_type
+                                    content_hash = hashlib.sha256(payload).hexdigest()
+                                    readable, readable_error = _validate_spreadsheet_payload(
+                                        filename, payload
+                                    )
+                                    if not readable:
+                                        summary["skipped_files"] += 1
+                                        source.last_checked_at = timezone.now()
+                                        source.last_status = "failed"
+                                        source.last_message = readable_error
+                                        source.last_filename = filename
+                                        source.save(
+                                            update_fields=[
+                                                "last_checked_at",
+                                                "last_status",
+                                                "last_message",
+                                                "last_filename",
+                                            ]
+                                        )
+                                        record_diagnostic(
+                                            decision=models.AttachmentDecision.SKIPPED,
+                                            reason_code=models.AttachmentReason.WORKBOOK_UNREADABLE,
+                                            message=f"Downloaded spreadsheet could not be opened: {_short(readable_error, 220)}",
+                                            mailbox=mailbox,
+                                            folder=item_folder,
+                                            msg_id=msg_id,
+                                            email_message_id=message_id,
+                                            message_date=received_at,
+                                            sender=from_addr,
+                                            subject=subject,
+                                            filename=filename,
+                                            content_type=content_type,
+                                            payload=payload,
+                                            content_hash=content_hash,
+                                            supplier_obj=matched_supplier,
+                                        )
+                                        continue
+
+                                    summary["matched_files"] += 1
+                                    summary["price_candidates"] += 1
+                                    processed_any = True
+                                    supplier_id_for_stats = matched_supplier.id
+                                    stats = supplier_stats.setdefault(
+                                        supplier_id_for_stats,
+                                        {
+                                            "matched": 0,
+                                            "processed": 0,
+                                            "errors": 0,
+                                            "last_message": "",
+                                            "duplicates": 0,
+                                            "skipped": 0,
+                                        },
+                                    )
+                                    stats["matched"] = stats.get("matched", 0) + 1
+                                    if run_id:
+                                        models.EmailImportRun.objects.filter(id=run_id).update(
+                                            matched_files=F("matched_files") + 1
+                                        )
+                                    set_run_message(
+                                        f"Found link file {matched_supplier.name}: {_short(filename, 90)}"
+                                    )
+                                    exists = models.ImportFile.objects.filter(
+                                        content_hash=content_hash,
+                                        status=models.ImportStatus.PROCESSED,
+                                        import_batch__supplier=matched_supplier,
+                                    ).exists()
+                                    if exists:
+                                        summary["skipped_duplicates"] += 1
+                                        summary["skipped_files"] += 1
+                                        stats["duplicates"] = stats.get("duplicates", 0) + 1
+                                        source.last_checked_at = timezone.now()
+                                        source.last_status = "duplicate"
+                                        source.last_message = "Duplicate price file hash."
+                                        source.last_filename = filename
+                                        source.save(
+                                            update_fields=[
+                                                "last_checked_at",
+                                                "last_status",
+                                                "last_message",
+                                                "last_filename",
+                                            ]
+                                        )
+                                        record_diagnostic(
+                                            decision=models.AttachmentDecision.DUPLICATE,
+                                            reason_code=models.AttachmentReason.DUPLICATE_HASH,
+                                            message="Duplicate price source link file.",
+                                            mailbox=mailbox,
+                                            folder=item_folder,
+                                            msg_id=msg_id,
+                                            email_message_id=message_id,
+                                            message_date=received_at,
+                                            sender=from_addr,
+                                            subject=subject,
+                                            filename=filename,
+                                            content_type=content_type,
+                                            payload=payload,
+                                            content_hash=content_hash,
+                                            supplier_obj=matched_supplier,
+                                        )
+                                        continue
+
+                                    batch_message_id = (message_id or "")[:200]
+                                    if source_link:
+                                        batch_message_id = f"{batch_message_id}|link:{hashlib.sha1(source_link.encode('utf-8')).hexdigest()[:16]}"
+                                    batch = models.ImportBatch.objects.create(
+                                        supplier=matched_supplier,
+                                        mailbox=mailbox,
+                                        message_folder=item_folder,
+                                        message_id=batch_message_id[:255],
+                                        received_at=received_at,
+                                        status=models.ImportStatus.PENDING,
+                                    )
+                                    mapping = models.SupplierFileMapping.objects.filter(
+                                        supplier=matched_supplier,
+                                        file_kind=models.FileKind.PRICE,
+                                        is_active=True,
+                                    ).order_by("-id").first()
+                                    import_file = models.ImportFile.objects.create(
+                                        import_batch=batch,
+                                        mapping=mapping,
+                                        file_kind=models.FileKind.PRICE,
+                                        filename=filename,
+                                        content_hash=content_hash,
+                                        status=models.ImportStatus.PENDING,
+                                    )
+                                    if not mapping:
+                                        import_file.storage_type = models.ImportFileStorage.QUARANTINE
+                                        import_file.status = models.ImportStatus.FAILED
+                                        import_file.reason_code = models.AttachmentReason.MAPPING_MISSING
+                                        import_file.quarantine_until = timezone.now() + timezone.timedelta(
+                                            days=int(settings_obj.quarantine_retention_days or 30)
+                                        )
+                                        import_file.file.save(filename, ContentFile(payload), save=True)
+                                        import_file.save(
+                                            update_fields=[
+                                                "storage_type",
+                                                "status",
+                                                "reason_code",
+                                                "quarantine_until",
+                                            ]
+                                        )
+                                        batch.status = models.ImportStatus.FAILED
+                                        batch.error_message = "Mapping is missing."
+                                        batch.save(update_fields=["status", "error_message"])
+                                        summary["errors"] += 1
+                                        summary["failed_files"] += 1
+                                        summary["quarantined_files"] += 1
+                                        stats["errors"] = stats.get("errors", 0) + 1
+                                        stats["last_message"] = "Mapping is missing."
+                                        source.last_checked_at = timezone.now()
+                                        source.last_status = "failed"
+                                        source.last_message = "Mapping is missing."
+                                        source.last_filename = filename
+                                        source.save(
+                                            update_fields=[
+                                                "last_checked_at",
+                                                "last_status",
+                                                "last_message",
+                                                "last_filename",
+                                            ]
+                                        )
+                                        record_diagnostic(
+                                            decision=models.AttachmentDecision.QUARANTINED,
+                                            reason_code=models.AttachmentReason.MAPPING_MISSING,
+                                            message="Mapping is missing.",
+                                            mailbox=mailbox,
+                                            folder=item_folder,
+                                            msg_id=msg_id,
+                                            email_message_id=message_id,
+                                            message_date=received_at,
+                                            sender=from_addr,
+                                            subject=subject,
+                                            filename=filename,
+                                            content_type=content_type,
+                                            payload=payload,
+                                            content_hash=content_hash,
+                                            supplier_obj=matched_supplier,
+                                            batch=batch,
+                                            import_file=import_file,
+                                        )
+                                        continue
+                                    import_file.file.save(filename, ContentFile(payload), save=True)
+                                    try:
+                                        process_import_file(import_file)
+                                        import_file.status = models.ImportStatus.PROCESSED
+                                        import_file.save(update_fields=["status"])
+                                        batch.status = models.ImportStatus.PROCESSED
+                                        batch.save(update_fields=["status"])
+                                        summary["processed_files"] += 1
+                                        stats["processed"] = stats.get("processed", 0) + 1
+                                        source.last_checked_at = timezone.now()
+                                        source.last_status = "imported"
+                                        source.last_message = "Imported successfully."
+                                        source.last_filename = filename
+                                        source.save(
+                                            update_fields=[
+                                                "last_checked_at",
+                                                "last_status",
+                                                "last_message",
+                                                "last_filename",
+                                            ]
+                                        )
+                                        record_diagnostic(
+                                            decision=models.AttachmentDecision.IMPORTED,
+                                            message="Price source link imported successfully.",
+                                            mailbox=mailbox,
+                                            folder=item_folder,
+                                            msg_id=msg_id,
+                                            email_message_id=message_id,
+                                            message_date=received_at,
+                                            sender=from_addr,
+                                            subject=subject,
+                                            filename=filename,
+                                            content_type=content_type,
+                                            payload=payload,
+                                            content_hash=content_hash,
+                                            supplier_obj=matched_supplier,
+                                            batch=batch,
+                                            import_file=import_file,
+                                        )
+                                        if run_id:
+                                            models.EmailImportRun.objects.filter(id=run_id).update(
+                                                processed_files=F("processed_files") + 1,
+                                                last_message=last_message,
+                                            )
+                                    except Exception as exc:
+                                        reason_code = _reason_from_error(str(exc))
+                                        try:
+                                            if import_file.file:
+                                                import_file.file.delete(save=False)
+                                        except Exception:
+                                            pass
+                                        import_file.storage_type = models.ImportFileStorage.QUARANTINE
+                                        import_file.status = models.ImportStatus.FAILED
+                                        import_file.reason_code = reason_code
+                                        import_file.quarantine_until = timezone.now() + timezone.timedelta(
+                                            days=int(settings_obj.quarantine_retention_days or 30)
+                                        )
+                                        import_file.error_message = str(exc)
+                                        import_file.file.save(filename, ContentFile(payload), save=True)
+                                        import_file.save(
+                                            update_fields=[
+                                                "storage_type",
+                                                "status",
+                                                "reason_code",
+                                                "quarantine_until",
+                                                "error_message",
+                                            ]
+                                        )
+                                        batch.status = models.ImportStatus.FAILED
+                                        batch.error_message = str(exc)
+                                        batch.save(update_fields=["status", "error_message"])
+                                        summary["errors"] += 1
+                                        summary["failed_files"] += 1
+                                        summary["quarantined_files"] += 1
+                                        stats["errors"] = stats.get("errors", 0) + 1
+                                        stats["last_message"] = str(exc)
+                                        source.last_checked_at = timezone.now()
+                                        source.last_status = "failed"
+                                        source.last_message = str(exc)
+                                        source.last_filename = filename
+                                        source.save(
+                                            update_fields=[
+                                                "last_checked_at",
+                                                "last_status",
+                                                "last_message",
+                                                "last_filename",
+                                            ]
+                                        )
+                                        record_diagnostic(
+                                            decision=models.AttachmentDecision.QUARANTINED,
+                                            reason_code=reason_code,
+                                            message=str(exc),
+                                            mailbox=mailbox,
+                                            folder=item_folder,
+                                            msg_id=msg_id,
+                                            email_message_id=message_id,
+                                            message_date=received_at,
+                                            sender=from_addr,
+                                            subject=subject,
+                                            filename=filename,
+                                            content_type=content_type,
+                                            payload=payload,
+                                            content_hash=content_hash,
+                                            supplier_obj=matched_supplier,
+                                            batch=batch,
+                                            import_file=import_file,
+                                        )
+                                    valid_attachment_processed = True
+                                    break
 
                         for batch in batch_by_supplier.values():
                             if batch.status != models.ImportStatus.FAILED:

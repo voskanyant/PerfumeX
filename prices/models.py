@@ -48,6 +48,7 @@ class AttachmentReason(models.TextChoices):
     PROCESSING_ERROR = "processing_error", "Processing error"
     BACKLOG_REMAINING = "backlog_remaining", "Backlog remaining"
     WORKBOOK_UNREADABLE = "workbook_unreadable", "Workbook unreadable"
+    LINK_DOWNLOAD_FAILED = "link_download_failed", "Link download failed"
 
 
 class FileKind(models.TextChoices):
@@ -134,6 +135,72 @@ class SupplierMailboxRule(models.Model):
 
     def __str__(self) -> str:
         return f"{self.supplier} / {self.mailbox}"
+
+
+class PriceSourceType(models.TextChoices):
+    EMAIL_LINK = "email_link", "Email link"
+    FIXED_LINK = "fixed_link", "Fixed link"
+
+
+class PriceSourceProvider(models.TextChoices):
+    AUTO = "auto", "Auto detect"
+    YANDEX_DISK = "yandex_disk", "Yandex Disk"
+    GOOGLE_DRIVE = "google_drive", "Google Drive"
+    DIRECT_URL = "direct_url", "Direct URL"
+    MAILRU_CLOUD = "mailru_cloud", "Mail.ru Cloud"
+
+
+class PriceSourcePickRule(models.TextChoices):
+    NEWEST_VALID = "newest_valid", "Newest valid file"
+    FIRST_VALID = "first_valid", "First valid file"
+
+
+class SupplierPriceSource(models.Model):
+    supplier = models.ForeignKey(
+        Supplier, on_delete=models.CASCADE, related_name="price_sources"
+    )
+    source_type = models.CharField(
+        max_length=20,
+        choices=PriceSourceType.choices,
+        default=PriceSourceType.FIXED_LINK,
+    )
+    provider = models.CharField(
+        max_length=20,
+        choices=PriceSourceProvider.choices,
+        default=PriceSourceProvider.AUTO,
+    )
+    url = models.URLField(max_length=1000, blank=True)
+    url_pattern = models.CharField(
+        max_length=300,
+        blank=True,
+        help_text="Optional text that must be present in email links.",
+    )
+    file_pattern = models.CharField(
+        max_length=200,
+        blank=True,
+        help_text="Optional filename text filter inside folders.",
+    )
+    pick_rule = models.CharField(
+        max_length=20,
+        choices=PriceSourcePickRule.choices,
+        default=PriceSourcePickRule.NEWEST_VALID,
+    )
+    is_active = models.BooleanField(default=True)
+    last_checked_at = models.DateTimeField(null=True, blank=True)
+    last_status = models.CharField(max_length=30, blank=True)
+    last_message = models.TextField(blank=True)
+    last_filename = models.CharField(max_length=255, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["supplier", "source_type", "is_active"]),
+            models.Index(fields=["source_type", "is_active"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.supplier} / {self.get_source_type_display()}"
 
 
 class SupplierFileMapping(models.Model):

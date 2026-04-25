@@ -34,6 +34,7 @@ from prices.services.email_importer import (
     run_import,
     _validate_spreadsheet_payload,
 )
+from prices.services import link_importer
 from prices.services.background import run_in_background
 from prices.views import (
     _batch_activity_datetime,
@@ -131,6 +132,26 @@ class FrontendHardeningTests(TestCase):
         self.assertContains(response, "Mapping preview")
         self.assertNotContains(response, "<p><label")
 
+    def test_supplier_import_page_exposes_link_sources(self):
+        supplier = models.Supplier.objects.create(
+            name="Link Supplier",
+            from_address_pattern="link@example.com",
+        )
+        models.SupplierPriceSource.objects.create(
+            supplier=supplier,
+            source_type=models.PriceSourceType.FIXED_LINK,
+            provider=models.PriceSourceProvider.YANDEX_DISK,
+            url="https://disk.yandex.ru/d/example",
+            file_pattern="price",
+        )
+
+        response = self.client.get(reverse("prices:supplier_import", args=[supplier.pk]), secure=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Update from link")
+        self.assertContains(response, "https://disk.yandex.ru/d/example")
+        self.assertContains(response, "Import now")
+
 
 class MailboxPasswordSecurityTests(TestCase):
     def test_mailbox_password_round_trip(self):
@@ -170,6 +191,54 @@ class MailboxPasswordSecurityTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertNotContains(response, "html-secret-value")
+
+
+class LinkImporterTests(TestCase):
+    def test_extract_links_from_email_body(self):
+        message = EmailMessage()
+        message.set_content(
+            "Price link: https://disk.yandex.ru/d/abc123 and https://example.com/price.xlsx"
+        )
+
+        links = link_importer.extract_links_from_email(message)
+
+        self.assertEqual(
+            links,
+            ["https://disk.yandex.ru/d/abc123", "https://example.com/price.xlsx"],
+        )
+
+    def test_source_matches_email_link_by_supplier_and_url_pattern(self):
+        supplier = models.Supplier.objects.create(
+            name="Ashot",
+            from_address_pattern="ashot@example.com",
+            price_subject_pattern="price",
+        )
+        source = models.SupplierPriceSource.objects.create(
+            supplier=supplier,
+            source_type=models.PriceSourceType.EMAIL_LINK,
+            provider=models.PriceSourceProvider.YANDEX_DISK,
+            url_pattern="disk.yandex.ru/d/",
+        )
+
+        matches = link_importer.source_matches_email(
+            source,
+            from_addr="ashot@example.com",
+            subject="fresh price",
+            links=["https://disk.yandex.ru/d/abc", "https://example.com/file.xlsx"],
+        )
+
+        self.assertEqual(matches, ["https://disk.yandex.ru/d/abc"])
+
+    def test_direct_download_rejects_non_spreadsheet_filename(self):
+        source = models.SupplierPriceSource(
+            provider=models.PriceSourceProvider.DIRECT_URL,
+            url="https://example.com/invoice.pdf",
+        )
+        with patch("prices.services.link_importer._http_get") as http_get:
+            http_get.return_value = (b"data", "application/pdf", "", source.url)
+
+            with self.assertRaises(link_importer.LinkImportError):
+                link_importer.download_price_source(source)
 
 
 class EmailImporterCursorTests(TestCase):

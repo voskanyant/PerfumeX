@@ -39,6 +39,21 @@ class SupplierFileMappingAdmin(admin.ModelAdmin):
     list_filter = ("file_kind", "mapping_mode", "is_active")
 
 
+@admin.register(models.SupplierPriceSource)
+class SupplierPriceSourceAdmin(admin.ModelAdmin):
+    list_display = (
+        "supplier",
+        "source_type",
+        "provider",
+        "pick_rule",
+        "is_active",
+        "last_status",
+        "last_checked_at",
+    )
+    search_fields = ("supplier__name", "url", "url_pattern", "file_pattern")
+    list_filter = ("source_type", "provider", "pick_rule", "is_active", "last_status")
+
+
 @admin.register(models.SupplierProduct)
 class SupplierProductAdmin(admin.ModelAdmin):
     list_display = (

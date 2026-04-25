@@ -25,6 +25,7 @@ from django.views.generic import (
     UpdateView,
 )
 from django.http import JsonResponse
+from django.core.files.base import ContentFile
 from django.core.paginator import Paginator
 from django.core.management import call_command
 from django.utils.http import url_has_allowed_host_and_scheme
@@ -63,6 +64,8 @@ from .services.importer import preview_mapping_file
 from .services.background import run_in_background
 from .services.cbr_rates import upsert_cbr_markup_rates, upsert_cbr_markup_rates_range
 from .services.email_import_lock import email_import_worker_is_busy
+from .services import link_importer
+from .services.email_importer import _reason_from_error, _validate_spreadsheet_payload
 from .services.product_visibility import (
     apply_hidden_product_keywords,
     normalize_hidden_product_keywords,
@@ -2484,6 +2487,10 @@ class SupplierImportView(LoginRequiredMixin, FormView):
         context = super().get_context_data(**kwargs)
         supplier = get_object_or_404(models.Supplier, pk=self.kwargs["pk"])
         context["supplier"] = supplier
+        context["source_form"] = forms.SupplierPriceSourceForm(
+            initial={"source_type": models.PriceSourceType.FIXED_LINK}
+        )
+        context["price_sources"] = supplier.price_sources.order_by("-is_active", "source_type", "id")
         return context
 
     def get_initial(self):
@@ -2568,6 +2575,86 @@ class SupplierQuickUploadView(LoginRequiredMixin, View):
         else:
             messages.success(request, f"{supplier.name}: {upload.name} imported.")
         return redirect("prices:supplier_overview")
+
+
+class SupplierPriceSourceCreateView(LoginRequiredMixin, View):
+    def post(self, request, pk):
+        supplier = get_object_or_404(models.Supplier, pk=pk)
+        form = forms.SupplierPriceSourceForm(request.POST)
+        if not form.is_valid():
+            messages.error(request, "Link source was not saved. Check the highlighted fields.")
+            return redirect("prices:supplier_import", pk=pk)
+        source = form.save(commit=False)
+        source.supplier = supplier
+        source.save()
+        messages.success(request, "Price link source saved.")
+        return redirect("prices:supplier_import", pk=pk)
+
+
+class SupplierPriceSourceImportView(LoginRequiredMixin, View):
+    def post(self, request, pk, source_pk):
+        supplier = get_object_or_404(models.Supplier, pk=pk)
+        source = get_object_or_404(
+            models.SupplierPriceSource, pk=source_pk, supplier=supplier
+        )
+        mapping = (
+            models.SupplierFileMapping.objects.filter(
+                supplier=supplier,
+                file_kind=models.FileKind.PRICE,
+                is_active=True,
+            )
+            .order_by("-id")
+            .first()
+        )
+        if not mapping:
+            messages.info(request, "Create or confirm the supplier price mapping first.")
+            return redirect("prices:supplier_import", pk=pk)
+        try:
+            downloaded = link_importer.download_price_source(source)
+            result = _process_supplier_price_payload(
+                supplier=supplier,
+                mapping=mapping,
+                filename=downloaded.filename,
+                payload=downloaded.payload,
+                content_type=downloaded.content_type,
+                source_label=f"{source.get_source_type_display()} / {downloaded.provider}",
+                source_url=downloaded.source_url,
+            )
+        except Exception as exc:
+            source.last_checked_at = timezone.now()
+            source.last_status = "failed"
+            source.last_message = str(exc)
+            source.save(update_fields=["last_checked_at", "last_status", "last_message"])
+            messages.error(request, f"{supplier.name}: link import failed. {exc}")
+            return redirect("prices:supplier_import", pk=pk)
+
+        source.last_checked_at = timezone.now()
+        source.last_status = result["status"]
+        source.last_message = result["message"]
+        source.last_filename = result["filename"]
+        source.save(
+            update_fields=[
+                "last_checked_at",
+                "last_status",
+                "last_message",
+                "last_filename",
+            ]
+        )
+        if result["status"] == "duplicate":
+            messages.info(request, f"{supplier.name}: no change, duplicate file {result['filename']}.")
+        else:
+            messages.success(request, f"{supplier.name}: imported {result['filename']} from link.")
+        return redirect("prices:supplier_import", pk=pk)
+
+
+class SupplierPriceSourceDeleteView(LoginRequiredMixin, View):
+    def post(self, request, pk, source_pk):
+        source = get_object_or_404(
+            models.SupplierPriceSource, pk=source_pk, supplier_id=pk
+        )
+        source.delete()
+        messages.success(request, "Price link source deleted.")
+        return redirect("prices:supplier_import", pk=pk)
 
 
 class SupplierEmailImportView(LoginRequiredMixin, View):
@@ -3311,6 +3398,141 @@ def _process_supplier_price_upload(supplier, mapping, upload):
         import_batch.save(update_fields=["status", "error_message"])
         raise
     return import_batch
+
+
+def _process_supplier_price_payload(
+    *,
+    supplier,
+    mapping,
+    filename,
+    payload,
+    content_type="",
+    source_label="link",
+    source_url="",
+    received_at=None,
+):
+    filename = filename or "downloaded_price.xlsx"
+    content_hash = hashlib.sha256(payload or b"").hexdigest()
+    readable, readable_error = _validate_spreadsheet_payload(filename, payload or b"")
+    if not readable:
+        raise RuntimeError(f"Spreadsheet could not be opened: {readable_error}")
+
+    existing = models.ImportFile.objects.filter(
+        content_hash=content_hash,
+        status=models.ImportStatus.PROCESSED,
+        import_batch__supplier=supplier,
+    ).first()
+    if existing:
+        models.EmailAttachmentDiagnostic.objects.create(
+            supplier=supplier,
+            import_file=existing,
+            import_batch=existing.import_batch,
+            message_id=source_url[:255],
+            message_date=received_at or timezone.now(),
+            sender=source_label[:300],
+            subject="Price source link",
+            filename=filename,
+            content_type=content_type[:200],
+            size_bytes=len(payload or b""),
+            content_hash=content_hash,
+            decision=models.AttachmentDecision.DUPLICATE,
+            reason_code=models.AttachmentReason.DUPLICATE_HASH,
+            message="Duplicate price source link file.",
+        )
+        return {
+            "status": "duplicate",
+            "message": "Duplicate price file hash.",
+            "filename": filename,
+            "batch": existing.import_batch,
+        }
+
+    import_batch = models.ImportBatch.objects.create(
+        supplier=supplier,
+        status=models.ImportStatus.PENDING,
+        received_at=received_at or timezone.now(),
+        message_id=source_url[:255],
+    )
+    import_file = models.ImportFile.objects.create(
+        import_batch=import_batch,
+        mapping=mapping,
+        file_kind=models.FileKind.PRICE,
+        filename=filename,
+        content_hash=content_hash,
+        status=models.ImportStatus.PENDING,
+    )
+    import_file.file.save(filename, ContentFile(payload), save=True)
+    try:
+        process_import_file(import_file)
+        import_file.status = models.ImportStatus.PROCESSED
+        import_file.save(update_fields=["status"])
+        import_batch.status = models.ImportStatus.PROCESSED
+        import_batch.save(update_fields=["status"])
+        models.EmailAttachmentDiagnostic.objects.create(
+            supplier=supplier,
+            import_batch=import_batch,
+            import_file=import_file,
+            message_id=source_url[:255],
+            message_date=received_at or timezone.now(),
+            sender=source_label[:300],
+            subject="Price source link",
+            filename=filename,
+            content_type=content_type[:200],
+            size_bytes=len(payload or b""),
+            content_hash=content_hash,
+            decision=models.AttachmentDecision.IMPORTED,
+            message="Price source link imported successfully.",
+        )
+    except Exception as exc:
+        reason_code = _reason_from_error(str(exc))
+        try:
+            if import_file.file:
+                import_file.file.delete(save=False)
+        except Exception:
+            pass
+        settings_obj = models.ImportSettings.get_solo()
+        import_file.storage_type = models.ImportFileStorage.QUARANTINE
+        import_file.status = models.ImportStatus.FAILED
+        import_file.reason_code = reason_code
+        import_file.quarantine_until = timezone.now() + timezone.timedelta(
+            days=int(settings_obj.quarantine_retention_days or 30)
+        )
+        import_file.error_message = str(exc)
+        import_file.file.save(filename, ContentFile(payload), save=True)
+        import_file.save(
+            update_fields=[
+                "storage_type",
+                "status",
+                "reason_code",
+                "quarantine_until",
+                "error_message",
+            ]
+        )
+        import_batch.status = models.ImportStatus.FAILED
+        import_batch.error_message = str(exc)
+        import_batch.save(update_fields=["status", "error_message"])
+        models.EmailAttachmentDiagnostic.objects.create(
+            supplier=supplier,
+            import_batch=import_batch,
+            import_file=import_file,
+            message_id=source_url[:255],
+            message_date=received_at or timezone.now(),
+            sender=source_label[:300],
+            subject="Price source link",
+            filename=filename,
+            content_type=content_type[:200],
+            size_bytes=len(payload or b""),
+            content_hash=content_hash,
+            decision=models.AttachmentDecision.QUARANTINED,
+            reason_code=reason_code,
+            message=str(exc),
+        )
+        raise
+    return {
+        "status": "imported",
+        "message": "Imported successfully.",
+        "filename": filename,
+        "batch": import_batch,
+    }
 
 
 class MailboxListView(BaseListView):

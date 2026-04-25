@@ -171,6 +171,47 @@ class SupplierImportForm(forms.Form):
     )
 
 
+class SupplierPriceSourceForm(forms.ModelForm):
+    class Meta:
+        model = models.SupplierPriceSource
+        fields = (
+            "source_type",
+            "provider",
+            "url",
+            "url_pattern",
+            "file_pattern",
+            "pick_rule",
+            "is_active",
+        )
+        labels = {
+            "source_type": "Source",
+            "provider": "Provider",
+            "url": "Fixed link",
+            "url_pattern": "Email link filter",
+            "file_pattern": "Filename filter",
+            "pick_rule": "Pick file",
+            "is_active": "Active",
+        }
+        help_texts = {
+            "url": "Required for fixed links. Leave empty for email-link sources.",
+            "url_pattern": "Optional. Used to choose which email body link belongs to this source.",
+            "file_pattern": "Optional. Example: price or прайс.",
+        }
+        widgets = {
+            "url": forms.URLInput(attrs={"placeholder": "https://disk.yandex.ru/d/..."}),
+            "url_pattern": forms.TextInput(attrs={"placeholder": "disk.yandex.ru/d/..."}),
+            "file_pattern": forms.TextInput(attrs={"placeholder": "price / прайс / stock"}),
+        }
+
+    def clean(self):
+        cleaned_data = super().clean()
+        source_type = cleaned_data.get("source_type")
+        url = (cleaned_data.get("url") or "").strip()
+        if source_type == models.PriceSourceType.FIXED_LINK and not url:
+            self.add_error("url", "Fixed link sources need a URL.")
+        return cleaned_data
+
+
 class ImportSettingsForm(forms.ModelForm):
     class Meta:
         model = models.ImportSettings
