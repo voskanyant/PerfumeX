@@ -338,6 +338,119 @@ class TeachParseTests(TestCase):
         self.assertEqual(len(parses), 1)
         self.assertEqual(parses[0].supplier_product_id, matching.id)
 
+    def test_parsed_products_page_requires_complete_parse_fields(self):
+        brand = Brand.objects.create(name="Montale")
+        BrandAlias.objects.create(
+            brand=brand,
+            alias_text="montale",
+            normalized_alias="montale",
+        )
+        complete = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="complete-parse",
+            name="Montale Arabians Tonka EDP 100ml",
+        )
+        missing_size = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="missing-size-parse",
+            name="Montale Arabians Tonka EDP",
+        )
+        missing_concentration = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="missing-concentration-parse",
+            name="Montale Arabians Tonka 100ml",
+        )
+        missing_name = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="missing-name-parse",
+            name="Montale EDP 100ml",
+        )
+        for product in [complete, missing_size, missing_concentration, missing_name]:
+            save_parse(product)
+
+        response = self.client.get(reverse("assistant_linking:normalization_parsed"))
+
+        self.assertEqual(response.status_code, 200)
+        parse_product_ids = {item.supplier_product_id for item in response.context["parses"]}
+        self.assertIn(complete.id, parse_product_ids)
+        self.assertNotIn(missing_size.id, parse_product_ids)
+        self.assertNotIn(missing_concentration.id, parse_product_ids)
+        self.assertNotIn(missing_name.id, parse_product_ids)
+
+    def test_dashboard_counts_only_complete_rows_as_parsed(self):
+        brand = Brand.objects.create(name="Montale")
+        BrandAlias.objects.create(
+            brand=brand,
+            alias_text="montale",
+            normalized_alias="montale",
+        )
+        complete = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="dashboard-complete",
+            name="Montale Arabians Tonka EDP 100ml",
+        )
+        missing_size = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="dashboard-missing-size",
+            name="Montale Arabians Tonka EDP",
+        )
+        missing_concentration = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="dashboard-missing-concentration",
+            name="Montale Arabians Tonka 100ml",
+        )
+        missing_name = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="dashboard-missing-name",
+            name="Montale EDP 100ml",
+        )
+        for product in [complete, missing_size, missing_concentration, missing_name]:
+            save_parse(product)
+
+        response = self.client.get(reverse("assistant_linking:normalization_dashboard"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["parsed_count"], 1)
+        self.assertEqual(response.context["missing_size_count"], 1)
+        self.assertEqual(response.context["missing_concentration_count"], 1)
+        self.assertEqual(response.context["missing_name_count"], 1)
+
+    def test_missing_concentration_and_name_queues_are_searchable(self):
+        brand = Brand.objects.create(name="Montale")
+        BrandAlias.objects.create(
+            brand=brand,
+            alias_text="montale",
+            normalized_alias="montale",
+        )
+        missing_concentration = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="queue-missing-concentration",
+            name="Montale Arabians Tonka 100ml",
+        )
+        missing_name = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="queue-missing-name",
+            name="Montale EDP 100ml",
+        )
+        save_parse(missing_concentration)
+        save_parse(missing_name)
+
+        concentration_response = self.client.get(
+            reverse("assistant_linking:normalization_missing_concentration"),
+            {"q": "Arabians"},
+        )
+        name_response = self.client.get(
+            reverse("assistant_linking:normalization_missing_name"),
+            {"q": "Montale"},
+        )
+
+        self.assertEqual(concentration_response.status_code, 200)
+        self.assertEqual(name_response.status_code, 200)
+        concentration_ids = {item.supplier_product_id for item in concentration_response.context["parses"]}
+        name_ids = {item.supplier_product_id for item in name_response.context["parses"]}
+        self.assertIn(missing_concentration.id, concentration_ids)
+        self.assertIn(missing_name.id, name_ids)
+
     def test_catalog_variant_label_hides_default_type_and_packaging(self):
         brand = Brand.objects.create(name="V Canto")
         perfume = Perfume.objects.create(
@@ -433,15 +546,21 @@ class TeachParseTests(TestCase):
         self.assertEqual(len(impact["examples"]), 12)
 
     def test_hidden_product_keywords_filter_parsed_products_page(self):
+        brand = Brand.objects.create(name="Montale")
+        BrandAlias.objects.create(
+            brand=brand,
+            alias_text="montale",
+            normalized_alias="montale",
+        )
         hidden = SupplierProduct.objects.create(
             supplier=self.supplier,
             identity_key="hidden-1",
-            name="Montale Hidden Tester 100ml",
+            name="Montale Hidden Tester EDP 100ml",
         )
         visible = SupplierProduct.objects.create(
             supplier=self.supplier,
             identity_key="visible-1",
-            name="Montale Arabians Tonka 100ml",
+            name="Montale Arabians Tonka EDP 100ml",
         )
         save_parse(hidden)
         save_parse(visible)
@@ -453,7 +572,7 @@ class TeachParseTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         parses = list(response.context["parses"])
-        self.assertEqual(len(parses), 2)
+        self.assertEqual(len(parses), 1)
         self.assertTrue(all("tester" not in parsed.supplier_product.name.lower() for parsed in parses))
 
     def test_unparsed_page_uses_50_row_pagination(self):

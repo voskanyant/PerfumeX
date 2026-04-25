@@ -61,6 +61,34 @@ def _exclude_garbage_parses(queryset):
     return queryset.exclude(modifiers__contains=[GARBAGE_MODIFIER])
 
 
+def _complete_parse_query():
+    return (
+        Q(normalized_brand__isnull=False)
+        & ~Q(product_name_text="")
+        & ~Q(concentration="")
+        & Q(size_ml__isnull=False)
+    )
+
+
+def _complete_parses(queryset):
+    return queryset.filter(_complete_parse_query())
+
+
+def _apply_parsed_search(queryset, query):
+    if not query:
+        return queryset
+    return queryset.filter(
+        Q(supplier_product__supplier__name__icontains=query)
+        | Q(supplier_product__name__icontains=query)
+        | Q(supplier_product__supplier_sku__icontains=query)
+        | Q(supplier_product__brand__icontains=query)
+        | Q(normalized_brand__name__icontains=query)
+        | Q(detected_brand_text__icontains=query)
+        | Q(product_name_text__icontains=query)
+        | Q(concentration__icontains=query)
+    )
+
+
 def _manual_decision_snapshot(decision):
     return {
         "id": decision.id,
@@ -230,17 +258,21 @@ class NormalizationDashboardView(StaffAssistantMixin, TemplateView):
         )
         return {
             **super().get_context_data(**kwargs),
-            "parsed_count": non_garbage_queryset.count(),
+            "parsed_count": _complete_parses(non_garbage_queryset).count(),
             "unparsed_count": unparsed_queryset.filter(assistant_parse__isnull=True).count(),
             "low_confidence_count": non_garbage_queryset.filter(confidence__lt=75).count(),
             "missing_brand_count": non_garbage_queryset.filter(normalized_brand__isnull=True).count(),
+            "missing_name_count": non_garbage_queryset.filter(product_name_text="").count(),
+            "missing_concentration_count": non_garbage_queryset.filter(concentration="").count(),
             "missing_size_count": non_garbage_queryset.filter(size_ml__isnull=True).count(),
             "modifier_count": non_garbage_queryset.exclude(modifiers=[]).count(),
             "garbage_count": parsed_queryset.filter(modifiers__contains=[GARBAGE_MODIFIER]).count(),
             "tester_sample_count": non_garbage_queryset.filter(
                 Q(is_tester=True) | Q(is_sample=True) | Q(is_travel=True) | Q(is_set=True)
             ).count(),
-            "recent": non_garbage_queryset.select_related("supplier_product", "normalized_brand").order_by("-updated_at")[:20],
+            "recent": _complete_parses(non_garbage_queryset)
+            .select_related("supplier_product", "normalized_brand")
+            .order_by("-updated_at")[:20],
             "hidden_keywords_active": bool(hidden_keywords),
         }
 
@@ -292,18 +324,7 @@ class LowConfidenceListView(NormalizationSearchMixin, StaffAssistantMixin, ListV
             "supplier_product__supplier",
             "normalized_brand",
         ).filter(confidence__lt=75)
-        query = self.get_search_query()
-        if query:
-            queryset = queryset.filter(
-                Q(supplier_product__supplier__name__icontains=query)
-                | Q(supplier_product__name__icontains=query)
-                | Q(supplier_product__supplier_sku__icontains=query)
-                | Q(supplier_product__brand__icontains=query)
-                | Q(normalized_brand__name__icontains=query)
-                | Q(detected_brand_text__icontains=query)
-                | Q(product_name_text__icontains=query)
-                | Q(concentration__icontains=query)
-            )
+        queryset = _apply_parsed_search(queryset, self.get_search_query())
         queryset = _exclude_garbage_parses(_hide_parsed_products(queryset, self.request))
         return queryset.order_by("confidence", "supplier_product__supplier__name", "supplier_product__name")
 
@@ -361,6 +382,7 @@ class MissingBrandListView(NormalizationIssueListView):
             "supplier_product__supplier",
             "normalized_brand",
         ).filter(normalized_brand__isnull=True)
+        queryset = _apply_parsed_search(queryset, self.get_search_query())
         queryset = _exclude_garbage_parses(_hide_parsed_products(queryset, self.request))
         return queryset.order_by("supplier_product__name")
 
@@ -369,6 +391,40 @@ class MissingBrandListView(NormalizationIssueListView):
 
     def should_refresh_parse(self, parsed) -> bool:
         return not parsed.locked_by_human
+
+
+class MissingNameListView(NormalizationIssueListView):
+    issue_title = "Missing product name"
+
+    def get_queryset(self):
+        queryset = models.ParsedSupplierProduct.objects.select_related(
+            "supplier_product",
+            "supplier_product__supplier",
+            "normalized_brand",
+        ).filter(product_name_text="")
+        queryset = _apply_parsed_search(queryset, self.get_search_query())
+        queryset = _exclude_garbage_parses(_hide_parsed_products(queryset, self.request))
+        return queryset.order_by("supplier_product__name")
+
+    def parse_matches_view(self, parsed):
+        return not parsed.product_name_text
+
+
+class MissingConcentrationListView(NormalizationIssueListView):
+    issue_title = "Missing concentration"
+
+    def get_queryset(self):
+        queryset = models.ParsedSupplierProduct.objects.select_related(
+            "supplier_product",
+            "supplier_product__supplier",
+            "normalized_brand",
+        ).filter(concentration="")
+        queryset = _apply_parsed_search(queryset, self.get_search_query())
+        queryset = _exclude_garbage_parses(_hide_parsed_products(queryset, self.request))
+        return queryset.order_by("supplier_product__name")
+
+    def parse_matches_view(self, parsed):
+        return not parsed.concentration
 
 
 class MissingSizeListView(NormalizationIssueListView):
@@ -380,6 +436,7 @@ class MissingSizeListView(NormalizationIssueListView):
             "supplier_product__supplier",
             "normalized_brand",
         ).filter(size_ml__isnull=True)
+        queryset = _apply_parsed_search(queryset, self.get_search_query())
         queryset = _exclude_garbage_parses(_hide_parsed_products(queryset, self.request))
         return queryset.order_by("supplier_product__name")
 
@@ -396,6 +453,7 @@ class TesterSampleListView(NormalizationIssueListView):
             "supplier_product__supplier",
             "normalized_brand",
         ).filter(Q(is_tester=True) | Q(is_sample=True) | Q(is_travel=True) | Q(is_set=True))
+        queryset = _apply_parsed_search(queryset, self.get_search_query())
         queryset = _exclude_garbage_parses(_hide_parsed_products(queryset, self.request))
         return queryset.order_by("supplier_product__name")
 
@@ -412,6 +470,7 @@ class ModifierConflictListView(NormalizationIssueListView):
             "supplier_product__supplier",
             "normalized_brand",
         ).exclude(modifiers=[])
+        queryset = _apply_parsed_search(queryset, self.get_search_query())
         queryset = _exclude_garbage_parses(_hide_parsed_products(queryset, self.request))
         return queryset.order_by("supplier_product__name")
 
@@ -420,7 +479,7 @@ class ModifierConflictListView(NormalizationIssueListView):
 
 
 class ParsedListView(NormalizationIssueListView):
-    issue_title = "Parsed products"
+    issue_title = "Complete parsed products"
 
     def get_queryset(self):
         queryset = models.ParsedSupplierProduct.objects.select_related(
@@ -428,23 +487,19 @@ class ParsedListView(NormalizationIssueListView):
             "supplier_product__supplier",
             "normalized_brand",
         )
-        query = self.get_search_query()
-        if query:
-            queryset = queryset.filter(
-                Q(supplier_product__supplier__name__icontains=query)
-                | Q(supplier_product__name__icontains=query)
-                | Q(supplier_product__supplier_sku__icontains=query)
-                | Q(supplier_product__brand__icontains=query)
-                | Q(normalized_brand__name__icontains=query)
-                | Q(detected_brand_text__icontains=query)
-                | Q(product_name_text__icontains=query)
-                | Q(concentration__icontains=query)
-            )
+        queryset = _apply_parsed_search(queryset, self.get_search_query())
         queryset = _hide_parsed_products(queryset, self.request)
+        queryset = _complete_parses(_exclude_garbage_parses(queryset))
         return queryset.order_by("-updated_at", "supplier_product__supplier__name", "supplier_product__name")
 
     def parse_matches_view(self, parsed):
-        return True
+        return (
+            parsed.normalized_brand_id is not None
+            and bool(parsed.product_name_text)
+            and bool(parsed.concentration)
+            and parsed.size_ml is not None
+            and GARBAGE_MODIFIER not in (parsed.modifiers or [])
+        )
 
 
 class GarbageListView(NormalizationIssueListView):
@@ -456,6 +511,7 @@ class GarbageListView(NormalizationIssueListView):
             "supplier_product__supplier",
             "normalized_brand",
         ).filter(modifiers__contains=[GARBAGE_MODIFIER])
+        queryset = _apply_parsed_search(queryset, self.get_search_query())
         queryset = _hide_parsed_products(queryset, self.request)
         return queryset.order_by("supplier_product__supplier__name", "supplier_product__name")
 
