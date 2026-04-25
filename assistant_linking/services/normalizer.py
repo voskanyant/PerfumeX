@@ -20,7 +20,7 @@ from assistant_linking.models import (
     ProductAlias,
 )
 from assistant_linking.services.garbage import GARBAGE_MODIFIER, GARBAGE_WARNING_PREFIX, match_garbage_keyword
-from assistant_linking.services.parser_rules import get_parser_terms, get_regex_preprocess_rules
+from assistant_linking.services.parser_rules import get_audience_alias_rules, get_parser_terms, get_regex_preprocess_rules
 from assistant_linking.utils.text import normalize_alias_value
 from catalog.models import Brand
 from prices.models import SupplierProduct
@@ -59,10 +59,35 @@ DEFAULT_CONCENTRATION_ALIASES = (
     ("аттар", "Perfume Oil"),
 )
 
-GENDER_ALIASES = (
-    (r"\bpour homme\b|\bhomme\b|\buomo\b|\bmen\b|\bman\b", "men"),
-    (r"\bpour femme\b|\bfemme\b|\bdonna\b|\bwomen\b|\bwoman\b|\blady\b", "women"),
-    (r"\bunisex\b|\bунисекс\b|\bуни\b", "unisex"),
+DEFAULT_AUDIENCE_ALIASES = (
+    ("pour femme", "Pour Femme", "women"),
+    ("femme", "Femme", "women"),
+    ("donna", "Woman", "women"),
+    ("women", "Woman", "women"),
+    ("woman", "Woman", "women"),
+    ("female", "Woman", "women"),
+    ("lady", "Woman", "women"),
+    ("her", "Woman", "women"),
+    ("w", "Woman", "women"),
+    ("жен", "Woman", "women"),
+    ("женский", "Woman", "women"),
+    ("женская", "Woman", "women"),
+    ("женские", "Woman", "women"),
+    ("pour homme", "Pour Homme", "men"),
+    ("homme", "Homme", "men"),
+    ("uomo", "Men", "men"),
+    ("men", "Men", "men"),
+    ("man", "Men", "men"),
+    ("male", "Men", "men"),
+    ("him", "Men", "men"),
+    ("m", "Men", "men"),
+    ("муж", "Men", "men"),
+    ("мужской", "Men", "men"),
+    ("мужская", "Men", "men"),
+    ("мужские", "Men", "men"),
+    ("unisex", "Unisex", "unisex"),
+    ("унисекс", "Unisex", "unisex"),
+    ("уни", "Unisex", "unisex"),
 )
 
 MODIFIER_TERMS = ("intense", "elixir", "absolu", "eau intense", "extreme", "sport", "fraiche", "fraicheur")
@@ -71,7 +96,7 @@ SAMPLE_TERMS = ("sample", "пробник", "vial")
 TRAVEL_TERMS = ("travel",)
 SET_TERMS = ("set", "набор", "coffret")
 NO_BOX_TERMS = ("no box", "without box", "без короб")
-GENDER_TERMS = ("pour homme", "homme", "uomo", "men", "man", "pour femme", "femme", "donna", "women", "woman", "lady", "unisex", "унисекс", "уни")
+GENDER_TERMS = tuple(alias for alias, _display, _group in DEFAULT_AUDIENCE_ALIASES)
 REFILL_MODIFIER = "refill"
 MINI_MODIFIER = "mini"
 
@@ -181,6 +206,29 @@ def _set_terms() -> tuple[str, ...]:
 
 def _refill_terms() -> tuple[str, ...]:
     return _kb_terms("parser_refill_term", ())
+
+
+def _audience_aliases() -> tuple[tuple[str, str, str], ...]:
+    aliases = [
+        (normalize_text(alias), display, group)
+        for alias, display, group in [*DEFAULT_AUDIENCE_ALIASES, *get_audience_alias_rules()]
+    ]
+    seen: set[str] = set()
+    unique: list[tuple[str, str, str]] = []
+    for alias, display, group in sorted(aliases, key=lambda row: len(row[0]), reverse=True):
+        if not alias or alias in seen:
+            continue
+        seen.add(alias)
+        unique.append((alias, display, group))
+    return tuple(unique)
+
+
+def audience_group(value: str) -> str:
+    normalized = normalize_text(value)
+    for alias, display, group in _audience_aliases():
+        if normalized in {alias, normalize_text(display)}:
+            return group
+    return normalized
 
 
 def _disable_regex_alias(alias, *, pattern: str, exc) -> None:
@@ -366,9 +414,10 @@ def parse_supplier_product(product: SupplierProduct) -> ParseResult:
             text = re.sub(rf"(^|\s){re.escape(needle)}($|\s)", " ", text).strip()
             break
 
-    for pattern, value in GENDER_ALIASES:
-        if re.search(pattern, text):
-            result.supplier_gender_hint = value
+    audience_aliases = _audience_aliases()
+    for alias_text, display_value, _group in audience_aliases:
+        if _contains_phrase(text, alias_text):
+            result.supplier_gender_hint = display_value
             break
 
     tester_terms = _tester_terms()
@@ -451,6 +500,7 @@ def parse_supplier_product(product: SupplierProduct) -> ParseResult:
                 result.raw_size_text,
                 result.concentration,
                 *GENDER_TERMS,
+                *(alias for alias, _display, _group in audience_aliases),
                 *tester_terms,
                 *sample_terms,
                 *travel_terms,

@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 
 from assistant_linking.models import ParsedSupplierProduct
-from assistant_linking.services.normalizer import normalize_text
+from assistant_linking.services.normalizer import audience_group, normalize_text
 from catalog.models import Perfume, PerfumeVariant
 from prices.models import SupplierProduct
 from prices.services.product_visibility import apply_hidden_product_keywords
@@ -90,7 +90,7 @@ def candidate_matches(parsed: ParsedSupplierProduct, limit: int = 8) -> list[Cat
                 conflicts.append("concentration differs")
                 score -= 8
         if parsed.supplier_gender_hint and perfume.audience:
-            if parsed.supplier_gender_hint == perfume.audience:
+            if audience_group(parsed.supplier_gender_hint) == audience_group(perfume.audience):
                 score += 5
                 reasons.append("audience matches")
             else:

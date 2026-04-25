@@ -74,8 +74,43 @@ class NormalizerTests(TestCase):
         self.assertEqual(parsed.concentration, "Eau de Toilette")
         self.assertEqual(parsed.size_ml, 100)
         self.assertTrue(parsed.is_tester)
-        self.assertEqual(parsed.supplier_gender_hint, "men")
+        self.assertEqual(parsed.supplier_gender_hint, "Pour Homme")
         self.assertEqual(parsed.normalized_brand, self.brand)
+
+    def test_standalone_w_and_m_are_audience_aliases_not_product_name(self):
+        brand = Brand.objects.create(name="Abercrombie & Fitch")
+        BrandAlias.objects.create(brand=brand, alias_text="Abercrombie Fitch", normalized_alias="abercrombie fitch")
+        woman_product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="audience-w",
+            name="Abercrombie Fitch Authentic Moment w tester edp100ml",
+        )
+        men_product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="audience-m",
+            name="Abercrombie Fitch Authentic m tester edt100ml",
+        )
+
+        woman_parse = parse_supplier_product(woman_product)
+        men_parse = parse_supplier_product(men_product)
+
+        self.assertEqual(woman_parse.supplier_gender_hint, "Woman")
+        self.assertEqual(woman_parse.product_name_text, "authentic moment")
+        self.assertTrue(woman_parse.is_tester)
+        self.assertEqual(men_parse.supplier_gender_hint, "Men")
+        self.assertEqual(men_parse.product_name_text, "authentic")
+
+    def test_femme_keeps_supplier_style_but_matches_women_group(self):
+        product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="audience-femme",
+            name="DG Light Blue pour femme edt 100ml",
+        )
+
+        parsed = parse_supplier_product(product)
+
+        self.assertEqual(parsed.supplier_gender_hint, "Pour Femme")
+        self.assertEqual(parsed.product_name_text, "light blue")
 
     def test_locked_human_parse_is_not_overwritten(self):
         product = SupplierProduct.objects.create(supplier=self.supplier, identity_key="2", name="DG Light Blue EDP 100ml")
@@ -351,7 +386,7 @@ class NormalizerTests(TestCase):
         self.assertEqual(parsed.size_ml, 50)
         self.assertTrue(parsed.is_tester)
         self.assertEqual(parsed.variant_type, "tester")
-        self.assertEqual(parsed.supplier_gender_hint, "unisex")
+        self.assertEqual(parsed.supplier_gender_hint, "Unisex")
         self.assertEqual(parsed.product_name_text, "ambre and tonka")
 
     def test_builtin_russian_concentration_aliases_work_without_database_seed(self):

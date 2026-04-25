@@ -11,9 +11,15 @@ from assistant_linking.models import BrandAlias, ProductAlias
 
 
 AUDIENCE_SYNONYMS = {
-    "men": {"men", "man", "male", "homme", "uomo", "pour homme", "him"},
-    "women": {"women", "woman", "female", "femme", "donna", "pour femme", "her", "lady"},
-    "unisex": {"unisex", "унисекс"},
+    "men": {"men", "man", "male", "homme", "uomo", "pour homme", "him", "m", "муж", "мужской", "мужская", "мужские"},
+    "women": {"women", "woman", "female", "femme", "donna", "pour femme", "her", "lady", "w", "жен", "женский", "женская", "женские"},
+    "unisex": {"unisex", "унисекс", "уни"},
+}
+
+AUDIENCE_DISPLAY_VALUES = {
+    "men": {"men", "Men", "Homme", "Pour Homme"},
+    "women": {"women", "Woman", "Femme", "Pour Femme"},
+    "unisex": {"unisex", "Unisex"},
 }
 
 CONCENTRATION_SYNONYMS = {
@@ -165,7 +171,7 @@ def apply_smart_supplier_search(queryset, query: str):
         raw_q = Q()
         for alias in aliases:
             raw_q |= Q(name__icontains=alias)
-        queryset = queryset.filter(Q(assistant_parse__supplier_gender_hint=intent.audience) | raw_q)
+        queryset = queryset.filter(Q(assistant_parse__supplier_gender_hint__in=AUDIENCE_DISPLAY_VALUES[intent.audience]) | raw_q)
 
     if intent.concentration:
         aliases = CONCENTRATION_SYNONYMS[intent.concentration]

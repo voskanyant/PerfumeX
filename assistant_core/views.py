@@ -129,6 +129,7 @@ class KnowledgeView(StaffAssistantMixin, TemplateView):
                         "parser_travel_term",
                         "parser_set_term",
                         "parser_refill_term",
+                        "parser_audience_term",
                         "regex_preprocess",
                     )
                 )
@@ -256,6 +257,7 @@ class KnowledgeView(StaffAssistantMixin, TemplateView):
                         "parser_travel_term",
                         "parser_set_term",
                         "parser_refill_term",
+                        "parser_audience_term",
                         "regex_preprocess",
                     )
                 ).count(),
@@ -607,6 +609,7 @@ class ParserTermCreateView(StaffAssistantMixin, View):
         "parser_travel_term",
         "parser_set_term",
         "parser_refill_term",
+        "parser_audience_term",
         "regex_preprocess",
     }
 
@@ -619,7 +622,7 @@ class ParserTermCreateView(StaffAssistantMixin, View):
             messages.error(request, "Choose a valid parser rule kind.")
             return redirect(f"{reverse_lazy('assistant_core:knowledge')}?section=parser_terms")
 
-        if rule_kind == "regex_preprocess":
+        if rule_kind in {"regex_preprocess", "parser_audience_term"}:
             terms = [line.strip() for line in raw_terms.splitlines() if line.strip()]
         else:
             terms = normalize_parser_terms(raw_terms)

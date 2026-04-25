@@ -18,6 +18,7 @@ PARSER_RULE_KINDS = (
     "parser_travel_term",
     "parser_set_term",
     "parser_refill_term",
+    "parser_audience_term",
     "regex_preprocess",
 )
 TERM_RULE_KINDS = tuple(kind for kind in PARSER_RULE_KINDS if kind != "regex_preprocess")
@@ -50,6 +51,23 @@ def _parse_preprocess_rule(rule_text: str) -> tuple[str, str] | None:
     return pattern, replacement
 
 
+def _parse_audience_rule(rule_text: str) -> tuple[str, str, str] | None:
+    if "=>" not in (rule_text or ""):
+        return None
+    alias, target = rule_text.split("=>", 1)
+    alias = normalize_alias_value(alias)
+    target = target.strip()
+    if "|" in target:
+        display, group = [part.strip() for part in target.split("|", 1)]
+    else:
+        display = target
+        group = normalize_alias_value(display)
+    group = normalize_alias_value(group)
+    if not alias or not display or group not in {"men", "women", "unisex"}:
+        return None
+    return alias, display, group
+
+
 def get_parser_rules() -> dict[str, list]:
     rules = cache.get(PARSER_RULE_CACHE_KEY)
     if rules is not None:
@@ -70,6 +88,11 @@ def get_parser_rules() -> dict[str, list]:
                 if parsed:
                     rules[rule_kind].append(parsed)
                 continue
+            if rule_kind == "parser_audience_term":
+                parsed = _parse_audience_rule(rule_text)
+                if parsed:
+                    rules[rule_kind].append(parsed)
+                continue
             for term in normalize_parser_terms(rule_text):
                 rules[rule_kind].append(term)
     except (OperationalError, ProgrammingError) as exc:
@@ -86,3 +109,7 @@ def get_parser_terms(rule_kind: str) -> tuple[str, ...]:
 
 def get_regex_preprocess_rules() -> tuple[tuple[str, str], ...]:
     return tuple(get_parser_rules().get("regex_preprocess", ()))
+
+
+def get_audience_alias_rules() -> tuple[tuple[str, str, str], ...]:
+    return tuple(get_parser_rules().get("parser_audience_term", ()))
