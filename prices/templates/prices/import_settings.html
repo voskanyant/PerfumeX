@@ -127,8 +127,14 @@
                         {% endif %}
                     </div>
                     <div class="space-top-xs"><strong>Runner script:</strong> <code>{{ cron_status.script_path }}</code> {% if cron_status.script_exists %}(exists){% else %}(missing){% endif %}</div>
+                    {% if cron_status.log_path %}
+                        <div class="space-top-xs"><strong>Runner log:</strong> <code>{{ cron_status.log_path }}</code></div>
+                    {% endif %}
                     {% if cron_status.line %}
                         <div class="space-top-xs"><strong>Cron line:</strong> <code>{{ cron_status.line }}</code></div>
+                    {% endif %}
+                    {% if cron_status.needs_reinstall %}
+                        <div class="space-top-xs tone-danger"><strong>Scheduler needs reinstall:</strong> current cron line does not match the saved interval/settings.</div>
                     {% endif %}
                     {% if cron_status.error %}
                         <div class="space-top-xs tone-danger"><strong>Error:</strong> {{ cron_status.error }}</div>

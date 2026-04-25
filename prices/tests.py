@@ -23,8 +23,10 @@ from prices.services.email_importer import (
 )
 from prices.views import (
     _batch_activity_datetime,
+    _build_cron_line,
     _build_supplier_board_row,
     _collect_latest_successful_imports,
+    _render_runner_script,
 )
 
 
@@ -432,6 +434,27 @@ class ImportDiagnosticsPageTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "daily-price.xlsx")
         self.assertContains(response, "Mapping is missing")
+
+
+class ImportSchedulerTests(TestCase):
+    def test_cron_line_uses_configured_interval_and_longer_timeout(self):
+        settings_obj = models.ImportSettings.get_solo()
+        settings_obj.interval_minutes = 20
+        settings_obj.save(update_fields=["interval_minutes"])
+
+        line = _build_cron_line(Path("/opt/perfumex/run_import_emails.sh"))
+
+        self.assertTrue(line.startswith("*/20 * * * * "))
+        self.assertIn("/usr/bin/timeout 1800s", line)
+        self.assertIn("PERFUMEX_IMPORT_CRON", line)
+
+    def test_runner_script_does_not_require_var_log_venv_or_env(self):
+        script = _render_runner_script()
+
+        self.assertIn("perfumex_email_import.log", script)
+        self.assertIn("if [ -f .env ]; then", script)
+        self.assertNotIn("/var/log/perfumex_email_import.log", script)
+        self.assertNotIn("source .venv/bin/activate", script)
 
 
 class HiddenProductKeywordTests(TestCase):

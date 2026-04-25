@@ -5,6 +5,7 @@ from django.urls import reverse_lazy
 from collections import defaultdict
 import hashlib
 import os
+import shlex
 import stat
 import subprocess
 from pathlib import Path
@@ -1226,18 +1227,23 @@ def _runner_script_path() -> Path:
 
 def _render_runner_script() -> str:
     base_dir = Path(settings.BASE_DIR)
+    log_dir = base_dir / "logs"
+    log_file = log_dir / "perfumex_email_import.log"
+    python_bin = Path(sys.executable)
     return "\n".join(
         [
             "#!/usr/bin/env bash",
             "set -Eeuo pipefail",
-            "exec >>/var/log/perfumex_email_import.log 2>&1",
+            f"mkdir -p {shlex.quote(str(log_dir))}",
+            f"exec >>{shlex.quote(str(log_file))} 2>&1",
             'echo "=== START $(date \'+%F %T\') ==="',
-            f"cd {base_dir}",
-            "source .venv/bin/activate",
-            "set -a",
-            f". {base_dir}/.env",
-            "set +a",
-            "python manage.py import_emails",
+            f"cd {shlex.quote(str(base_dir))}",
+            "if [ -f .env ]; then",
+            "  set -a",
+            "  . ./.env",
+            "  set +a",
+            "fi",
+            f"{shlex.quote(str(python_bin))} manage.py import_emails",
             "rc=$?",
             'echo "=== END $(date \'+%F %T\') rc=$rc ==="',
             "exit $rc",
@@ -1285,15 +1291,30 @@ def _write_crontab_lines(lines: list[str]) -> None:
     )
 
 
-def _build_cron_line(script_path: Path) -> str:
+def _cron_minute_expression(interval_minutes: int) -> str:
+    interval = max(int(interval_minutes or 5), 1)
+    if interval <= 1:
+        return "*"
+    if interval <= 59:
+        return f"*/{interval}"
+    return "0"
+
+
+def _build_cron_line(script_path: Path, interval_minutes: int | None = None) -> str:
+    settings_obj = models.ImportSettings.get_solo()
+    interval = int(interval_minutes or settings_obj.interval_minutes or 5)
+    timeout_seconds = max(1800, interval * 60)
     return (
-        "*/5 * * * * /usr/bin/flock -n /tmp/perfumex_import.lock "
-        f"/usr/bin/timeout 240s /bin/bash {script_path} # {CRON_MARKER}"
+        f"{_cron_minute_expression(interval)} * * * * "
+        "/usr/bin/flock -n /tmp/perfumex_import.lock "
+        f"/usr/bin/timeout {timeout_seconds}s /bin/bash {shlex.quote(str(script_path))} "
+        f"# {CRON_MARKER}"
     )
 
 
 def _get_cron_status() -> dict:
     script_path = _runner_script_path()
+    expected_line = _build_cron_line(script_path)
     try:
         lines = _read_crontab_lines()
         cron_line = next((line for line in lines if CRON_MARKER in line), "")
@@ -1301,16 +1322,22 @@ def _get_cron_status() -> dict:
             "supported": True,
             "installed": bool(cron_line),
             "line": cron_line,
+            "expected_line": expected_line,
+            "needs_reinstall": bool(cron_line and cron_line != expected_line),
             "script_path": str(script_path),
             "script_exists": script_path.exists(),
+            "log_path": str(Path(settings.BASE_DIR) / "logs" / "perfumex_email_import.log"),
         }
     except Exception as exc:
         return {
             "supported": False,
             "installed": False,
             "line": "",
+            "expected_line": expected_line,
+            "needs_reinstall": False,
             "script_path": str(script_path),
             "script_exists": script_path.exists(),
+            "log_path": str(Path(settings.BASE_DIR) / "logs" / "perfumex_email_import.log"),
             "error": str(exc),
         }
 
@@ -1842,9 +1869,10 @@ class ImportSettingsView(LoginRequiredMixin, TemplateView):
         action = request.POST.get("action")
         if action == "install_cron":
             try:
+                settings_obj = models.ImportSettings.get_solo()
                 script_path = _ensure_runner_script()
                 lines = [line for line in _read_crontab_lines() if CRON_MARKER not in line]
-                lines.append(_build_cron_line(script_path))
+                lines.append(_build_cron_line(script_path, settings_obj.interval_minutes))
                 _write_crontab_lines(lines)
                 messages.success(request, "Scheduler installed (cron + runner script).")
             except Exception as exc:
