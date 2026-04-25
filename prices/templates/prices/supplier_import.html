@@ -1,71 +1,159 @@
-﻿{% extends "prices/base.html" %}
+{% extends "prices/base.html" %}
 {% load static %}
 
 {% block title %}Import Prices{% endblock %}
 {% block body_data %}data-page="supplier-import"{% endblock %}
-{% block topbar_label %}Import — {{ supplier.name }}{% endblock %}
+{% block topbar_label %}Import - {{ supplier.name }}{% endblock %}
 
 {% block content %}
-    <div class="page-stack">
+    <div class="page-stack supplier-import-page">
         {% url 'prices:supplier_overview' as supplier_overview_url %}
         {% include "prices/_breadcrumbs.html" with parent_label="Import Prices" parent_url=supplier_overview_url current_label=supplier.name %}
-        <div class="section-card" id="manual-upload">
-            <div class="layout-row layout-row--wrap items-start justify-between gap-md">
-                <div>
-                    <span class="page-kicker">Upload</span>
-                    <h1 class="page-title">Import Prices - {{ supplier.name }}</h1>
-                    <p class="page-subtitle space-bottom-none">Upload price list and set mapping for this supplier.</p>
-                </div>
+
+        <div class="supplier-import-hero">
+            <div>
+                <span class="page-kicker">Supplier import</span>
+                <h1 class="page-title">{{ supplier.name }}</h1>
+                <p class="page-subtitle space-bottom-none">Upload a price file, verify columns, and run a controlled import for this supplier.</p>
             </div>
-            <form method="post" enctype="multipart/form-data" class="space-top-md">
-                {% csrf_token %}
-                {{ form.as_p }}
-                <div class="form-actions">
-                    <button class="button" type="submit">Upload and import</button>
-                </div>
-            </form>
+            <div class="supplier-import-hero__meta">
+                <span>{{ supplier.from_address_pattern|default:"No email route" }}</span>
+                <a class="button secondary" href="{{ supplier_overview_url }}">Back to board</a>
+            </div>
         </div>
 
-        <div class="section-card" id="email-backfill">
-            <span class="card-label">History</span>
-            <h2 class="card-title">Email backfill</h2>
-            <p class="card-desc">Import historical emails for this supplier and build price history.</p>
-            <form method="post" action="{% url 'prices:supplier_import_email_backfill' supplier.pk %}" class="layout-grid-12 gap-md items-end">
+        <div class="supplier-import-workbench" id="manual-upload">
+            <form method="post" enctype="multipart/form-data" class="supplier-import-form">
                 {% csrf_token %}
-                <div class="span-12 md-span-6">
+                {% if form.non_field_errors %}
+                    <div class="form-errors">
+                        {{ form.non_field_errors }}
+                    </div>
+                {% endif %}
+
+                <section class="supplier-import-panel supplier-import-panel--config">
+                    <div class="supplier-import-panel__head">
+                        <span class="card-label">Upload</span>
+                        <h2 class="card-title">Price file</h2>
+                        <p class="card-desc">Choose a spreadsheet, then click columns in the preview to fill the mapping.</p>
+                    </div>
+
+                    <div class="supplier-upload-box">
+                        <label for="{{ form.file.id_for_label }}" class="supplier-upload-box__label">
+                            <span>Spreadsheet</span>
+                            <strong>XLS, XLSX, or CSV</strong>
+                        </label>
+                        {{ form.file }}
+                        {% if form.file.errors %}<div class="field-errors">{{ form.file.errors }}</div>{% endif %}
+                    </div>
+
+                    <div class="supplier-field-section">
+                        <div>
+                            <span class="card-label">Workbook</span>
+                            <p class="supplier-field-section__hint">Use sheet selector only when prices live on specific sheets.</p>
+                        </div>
+                        <div class="supplier-import-field">
+                            <label for="{{ form.sheet_selector.id_for_label }}" class="form-label">Sheet selector</label>
+                            {{ form.sheet_selector }}
+                            {% if form.sheet_selector.help_text %}<div class="field-help">{{ form.sheet_selector.help_text }}</div>{% endif %}
+                            {% if form.sheet_selector.errors %}<div class="field-errors">{{ form.sheet_selector.errors }}</div>{% endif %}
+                        </div>
+                        <div class="supplier-import-field supplier-import-field--small">
+                            <label for="{{ form.header_row.id_for_label }}" class="form-label">Header row</label>
+                            {{ form.header_row }}
+                            {% if form.header_row.errors %}<div class="field-errors">{{ form.header_row.errors }}</div>{% endif %}
+                        </div>
+                    </div>
+
+                    <div class="supplier-field-section">
+                        <div>
+                            <span class="card-label">Columns</span>
+                            <p class="supplier-field-section__hint">Column numbers are 1-based. Use Add Name for multi-column names.</p>
+                        </div>
+                        <div class="supplier-mapping-grid">
+                            <div class="supplier-import-field">
+                                <label for="{{ form.sku_column.id_for_label }}" class="form-label">SKU</label>
+                                {{ form.sku_column }}
+                                {% if form.sku_column.errors %}<div class="field-errors">{{ form.sku_column.errors }}</div>{% endif %}
+                            </div>
+                            <div class="supplier-import-field">
+                                <label for="{{ form.name_columns.id_for_label }}" class="form-label">Name</label>
+                                {{ form.name_columns }}
+                                {% if form.name_columns.help_text %}<div class="field-help">{{ form.name_columns.help_text }}</div>{% endif %}
+                                {% if form.name_columns.errors %}<div class="field-errors">{{ form.name_columns.errors }}</div>{% endif %}
+                            </div>
+                            <div class="supplier-import-field">
+                                <label for="{{ form.price_column.id_for_label }}" class="form-label">Price</label>
+                                {{ form.price_column }}
+                                {% if form.price_column.errors %}<div class="field-errors">{{ form.price_column.errors }}</div>{% endif %}
+                            </div>
+                            <div class="supplier-import-field">
+                                <label for="{{ form.currency_column.id_for_label }}" class="form-label">Currency</label>
+                                {{ form.currency_column }}
+                                {% if form.currency_column.help_text %}<div class="field-help">{{ form.currency_column.help_text }}</div>{% endif %}
+                                {% if form.currency_column.errors %}<div class="field-errors">{{ form.currency_column.errors }}</div>{% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="supplier-import-actions">
+                        <button class="button" type="submit">Upload and import</button>
+                        <a class="button ghost" href="#mapping-preview">Preview mapping</a>
+                    </div>
+                </section>
+            </form>
+
+            <section class="supplier-import-panel supplier-import-panel--preview" id="mapping-preview">
+                <div class="supplier-import-panel__head supplier-preview-head">
+                    <div>
+                        <span class="card-label">Preview</span>
+                        <h2 class="card-title">Mapping preview</h2>
+                        <p class="card-desc">Select a file to load rows. Click a column header to assign the active field.</p>
+                    </div>
+                    <div id="sheet-row" class="supplier-sheet-picker is-hidden">
+                        <label for="sheet-select" class="form-label">Sheet</label>
+                        <select id="sheet-select"></select>
+                    </div>
+                </div>
+
+                <div class="supplier-preview-toolbar" role="toolbar" aria-label="Mapping tools">
+                    <button type="button" class="button secondary is-active" id="mode-sku" data-mode-button>SKU</button>
+                    <button type="button" class="button secondary" id="mode-name" data-mode-button>Name</button>
+                    <button type="button" class="button secondary" id="mode-name-add" data-mode-button>Add name</button>
+                    <button type="button" class="button secondary" id="mode-price" data-mode-button>Price</button>
+                    <button type="button" class="button secondary" id="mode-currency" data-mode-button>Currency</button>
+                    <span id="mode-status" class="supplier-preview-mode">Mode: SKU</span>
+                </div>
+
+                <div id="preview-table" class="supplier-preview-table">
+                    <div class="supplier-preview-empty">
+                        <span class="card-label">No file selected</span>
+                        <p>Choose a spreadsheet to preview rows and set mapping columns.</p>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <div class="supplier-import-utility" id="email-backfill">
+            <div>
+                <span class="card-label">History</span>
+                <h2 class="card-title">Email backfill</h2>
+                <p class="card-desc">Run a targeted historical scan for this supplier when old prices need to be rebuilt.</p>
+            </div>
+            <form method="post" action="{% url 'prices:supplier_import_email_backfill' supplier.pk %}" class="supplier-backfill-form">
+                {% csrf_token %}
+                <div class="supplier-import-field">
                     <label for="backfill-start" class="form-label">Start date</label>
                     <input id="backfill-start" name="start_date" type="date" required>
                 </div>
-                <div class="span-12 md-span-6">
+                <div class="supplier-import-field">
                     <label for="backfill-end" class="form-label">End date</label>
                     <input id="backfill-end" name="end_date" type="date">
                 </div>
-                <div class="span-12">
-                    <button class="button" type="submit">Run backfill</button>
-                </div>
+                <button class="button secondary" type="submit">Run backfill</button>
             </form>
-        </div>
-
-        <div class="section-card" id="mapping-preview">
-            <span class="card-label">Preview</span>
-            <h2 class="card-title">Mapping preview</h2>
-            <p class="card-desc">Upload a price file to preview the first 50 rows and pick columns.</p>
-            <div id="sheet-row" class="space-top-sm is-hidden">
-                <label for="sheet-select" class="form-label">Sheet</label>
-                <select id="sheet-select"></select>
-            </div>
-            <div class="form-actions space-top-sm">
-                <button type="button" class="button secondary" id="mode-sku">Set SKU</button>
-                <button type="button" class="button secondary" id="mode-name">Set Name</button>
-                <button type="button" class="button secondary" id="mode-name-add">Add Name</button>
-                <button type="button" class="button secondary" id="mode-price">Set Price</button>
-                <button type="button" class="button secondary" id="mode-currency">Set Currency</button>
-                <span id="mode-status" class="tone-muted text-small">Mode: SKU</span>
-            </div>
-            <div id="preview-table" class="table-wrap table-scroll-x space-top-md"></div>
         </div>
     </div>
     <div id="supplier-import-config" data-supplier-id="{{ supplier.pk }}"></div>
     <script src="{% static 'prices/js/supplier-import.js' %}"></script>
 {% endblock %}
-

@@ -117,6 +117,20 @@ class FrontendHardeningTests(TestCase):
         self.assertIn("&lt;img src=x onerror=alert(1)&gt;", html)
         self.assertNotIn(payload, html)
 
+    def test_supplier_import_page_uses_workbench_layout(self):
+        supplier = models.Supplier.objects.create(
+            name="Workbench Supplier",
+            from_address_pattern="supplier@example.com",
+        )
+
+        response = self.client.get(reverse("prices:supplier_import", args=[supplier.pk]), secure=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "supplier-import-workbench")
+        self.assertContains(response, "supplier-upload-box")
+        self.assertContains(response, "Mapping preview")
+        self.assertNotContains(response, "<p><label")
+
 
 class MailboxPasswordSecurityTests(TestCase):
     def test_mailbox_password_round_trip(self):
