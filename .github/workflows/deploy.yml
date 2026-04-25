@@ -32,7 +32,7 @@ jobs:
               esac
               case "$key" in
                 [A-Za-z_][A-Za-z0-9_]*)
-                  value="$(printf '%s' "$value" | tr -d '\r')"
+                  value="$(printf '%s' "$value" | tr -d '\r' | sed -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'$//")"
                   export "$key=$value"
                   ;;
               esac
