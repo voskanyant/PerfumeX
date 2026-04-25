@@ -60,29 +60,187 @@ class DashboardView(StaffAssistantMixin, TemplateView):
 
 class KnowledgeView(StaffAssistantMixin, TemplateView):
     template_name = "assistant_core/knowledge/index.html"
+    paginate_by = 50
 
-    def get_context_data(self, **kwargs):
+    SECTION_GLOBAL_RULES = "global_rules"
+    SECTION_SUPPLIER_RULES = "supplier_rules"
+    SECTION_NOTES = "notes"
+    SECTION_BRAND_ALIASES = "brand_aliases"
+    SECTION_PRODUCT_ALIASES = "product_aliases"
+    SECTION_CONCENTRATION_ALIASES = "concentration_aliases"
+    SECTION_DECISIONS = "decisions"
+    SECTION_CHOICES = {
+        SECTION_GLOBAL_RULES,
+        SECTION_SUPPLIER_RULES,
+        SECTION_NOTES,
+        SECTION_BRAND_ALIASES,
+        SECTION_PRODUCT_ALIASES,
+        SECTION_CONCENTRATION_ALIASES,
+        SECTION_DECISIONS,
+    }
+
+    def _active_section(self):
+        section = self.request.GET.get("section", self.SECTION_BRAND_ALIASES).strip()
+        return section if section in self.SECTION_CHOICES else self.SECTION_BRAND_ALIASES
+
+    def _filter_status(self, queryset, field_name="active"):
+        status = self.request.GET.get("status", "active").strip()
+        if status == "active":
+            queryset = queryset.filter(**{field_name: True})
+        elif status == "inactive":
+            queryset = queryset.filter(**{field_name: False})
+        return queryset, status
+
+    def _scope_filter(self, queryset):
+        scope = self.request.GET.get("scope", "all").strip()
+        if scope == "global":
+            queryset = queryset.filter(supplier__isnull=True)
+        elif scope == "supplier":
+            queryset = queryset.filter(supplier__isnull=False)
+        return queryset, scope
+
+    def _queryset_for_section(self, section, query):
         from assistant_linking.models import BrandAlias, ConcentrationAlias, ManualLinkDecision, ProductAlias
 
-        return {
-            **super().get_context_data(**kwargs),
-            "global_rules": models.GlobalRule.objects.order_by("priority", "title"),
-            "supplier_rules": models.SupplierRule.objects.select_related("supplier", "brand").order_by("supplier__name", "priority"),
-            "notes": models.KnowledgeNote.objects.select_related("supplier", "brand", "perfume").order_by("category", "title"),
-            "brand_aliases": BrandAlias.objects.select_related("brand", "supplier").order_by("supplier__name", "priority", "alias_text"),
-            "product_aliases": ProductAlias.objects.select_related("brand", "perfume", "supplier").order_by("supplier__name", "priority", "alias_text"),
-            "concentration_alias_count": ConcentrationAlias.objects.count(),
-            "manual_decisions": ManualLinkDecision.objects.select_related(
+        if section == self.SECTION_GLOBAL_RULES:
+            queryset = models.GlobalRule.objects.order_by("priority", "title")
+            if query:
+                queryset = queryset.filter(
+                    Q(title__icontains=query)
+                    | Q(rule_kind__icontains=query)
+                    | Q(rule_text__icontains=query)
+                    | Q(scope_type__icontains=query)
+                    | Q(scope_value__icontains=query)
+                )
+            queryset, status = self._filter_status(queryset)
+            return queryset, {"status": status, "scope": "all"}
+
+        if section == self.SECTION_SUPPLIER_RULES:
+            queryset = models.SupplierRule.objects.select_related("supplier", "brand").order_by("supplier__name", "priority", "title")
+            if query:
+                queryset = queryset.filter(
+                    Q(title__icontains=query)
+                    | Q(rule_kind__icontains=query)
+                    | Q(rule_text__icontains=query)
+                    | Q(applies_to_text__icontains=query)
+                    | Q(supplier__name__icontains=query)
+                    | Q(brand__name__icontains=query)
+                )
+            queryset, status = self._filter_status(queryset)
+            return queryset, {"status": status, "scope": "all"}
+
+        if section == self.SECTION_NOTES:
+            queryset = models.KnowledgeNote.objects.select_related("supplier", "brand", "perfume").order_by("category", "title")
+            if query:
+                queryset = queryset.filter(
+                    Q(category__icontains=query)
+                    | Q(title__icontains=query)
+                    | Q(content__icontains=query)
+                    | Q(supplier__name__icontains=query)
+                    | Q(brand__name__icontains=query)
+                    | Q(perfume__name__icontains=query)
+                )
+            queryset, status = self._filter_status(queryset)
+            return queryset, {"status": status, "scope": "all"}
+
+        if section == self.SECTION_PRODUCT_ALIASES:
+            queryset = ProductAlias.objects.select_related("brand", "perfume", "supplier").order_by("supplier__name", "priority", "alias_text")
+            if query:
+                queryset = queryset.filter(
+                    Q(alias_text__icontains=query)
+                    | Q(canonical_text__icontains=query)
+                    | Q(excluded_terms__icontains=query)
+                    | Q(concentration__icontains=query)
+                    | Q(audience__icontains=query)
+                    | Q(brand__name__icontains=query)
+                    | Q(perfume__name__icontains=query)
+                    | Q(supplier__name__icontains=query)
+                )
+            queryset, scope = self._scope_filter(queryset)
+            queryset, status = self._filter_status(queryset)
+            return queryset, {"status": status, "scope": scope}
+
+        if section == self.SECTION_CONCENTRATION_ALIASES:
+            queryset = ConcentrationAlias.objects.select_related("supplier").order_by("supplier__name", "priority", "alias_text")
+            if query:
+                queryset = queryset.filter(
+                    Q(alias_text__icontains=query)
+                    | Q(normalized_alias__icontains=query)
+                    | Q(concentration__icontains=query)
+                    | Q(supplier__name__icontains=query)
+                )
+            queryset, scope = self._scope_filter(queryset)
+            queryset, status = self._filter_status(queryset)
+            return queryset, {"status": status, "scope": scope}
+
+        if section == self.SECTION_DECISIONS:
+            queryset = ManualLinkDecision.objects.select_related(
                 "supplier_product",
                 "supplier_product__supplier",
                 "perfume",
                 "variant",
-            ).order_by("-created_at")[:50],
-        }
+            ).order_by("-created_at")
+            if query:
+                queryset = queryset.filter(
+                    Q(supplier_product__name__icontains=query)
+                    | Q(supplier_product__supplier__name__icontains=query)
+                    | Q(perfume__name__icontains=query)
+                    | Q(perfume__brand__name__icontains=query)
+                    | Q(reason__icontains=query)
+                    | Q(decision_type__icontains=query)
+                )
+            return queryset, {"status": "all", "scope": "all"}
+
+        queryset = BrandAlias.objects.select_related("brand", "supplier").order_by("supplier__name", "priority", "alias_text")
+        if query:
+            queryset = queryset.filter(
+                Q(alias_text__icontains=query)
+                | Q(normalized_alias__icontains=query)
+                | Q(brand__name__icontains=query)
+                | Q(supplier__name__icontains=query)
+            )
+        queryset, scope = self._scope_filter(queryset)
+        queryset, status = self._filter_status(queryset)
+        return queryset, {"status": status, "scope": scope}
+
+    def get_context_data(self, **kwargs):
+        from assistant_linking.models import BrandAlias, ConcentrationAlias, ManualLinkDecision, ProductAlias
+
+        context = super().get_context_data(**kwargs)
+        section = self._active_section()
+        query = self.request.GET.get("q", "").strip()
+        queryset, filters = self._queryset_for_section(section, query)
+        page_obj = Paginator(queryset, self.paginate_by).get_page(self.request.GET.get("page") or 1)
+
+        sections = [
+            {"key": self.SECTION_BRAND_ALIASES, "label": "Brand aliases", "count": BrandAlias.objects.count()},
+            {"key": self.SECTION_PRODUCT_ALIASES, "label": "Product aliases", "count": ProductAlias.objects.count()},
+            {"key": self.SECTION_CONCENTRATION_ALIASES, "label": "Concentration aliases", "count": ConcentrationAlias.objects.count()},
+            {"key": self.SECTION_GLOBAL_RULES, "label": "Global rules", "count": models.GlobalRule.objects.count()},
+            {"key": self.SECTION_SUPPLIER_RULES, "label": "Supplier rules", "count": models.SupplierRule.objects.count()},
+            {"key": self.SECTION_NOTES, "label": "Notes", "count": models.KnowledgeNote.objects.count()},
+            {"key": self.SECTION_DECISIONS, "label": "Manual decisions", "count": ManualLinkDecision.objects.count()},
+        ]
+
+        context.update(
+            {
+                "active_section": section,
+                "sections": sections,
+                "query": query,
+                "scope": filters["scope"],
+                "status": filters["status"],
+                "page_obj": page_obj,
+                "items": page_obj.object_list,
+                "concentration_alias_count": ConcentrationAlias.objects.count(),
+            }
+        )
+        return context
 
 
 class RulesView(KnowledgeView):
-    pass
+    def _active_section(self):
+        section = self.request.GET.get("section", self.SECTION_GLOBAL_RULES).strip()
+        return section if section in self.SECTION_CHOICES else self.SECTION_GLOBAL_RULES
 
 
 class AliasesView(StaffAssistantMixin, TemplateView):

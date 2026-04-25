@@ -38,13 +38,39 @@ class KnowledgeResearchTests(TestCase):
         response = self.client.get(reverse("assistant_core:knowledge"))
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Taught Brand Aliases")
+        self.assertContains(response, "Brand aliases")
+        self.assertContains(response, "Search")
         self.assertContains(response, "mntl")
-        self.assertContains(response, "Taught Product Aliases")
+
+        response = self.client.get(reverse("assistant_core:knowledge"), {"section": "product_aliases", "q": "tester"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Product aliases")
         self.assertContains(response, "vanilla extasy")
         self.assertContains(response, "tester")
-        self.assertContains(response, "Recent Manual Decisions")
+
+        response = self.client.get(reverse("assistant_core:knowledge"), {"section": "decisions", "q": "manual match"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Manual decisions")
         self.assertContains(response, "manual match")
+
+    def test_knowledge_page_paginates_large_alias_sets(self):
+        user = User.objects.create_user(username="staff-page", password="pass", is_staff=True)
+        self.client.force_login(user)
+        brand = Brand.objects.create(name="Montale")
+        for index in range(55):
+            BrandAlias.objects.create(
+                brand=brand,
+                alias_text=f"montale alias {index:02d}",
+                normalized_alias=f"montale alias {index:02d}",
+            )
+
+        response = self.client.get(reverse("assistant_core:knowledge"), {"section": "brand_aliases"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Showing 1-50 of 55 entries")
+        self.assertContains(response, "Next")
 
     def test_aliases_page_supports_sections_search_and_concentration_entries(self):
         user = User.objects.create_user(username="staff2", password="pass", is_staff=True)

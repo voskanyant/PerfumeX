@@ -6,133 +6,196 @@
     <div>
         <span class="page-kicker">Assistant</span>
         <h1 class="page-title">Knowledge Base</h1>
+        <div class="page-meta">Search and edit assistant rules, notes, aliases, and decisions.</div>
     </div>
     <div class="page-actions">
         <a class="button primary" href="{% url 'assistant_core:global_rule_create' %}">New global rule</a>
         <a class="button ghost" href="{% url 'assistant_core:supplier_rule_create' %}">New supplier rule</a>
         <a class="button ghost" href="{% url 'assistant_core:knowledge_note_create' %}">New note</a>
-        <a class="button ghost" href="{% url 'assistant_core:aliases' %}">Alias dictionaries{% if concentration_alias_count %} · {{ concentration_alias_count }} concentration{% endif %}</a>
+        <a class="button ghost" href="{% url 'assistant_core:aliases' %}">Alias editor</a>
     </div>
 </div>
+
 <div class="workspace-block">
-    <h2 class="kpi-link-title">Global Rules</h2>
-    <table class="data-table">
-        <thead><tr><th>Title</th><th>Kind</th><th>Scope</th><th>Confidence</th><th>Status</th></tr></thead>
-        <tbody>
-        {% for rule in global_rules %}
-            <tr>
-                <td>{{ rule.title }}</td>
-                <td>{{ rule.rule_kind }}</td>
-                <td>{{ rule.scope_type }}{% if rule.scope_value %}: {{ rule.scope_value }}{% endif %}</td>
-                <td>{{ rule.confidence }}</td>
-                <td>{{ rule.active|yesno:"active,inactive" }}</td>
-            </tr>
-        {% empty %}
-            <tr><td colspan="5">No global rules.</td></tr>
+    <div class="layout-inline gap-sm flex-wrap">
+        {% for item in sections %}
+            {% if item.key == active_section %}
+                <span class="button">{{ item.label }} &middot; {{ item.count }}</span>
+            {% else %}
+                <a class="button ghost" href="{% url 'assistant_core:knowledge' %}?section={{ item.key }}">{{ item.label }} &middot; {{ item.count }}</a>
+            {% endif %}
         {% endfor %}
-        </tbody>
-    </table>
+    </div>
+
+    <form method="get" class="space-top-md">
+        <input type="hidden" name="section" value="{{ active_section }}">
+        <div class="layout-grid-12 gap-md items-end">
+            <div class="span-12 md-span-5">
+                <label class="form-label" for="knowledge-search">Search</label>
+                <input id="knowledge-search" type="text" name="q" value="{{ query }}" placeholder="Search current knowledge section">
+            </div>
+            <div class="span-6 md-span-2">
+                <label class="form-label" for="knowledge-scope">Scope</label>
+                <select id="knowledge-scope" name="scope"{% if active_section != "brand_aliases" and active_section != "product_aliases" and active_section != "concentration_aliases" %} disabled{% endif %}>
+                    <option value="all"{% if scope == "all" %} selected{% endif %}>All</option>
+                    <option value="global"{% if scope == "global" %} selected{% endif %}>Global</option>
+                    <option value="supplier"{% if scope == "supplier" %} selected{% endif %}>Supplier-only</option>
+                </select>
+            </div>
+            <div class="span-6 md-span-2">
+                <label class="form-label" for="knowledge-status">Status</label>
+                <select id="knowledge-status" name="status"{% if active_section == "decisions" %} disabled{% endif %}>
+                    <option value="active"{% if status == "active" %} selected{% endif %}>Active</option>
+                    <option value="inactive"{% if status == "inactive" %} selected{% endif %}>Inactive</option>
+                    <option value="all"{% if status == "all" %} selected{% endif %}>All</option>
+                </select>
+            </div>
+            <div class="span-12 md-span-3">
+                <div class="layout-inline gap-sm">
+                    <button class="button" type="submit">Apply</button>
+                    <a class="button ghost" href="{% url 'assistant_core:knowledge' %}?section={{ active_section }}">Reset</a>
+                </div>
+            </div>
+        </div>
+    </form>
+
+    <div class="page-meta space-top-sm">
+        Showing {{ page_obj.start_index }}-{{ page_obj.end_index }} of {{ page_obj.paginator.count }} entries.
+    </div>
 </div>
+
 <div class="workspace-block space-top-md">
-    <h2 class="kpi-link-title">Supplier Rules</h2>
-    <table class="data-table">
-        <thead><tr><th>Supplier</th><th>Brand</th><th>Title</th><th>Kind</th><th>Applies to</th><th>Confidence</th><th>Status</th></tr></thead>
-        <tbody>
-        {% for rule in supplier_rules %}
-            <tr>
-                <td>{{ rule.supplier }}</td>
-                <td>{{ rule.brand|default:"any brand" }}</td>
-                <td>{{ rule.title }}</td>
-                <td>{{ rule.rule_kind }}</td>
-                <td>{{ rule.applies_to_text|default:"all" }}</td>
-                <td>{{ rule.confidence }}</td>
-                <td>{{ rule.active|yesno:"active,inactive" }}</td>
-            </tr>
-        {% empty %}
-            <tr><td colspan="7">No supplier rules.</td></tr>
-        {% endfor %}
-        </tbody>
-    </table>
-</div>
-<div class="workspace-block space-top-md">
-    <h2 class="kpi-link-title">Knowledge Notes</h2>
-    <table class="data-table">
-        <thead><tr><th>Category</th><th>Title</th><th>Supplier</th><th>Brand</th><th>Perfume</th><th>Status</th></tr></thead>
-        <tbody>
-        {% for note in notes %}
-            <tr>
-                <td>{{ note.category }}</td>
-                <td>{{ note.title }}</td>
-                <td>{{ note.supplier|default:"global" }}</td>
-                <td>{{ note.brand|default:"any brand" }}</td>
-                <td>{{ note.perfume|default:"any perfume" }}</td>
-                <td>{{ note.active|yesno:"active,inactive" }}</td>
-            </tr>
-        {% empty %}
-            <tr><td colspan="6">No notes.</td></tr>
-        {% endfor %}
-        </tbody>
-    </table>
-</div>
-<div class="workspace-block space-top-md">
-    <h2 class="kpi-link-title">Taught Brand Aliases</h2>
-    <table class="data-table">
-        <thead><tr><th>Supplier text</th><th>Brand</th><th>Scope</th><th>Priority</th><th>Status</th></tr></thead>
-        <tbody>
-        {% for alias in brand_aliases %}
-            <tr>
-                <td>{{ alias.alias_text }}</td>
-                <td>{{ alias.brand }}</td>
-                <td>{{ alias.supplier|default:"global" }}</td>
-                <td>{{ alias.priority }}</td>
-                <td>{{ alias.active|yesno:"active,inactive" }}</td>
-            </tr>
-        {% empty %}
-            <tr><td colspan="5">No taught brand aliases.</td></tr>
-        {% endfor %}
-        </tbody>
-    </table>
-</div>
-<div class="workspace-block space-top-md">
-    <h2 class="kpi-link-title">Taught Product Aliases</h2>
-    <table class="data-table">
-        <thead><tr><th>Supplier text</th><th>Brand</th><th>Correct scent</th><th>Concentration</th><th>Audience</th><th>Blockers</th><th>Scope</th><th>Status</th></tr></thead>
-        <tbody>
-        {% for alias in product_aliases %}
-            <tr>
-                <td>{{ alias.alias_text }}</td>
-                <td>{{ alias.brand|default:"any brand" }}</td>
-                <td>{{ alias.canonical_text }}</td>
-                <td>{{ alias.concentration|default:"-" }}</td>
-                <td>{{ alias.audience|default:"-" }}</td>
-                <td>{{ alias.excluded_terms|default:"-" }}</td>
-                <td>{{ alias.supplier|default:"global" }}</td>
-                <td>{{ alias.active|yesno:"active,inactive" }}</td>
-            </tr>
-        {% empty %}
-            <tr><td colspan="8">No taught product aliases.</td></tr>
-        {% endfor %}
-        </tbody>
-    </table>
-</div>
-<div class="workspace-block space-top-md">
-    <h2 class="kpi-link-title">Recent Manual Decisions</h2>
-    <table class="data-table">
-        <thead><tr><th>Supplier product</th><th>Decision</th><th>Perfume</th><th>Variant</th><th>Reason</th><th>Created</th></tr></thead>
-        <tbody>
-        {% for decision in manual_decisions %}
-            <tr>
-                <td>{{ decision.supplier_product }}</td>
-                <td>{{ decision.get_decision_type_display }}</td>
-                <td>{{ decision.perfume|default:"-" }}</td>
-                <td>{{ decision.variant|default:"-" }}</td>
-                <td>{{ decision.reason|default:"-" }}</td>
-                <td>{{ decision.created_at|date:"d.m.Y H:i" }}</td>
-            </tr>
-        {% empty %}
-            <tr><td colspan="6">No manual decisions.</td></tr>
-        {% endfor %}
-        </tbody>
-    </table>
+    <div class="table-wrap table-scroll-x">
+        <table class="data-table">
+            <thead>
+                {% if active_section == "global_rules" %}
+                    <tr><th>Title</th><th>Kind</th><th>Scope</th><th>Confidence</th><th>Status</th></tr>
+                {% elif active_section == "supplier_rules" %}
+                    <tr><th>Supplier</th><th>Brand</th><th>Title</th><th>Kind</th><th>Applies to</th><th>Confidence</th><th>Status</th></tr>
+                {% elif active_section == "notes" %}
+                    <tr><th>Category</th><th>Title</th><th>Supplier</th><th>Brand</th><th>Perfume</th><th>Status</th></tr>
+                {% elif active_section == "product_aliases" %}
+                    <tr><th>Supplier text</th><th>Brand</th><th>Correct scent</th><th>Concentration</th><th>Audience</th><th>Blockers</th><th>Scope</th><th>Status</th><th>Actions</th></tr>
+                {% elif active_section == "concentration_aliases" %}
+                    <tr><th>Supplier text</th><th>Normalized alias</th><th>Correct concentration</th><th>Scope</th><th>Priority</th><th>Matcher</th><th>Status</th><th>Actions</th></tr>
+                {% elif active_section == "decisions" %}
+                    <tr><th>Supplier product</th><th>Decision</th><th>Perfume</th><th>Variant</th><th>Reason</th><th>Created</th></tr>
+                {% else %}
+                    <tr><th>Supplier text</th><th>Brand</th><th>Scope</th><th>Priority</th><th>Matcher</th><th>Status</th><th>Actions</th></tr>
+                {% endif %}
+            </thead>
+            <tbody>
+                {% for item in items %}
+                    <tr>
+                        {% if active_section == "global_rules" %}
+                            <td>{{ item.title }}</td>
+                            <td>{{ item.rule_kind }}</td>
+                            <td>{{ item.scope_type }}{% if item.scope_value %}: {{ item.scope_value }}{% endif %}</td>
+                            <td>{{ item.confidence }}</td>
+                            <td>{{ item.active|yesno:"active,inactive" }}</td>
+                        {% elif active_section == "supplier_rules" %}
+                            <td>{{ item.supplier }}</td>
+                            <td>{{ item.brand|default:"any brand" }}</td>
+                            <td>{{ item.title }}</td>
+                            <td>{{ item.rule_kind }}</td>
+                            <td>{{ item.applies_to_text|default:"all" }}</td>
+                            <td>{{ item.confidence }}</td>
+                            <td>{{ item.active|yesno:"active,inactive" }}</td>
+                        {% elif active_section == "notes" %}
+                            <td>{{ item.category }}</td>
+                            <td>{{ item.title }}</td>
+                            <td>{{ item.supplier|default:"global" }}</td>
+                            <td>{{ item.brand|default:"any brand" }}</td>
+                            <td>{{ item.perfume|default:"any perfume" }}</td>
+                            <td>{{ item.active|yesno:"active,inactive" }}</td>
+                        {% elif active_section == "product_aliases" %}
+                            <td>{{ item.alias_text }}</td>
+                            <td>{{ item.brand|default:"any brand" }}</td>
+                            <td>{{ item.canonical_text }}</td>
+                            <td>{{ item.concentration|default:"-" }}</td>
+                            <td>{{ item.audience|default:"-" }}</td>
+                            <td>{{ item.excluded_terms|default:"-" }}</td>
+                            <td>{{ item.supplier|default:"global" }}</td>
+                            <td>{{ item.active|yesno:"active,inactive" }}</td>
+                            <td class="actions">
+                                <div class="layout-inline gap-sm">
+                                    <a class="button ghost" href="{% url 'assistant_core:product_alias_update' item.pk %}">Edit</a>
+                                    <a class="button ghost" href="{% url 'assistant_core:product_alias_delete' item.pk %}">Delete</a>
+                                </div>
+                            </td>
+                        {% elif active_section == "concentration_aliases" %}
+                            <td>{{ item.alias_text }}</td>
+                            <td>{{ item.normalized_alias }}</td>
+                            <td>{{ item.concentration }}</td>
+                            <td>{{ item.supplier|default:"global" }}</td>
+                            <td>{{ item.priority }}</td>
+                            <td>{% if item.is_regex %}regex{% else %}phrase{% endif %}</td>
+                            <td>{{ item.active|yesno:"active,inactive" }}</td>
+                            <td class="actions">
+                                <div class="layout-inline gap-sm">
+                                    <a class="button ghost" href="{% url 'assistant_core:concentration_alias_update' item.pk %}">Edit</a>
+                                    <a class="button ghost" href="{% url 'assistant_core:concentration_alias_delete' item.pk %}">Delete</a>
+                                </div>
+                            </td>
+                        {% elif active_section == "decisions" %}
+                            <td>{{ item.supplier_product }}</td>
+                            <td>{{ item.get_decision_type_display }}</td>
+                            <td>{{ item.perfume|default:"-" }}</td>
+                            <td>{{ item.variant|default:"-" }}</td>
+                            <td>{{ item.reason|default:"-" }}</td>
+                            <td>{{ item.created_at|date:"d.m.Y H:i" }}</td>
+                        {% else %}
+                            <td>{{ item.alias_text }}</td>
+                            <td>{{ item.brand }}</td>
+                            <td>{{ item.supplier|default:"global" }}</td>
+                            <td>{{ item.priority }}</td>
+                            <td>{% if item.is_regex %}regex{% else %}phrase{% endif %}</td>
+                            <td>{{ item.active|yesno:"active,inactive" }}</td>
+                            <td class="actions">
+                                <div class="layout-inline gap-sm">
+                                    <a class="button ghost" href="{% url 'assistant_core:brand_alias_update' item.pk %}">Edit</a>
+                                    <a class="button ghost" href="{% url 'assistant_core:brand_alias_delete' item.pk %}">Delete</a>
+                                </div>
+                            </td>
+                        {% endif %}
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="9">No entries match the current filters.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% if page_obj.paginator.num_pages > 1 %}
+        <nav class="pagination-shell space-top-md" aria-label="Knowledge pagination">
+            <div class="pagination-list">
+                {% if page_obj.has_previous %}
+                    <a class="page-link" href="?section={{ active_section }}&q={{ query|urlencode }}&scope={{ scope }}&status={{ status }}&page={{ page_obj.previous_page_number }}">Previous</a>
+                {% endif %}
+                {% for page_num in page_obj.paginator.page_range %}
+                    {% if page_num <= 5 or page_num > page_obj.paginator.num_pages|add:-3 %}
+                        {% if page_num == page_obj.number %}
+                            <span class="page-link is-active">{{ page_num }}</span>
+                        {% else %}
+                            <a class="page-link" href="?section={{ active_section }}&q={{ query|urlencode }}&scope={{ scope }}&status={{ status }}&page={{ page_num }}">{{ page_num }}</a>
+                        {% endif %}
+                    {% endif %}
+                {% endfor %}
+                {% if page_obj.has_next %}
+                    <a class="page-link" href="?section={{ active_section }}&q={{ query|urlencode }}&scope={{ scope }}&status={{ status }}&page={{ page_obj.next_page_number }}">Next</a>
+                {% endif %}
+            </div>
+            <form class="pagination-jump" method="get">
+                <input type="hidden" name="section" value="{{ active_section }}">
+                <input type="hidden" name="q" value="{{ query }}">
+                <input type="hidden" name="scope" value="{{ scope }}">
+                <input type="hidden" name="status" value="{{ status }}">
+                <label for="knowledge-page-jump">Page</label>
+                <input id="knowledge-page-jump" type="number" name="page" min="1" max="{{ page_obj.paginator.num_pages }}" value="{{ page_obj.number }}">
+                <button class="button secondary" type="submit">Go</button>
+            </form>
+            <div class="pagination-summary">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</div>
+        </nav>
+    {% endif %}
 </div>
 {% endblock %}
