@@ -10,6 +10,8 @@ from django.core.files.base import ContentFile
 from django.core.management import call_command
 from django.test import TestCase
 from django.test.utils import override_settings
+from django.template import Context, Template
+from django.test import RequestFactory
 from django.urls import reverse
 from django.utils import timezone
 
@@ -28,6 +30,29 @@ from prices.views import (
     _collect_latest_successful_imports,
     _render_runner_script,
 )
+
+
+class SharedUiComponentTests(TestCase):
+    def test_page_query_preserves_filters_and_replaces_page_param(self):
+        request = RequestFactory().get("/admin/products/", {"q": "mango", "page": "2", "supplier": "7"})
+        rendered = Template(
+            "{% load prices_extras %}{% page_query 3 %}"
+        ).render(Context({"request": request}))
+
+        self.assertIn("q=mango", rendered)
+        self.assertIn("supplier=7", rendered)
+        self.assertIn("page=3", rendered)
+        self.assertNotIn("page=2", rendered)
+
+    def test_page_query_supports_custom_page_param(self):
+        request = RequestFactory().get("/admin/linking/", {"q": "mango", "sp_page": "2"})
+        rendered = Template(
+            "{% load prices_extras %}{% page_query 4 'sp_page' %}"
+        ).render(Context({"request": request}))
+
+        self.assertIn("q=mango", rendered)
+        self.assertIn("sp_page=4", rendered)
+        self.assertNotIn("sp_page=2", rendered)
 
 
 class OurProductCatalogueListTests(TestCase):

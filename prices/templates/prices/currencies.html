@@ -6,11 +6,7 @@
 
 {% block content %}
     <div class="page-stack">
-        <div class="section-card">
-            <span class="page-kicker">Rates</span>
-            <h1 class="page-title">Currencies</h1>
-            <p class="page-subtitle space-bottom-none">Set exchange rates used for product price conversion.</p>
-        </div>
+        {% include "prices/components/page_header.html" with kicker="Rates" title="Currencies" meta="Set exchange rates used for product price conversion." %}
         <div class="section-card">
             <span class="card-label">Automation</span>
             <h2 class="card-title">CBR Auto Rates</h2>
@@ -132,33 +128,7 @@
                 </tbody>
                     </table>
                 </div>
-                {% if rates_page and rates_page.paginator.num_pages > 1 %}
-                    <nav class="pagination-shell space-top-md" aria-label="Rates pagination">
-                        <div class="pagination-list">
-                        {% if rates_page.has_previous %}
-                            <a class="page-link" href="?page={{ rates_page.previous_page_number }}">Previous</a>
-                        {% endif %}
-                        {% for page_num in rates_page.paginator.page_range %}
-                            {% if page_num <= 5 or page_num > rates_page.paginator.num_pages|add:-3 %}
-                                {% if page_num == rates_page.number %}
-                                    <span class="page-link is-active">{{ page_num }}</span>
-                                {% else %}
-                                    <a class="page-link" href="?page={{ page_num }}">{{ page_num }}</a>
-                                {% endif %}
-                            {% endif %}
-                        {% endfor %}
-                        {% if rates_page.has_next %}
-                            <a class="page-link" href="?page={{ rates_page.next_page_number }}">Next</a>
-                        {% endif %}
-                        </div>
-                        <form class="pagination-jump" method="get">
-                            <label for="rates-page-jump">Page</label>
-                            <input id="rates-page-jump" type="number" name="page" min="1" max="{{ rates_page.paginator.num_pages }}" value="{{ rates_page.number }}">
-                            <button class="button secondary" type="submit">Go</button>
-                        </form>
-                        <div class="pagination-summary">Page {{ rates_page.number }} of {{ rates_page.paginator.num_pages }}</div>
-                    </nav>
-                {% endif %}
+                {% include "prices/components/pagination.html" with page_obj=rates_page class_name="space-top-md" label="Rates pagination" jump_id="rates-page-jump" %}
             {% else %}
                 <p class="muted space-top-sm">No rates yet.</p>
             {% endif %}

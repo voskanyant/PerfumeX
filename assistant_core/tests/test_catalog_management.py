@@ -27,6 +27,15 @@ class CatalogManagementTests(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertEqual(response.url, f"{reverse('prices:our_product_list')}?q=mont")
 
+    def test_catalog_list_pages_use_shared_page_components(self):
+        response = self.client.get(reverse("assistant_core:catalog_brands"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'class="page-header')
+        self.assertContains(response, 'class="tabs')
+        self.assertContains(response, 'class="table-wrap')
+        self.assertContains(response, "Catalogue sections")
+
     def test_staff_can_edit_catalogue_brand(self):
         response = self.client.post(
             reverse("assistant_core:catalog_brand_update", args=[self.brand.pk]),
