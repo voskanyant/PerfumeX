@@ -355,7 +355,7 @@ class TeachParseTests(TestCase):
         response = self.client.get(reverse("assistant_linking:normalization_parsed"))
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "100 Bon / ambre sensuel / Eau de Toilette / 50.00 / Tester")
+        self.assertContains(response, "100 Bon / ambre sensuel / Eau de Toilette / 50ml / Tester")
 
     def test_normalization_detail_capitalizes_tester_type(self):
         brand = Brand.objects.create(name="100 Bon")
@@ -375,7 +375,8 @@ class TeachParseTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Type: Tester")
-        self.assertContains(response, "Normalized: 100 Bon / ambre sensuel / Eau de Toilette / 50.00 / Tester")
+        self.assertContains(response, "Normalized: 100 Bon / ambre sensuel / Eau de Toilette / 50ml / Tester")
+        self.assertNotContains(response, "50ml ml")
 
     def test_parsed_products_page_requires_complete_parse_fields(self):
         brand = Brand.objects.create(name="Montale")

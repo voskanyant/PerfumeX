@@ -58,6 +58,13 @@ class CatalogManagementTests(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertFalse(PerfumeVariant.objects.filter(pk=self.variant.pk).exists())
 
+    def test_catalogue_variant_list_uses_compact_size_labels(self):
+        response = self.client.get(reverse("assistant_core:catalog_variants"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "100ml")
+        self.assertNotContains(response, "100.00")
+
     def test_staff_can_merge_catalogue_perfumes(self):
         duplicate = Perfume.objects.create(brand=self.brand, name="Vanilla Extasy", concentration="Eau de Parfum")
         duplicate_variant = PerfumeVariant.objects.create(perfume=duplicate, size_ml="50", variant_type="standard")

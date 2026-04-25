@@ -17,7 +17,7 @@
             {% for variant in variants %}
                 <tr>
                     <td>{{ variant.perfume }}</td>
-                    <td>{{ variant.size_ml|default:"" }}</td>
+                    <td>{{ variant.display_size|default:"" }}</td>
                     <td>{{ variant.variant_type }}</td>
                     <td>{{ variant.packaging }}</td>
                     <td>{{ variant.is_tester|yesno:"yes,no" }}</td>

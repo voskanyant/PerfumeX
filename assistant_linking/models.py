@@ -6,6 +6,7 @@ from django.core.exceptions import ValidationError
 from django.db import models
 
 from assistant_linking.utils.text import normalize_alias_value
+from catalog.models import compact_decimal_text
 
 
 CONCENTRATION_ALIAS_CACHE_KEY = "assistant_linking:concentration_aliases:v1"
@@ -164,7 +165,7 @@ class ParsedSupplierProduct(TimeStampedModel):
     def display_size(self) -> str:
         if self.size_ml is None:
             return ""
-        return str(self.size_ml)
+        return f"{compact_decimal_text(self.size_ml)}ml"
 
     @property
     def display_variant_type(self) -> str:
@@ -244,7 +245,7 @@ class MatchGroup(TimeStampedModel):
     def display_size(self) -> str:
         if self.size_ml is None:
             return ""
-        return str(self.size_ml)
+        return f"{compact_decimal_text(self.size_ml)}ml"
 
     @property
     def display_variant_type(self) -> str:
