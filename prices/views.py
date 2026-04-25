@@ -908,34 +908,35 @@ def _attachment_reason_label(reason_code: str, decision: str = "") -> str:
 
 def _summarize_latest_files(supplier, latest_run, diagnostic_summary=None) -> str:
     if latest_run:
-        parts = [
-            f"matched {latest_run.matched_files}",
-            f"imported {latest_run.processed_files}",
-        ]
-        if latest_run.skipped_duplicates:
-            parts.append(f"duplicates {latest_run.skipped_duplicates}")
+        if latest_run.processed_files:
+            return f"Imported {latest_run.processed_files} file(s)"
         if latest_run.errors:
-            parts.append(f"failed {latest_run.errors}")
-        return " / ".join(parts)
+            return "Import issue"
+        if latest_run.skipped_duplicates:
+            return "No change - duplicate price file"
+        if latest_run.matched_files:
+            return "Price email found, no new file"
+        return "No price email found"
     if diagnostic_summary:
-        parts = [
-            f"candidates {diagnostic_summary.get('price_candidates', 0)}",
-            f"imported {diagnostic_summary.get('imported', 0)}",
-            f"duplicates {diagnostic_summary.get('duplicates', 0)}",
-            f"skipped {diagnostic_summary.get('skipped', 0)}",
-            f"failed {diagnostic_summary.get('failed', 0)}",
-        ]
-        if diagnostic_summary.get("quarantined"):
-            parts.append(f"quarantine {diagnostic_summary.get('quarantined', 0)}")
         if diagnostic_summary.get("backlog"):
-            parts.append("backlog")
-        return " / ".join(parts)
+            return "Backlog not fully scanned"
+        if diagnostic_summary.get("imported"):
+            return f"Imported {diagnostic_summary.get('imported')} file(s)"
+        if diagnostic_summary.get("failed") or diagnostic_summary.get("quarantined"):
+            return "Import issue"
+        if diagnostic_summary.get("duplicates"):
+            return "No change - duplicate price file"
+        if diagnostic_summary.get("price_candidates"):
+            return "Price file found, not imported"
+        return "No price file found"
     if supplier.last_email_check_at:
-        return (
-            f"matched {supplier.last_email_matched} / "
-            f"imported {supplier.last_email_processed} / "
-            f"failed {supplier.last_email_errors}"
-        )
+        if supplier.last_email_processed:
+            return f"Imported {supplier.last_email_processed} file(s)"
+        if supplier.last_email_errors:
+            return "Import issue"
+        if supplier.last_email_matched:
+            return "Price email found, no new file"
+        return "No price email found"
     return "No check yet"
 
 

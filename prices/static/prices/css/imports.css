@@ -204,7 +204,14 @@
 .import-file-summary,
 .import-problem-link {
   display: block;
-  max-width: 260px;
+  max-width: 220px;
+}
+
+.import-source-note {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .import-problem-link {

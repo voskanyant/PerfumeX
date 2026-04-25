@@ -214,7 +214,7 @@
                                     <td class="import-col-files" data-label="Files">
                                         <div class="import-status-note import-file-summary" data-file-summary title="{{ row.file_summary }}">{{ row.file_summary }}</div>
                                         {% if row.source_mailbox_folder %}
-                                            <div class="import-status-note" data-source-mailbox-folder title="{{ row.source_mailbox_folder }}">Source {{ row.source_mailbox_folder }}</div>
+                                            <div class="import-status-note import-source-note" data-source-mailbox-folder title="{{ row.source_mailbox_folder }}">{{ row.source_mailbox_folder }}</div>
                                         {% endif %}
                                         {% if row.expected_at %}
                                             <div class="import-status-note">Expected {{ row.expected_at }}</div>
@@ -433,7 +433,7 @@
                 applyText(row.querySelector("[data-health-note]"), state.health_note);
                 applyText(row.querySelector("[data-file-summary]"), state.file_summary);
                 applyText(row.querySelector("[data-problem-note]"), state.problem_note);
-                applyText(row.querySelector("[data-source-mailbox-folder]"), state.source_mailbox_folder ? "Source " + state.source_mailbox_folder : "");
+                applyText(row.querySelector("[data-source-mailbox-folder]"), state.source_mailbox_folder || "");
                 applyProgress(row, state.is_running ? state.check_progress : null);
 
                 var updateBtn = row.querySelector("[data-email-update]");

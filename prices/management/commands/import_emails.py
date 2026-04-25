@@ -11,6 +11,9 @@ from prices.services.importer import process_import_file
 from prices.services.email_import_lock import acquire_email_import_worker_lock
 
 
+INTERVAL_EARLY_GRACE_SECONDS = 90
+
+
 def _get_supplier_latest_batch_time(supplier: models.Supplier):
     latest = None
     batches = models.ImportBatch.objects.filter(
@@ -23,6 +26,18 @@ def _get_supplier_latest_batch_time(supplier: models.Supplier):
         if candidate and (latest is None or candidate > latest):
             latest = candidate
     return latest
+
+
+def _should_skip_recent_run(settings_obj: models.ImportSettings, now=None) -> bool:
+    if not settings_obj.last_run_at:
+        return False
+    interval_seconds = int(settings_obj.interval_minutes or 0) * 60
+    if interval_seconds <= 0:
+        return False
+    now = now or timezone.now()
+    elapsed_seconds = (now - settings_obj.last_run_at).total_seconds()
+    threshold_seconds = max(interval_seconds - INTERVAL_EARLY_GRACE_SECONDS, 0)
+    return elapsed_seconds < threshold_seconds
 
 
 class Command(BaseCommand):
@@ -162,11 +177,9 @@ class Command(BaseCommand):
                 if not settings_obj.enabled:
                     self.stdout.write("Import settings disabled. Use --force to run.")
                     return
-                if settings_obj.last_run_at:
-                    elapsed = timezone.now() - settings_obj.last_run_at
-                    if elapsed.total_seconds() < settings_obj.interval_minutes * 60:
-                        self.stdout.write("Skipped. Last run too recent.")
-                        return
+                if _should_skip_recent_run(settings_obj):
+                    self.stdout.write("Skipped. Last run too recent.")
+                    return
 
             mailboxes = models.Mailbox.objects.filter(is_active=True).order_by(
                 "priority", "id"

@@ -22,7 +22,10 @@ from django.utils import timezone
 
 from catalog.models import Brand, Perfume, PerfumeVariant
 from prices import models
-from prices.management.commands.import_emails import _get_supplier_latest_batch_time
+from prices.management.commands.import_emails import (
+    _get_supplier_latest_batch_time,
+    _should_skip_recent_run,
+)
 from prices.services.email_importer import (
     _advance_mailbox_uid_cursor,
     _is_non_price_filename,
@@ -40,6 +43,7 @@ from prices.views import (
     _collect_latest_successful_imports,
     _get_cron_status,
     _render_runner_script,
+    _summarize_latest_files,
 )
 
 
@@ -731,6 +735,21 @@ class SupplierImportBoundaryTests(TestCase):
         self.assertEqual(status["remaining_backlog"], 209)
         self.assertEqual(status["mailboxes"][0]["all_mail_uid"], 12000)
 
+    def test_file_summary_stays_compact_for_large_duplicate_runs(self):
+        run = models.EmailImportRun.objects.create(
+            supplier=self.supplier,
+            status=models.EmailImportStatus.FINISHED,
+            matched_files=1597,
+            processed_files=0,
+            skipped_duplicates=649,
+            errors=0,
+        )
+
+        summary = _summarize_latest_files(self.supplier, run)
+
+        self.assertEqual(summary, "No change - duplicate price file")
+        self.assertNotIn("1597", summary)
+
 
 class ImportAttachmentPreflightTests(TestCase):
     def test_unnamed_body_parts_are_not_treated_as_attachments(self):
@@ -931,6 +950,18 @@ class ImportSchedulerTests(TestCase):
 
         self.assertTrue(status["stale"])
         self.assertGreaterEqual(status["late_by_minutes"], 30)
+
+    def test_recent_run_throttle_allows_wall_clock_cron_tick(self):
+        settings_obj = models.ImportSettings.get_solo()
+        now = timezone.now().replace(microsecond=0)
+        settings_obj.interval_minutes = 20
+        settings_obj.last_run_at = now - timedelta(minutes=19, seconds=10)
+        settings_obj.save(update_fields=["interval_minutes", "last_run_at"])
+
+        self.assertFalse(_should_skip_recent_run(settings_obj, now=now))
+
+        settings_obj.last_run_at = now - timedelta(minutes=18)
+        self.assertTrue(_should_skip_recent_run(settings_obj, now=now))
 
 
 class HiddenProductKeywordTests(TestCase):
