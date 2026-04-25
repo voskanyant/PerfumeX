@@ -21,11 +21,11 @@ class SupplierForm(forms.ModelForm):
         )
         labels = {
             "from_address_pattern": "Supplier email",
-            "expected_import_interval_hours": "Expected import cadence (hours)",
+            "expected_import_interval_hours": "Expected weekday cadence (hours)",
         }
         help_texts = {
             "from_address_pattern": "Email address used to receive this supplier's price lists.",
-            "expected_import_interval_hours": "Used on the Import Prices board to decide when this supplier becomes warning, stale, or critical.",
+            "expected_import_interval_hours": "Used on the Import Prices board. Daily suppliers use business-day grace, so Friday can remain healthy through the weekend.",
         }
         widgets = {
             "from_address_pattern": forms.TextInput(

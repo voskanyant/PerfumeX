@@ -452,6 +452,9 @@ def run_import(
         "skipped_no_payload": 0,
         "skipped_blacklist": 0,
         "skipped_unsupported_extension": 0,
+        "messages_found": 0,
+        "messages_scanned": 0,
+        "remaining_backlog": 0,
     }
     if run_id:
         models.EmailImportRun.objects.filter(id=run_id).update(
@@ -520,157 +523,144 @@ def run_import(
                 criteria.extend(["SINCE", since_date.strftime("%d-%b-%Y")])
             if before_date:
                 criteria.extend(["BEFORE", before_date.strftime("%d-%b-%Y")])
-            status, data, client = _imap_search(
-                client, mailbox, criteria, _log_line, selected_folder=selected_folder
-            )
-            if status != "OK":
-                note(f"Failed to search mailbox: {mailbox.name}")
-                if client:
-                    client.logout()
-                continue
-            message_ids = data[0].split()
-            inbox_ids = set(message_ids)
-            note(f"{mailbox.name}: found {len(message_ids)} message(s) in INBOX.")
-            # Gmail can have relevant messages outside INBOX (archived/labels).
-            # Always merge INBOX + All Mail for reliability.
-            if mailbox.host and "gmail.com" in mailbox.host.lower():
+
+            def search_folder(folder_name: str):
+                nonlocal client, selected_folder
+                if selected_folder != folder_name:
+                    if not _select_mailbox(client, folder_name):
+                        client = _connect_imap(mailbox, _log_line, select_folder=folder_name)
+                        if not client:
+                            summary["errors"] += 1
+                            note(
+                                f"Skipping folder due select failure: {mailbox.name}/{folder_name}"
+                            )
+                            return []
+                    selected_folder = folder_name
+                status, data, client = _imap_search(
+                    client, mailbox, criteria, _log_line, selected_folder=folder_name
+                )
+                if status != "OK":
+                    note(f"Failed to search mailbox folder: {mailbox.name}/{folder_name}")
+                    return []
+                return _sort_message_ids(data[0].split())
+
+            work_items = []
+            inbox_ids = search_folder("INBOX")
+            note(f"{mailbox.name}: found {len(inbox_ids)} message(s) in INBOX.")
+            work_items.extend(("INBOX", msg_id) for msg_id in inbox_ids)
+
+            host_lower = (mailbox.host or "").lower()
+            if "gmail.com" in host_lower:
                 try:
-                    selected = False
                     detected_folder = _find_all_mail_folder(client)
                     folder_candidates = []
                     if detected_folder:
                         folder_candidates.append(detected_folder)
                     folder_candidates.extend(["[Gmail]/All Mail", "[Google Mail]/All Mail"])
                     seen = set()
+                    all_mail_folder = None
                     for folder in folder_candidates:
                         if not folder or folder in seen:
                             continue
                         seen.add(folder)
                         if _select_mailbox(client, folder):
-                            selected = True
                             selected_folder = folder
+                            all_mail_folder = folder
                             break
-                    if selected:
-                        status, data, client = _imap_search(
-                            client, mailbox, criteria, _log_line, selected_folder=selected_folder
+                    if all_mail_folder:
+                        all_mail_ids = search_folder(all_mail_folder)
+                        note(
+                            f"{mailbox.name}: found {len(all_mail_ids)} message(s) in Gmail All Mail."
                         )
-                        if status == "OK":
-                            all_mail_ids = set(data[0].split())
-                            note(
-                                f"{mailbox.name}: found {len(all_mail_ids)} message(s) in Gmail All Mail."
-                            )
-                            if all_mail_ids:
-                                message_ids = list(all_mail_ids)
-                                _log(_log_line, f"Using Gmail All Mail for {mailbox.name}.")
-                            else:
-                                message_ids = list(inbox_ids)
-                                selected_folder = "INBOX"
+                        if all_mail_ids:
+                            # All Mail includes INBOX for Gmail, so use it as the authoritative folder.
+                            work_items = [(all_mail_folder, msg_id) for msg_id in all_mail_ids]
+                            _log(_log_line, f"Using Gmail All Mail for {mailbox.name}.")
                     else:
                         _log(_log_line, f"Gmail All Mail folder not accessible for {mailbox.name}.")
-                        selected_folder = "INBOX"
                 except Exception as exc:
                     _log(_log_line, f"Failed Gmail All Mail fallback ({mailbox.name}): {exc}")
-                    selected_folder = "INBOX"
-                # Ensure we are back in SELECTED state for INBOX fetch loop.
-                if selected_folder == "INBOX":
-                    try:
-                        if not _select_mailbox(client, "INBOX"):
-                            client = _connect_imap(mailbox, _log_line, select_folder="INBOX")
-                            if not client:
-                                summary["errors"] += 1
-                                note(f"Skipping mailbox due INBOX re-select failure: {mailbox.name}")
-                                continue
-                    except Exception:
-                        client = _connect_imap(mailbox, _log_line, select_folder="INBOX")
-                        if not client:
-                            summary["errors"] += 1
-                            note(f"Skipping mailbox due INBOX re-select failure: {mailbox.name}")
-                            continue
-                elif not _select_mailbox(client, selected_folder):
-                    client = _connect_imap(mailbox, _log_line, select_folder=selected_folder)
-                    if not client:
-                        summary["errors"] += 1
-                        note(
-                            f"Skipping mailbox due mailbox re-select failure: {mailbox.name} ({selected_folder})"
-                        )
-                        continue
-            elif mailbox.host and any(
-                domain in mailbox.host.lower()
-                for domain in ("mail.ru", "inbox.ru", "list.ru", "bk.ru")
-            ):
-                # mail.ru-family providers may keep relevant messages outside INBOX.
-                # For supplier/manual runs OR when INBOX is empty, try archive-like folder.
-                # This keeps broad cron runs lightweight but prevents missing archived mail.
-                if supplier or from_filter or subject_filter or not inbox_ids:
-                    try:
-                        archive_folder = _find_archive_like_folder(client)
-                        if archive_folder and _select_mailbox(client, archive_folder):
-                            status, data, client = _imap_search(
-                                client, mailbox, criteria, _log_line, selected_folder=archive_folder
+            elif any(domain in host_lower for domain in ("mail.ru", "inbox.ru", "list.ru", "bk.ru")):
+                try:
+                    archive_folder = _find_archive_like_folder(client)
+                    if archive_folder:
+                        archive_ids = search_folder(archive_folder)
+                        if archive_ids:
+                            existing_keys = {
+                                (folder, _uid_display(msg_id)) for folder, msg_id in work_items
+                            }
+                            for msg_id in archive_ids:
+                                key = (archive_folder, _uid_display(msg_id))
+                                if key not in existing_keys:
+                                    work_items.append((archive_folder, msg_id))
+                            note(
+                                f"{mailbox.name}: found {len(archive_ids)} message(s) in archive folder '{archive_folder}'."
                             )
-                            if status == "OK":
-                                archive_ids = set(data[0].split())
-                                if archive_ids:
-                                    merged = set(message_ids) | archive_ids
-                                    message_ids = list(merged)
-                                    note(
-                                        f"{mailbox.name}: found {len(archive_ids)} message(s) in archive folder '{archive_folder}'."
-                                    )
-                            # Return to INBOX for fetch loop.
-                            _select_mailbox(client, "INBOX")
-                    except Exception as exc:
-                        _log(_log_line, f"mail.ru archive fallback failed ({mailbox.name}): {exc}")
-            # Process oldest first so history is built chronologically.
-            try:
-                message_ids = sorted(message_ids, key=lambda x: int(x))
-            except Exception:
-                pass
-            cursor_field = "last_inbox_uid"
-            if selected_folder != "INBOX":
-                cursor_field = "last_all_mail_uid"
+                except Exception as exc:
+                    _log(_log_line, f"mail.ru archive fallback failed ({mailbox.name}): {exc}")
+
+            work_items = sorted(
+                work_items,
+                key=lambda item: (
+                    0 if item[0] == "INBOX" else 1,
+                    _uid_to_int(item[1]) or 0,
+                    _uid_display(item[1]),
+                ),
+            )
+            summary["messages_found"] += len(work_items)
             if use_uid_cursor and not supplier and not from_filter and not subject_filter:
-                last_uid = getattr(mailbox, cursor_field, 0) or 0
-                filtered_ids = []
-                for _mid in message_ids:
-                    uid_int = _uid_to_int(_mid)
-                    if uid_int is None:
+                filtered_items = []
+                counts_by_folder = {}
+                for folder_name, msg_id in work_items:
+                    cursor_field = _folder_cursor_field(folder_name)
+                    last_uid = getattr(mailbox, cursor_field, 0) or 0
+                    uid_int = _uid_to_int(msg_id)
+                    if uid_int is None or uid_int <= last_uid:
                         continue
-                    if uid_int > last_uid:
-                        filtered_ids.append(_mid)
-                note(
-                    f"{mailbox.name}: new by UID cursor={len(filtered_ids)} (last={last_uid}, folder={selected_folder})."
-                )
-                message_ids = filtered_ids
+                    filtered_items.append((folder_name, msg_id))
+                    counts_by_folder[folder_name] = counts_by_folder.get(folder_name, 0) + 1
+                details = ", ".join(
+                    f"{folder}={count}" for folder, count in sorted(counts_by_folder.items())
+                ) or "none"
+                note(f"{mailbox.name}: new by UID cursor {details}.")
+                work_items = filtered_items
             if limit:
                 if use_uid_cursor and not supplier and not from_filter and not subject_filter:
-                    # For recurring auto-import runs we prioritize newest messages first.
-                    # This prevents "stuck" behavior after mailbox re-enable when UID backlog is large.
-                    backlog = max(0, len(message_ids) - limit)
+                    backlog = max(0, len(work_items) - limit)
                     if backlog:
+                        summary["remaining_backlog"] += backlog
                         _log_line(
-                            f"{mailbox.name}: backlog={backlog} message(s); processing newest {limit}."
+                            f"{mailbox.name}: backlog remaining after this run={backlog}; processing oldest {limit}."
                         )
-                    message_ids = message_ids[-limit:]
+                    work_items = work_items[:limit]
                 else:
-                    # Without cursor, newest-first is safer for manual recovery runs.
-                    message_ids = message_ids[-limit:]
-            note(f"{mailbox.name}: processing {len(message_ids)} message(s) after limit.")
+                    work_items = work_items[-limit:]
+            note(f"{mailbox.name}: processing {len(work_items)} message(s) after limit.")
             if run_id:
                 models.EmailImportRun.objects.filter(id=run_id).update(
-                    total_messages=len(message_ids),
+                    total_messages=len(work_items),
                     processed_messages=0,
-                    last_message=f"Found {len(message_ids)} message(s) in {mailbox.name}.",
+                    last_message=f"Found {len(work_items)} message(s) in {mailbox.name}.",
                 )
-            if not message_ids and run_id:
+            if not work_items and run_id:
                 models.EmailImportRun.objects.filter(id=run_id).update(
                     last_message=f"No messages found in {mailbox.name}.",
                 )
 
-            max_processed_uid = 0
-            for msg_id in message_ids:
+            max_processed_uid_by_field = {}
+            for item_folder, msg_id in work_items:
                 check_timeout("processing messages")
                 if run_was_canceled():
                     break
+                if selected_folder != item_folder:
+                    if not _select_mailbox(client, item_folder):
+                        client = _connect_imap(mailbox, _log_line, select_folder=item_folder)
+                        if not client:
+                            summary["errors"] += 1
+                            note(f"Skipping message due folder select failure: {mailbox.name}/{item_folder}")
+                            continue
+                    selected_folder = item_folder
+                summary["messages_scanned"] += 1
                 if run_id:
                     models.EmailImportRun.objects.filter(id=run_id).update(
                         processed_messages=F("processed_messages") + 1
@@ -681,7 +671,7 @@ def run_import(
                     msg_id,
                     "(BODY.PEEK[HEADER.FIELDS (SUBJECT FROM DATE MESSAGE-ID)] RFC822.SIZE INTERNALDATE)",
                     _log_line,
-                    selected_folder=selected_folder,
+                    selected_folder=item_folder,
                 )
                 if not client:
                     continue
@@ -697,10 +687,10 @@ def run_import(
                             except (IndexError, ValueError):
                                 size = None
                 if size and size > max_bytes:
-                    note(f"Skipping message {msg_id.decode()}: size {size} bytes.")
+                    note(f"Skipping message {item_folder}/{_uid_display(msg_id)}: size {size} bytes.")
                     if run_id:
                         models.EmailImportRun.objects.filter(id=run_id).update(
-                            last_message=f"Skipped large message {msg_id.decode()}"
+                            last_message=f"Skipped large message {item_folder}/{_uid_display(msg_id)}"
                         )
                     continue
                 received_at = _extract_internaldate(meta)
@@ -733,31 +723,34 @@ def run_import(
                     msg_id,
                     "(BODY.PEEK[])",
                     _log_line,
-                    selected_folder=selected_folder,
+                    selected_folder=item_folder,
                 )
                 if not client:
                     continue
                 if status != "OK" or not msg_data:
                     _log_line(
-                        f"{mailbox.name}: skip message {msg_id.decode(errors='ignore')} - fetch body failed."
+                        f"{mailbox.name}/{item_folder}: skip message {_uid_display(msg_id)} - fetch body failed."
                     )
                     continue
                 raw_email = _extract_raw_email_from_fetch(msg_data)
                 if not raw_email:
                     _log_line(
-                        f"{mailbox.name}: skip message {msg_id.decode(errors='ignore')} - empty RFC822 payload."
+                        f"{mailbox.name}/{item_folder}: skip message {_uid_display(msg_id)} - empty RFC822 payload."
                     )
                     continue
                 uid_int = _uid_to_int(msg_id)
-                if uid_int and uid_int > max_processed_uid:
-                    max_processed_uid = uid_int
+                cursor_field = _folder_cursor_field(item_folder)
+                if uid_int:
+                    previous_uid = max_processed_uid_by_field.get(cursor_field, 0)
+                    if uid_int > previous_uid:
+                        max_processed_uid_by_field[cursor_field] = uid_int
                 message = email.message_from_bytes(raw_email)
                 subject = _decode_header(message.get("Subject", ""))
                 from_addr = parseaddr(message.get("From", ""))[1]
                 message_id = (message.get("Message-ID") or "").strip()
                 _log_line(
                     "Message "
-                    f"{msg_id.decode(errors='ignore')} "
+                    f"{mailbox.name}/{item_folder}/{_uid_display(msg_id)} "
                     f"from={_short(from_addr, 80)} "
                     f"subject='{_short(subject, 120)}' "
                     f"msgid={_short(message_id, 80) or '-'}"
@@ -772,12 +765,12 @@ def run_import(
 
                 batch_by_supplier = {}
                 processed_any = False
-                first_attachment_selected = False
+                valid_attachment_processed = False
                 for part in message.walk():
                     check_timeout("processing attachments")
-                    if first_attachment_selected:
+                    if valid_attachment_processed:
                         _log_line(
-                            f"{mailbox.name}: processed first attachment in message {msg_id.decode(errors='ignore')}; skipping remaining attachments."
+                            f"{mailbox.name}/{item_folder}: processed first valid attachment in message {_uid_display(msg_id)}; skipping remaining attachments."
                         )
                         break
                     if run_was_canceled():
@@ -796,11 +789,10 @@ def run_import(
                         else:
                             summary["skipped_no_filename"] += 1
                             _log_line(
-                                f"{mailbox.name}: SKIP attachment in message {msg_id.decode(errors='ignore')} - no filename."
+                                f"{mailbox.name}/{item_folder}: SKIP attachment in message {_uid_display(msg_id)} - no filename."
                             )
                             continue
                     summary["attachments_seen"] += 1
-                    first_attachment_selected = True
                     lowered_filename = filename.lower()
                     if blacklist_terms and any(term in lowered_filename for term in blacklist_terms):
                         summary["skipped_blacklist"] += 1
@@ -880,6 +872,8 @@ def run_import(
                             "processed": 0,
                             "errors": 0,
                             "last_message": "",
+                            "duplicates": 0,
+                            "skipped": 0,
                         },
                     )
                     stats["matched"] = stats.get("matched", 0) + 1
@@ -896,7 +890,9 @@ def run_import(
                                 f"{mailbox.name}: SKIP '{filename}' - unsupported extension for price import."
                             )
                             last_message = f"Skipped unsupported file: {filename}"
+                            stats["skipped"] = stats.get("skipped", 0) + 1
                             continue
+                    valid_attachment_processed = True
 
                     content_hash = hashlib.sha256(payload).hexdigest()
                     if dedupe_same_day_only and received_at:
@@ -934,6 +930,7 @@ def run_import(
                                 skipped_duplicates=F("skipped_duplicates") + 1
                             )
                         last_message = f"Skipped duplicate file: {filename}"
+                        stats["duplicates"] = stats.get("duplicates", 0) + 1
                         continue
 
                     batch = batch_by_supplier.get(matched_supplier.id)
@@ -944,6 +941,7 @@ def run_import(
                                 message_id=message_id,
                                 defaults={
                                     "mailbox": mailbox,
+                                    "message_folder": item_folder,
                                     "received_at": received_at,
                                     "status": models.ImportStatus.PENDING,
                                 },
@@ -956,6 +954,9 @@ def run_import(
                             if batch.received_at is None and received_at is not None:
                                 batch.received_at = received_at
                                 update_fields.append("received_at")
+                            if not batch.message_folder:
+                                batch.message_folder = item_folder
+                                update_fields.append("message_folder")
                             if update_fields:
                                 batch.save(update_fields=update_fields)
                         else:
@@ -964,6 +965,7 @@ def run_import(
                             batch = models.ImportBatch.objects.create(
                                 supplier=matched_supplier,
                                 mailbox=mailbox,
+                                message_folder=item_folder,
                                 message_id="",
                                 received_at=received_at,
                                 status=models.ImportStatus.PENDING,
@@ -1032,12 +1034,16 @@ def run_import(
                         _log(_log_line, "Failed to mark message as seen.")
 
             if use_uid_cursor and not supplier and not from_filter and not subject_filter:
-                if max_processed_uid:
+                update_fields = []
+                for cursor_field, max_processed_uid in max_processed_uid_by_field.items():
                     current_uid = getattr(mailbox, cursor_field, 0) or 0
                     if max_processed_uid > current_uid:
                         setattr(mailbox, cursor_field, max_processed_uid)
-                        mailbox.last_checked_at = timezone.now()
-                        mailbox.save(update_fields=[cursor_field, "last_checked_at"])
+                        update_fields.append(cursor_field)
+                if update_fields:
+                    mailbox.last_checked_at = timezone.now()
+                    update_fields.append("last_checked_at")
+                    mailbox.save(update_fields=update_fields)
 
             if client:
                 client.logout()
@@ -1059,11 +1065,18 @@ def run_import(
                     "matched": 0,
                     "processed": 0,
                     "errors": 0,
+                    "duplicates": 0,
+                    "skipped": 0,
                     "last_message": "No matching emails.",
                 },
             )
             if not stats.get("last_message"):
-                stats["last_message"] = "No matching emails."
+                parts = []
+                if stats.get("duplicates"):
+                    parts.append(f"{stats.get('duplicates')} duplicate(s)")
+                if stats.get("skipped"):
+                    parts.append(f"{stats.get('skipped')} skipped")
+                stats["last_message"] = ", ".join(parts) if parts else "No matching emails."
             fallback_supplier.last_email_check_at = run_started
             fallback_supplier.last_email_matched = stats.get("matched", 0)
             fallback_supplier.last_email_processed = stats.get("processed", 0)
@@ -1088,6 +1101,11 @@ def run_import(
                 detailed_log="\n".join(log_lines),
             )
         elif not timed_out:
+            final_message = (
+                f"Imported {summary['processed_files']} of {summary['matched_files']} matched file(s); "
+                f"duplicates {summary['skipped_duplicates']}, errors {summary['errors']}, "
+                f"remaining backlog {summary['remaining_backlog']}."
+            )
             models.EmailImportRun.objects.filter(id=run_id).update(
                 status=models.EmailImportStatus.FINISHED,
                 finished_at=timezone.now(),
@@ -1095,6 +1113,7 @@ def run_import(
                 processed_files=summary["processed_files"],
                 skipped_duplicates=summary["skipped_duplicates"],
                 errors=summary["errors"],
+                last_message=final_message,
                 detailed_log="\n".join(log_lines),
             )
     if not summary["matched_files"] and unmatched_samples and logger:
@@ -1109,11 +1128,14 @@ def run_import(
         _log(
             _log_line,
             "Attachment diagnostics: "
+            f"messages_found={summary['messages_found']} "
+            f"messages_scanned={summary['messages_scanned']} "
             f"seen={summary['attachments_seen']} "
             f"no_filename={summary['skipped_no_filename']} "
             f"no_payload={summary['skipped_no_payload']} "
             f"blacklist={summary['skipped_blacklist']} "
-            f"unsupported_ext={summary['skipped_unsupported_extension']}",
+            f"unsupported_ext={summary['skipped_unsupported_extension']} "
+            f"remaining_backlog={summary['remaining_backlog']}",
         )
     if run_id:
         models.EmailImportRun.objects.filter(id=run_id).update(
@@ -1135,3 +1157,20 @@ def _uid_to_int(uid):
         return int(str(uid).strip())
     except Exception:
         return None
+
+
+def _uid_display(uid) -> str:
+    if isinstance(uid, bytes):
+        return uid.decode(errors="ignore")
+    return str(uid)
+
+
+def _folder_cursor_field(folder_name: str) -> str:
+    return "last_inbox_uid" if folder_name == "INBOX" else "last_all_mail_uid"
+
+
+def _sort_message_ids(message_ids):
+    try:
+        return sorted(message_ids, key=lambda value: int(value))
+    except Exception:
+        return list(message_ids)

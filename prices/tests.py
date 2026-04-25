@@ -1,4 +1,5 @@
-from datetime import timedelta
+from datetime import datetime, timedelta
+from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase
@@ -8,7 +9,11 @@ from django.utils import timezone
 from catalog.models import Brand, Perfume, PerfumeVariant
 from prices import models
 from prices.management.commands.import_emails import _get_supplier_latest_batch_time
-from prices.views import _batch_activity_datetime, _collect_latest_successful_imports
+from prices.views import (
+    _batch_activity_datetime,
+    _build_supplier_board_row,
+    _collect_latest_successful_imports,
+)
 
 
 class OurProductCatalogueListTests(TestCase):
@@ -142,6 +147,100 @@ class SupplierImportBoundaryTests(TestCase):
         latest_batch = latest_batches[self.supplier.id]
 
         self.assertEqual(_batch_activity_datetime(latest_batch), now)
+
+    def test_supplier_board_prefers_newer_autorun_check_over_canceled_run(self):
+        now = timezone.now().replace(microsecond=0)
+        self.supplier.last_email_check_at = now
+        self.supplier.last_email_matched = 1
+        self.supplier.last_email_processed = 0
+        self.supplier.last_email_errors = 0
+        self.supplier.last_email_last_message = "Matching emails found."
+        self.supplier.from_address_pattern = "supplier@example.com"
+        self.supplier.save(
+            update_fields=[
+                "last_email_check_at",
+                "last_email_matched",
+                "last_email_processed",
+                "last_email_errors",
+                "last_email_last_message",
+                "from_address_pattern",
+            ]
+        )
+        canceled_run = models.EmailImportRun.objects.create(
+            supplier=self.supplier,
+            status=models.EmailImportStatus.CANCELED,
+            finished_at=now - timedelta(hours=1),
+            last_message="Canceled by user.",
+        )
+
+        row = _build_supplier_board_row(
+            supplier=self.supplier,
+            successful_batch=None,
+            latest_run=canceled_run,
+        )
+
+        self.assertEqual(row["check_code"], "no-change")
+        self.assertEqual(row["check_label"], "no change")
+
+    def test_supplier_board_keeps_canceled_run_when_newer_than_autorun_check(self):
+        now = timezone.now().replace(microsecond=0)
+        self.supplier.last_email_check_at = now - timedelta(hours=1)
+        self.supplier.last_email_matched = 1
+        self.supplier.from_address_pattern = "supplier@example.com"
+        self.supplier.save(
+            update_fields=[
+                "last_email_check_at",
+                "last_email_matched",
+                "from_address_pattern",
+            ]
+        )
+        canceled_run = models.EmailImportRun.objects.create(
+            supplier=self.supplier,
+            status=models.EmailImportStatus.CANCELED,
+            finished_at=now,
+            last_message="Canceled by user.",
+        )
+
+        row = _build_supplier_board_row(
+            supplier=self.supplier,
+            successful_batch=None,
+            latest_run=canceled_run,
+        )
+
+        self.assertEqual(row["check_code"], "canceled")
+        self.assertEqual(row["check_label"], "canceled")
+
+    def test_supplier_board_keeps_friday_import_fresh_through_weekend(self):
+        self.supplier.from_address_pattern = "supplier@example.com"
+        self.supplier.expected_import_interval_hours = 24
+        self.supplier.save(update_fields=["from_address_pattern", "expected_import_interval_hours"])
+        friday = timezone.make_aware(datetime(2026, 4, 24, 10, 0, 0))
+        sunday = timezone.make_aware(datetime(2026, 4, 26, 12, 0, 0))
+        batch = models.ImportBatch.objects.create(
+            supplier=self.supplier,
+            mailbox=self.mailbox,
+            message_id="<weekend@example.com>",
+            received_at=friday,
+            status=models.ImportStatus.PROCESSED,
+        )
+        models.ImportFile.objects.create(
+            import_batch=batch,
+            file_kind=models.FileKind.PRICE,
+            filename="weekend.xlsx",
+            content_hash="hash-weekend",
+            status=models.ImportStatus.PROCESSED,
+            processed_at=friday,
+        )
+
+        with patch("prices.views.timezone.now", return_value=sunday):
+            row = _build_supplier_board_row(
+                supplier=self.supplier,
+                successful_batch=batch,
+                latest_run=None,
+            )
+
+        self.assertEqual(row["health_code"], "fresh")
+        self.assertIn("Mon", row["health_note"])
 
 
 class HiddenProductKeywordTests(TestCase):

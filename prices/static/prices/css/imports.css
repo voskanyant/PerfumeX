@@ -133,10 +133,27 @@
 
 .import-supplier-note,
 .import-last-note,
-.import-status-note {
+.import-status-note,
+.import-problem-link {
   font-size: 11px;
   line-height: 1.35;
   color: var(--grey-500);
+}
+
+.import-file-summary,
+.import-problem-link {
+  display: block;
+  max-width: 260px;
+}
+
+.import-problem-link {
+  text-decoration: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.import-problem-link:hover {
+  color: var(--black);
 }
 
 .import-check-head {
@@ -399,7 +416,9 @@
       "supplier actions"
       "last last"
       "check check"
-      "health health";
+      "files files"
+      "health health"
+      "problem problem";
     gap: 8px 12px;
     margin-bottom: 10px;
     padding: 14px 16px;
@@ -443,8 +462,16 @@
     grid-area: check;
   }
 
+  .supplier-import-table td.import-col-files {
+    grid-area: files;
+  }
+
   .supplier-import-table td.import-col-health {
     grid-area: health;
+  }
+
+  .supplier-import-table td.import-col-problem {
+    grid-area: problem;
   }
 
   .supplier-import-table td.import-col-actions {

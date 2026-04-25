@@ -123,7 +123,9 @@
                                 <th>Supplier</th>
                                 <th>Last success</th>
                                 <th>Latest email check</th>
+                                <th>Files</th>
                                 <th>Health</th>
+                                <th>Problem</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
@@ -134,7 +136,7 @@
                                     <td class="import-col-supplier" data-label="Supplier">
                                         <div class="import-supplier-stack">
                                             <div class="import-supplier-name">{{ row.supplier.name }}</div>
-                                            <div class="import-supplier-note">Expected every {{ row.expected_interval_label }}</div>
+                                            <div class="import-supplier-note">Expected {{ row.expected_interval_label }}</div>
                                             {% if not row.has_email_route %}
                                                 <div class="import-supplier-note is-warning">Email route missing</div>
                                             {% endif %}
@@ -168,11 +170,20 @@
                                             </div>
                                         </div>
                                     </td>
+                                    <td class="import-col-files" data-label="Files">
+                                        <div class="import-status-note import-file-summary" data-file-summary title="{{ row.file_summary }}">{{ row.file_summary }}</div>
+                                        {% if row.expected_at %}
+                                            <div class="import-status-note">Expected {{ row.expected_at }}</div>
+                                        {% endif %}
+                                    </td>
                                     <td class="import-col-health" data-label="Health">
                                         <div class="import-health-stack">
                                             <span class="import-health-chip {{ row.health_class }}" data-health-chip>{{ row.health_label }}</span>
                                             <div class="import-status-note" data-health-note title="{{ row.health_note }}">{{ row.health_note }}</div>
                                         </div>
+                                    </td>
+                                    <td class="import-col-problem" data-label="Problem">
+                                        <a class="import-problem-link" href="{{ row.latest_log_url }}" data-problem-note title="{{ row.problem_note }}">{{ row.problem_note }}</a>
                                     </td>
                                     <td class="actions import-col-actions" data-label="Actions">
                                         <div class="import-actions-row">
@@ -332,7 +343,9 @@
                         })[0] || "is-neutral";
                     })(),
                     health_code: "",
-                    health_note: currentText("[data-health-note]", row)
+                    health_note: currentText("[data-health-note]", row),
+                    file_summary: currentText("[data-file-summary]", row),
+                    problem_note: "Starting background import..."
                 };
             }
 
@@ -367,6 +380,8 @@
                     state.health_label
                 );
                 applyText(row.querySelector("[data-health-note]"), state.health_note);
+                applyText(row.querySelector("[data-file-summary]"), state.file_summary);
+                applyText(row.querySelector("[data-problem-note]"), state.problem_note);
                 applyProgress(row, state.is_running ? state.check_progress : null);
 
                 var updateBtn = row.querySelector("[data-email-update]");

@@ -274,6 +274,7 @@ class Command(BaseCommand):
                     f"processed={summary.get('processed_files', 0)} "
                     f"duplicates={summary.get('skipped_duplicates', 0)} "
                     f"errors={summary.get('errors', 0)} "
+                    f"remaining={summary.get('remaining_backlog', 0)} "
                     f"timed_out={summary.get('timed_out', False)}"
                 )
                 return
@@ -309,6 +310,7 @@ class Command(BaseCommand):
                 f"processed={summary.get('processed_files', 0)} "
                 f"duplicates={summary.get('skipped_duplicates', 0)} "
                 f"errors={summary.get('errors', 0)} "
+                f"remaining={summary.get('remaining_backlog', 0)} "
                 f"timed_out={summary.get('timed_out', False)}"
             )
 

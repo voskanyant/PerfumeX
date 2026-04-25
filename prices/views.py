@@ -149,7 +149,7 @@ def _run_activity_datetime(run):
 
 def _expected_import_interval_hours(supplier) -> int:
     value = int(getattr(supplier, "expected_import_interval_hours", 0) or 0)
-    return value if value > 0 else 72
+    return value if value > 0 else 24
 
 
 def _format_interval_hours(hours: int) -> str:
@@ -157,6 +157,38 @@ def _format_interval_hours(hours: int) -> str:
         days = hours // 24
         return f"{days}d" if days != 1 else "1d"
     return f"{hours}h"
+
+
+def _format_expected_cadence(supplier) -> str:
+    hours = _expected_import_interval_hours(supplier)
+    if hours == 24:
+        return "daily, weekdays"
+    return f"every {_format_interval_hours(hours)}, weekdays"
+
+
+def _add_business_interval(start, hours: int):
+    if not start:
+        return None
+    current = timezone.localtime(start)
+    safe_hours = max(int(hours or 24), 1)
+    if safe_hours % 24 == 0:
+        business_days = max(safe_hours // 24, 1)
+        added = 0
+        while added < business_days:
+            current = current + timezone.timedelta(days=1)
+            if current.weekday() < 5:
+                added += 1
+        return current
+    current = current + timezone.timedelta(hours=safe_hours)
+    while current.weekday() >= 5:
+        current = current + timezone.timedelta(days=1)
+    return current
+
+
+def _format_expected_deadline(value) -> str:
+    if not value:
+        return ""
+    return timezone.localtime(value).strftime("%a %d/%m %H:%M")
 
 
 def _email_import_timeout_seconds() -> int | None:
@@ -324,6 +356,20 @@ def _collect_latest_successful_imports() -> dict[int, models.ImportBatch]:
     return latest
 
 
+def _collect_latest_failed_import_files() -> dict[int, models.ImportFile]:
+    files = (
+        models.ImportFile.objects.select_related("import_batch", "import_batch__supplier")
+        .filter(status=models.ImportStatus.FAILED)
+        .order_by("-import_batch__created_at", "-id")
+    )
+    latest: dict[int, models.ImportFile] = {}
+    for import_file in files:
+        supplier_id = import_file.import_batch.supplier_id
+        if supplier_id not in latest:
+            latest[supplier_id] = import_file
+    return latest
+
+
 def _collect_active_price_mappings() -> dict[int, models.SupplierFileMapping]:
     mappings = (
         models.SupplierFileMapping.objects.filter(
@@ -376,9 +422,12 @@ def _build_last_import_info(batch) -> dict[str, str | int]:
             "note": "No successful import yet",
             "source_code": "never",
             "sort_age_seconds": 10**12,
+            "datetime": None,
         }
     if batch.mailbox_id:
-        note = "Email import"
+        mailbox_name = getattr(batch.mailbox, "name", "") or "mailbox"
+        folder = (getattr(batch, "message_folder", "") or "").strip()
+        note = f"{mailbox_name} / {folder}" if folder else f"{mailbox_name} email"
         source_code = "email"
     else:
         note = "Manual upload / backfill"
@@ -392,12 +441,22 @@ def _build_last_import_info(batch) -> dict[str, str | int]:
         "note": note,
         "source_code": source_code,
         "sort_age_seconds": age_seconds,
+        "datetime": batch_dt,
     }
 
 
 def _build_latest_check_info(supplier, run, streak_count: int = 1) -> dict[str, str | int | None | bool]:
+    fallback_dt = supplier.last_email_check_at
     if run:
         run_dt = _run_activity_datetime(run)
+        if fallback_dt:
+            fallback_compare_dt = fallback_dt
+            if timezone.is_naive(fallback_compare_dt):
+                fallback_compare_dt = timezone.make_aware(
+                    fallback_compare_dt, timezone.get_current_timezone()
+                )
+            if not run_dt or fallback_compare_dt > run_dt:
+                return _build_supplier_email_fallback_check(supplier, fallback_dt)
         run_status = _build_email_run_status(run)
         note = str(run_status.get("note") or "")
         code = str(run_status.get("code") or "unknown")
@@ -418,38 +477,8 @@ def _build_latest_check_info(supplier, run, streak_count: int = 1) -> dict[str, 
             "show_time": bool(run_dt),
         }
 
-    fallback_dt = supplier.last_email_check_at
     if fallback_dt:
-        if supplier.last_email_errors:
-            label = "issues"
-            class_name = "is-warning"
-            code = "warning"
-            note = f"{supplier.last_email_errors} error(s) on latest check"
-        elif supplier.last_email_processed:
-            label = "successful"
-            class_name = "is-success"
-            code = "successful"
-            note = f"{supplier.last_email_processed} file(s) imported"
-        elif supplier.last_email_matched:
-            label = "no change"
-            class_name = "is-neutral"
-            code = "no-change"
-            note = "Matching emails found, but nothing new was imported"
-        else:
-            label = "no file"
-            class_name = "is-warning"
-            code = "no-files"
-            note = supplier.last_email_last_message or "No matching email files found"
-        return {
-            "label": label,
-            "class_name": class_name,
-            "code": code,
-            "note": note,
-            "relative": _short_relative_datetime(fallback_dt),
-            "full": _format_local_datetime(fallback_dt),
-            "progress": None,
-            "show_time": True,
-        }
+        return _build_supplier_email_fallback_check(supplier, fallback_dt)
 
     if not supplier.from_address_pattern:
         return {
@@ -472,6 +501,39 @@ def _build_latest_check_info(supplier, run, streak_count: int = 1) -> dict[str, 
         "full": "",
         "progress": None,
         "show_time": False,
+    }
+
+
+def _build_supplier_email_fallback_check(supplier, fallback_dt) -> dict[str, str | int | None | bool]:
+    if supplier.last_email_errors:
+        label = "issues"
+        class_name = "is-warning"
+        code = "warning"
+        note = f"{supplier.last_email_errors} error(s) on latest check"
+    elif supplier.last_email_processed:
+        label = "successful"
+        class_name = "is-success"
+        code = "successful"
+        note = f"{supplier.last_email_processed} file(s) imported"
+    elif supplier.last_email_matched:
+        label = "no change"
+        class_name = "is-neutral"
+        code = "no-change"
+        note = "Matching emails found, but nothing new was imported"
+    else:
+        label = "no file"
+        class_name = "is-warning"
+        code = "no-files"
+        note = supplier.last_email_last_message or "No matching email files found"
+    return {
+        "label": label,
+        "class_name": class_name,
+        "code": code,
+        "note": note,
+        "relative": _short_relative_datetime(fallback_dt),
+        "full": _format_local_datetime(fallback_dt),
+        "progress": None,
+        "show_time": True,
     }
 
 
@@ -584,6 +646,107 @@ def _build_health_info(supplier, last_import_info, latest_check_info, streak_cou
     }
 
 
+def _build_business_health_info(supplier, last_import_info, latest_check_info, streak_count: int = 1) -> dict[str, str | int]:
+    expected_hours = _expected_import_interval_hours(supplier)
+    cadence_label = _format_expected_cadence(supplier)
+    code = str(latest_check_info.get("code") or "")
+    last_success_dt = last_import_info.get("datetime")
+    expected_deadline = _add_business_interval(last_success_dt, expected_hours)
+    now = timezone.localtime(timezone.now())
+    overdue_seconds = (
+        max(int((now - expected_deadline).total_seconds()), 0)
+        if expected_deadline
+        else None
+    )
+    expected_label = _format_expected_deadline(expected_deadline)
+    grace_seconds = expected_hours * 3600
+
+    if not supplier.from_address_pattern:
+        return {
+            "label": "critical",
+            "class_name": "is-critical",
+            "note": f"Email route missing - expected {cadence_label}",
+            "code": "critical",
+            "severity": 0,
+            "expected_at": expected_label,
+        }
+    if last_import_info["source_code"] == "never":
+        return {
+            "label": "critical",
+            "class_name": "is-critical",
+            "note": f"No successful import yet - expected {cadence_label}",
+            "code": "critical",
+            "severity": 0,
+            "expected_at": expected_label,
+        }
+    if code == "failed" and streak_count >= 2:
+        return {
+            "label": "critical",
+            "class_name": "is-critical",
+            "note": f"{streak_count} failed checks in a row - expected {cadence_label}",
+            "code": "critical",
+            "severity": 0,
+            "expected_at": expected_label,
+        }
+    if overdue_seconds is not None and overdue_seconds > grace_seconds * 2:
+        return {
+            "label": "critical",
+            "class_name": "is-critical",
+            "note": f"Overdue since {expected_label}",
+            "code": "critical",
+            "severity": 0,
+            "expected_at": expected_label,
+        }
+    if code == "failed":
+        recent_success = str(last_import_info.get("relative") or "").strip()
+        note = latest_check_info["note"] or f"Latest check failed - expected {cadence_label}"
+        if recent_success and overdue_seconds is not None and overdue_seconds == 0:
+            note = f"Recent success {recent_success} - latest email check failed"
+        return {
+            "label": "warning",
+            "class_name": "is-warning",
+            "note": note,
+            "code": "warning",
+            "severity": 2,
+            "expected_at": expected_label,
+        }
+    if code == "no-files" and streak_count >= 3 and overdue_seconds is not None and overdue_seconds > 0:
+        return {
+            "label": "stale",
+            "class_name": "is-stale",
+            "note": f"{streak_count} no-file checks in a row - expected {cadence_label}",
+            "code": "stale",
+            "severity": 1,
+            "expected_at": expected_label,
+        }
+    if overdue_seconds is not None and overdue_seconds > grace_seconds:
+        return {
+            "label": "stale",
+            "class_name": "is-stale",
+            "note": f"Past expected time {expected_label}",
+            "code": "stale",
+            "severity": 1,
+            "expected_at": expected_label,
+        }
+    if overdue_seconds is not None and overdue_seconds > 0:
+        return {
+            "label": "warning",
+            "class_name": "is-warning",
+            "note": f"Expected by {expected_label}",
+            "code": "warning",
+            "severity": 2,
+            "expected_at": expected_label,
+        }
+    return {
+        "label": "fresh",
+        "class_name": "is-success",
+        "note": f"Next expected by {expected_label}",
+        "code": "fresh",
+        "severity": 3,
+        "expected_at": expected_label,
+    }
+
+
 def _supplier_log_url(supplier_id: int, run=None, batch=None) -> str:
     base_url = str(reverse_lazy("prices:import_detailed_logs"))
     query = urlencode({"supplier": supplier_id})
@@ -597,16 +760,56 @@ def _supplier_log_url(supplier_id: int, run=None, batch=None) -> str:
     return f"{base_url}?{query}{anchor}"
 
 
-def _build_supplier_board_row(supplier, successful_batch, latest_run, streak_count: int = 1) -> dict[str, object]:
+def _summarize_latest_files(supplier, latest_run) -> str:
+    if latest_run:
+        parts = [
+            f"matched {latest_run.matched_files}",
+            f"imported {latest_run.processed_files}",
+        ]
+        if latest_run.skipped_duplicates:
+            parts.append(f"duplicates {latest_run.skipped_duplicates}")
+        if latest_run.errors:
+            parts.append(f"failed {latest_run.errors}")
+        return " / ".join(parts)
+    if supplier.last_email_check_at:
+        return (
+            f"matched {supplier.last_email_matched} / "
+            f"imported {supplier.last_email_processed} / "
+            f"failed {supplier.last_email_errors}"
+        )
+    return "No check yet"
+
+
+def _build_problem_note(supplier, latest_check, health, latest_failed_file=None) -> str:
+    if latest_failed_file:
+        filename = latest_failed_file.filename or "file"
+        error = (latest_failed_file.error_message or "").strip()
+        if error:
+            return f"{filename}: {error[:180]}"
+        return f"{filename}: import failed"
+    check_code = str(latest_check.get("code") or "")
+    if check_code in {"failed", "warning", "no-files", "no-change", "canceled"}:
+        return str(latest_check.get("note") or "")
+    if str(health.get("code") or "") in {"warning", "stale", "critical"}:
+        return str(health.get("note") or "")
+    if supplier.last_email_check_at and supplier.last_email_matched and not supplier.last_email_processed:
+        return "Matching email found, but no new price file was imported."
+    return str(health.get("note") or "")
+
+
+def _build_supplier_board_row(supplier, successful_batch, latest_run, streak_count: int = 1, latest_failed_file=None) -> dict[str, object]:
     last_import = _build_last_import_info(successful_batch)
     latest_check = _build_latest_check_info(supplier, latest_run, streak_count)
     latest_check = _clarify_latest_check_with_last_success(latest_check, last_import)
-    health = _build_health_info(supplier, last_import, latest_check, streak_count)
+    health = _build_business_health_info(supplier, last_import, latest_check, streak_count)
+    file_summary = _summarize_latest_files(supplier, latest_run)
+    problem_note = _build_problem_note(supplier, latest_check, health, latest_failed_file)
     return {
         "supplier": supplier,
         "has_email_route": bool(supplier.from_address_pattern),
         "is_running": bool(latest_run and latest_run.status == models.EmailImportStatus.RUNNING),
-        "expected_interval_label": _format_interval_hours(_expected_import_interval_hours(supplier)),
+        "expected_interval_label": _format_expected_cadence(supplier),
+        "expected_at": str(health.get("expected_at") or ""),
         "last_import_relative": str(last_import["relative"]),
         "last_import_full": str(last_import["full"]),
         "last_import_age_class": str(last_import["class_name"]),
@@ -626,6 +829,8 @@ def _build_supplier_board_row(supplier, successful_batch, latest_run, streak_cou
         "health_code": str(health["code"]),
         "health_note": str(health["note"]),
         "health_severity": int(health["severity"]),
+        "file_summary": file_summary,
+        "problem_note": problem_note,
         "latest_log_url": _supplier_log_url(supplier.id, run=latest_run, batch=successful_batch),
     }
 
@@ -1207,6 +1412,7 @@ class SupplierOverviewView(LoginRequiredMixin, TemplateView):
         context = super().get_context_data(**kwargs)
         suppliers = list(models.Supplier.objects.order_by("name"))
         latest_successful_imports = _collect_latest_successful_imports()
+        latest_failed_import_files = _collect_latest_failed_import_files()
         active_price_mappings = _collect_active_price_mappings()
         _expire_stale_email_import_runs()
         latest_runs, run_streaks = _collect_latest_runs_and_streaks()
@@ -1301,6 +1507,7 @@ class SupplierOverviewView(LoginRequiredMixin, TemplateView):
                     successful_batch=latest_successful_imports.get(supplier.id),
                     latest_run=latest_runs.get(supplier.id),
                     streak_count=run_streaks.get(supplier.id, 1),
+                    latest_failed_file=latest_failed_import_files.get(supplier.id),
                 )
             )
             rows[-1]["has_quick_upload"] = supplier.id in active_price_mappings
@@ -2234,6 +2441,7 @@ class SupplierEmailImportStatusAllView(LoginRequiredMixin, View):
         _expire_stale_email_import_runs()
         suppliers = list(models.Supplier.objects.order_by("name"))
         latest_successful_imports = _collect_latest_successful_imports()
+        latest_failed_import_files = _collect_latest_failed_import_files()
         latest_runs, run_streaks = _collect_latest_runs_and_streaks()
         rows = {}
         for supplier in suppliers:
@@ -2242,6 +2450,7 @@ class SupplierEmailImportStatusAllView(LoginRequiredMixin, View):
                 successful_batch=latest_successful_imports.get(supplier.id),
                 latest_run=latest_runs.get(supplier.id),
                 streak_count=run_streaks.get(supplier.id, 1),
+                latest_failed_file=latest_failed_import_files.get(supplier.id),
             )
             rows[str(supplier.id)] = {
                 "is_running": row["is_running"],
@@ -2262,6 +2471,9 @@ class SupplierEmailImportStatusAllView(LoginRequiredMixin, View):
                 "health_class": row["health_class"],
                 "health_code": row["health_code"],
                 "health_note": row["health_note"],
+                "expected_at": row["expected_at"],
+                "file_summary": row["file_summary"],
+                "problem_note": row["problem_note"],
             }
         return JsonResponse(
             {

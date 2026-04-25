@@ -39,7 +39,7 @@ class Supplier(models.Model):
     price_subject_pattern = models.CharField(max_length=200, blank=True)
     price_filename_pattern = models.CharField(max_length=200, blank=True)
     email_search_days = models.PositiveIntegerField(default=7)
-    expected_import_interval_hours = models.PositiveIntegerField(default=72)
+    expected_import_interval_hours = models.PositiveIntegerField(default=24)
     notes = models.TextField(blank=True)
     last_email_check_at = models.DateTimeField(null=True, blank=True)
     last_email_matched = models.PositiveIntegerField(default=0)
@@ -222,6 +222,7 @@ class ImportBatch(models.Model):
     mailbox = models.ForeignKey(
         Mailbox, on_delete=models.SET_NULL, null=True, blank=True
     )
+    message_folder = models.CharField(max_length=255, blank=True)
     message_id = models.CharField(max_length=255, blank=True)
     received_at = models.DateTimeField(null=True, blank=True)
     status = models.CharField(
