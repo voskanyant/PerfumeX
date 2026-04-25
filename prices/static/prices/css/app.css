@@ -872,6 +872,8 @@ tr.is-selected-row > td {
   min-width: 120px;
 }
 
+.form-field,
+.select-field,
 .form-control,
 .form-select,
 .form-input,
@@ -890,6 +892,8 @@ select {
   transition: border-color var(--transition), box-shadow var(--transition);
 }
 
+.form-field:focus,
+.select-field:focus,
 .form-control:focus,
 .form-select:focus,
 .form-input:focus,

@@ -14,14 +14,14 @@
 
     document.querySelectorAll("input, textarea").forEach(function (el) {
         if (el.type === "checkbox" || el.type === "radio" || el.type === "hidden") return;
-        if (!el.classList.contains("form-control") && !el.classList.contains("form-select")) {
-            el.classList.add("form-control");
+        if (!el.classList.contains("form-field") && !el.classList.contains("select-field") && !el.classList.contains("form-control") && !el.classList.contains("form-select")) {
+            el.classList.add("form-field");
         }
     });
 
     document.querySelectorAll("select").forEach(function (el) {
-        if (!el.classList.contains("form-select")) {
-            el.classList.add("form-select");
+        if (!el.classList.contains("select-field") && !el.classList.contains("form-select")) {
+            el.classList.add("select-field");
         }
     });
 
