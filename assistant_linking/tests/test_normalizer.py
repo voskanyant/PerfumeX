@@ -500,6 +500,28 @@ class NormalizerTests(TestCase):
         self.assertIn("excluded garbage keyword: blotters", parsed.warnings)
         self.assertFalse(parsed.product_name_text)
 
+    def test_worn_russian_keyword_routes_to_garbage(self):
+        GlobalRule.objects.create(
+            title="Garbage keyword: worn",
+            rule_kind="garbage_keyword",
+            scope_type="global",
+            rule_text="потерт",
+            active=True,
+            approved=True,
+        )
+        product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="worn-russian",
+            name="GUERLAIN L'HEURE de NUIT edp 125 ml потертая",
+        )
+
+        parsed = parse_supplier_product(product)
+
+        self.assertEqual(parsed.modifiers, ["garbage"])
+        self.assertEqual(parsed.confidence, 100)
+        self.assertIn("excluded garbage keyword: потерт", parsed.warnings)
+        self.assertFalse(parsed.product_name_text)
+
     def test_custom_concentration_aliases_can_be_managed_in_database(self):
         brand = Brand.objects.create(name="Montale")
         BrandAlias.objects.create(brand=brand, alias_text="Montale", normalized_alias="montale")
