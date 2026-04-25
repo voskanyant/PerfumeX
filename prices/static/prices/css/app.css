@@ -606,7 +606,8 @@ tr.is-selected-row > td {
   gap: 20px;
 }
 
-.page-header {
+.page-header,
+.page-head {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -614,7 +615,9 @@ tr.is-selected-row > td {
   margin-bottom: 28px;
 }
 
-.page-header > div:last-child {
+.page-header > div:last-child,
+.page-head > div:last-child,
+.page-actions {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -661,6 +664,7 @@ tr.is-selected-row > td {
   gap: 0;
   border-bottom: 1px solid var(--grey-200);
   margin-bottom: 28px;
+  overflow-x: auto;
 }
 
 .tab,
@@ -680,6 +684,7 @@ tr.is-selected-row > td {
 .tab:hover,
 .import-tabs__link:hover { color: var(--black); }
 .tab.active,
+.tab.is-active,
 .import-tabs__link.is-active {
   color: var(--black);
   border-bottom-color: var(--black);
@@ -977,6 +982,12 @@ select:focus {
   box-shadow: var(--shadow-sm);
 }
 
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 0;
+}
+
 .table,
 table {
   width: 100%;
@@ -1096,6 +1107,12 @@ tbody td,
 .cell-imported.age-warn { color: var(--grey-400); }
 
 .actions-cell { display: flex; gap: 6px; align-items: center; }
+
+.table-empty-cell {
+  color: var(--grey-600);
+  text-align: center;
+  padding: 24px 16px;
+}
 
 .empty-state {
   border: 1px dashed var(--grey-200);

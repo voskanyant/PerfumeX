@@ -2,47 +2,37 @@
 {% block title %}Assistant Catalogue Brands{% endblock %}
 {% block topbar_label %}Assistant{% endblock %}
 {% block content %}
-<div class="page-head">
-    <div>
-        <span class="page-kicker">Catalogue</span>
-        <h1 class="page-title">Brands</h1>
-        <div class="page-meta">Clean brand names here before using them in normalisation.</div>
-    </div>
-    <div class="page-actions">
-        {% include "assistant_core/catalog/_nav.html" %}
-        <a class="button primary" href="{% url 'assistant_core:catalog_brand_create' %}">Add brand</a>
-    </div>
-</div>
+{% url 'assistant_core:catalog_brand_create' as create_url %}
+{% include "prices/components/page_header.html" with kicker="Catalogue" title="Brands" meta="Clean brand names here before using them in normalisation." primary_url=create_url primary_label="Add brand" %}
+{% include "assistant_core/catalog/_nav.html" %}
 <div class="workspace-block">
     <form method="get" class="search-wrap">
         <input type="text" name="q" value="{{ request.GET.q }}" placeholder="Search brands...">
         <button class="button ghost" type="submit">Search</button>
     </form>
-    <table class="data-table">
-        <thead><tr><th>Brand</th><th>Country</th><th>Perfumes</th><th>Status</th><th></th></tr></thead>
-        <tbody>
-        {% for brand in brands %}
-            <tr>
-                <td>{{ brand.name }}</td>
-                <td>{{ brand.country_of_origin|default:"" }}</td>
-                <td>{{ brand.perfume_count }}</td>
-                <td>{{ brand.is_active|yesno:"active,inactive" }}</td>
-                <td>
-                    <a class="button ghost" href="{% url 'assistant_core:catalog_brand_update' brand.pk %}">Edit</a>
-                    <a class="button ghost" href="{% url 'assistant_core:catalog_brand_delete' brand.pk %}">Delete</a>
-                </td>
-            </tr>
-        {% empty %}
-            <tr><td colspan="5">No brands yet.</td></tr>
-        {% endfor %}
-        </tbody>
-    </table>
-    {% if is_paginated %}
-        <div class="pagination">
-            {% if page_obj.has_previous %}<a class="button ghost" href="?q={{ request.GET.q|urlencode }}&page={{ page_obj.previous_page_number }}">Previous</a>{% endif %}
-            <span>Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
-            {% if page_obj.has_next %}<a class="button ghost" href="?q={{ request.GET.q|urlencode }}&page={{ page_obj.next_page_number }}">Next</a>{% endif %}
-        </div>
-    {% endif %}
+    <div class="table-wrap table-scroll-x">
+        <table class="table data-table">
+            <thead><tr><th>Brand</th><th>Country</th><th>Perfumes</th><th>Status</th><th>Actions</th></tr></thead>
+            <tbody>
+            {% for brand in brands %}
+                <tr>
+                    <td>{{ brand.name }}</td>
+                    <td>{{ brand.country_of_origin|default:"" }}</td>
+                    <td>{{ brand.perfume_count }}</td>
+                    <td>{{ brand.is_active|yesno:"active,inactive" }}</td>
+                    <td class="actions">
+                        <div class="layout-inline gap-sm">
+                            <a class="button ghost" href="{% url 'assistant_core:catalog_brand_update' brand.pk %}">Edit</a>
+                            <a class="button ghost" href="{% url 'assistant_core:catalog_brand_delete' brand.pk %}">Delete</a>
+                        </div>
+                    </td>
+                </tr>
+            {% empty %}
+                {% include "prices/components/table_empty.html" with colspan=5 message="No brands yet." %}
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% include "prices/components/pagination.html" with page_obj=page_obj class_name="space-top-md" label="Brand pagination" jump_id="brand-page-jump" %}
 </div>
 {% endblock %}

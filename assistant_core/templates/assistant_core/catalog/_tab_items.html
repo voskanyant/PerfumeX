@@ -1,0 +1,5 @@
+<a class="tab {% if request.resolver_match.url_name == 'our_product_list' %}active{% endif %}" href="{% url 'prices:our_product_list' %}">Perfumes</a>
+<a class="tab {% if request.resolver_match.url_name == 'catalog_brands' %}active{% endif %}" href="{% url 'assistant_core:catalog_brands' %}">Brands</a>
+<a class="tab {% if request.resolver_match.url_name == 'catalog_variants' %}active{% endif %}" href="{% url 'assistant_core:catalog_variants' %}">Variants</a>
+<a class="tab {% if request.resolver_match.url_name == 'catalog_import' %}active{% endif %}" href="{% url 'assistant_core:catalog_import' %}">Import</a>
+<a class="tab {% if request.resolver_match.url_name == 'catalog_cleanup' %}active{% endif %}" href="{% url 'assistant_core:catalog_cleanup' %}">Cleanup</a>
