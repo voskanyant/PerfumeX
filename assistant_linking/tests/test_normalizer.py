@@ -78,6 +78,7 @@ class NormalizerTests(TestCase):
         self.assertTrue(parsed.is_tester)
         self.assertEqual(parsed.supplier_gender_hint, "Pour Homme")
         self.assertEqual(parsed.normalized_brand, self.brand)
+        self.assertEqual(parsed.product_name_text, "light blue pour homme")
 
     def test_parses_decimal_ml_with_comma_or_dot(self):
         brand = Brand.objects.create(name="Tiziana Terenzi")
@@ -313,7 +314,24 @@ class NormalizerTests(TestCase):
         parsed = parse_supplier_product(product)
 
         self.assertEqual(parsed.supplier_gender_hint, "Pour Femme")
-        self.assertEqual(parsed.product_name_text, "light blue")
+        self.assertEqual(parsed.product_name_text, "light blue pour femme")
+
+    def test_pour_homme_stays_in_product_name_while_setting_audience(self):
+        brand = Brand.objects.create(name="Issey Miyake")
+        BrandAlias.objects.create(brand=brand, alias_text="Issey Miyake", normalized_alias="issey miyake")
+        product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="issey-pour-homme",
+            name="ISSEY MIYAKE L'EAU D'ISSEY POUR HOMME SHADES OF KOLAM 125ML EDT TESTER",
+        )
+
+        parsed = parse_supplier_product(product)
+
+        self.assertEqual(parsed.supplier_gender_hint, "Pour Homme")
+        self.assertEqual(parsed.product_name_text, "l'eau d'issey pour homme shades of kolam")
+        self.assertEqual(parsed.concentration, "Eau de Toilette")
+        self.assertEqual(parsed.size_ml, Decimal("125.00"))
+        self.assertTrue(parsed.is_tester)
 
     def test_explicit_edp_wins_over_catalogue_link_concentration(self):
         brand = Brand.objects.create(name="Trussardi")

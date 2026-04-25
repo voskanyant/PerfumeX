@@ -104,6 +104,7 @@ TRAVEL_TERMS = ("travel",)
 SET_TERMS = ("set", "набор", "coffret")
 NO_BOX_TERMS = ("no box", "without box", "без короб")
 GENDER_TERMS = tuple(alias for alias, _display, _group in DEFAULT_AUDIENCE_ALIASES)
+NAME_AUDIENCE_TERMS = ("pour femme", "femme", "donna", "pour homme", "homme", "uomo")
 REFILL_MODIFIER = "refill"
 MINI_MODIFIER = "mini"
 
@@ -301,6 +302,12 @@ def _strip_known_terms(text: str, terms: list[str]) -> str:
     for term in [normalize_text(term) for term in terms if term]:
         remaining = re.sub(rf"(^|\s){re.escape(term)}($|\s)", " ", remaining)
     return re.sub(r"\s+", " ", remaining).strip()
+
+
+def _audience_terms_to_strip(audience_aliases: tuple[tuple[str, str, str], ...]) -> list[str]:
+    preserved = {normalize_text(term) for term in NAME_AUDIENCE_TERMS}
+    terms = [*GENDER_TERMS, *(alias for alias, _display, _group in audience_aliases)]
+    return [term for term in terms if normalize_text(term) not in preserved]
 
 
 def _extract_size(text: str) -> tuple[Decimal | None, str, str]:
@@ -519,8 +526,7 @@ def parse_supplier_product(product: SupplierProduct) -> ParseResult:
             [
                 result.raw_size_text,
                 result.concentration,
-                *GENDER_TERMS,
-                *(alias for alias, _display, _group in audience_aliases),
+                *_audience_terms_to_strip(audience_aliases),
                 *tester_terms,
                 *sample_terms,
                 *travel_terms,
