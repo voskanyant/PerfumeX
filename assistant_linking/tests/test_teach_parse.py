@@ -260,6 +260,30 @@ class TeachParseTests(TestCase):
         self.assertEqual(form["concentration"].value(), "Extrait de Parfum")
         self.assertEqual(str(form["size_ml"].value()), "100")
 
+    def test_normalization_detail_prefills_teaching_from_strong_catalog_conflict(self):
+        brand = Brand.objects.create(name="12 Parfumeurs")
+        perfume = Perfume.objects.create(brand=brand, name="Malmaison", concentration="Extrait de Parfum")
+        PerfumeVariant.objects.create(perfume=perfume, size_ml="100", variant_type="standard")
+        BrandAlias.objects.create(
+            brand=brand,
+            alias_text="12 parfumeurs",
+            normalized_alias="12 parfumeurs",
+        )
+        product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="malmaison-candidate",
+            name="12 Parfumeurs Malmaison 100ml EDP",
+        )
+
+        response = self.client.get(reverse("assistant_linking:normalization_detail", args=[product.id]))
+
+        self.assertEqual(response.status_code, 200)
+        parsed = response.context["parsed"]
+        form = response.context["teach_form"]
+        self.assertEqual(parsed.concentration, "Eau de Parfum")
+        self.assertEqual(form["concentration"].value(), "Extrait de Parfum")
+        self.assertContains(response, "Catalogue match suggests Extrait de Parfum")
+
     def test_missing_brand_list_refreshes_stale_parse_before_render(self):
         product = SupplierProduct.objects.create(
             supplier=self.supplier,

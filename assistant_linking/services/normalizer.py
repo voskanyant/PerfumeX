@@ -38,10 +38,16 @@ DEFAULT_CONCENTRATION_ALIASES = (
 GENDER_ALIASES = (
     (r"\bpour homme\b|\bhomme\b|\buomo\b|\bmen\b|\bman\b", "men"),
     (r"\bpour femme\b|\bfemme\b|\bdonna\b|\bwomen\b|\bwoman\b|\blady\b", "women"),
-    (r"\bunisex\b", "unisex"),
+    (r"\bunisex\b|\bунисекс\b|\bуни\b", "unisex"),
 )
 
 MODIFIER_TERMS = ("intense", "elixir", "absolu", "eau intense", "extreme", "sport", "fraiche", "fraicheur")
+TESTER_TERMS = ("tester", "test", "тестер", "тест")
+SAMPLE_TERMS = ("sample", "пробник", "vial")
+TRAVEL_TERMS = ("travel", "мини", "mini")
+SET_TERMS = ("set", "набор", "coffret")
+NO_BOX_TERMS = ("no box", "without box", "без короб")
+GENDER_TERMS = ("pour homme", "homme", "uomo", "men", "man", "pour femme", "femme", "donna", "women", "woman", "lady", "unisex", "унисекс", "уни")
 
 
 @dataclass
@@ -99,8 +105,19 @@ def _contains_phrase(text: str, phrase: str) -> bool:
     return bool(re.search(rf"(^|\s){re.escape(phrase)}($|\s)", text))
 
 
+def _contains_any_phrase(text: str, terms: tuple[str, ...]) -> bool:
+    return any(_contains_phrase(text, term) for term in terms)
+
+
+def _strip_known_terms(text: str, terms: list[str]) -> str:
+    remaining = text
+    for term in [normalize_text(term) for term in terms if term]:
+        remaining = re.sub(rf"(^|\s){re.escape(term)}($|\s)", " ", remaining)
+    return re.sub(r"\s+", " ", remaining).strip()
+
+
 def _extract_size(text: str) -> tuple[Decimal | None, str, str]:
-    ml_match = re.search(r"\b(\d+(?:[.,]\d+)?)\s*(?:ml|мл)\b", text)
+    ml_match = re.search(r"\b(\d+(?:[.,]\d+)?)\s*(?:ml|мл|м\.л\.?)(?=\s|$)", text)
     if ml_match:
         raw = ml_match.group(0)
         value = Decimal(ml_match.group(1).replace(",", ".")).quantize(Decimal("0.01"))
@@ -189,12 +206,12 @@ def parse_supplier_product(product: SupplierProduct) -> ParseResult:
             result.supplier_gender_hint = value
             break
 
-    result.is_tester = bool(re.search(r"\btester\b|\bтестер\b|\btest\b", text))
-    result.is_sample = bool(re.search(r"\bsample\b|\bпробник\b|\bvial\b", text))
-    result.is_travel = bool(re.search(r"\btravel\b|\bмини\b|\bmini\b", text))
-    result.is_set = bool(re.search(r"\bset\b|\bнабор\b|\bcoffret\b", text))
-    result.packaging = "no_box" if re.search(r"\bno box\b|\bwithout box\b|\bбез короб", text) else ""
-    result.variant_type = "sample" if result.is_sample else ("travel" if result.is_travel else ("set" if result.is_set else "standard"))
+    result.is_tester = _contains_any_phrase(text, TESTER_TERMS)
+    result.is_sample = _contains_any_phrase(text, SAMPLE_TERMS)
+    result.is_travel = _contains_any_phrase(text, TRAVEL_TERMS)
+    result.is_set = _contains_any_phrase(text, SET_TERMS)
+    result.packaging = "no_box" if _contains_any_phrase(text, NO_BOX_TERMS) else ""
+    result.variant_type = "sample" if result.is_sample else ("travel" if result.is_travel else ("set" if result.is_set else ("tester" if result.is_tester else "standard")))
     result.modifiers = [term for term in MODIFIER_TERMS if re.search(rf"(^|\s){re.escape(term)}($|\s)", text)]
 
     alias, brand = _match_aliases(text, product.supplier_id)
@@ -251,9 +268,19 @@ def parse_supplier_product(product: SupplierProduct) -> ParseResult:
 
     if not result.product_name_text:
         remaining = text
-        for term in [result.raw_size_text, result.concentration, "tester", "sample", "travel", "set", "no box", "without box"]:
-            if term:
-                remaining = remaining.replace(term, " ")
+        remaining = _strip_known_terms(
+            remaining,
+            [
+                result.raw_size_text,
+                result.concentration,
+                *GENDER_TERMS,
+                *TESTER_TERMS,
+                *SAMPLE_TERMS,
+                *TRAVEL_TERMS,
+                *SET_TERMS,
+                *NO_BOX_TERMS,
+            ],
+        )
         result.product_name_text = re.sub(r"\s+", " ", remaining).strip()[:255]
 
     if not result.normalized_brand:

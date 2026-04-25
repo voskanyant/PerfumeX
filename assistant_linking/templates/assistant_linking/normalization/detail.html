@@ -34,7 +34,7 @@
         <p>{{ product.is_active|yesno:"active,inactive" }}</p>
     </div>
     <div class="workspace-block">
-        <h2 class="kpi-link-title">Parsed fields</h2>
+        <h2 class="kpi-link-title">Supplier parsed fields</h2>
         <p>Brand: {{ parsed.normalized_brand|default:parsed.detected_brand_text }}</p>
         <p>Name: {{ parsed.product_name_text }}</p>
         <p>{{ parsed.concentration }} &middot; {{ parsed.size_ml }} ml &middot; {{ parsed.supplier_gender_hint }}</p>
@@ -48,6 +48,11 @@
         {% empty %}
             <p>No warnings.</p>
         {% endfor %}
+        {% if suggested_catalog_candidate %}
+            <div class="flash flash--warning">
+                Catalogue match suggests {{ suggested_catalog_candidate.perfume.concentration }}. Supplier text parsed as {{ parsed.concentration }}.
+            </div>
+        {% endif %}
     </div>
 </div>
 

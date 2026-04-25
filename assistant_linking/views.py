@@ -301,6 +301,12 @@ class ParsedProductDetailView(StaffAssistantMixin, DetailView):
         parsed = save_parse(product)
         canonical_perfume = product.catalog_perfume
         canonical_variant = product.catalog_variant
+        catalog_candidates = candidate_matches(parsed)
+        suggested_candidate = None
+        if not canonical_perfume and catalog_candidates:
+            best_candidate = catalog_candidates[0]
+            if best_candidate.score >= 80 and "concentration differs" in best_candidate.conflicts:
+                suggested_candidate = best_candidate
         product_alias_text = parsed.product_name_text or product.name
         brand_alias_text = parsed.detected_brand_text or product.brand
         existing_alias = None
@@ -314,22 +320,24 @@ class ParsedProductDetailView(StaffAssistantMixin, DetailView):
             )
             existing_alias = alias_queryset.order_by("supplier_id", "priority").first()
         existing_blockers = existing_alias.excluded_terms if existing_alias else ""
+        teaching_perfume = canonical_perfume or (suggested_candidate.perfume if suggested_candidate else None)
+        teaching_variant = canonical_variant or (suggested_candidate.variant if suggested_candidate else None)
         teach_initial = {
             "supplier_brand_text": brand_alias_text,
-            "brand_name": canonical_perfume.brand.name if canonical_perfume else (parsed.normalized_brand.name if parsed.normalized_brand_id else parsed.detected_brand_text),
+            "brand_name": teaching_perfume.brand.name if teaching_perfume else (parsed.normalized_brand.name if parsed.normalized_brand_id else parsed.detected_brand_text),
             "supplier_product_text": product_alias_text,
-            "product_name": canonical_perfume.name if canonical_perfume else parsed.product_name_text,
+            "product_name": teaching_perfume.name if teaching_perfume else parsed.product_name_text,
             "product_excluded_terms": existing_blockers,
             "supplier_concentration_text": parsed.concentration,
-            "concentration": canonical_perfume.concentration if canonical_perfume else parsed.concentration,
+            "concentration": teaching_perfume.concentration if teaching_perfume else parsed.concentration,
             "supplier_size_text": parsed.raw_size_text or product.size,
-            "size_ml": canonical_variant.size_ml if canonical_variant and canonical_variant.size_ml else parsed.size_ml,
+            "size_ml": teaching_variant.size_ml if teaching_variant and teaching_variant.size_ml else parsed.size_ml,
             "supplier_audience_text": parsed.supplier_gender_hint,
-            "audience": canonical_perfume.audience if canonical_perfume and canonical_perfume.audience else parsed.supplier_gender_hint,
+            "audience": teaching_perfume.audience if teaching_perfume and teaching_perfume.audience else parsed.supplier_gender_hint,
             "supplier_type_text": parsed.variant_type,
-            "variant_type": canonical_variant.variant_type if canonical_variant and canonical_variant.variant_type else parsed.variant_type,
+            "variant_type": teaching_variant.variant_type if teaching_variant and teaching_variant.variant_type else parsed.variant_type,
             "supplier_packaging_text": parsed.packaging,
-            "packaging": canonical_variant.packaging if canonical_variant and canonical_variant.packaging else parsed.packaging,
+            "packaging": teaching_variant.packaging if teaching_variant and teaching_variant.packaging else parsed.packaging,
             "alias_scope": forms.ParseTeachingForm.SCOPE_GLOBAL,
             "lock_parse": True,
             "reparse_similar": False,
@@ -338,7 +346,8 @@ class ParsedProductDetailView(StaffAssistantMixin, DetailView):
             **super().get_context_data(**kwargs),
             "parsed": parsed,
             "teach_form": forms.ParseTeachingForm(initial=teach_initial),
-            "catalog_candidates": candidate_matches(parsed),
+            "catalog_candidates": catalog_candidates,
+            "suggested_catalog_candidate": suggested_candidate,
             "similar_rows": similar_supplier_rows(
                 product,
                 parsed,

@@ -1,3 +1,4 @@
+from django.core.cache import cache
 from django.test import TestCase
 
 from assistant_linking.models import BrandAlias, ConcentrationAlias, ProductAlias
@@ -8,6 +9,7 @@ from prices.models import Supplier, SupplierProduct
 
 class NormalizerTests(TestCase):
     def setUp(self):
+        cache.clear()
         self.supplier = Supplier.objects.create(name="Supplier", code="sup")
         self.brand = Brand.objects.create(name="Dolce Gabbana")
         BrandAlias.objects.create(brand=self.brand, alias_text="DG", normalized_alias="dg")
@@ -125,3 +127,29 @@ class NormalizerTests(TestCase):
 
         self.assertEqual(parsed.normalized_brand, brand)
         self.assertEqual(parsed.concentration, "Eau de Parfum")
+
+    def test_russian_concentration_tester_size_and_unisex_terms_are_normalized(self):
+        brand = Brand.objects.create(name="100 Bon")
+        BrandAlias.objects.create(brand=brand, alias_text="100 Bon", normalized_alias="100 bon")
+        ConcentrationAlias.objects.create(
+            concentration="Eau de Parfum",
+            alias_text="парфюмированная вода",
+            normalized_alias="парфюмированная вода",
+            priority=40,
+            active=True,
+        )
+        product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="ru-1",
+            name="100 Bon Ambre and Tonka парфюмированная вода тестер 50 м.л. уни",
+        )
+
+        parsed = parse_supplier_product(product)
+
+        self.assertEqual(parsed.normalized_brand, brand)
+        self.assertEqual(parsed.concentration, "Eau de Parfum")
+        self.assertEqual(parsed.size_ml, 50)
+        self.assertTrue(parsed.is_tester)
+        self.assertEqual(parsed.variant_type, "tester")
+        self.assertEqual(parsed.supplier_gender_hint, "unisex")
+        self.assertEqual(parsed.product_name_text, "ambre and tonka")
