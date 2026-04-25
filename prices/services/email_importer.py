@@ -1,6 +1,8 @@
 import email
+import csv
 import hashlib
 import imaplib
+import io
 import re
 import socket
 import ssl
@@ -16,6 +18,24 @@ from django.db.models import F
 
 from prices import models
 from prices.services.importer import process_import_file
+
+
+SUPPORTED_PRICE_EXTENSIONS = (".csv", ".xlsx", ".xls")
+IMAGE_EXTENSIONS = (".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".tiff")
+NON_PRICE_FILENAME_TERMS = (
+    "invoice",
+    "report",
+    "receipt",
+    "reconciliation",
+    "delivery",
+    "statement",
+    "сверка",
+    "наклад",
+    "накладная",
+    "акт",
+    "отчет",
+    "счет",
+)
 
 
 def _mailbox_host_candidates(mailbox):
@@ -68,6 +88,65 @@ def _infer_extension(content_type):
     if content_type in ("application/octet-stream",):
         return ".xlsx"
     return ""
+
+
+def _filename_extension(filename: str) -> str:
+    if "." not in (filename or ""):
+        return ""
+    return "." + filename.rsplit(".", 1)[-1].lower()
+
+
+def _is_non_price_filename(filename: str, content_type: str) -> bool:
+    lowered = (filename or "").lower()
+    if (content_type or "").lower().startswith("image/"):
+        return True
+    if _filename_extension(lowered) in IMAGE_EXTENSIONS:
+        return True
+    return any(term in lowered for term in NON_PRICE_FILENAME_TERMS)
+
+
+def _validate_spreadsheet_payload(filename: str, payload: bytes) -> tuple[bool, str]:
+    extension = _filename_extension(filename)
+    try:
+        if extension == ".csv":
+            sample = payload[:8192].decode("utf-8-sig", errors="ignore")
+            list(csv.reader(io.StringIO(sample)))
+            return True, ""
+        if extension == ".xlsx":
+            import openpyxl
+
+            workbook = openpyxl.load_workbook(
+                io.BytesIO(payload), data_only=True, read_only=True
+            )
+            try:
+                if not workbook.sheetnames:
+                    return False, "Workbook has no sheets."
+            finally:
+                workbook.close()
+            return True, ""
+        if extension == ".xls":
+            import xlrd
+
+            workbook = xlrd.open_workbook(file_contents=payload)
+            if workbook.nsheets < 1:
+                return False, "Workbook has no sheets."
+            return True, ""
+    except Exception as exc:
+        return False, str(exc)
+    return False, f"Unsupported file type: {extension or '-'}"
+
+
+def _reason_from_error(error: str) -> str:
+    lowered = (error or "").lower()
+    if "mapping is missing" in lowered or "mapping must include" in lowered:
+        return models.AttachmentReason.MAPPING_MISSING
+    if "no data rows parsed" in lowered:
+        return models.AttachmentReason.NO_ROWS_PARSED
+    if "too few products" in lowered:
+        return models.AttachmentReason.TOO_FEW_PRODUCTS
+    if "missing exchange rate" in lowered:
+        return models.AttachmentReason.MISSING_EXCHANGE_RATE
+    return models.AttachmentReason.PROCESSING_ERROR
 
 def _local_day_bounds(dt):
     """Return UTC bounds for the local calendar day of dt."""
@@ -455,6 +534,10 @@ def run_import(
         "messages_found": 0,
         "messages_scanned": 0,
         "remaining_backlog": 0,
+        "price_candidates": 0,
+        "skipped_files": 0,
+        "failed_files": 0,
+        "quarantined_files": 0,
     }
     if run_id:
         models.EmailImportRun.objects.filter(id=run_id).update(
@@ -487,6 +570,52 @@ def run_import(
                 detailed_log="\n".join(log_lines),
             )
         raise TimeoutError(msg)
+
+    def record_diagnostic(
+        *,
+        decision,
+        reason_code="",
+        message="",
+        mailbox=None,
+        folder="",
+        msg_id=None,
+        email_message_id="",
+        message_date=None,
+        sender="",
+        subject="",
+        filename="",
+        content_type="",
+        payload=None,
+        content_hash="",
+        supplier_obj=None,
+        batch=None,
+        import_file=None,
+    ):
+        size_bytes = len(payload or b"")
+        try:
+            return models.EmailAttachmentDiagnostic.objects.create(
+                run_id=run_id,
+                supplier=supplier_obj,
+                mailbox=mailbox,
+                import_batch=batch,
+                import_file=import_file,
+                message_folder=folder or "",
+                message_uid=_uid_display(msg_id) if msg_id is not None else "",
+                message_id=email_message_id or "",
+                message_date=message_date,
+                sender=sender or "",
+                subject=(subject or "")[:500],
+                filename=filename or "",
+                content_type=(content_type or "")[:200],
+                size_bytes=size_bytes,
+                content_hash=content_hash or "",
+                decision=decision,
+                reason_code=reason_code or "",
+                message=message or "",
+            )
+        except Exception as exc:
+            _log_line(f"Diagnostic write failed: {_short(exc, 160)}")
+            return None
 
     client = None
     try:
@@ -631,6 +760,12 @@ def run_import(
                         summary["remaining_backlog"] += backlog
                         _log_line(
                             f"{mailbox.name}: backlog remaining after this run={backlog}; processing oldest {limit}."
+                        )
+                        record_diagnostic(
+                            decision=models.AttachmentDecision.SKIPPED,
+                            reason_code=models.AttachmentReason.BACKLOG_REMAINING,
+                            message=f"{backlog} message(s) remain after this run.",
+                            mailbox=mailbox,
                         )
                     work_items = work_items[:limit]
                 else:
@@ -788,6 +923,20 @@ def run_import(
                             )
                         else:
                             summary["skipped_no_filename"] += 1
+                            summary["skipped_files"] += 1
+                            record_diagnostic(
+                                decision=models.AttachmentDecision.SKIPPED,
+                                reason_code=models.AttachmentReason.UNSUPPORTED_EXTENSION,
+                                message="Attachment has no filename.",
+                                mailbox=mailbox,
+                                folder=item_folder,
+                                msg_id=msg_id,
+                                email_message_id=message_id,
+                                message_date=received_at,
+                                sender=from_addr,
+                                subject=subject,
+                                content_type=content_type,
+                            )
                             _log_line(
                                 f"{mailbox.name}/{item_folder}: SKIP attachment in message {_uid_display(msg_id)} - no filename."
                             )
@@ -796,6 +945,21 @@ def run_import(
                     lowered_filename = filename.lower()
                     if blacklist_terms and any(term in lowered_filename for term in blacklist_terms):
                         summary["skipped_blacklist"] += 1
+                        summary["skipped_files"] += 1
+                        record_diagnostic(
+                            decision=models.AttachmentDecision.SKIPPED,
+                            reason_code=models.AttachmentReason.FILENAME_BLACKLISTED,
+                            message="Filename matched blacklist.",
+                            mailbox=mailbox,
+                            folder=item_folder,
+                            msg_id=msg_id,
+                            email_message_id=message_id,
+                            message_date=received_at,
+                            sender=from_addr,
+                            subject=subject,
+                            filename=filename,
+                            content_type=content_type,
+                        )
                         _log_line(
                             f"{mailbox.name}: SKIP '{filename}' - blacklist match."
                         )
@@ -808,8 +972,95 @@ def run_import(
                     payload = part.get_payload(decode=True)
                     if not payload:
                         summary["skipped_no_payload"] += 1
+                        summary["skipped_files"] += 1
+                        record_diagnostic(
+                            decision=models.AttachmentDecision.SKIPPED,
+                            reason_code=models.AttachmentReason.EMPTY_PAYLOAD,
+                            message="Attachment payload is empty.",
+                            mailbox=mailbox,
+                            folder=item_folder,
+                            msg_id=msg_id,
+                            email_message_id=message_id,
+                            message_date=received_at,
+                            sender=from_addr,
+                            subject=subject,
+                            filename=filename,
+                            content_type=content_type,
+                        )
                         _log_line(
                             f"{mailbox.name}: SKIP '{filename}' - empty payload."
+                        )
+                        continue
+
+                    lower_name = filename.lower()
+                    extension = _filename_extension(lower_name)
+                    content_hash = hashlib.sha256(payload).hexdigest()
+                    if _is_non_price_filename(filename, content_type):
+                        summary["skipped_files"] += 1
+                        record_diagnostic(
+                            decision=models.AttachmentDecision.SKIPPED,
+                            reason_code=models.AttachmentReason.INVOICE_OR_REPORT,
+                            message="Attachment looks like an invoice, report, image, or non-price document.",
+                            mailbox=mailbox,
+                            folder=item_folder,
+                            msg_id=msg_id,
+                            email_message_id=message_id,
+                            message_date=received_at,
+                            sender=from_addr,
+                            subject=subject,
+                            filename=filename,
+                            content_type=content_type,
+                            payload=payload,
+                            content_hash=content_hash,
+                        )
+                        _log_line(
+                            f"{mailbox.name}: SKIP '{filename}' - invoice/report/image classifier."
+                        )
+                        continue
+                    if extension not in SUPPORTED_PRICE_EXTENSIONS:
+                        summary["skipped_unsupported_extension"] += 1
+                        summary["skipped_files"] += 1
+                        record_diagnostic(
+                            decision=models.AttachmentDecision.SKIPPED,
+                            reason_code=models.AttachmentReason.UNSUPPORTED_EXTENSION,
+                            message=f"Unsupported file type: {extension or '-'}",
+                            mailbox=mailbox,
+                            folder=item_folder,
+                            msg_id=msg_id,
+                            email_message_id=message_id,
+                            message_date=received_at,
+                            sender=from_addr,
+                            subject=subject,
+                            filename=filename,
+                            content_type=content_type,
+                            payload=payload,
+                            content_hash=content_hash,
+                        )
+                        _log_line(
+                            f"{mailbox.name}: SKIP '{filename}' - unsupported extension for price import."
+                        )
+                        continue
+                    readable, readable_error = _validate_spreadsheet_payload(filename, payload)
+                    if not readable:
+                        summary["skipped_files"] += 1
+                        record_diagnostic(
+                            decision=models.AttachmentDecision.SKIPPED,
+                            reason_code=models.AttachmentReason.WORKBOOK_UNREADABLE,
+                            message=f"Spreadsheet could not be opened: {_short(readable_error, 220)}",
+                            mailbox=mailbox,
+                            folder=item_folder,
+                            msg_id=msg_id,
+                            email_message_id=message_id,
+                            message_date=received_at,
+                            sender=from_addr,
+                            subject=subject,
+                            filename=filename,
+                            content_type=content_type,
+                            payload=payload,
+                            content_hash=content_hash,
+                        )
+                        _log_line(
+                            f"{mailbox.name}: SKIP '{filename}' - unreadable workbook: {_short(readable_error, 180)}"
                         )
                         continue
 
@@ -825,6 +1076,24 @@ def run_import(
                             filename,
                             has_rules_for_mailbox,
                         ):
+                            summary["skipped_files"] += 1
+                            record_diagnostic(
+                                decision=models.AttachmentDecision.SKIPPED,
+                                reason_code=models.AttachmentReason.SENDER_NOT_MATCHED,
+                                message="Spreadsheet did not match this supplier sender/subject/filename pattern.",
+                                mailbox=mailbox,
+                                folder=item_folder,
+                                msg_id=msg_id,
+                                email_message_id=message_id,
+                                message_date=received_at,
+                                sender=from_addr,
+                                subject=subject,
+                                filename=filename,
+                                content_type=content_type,
+                                payload=payload,
+                                content_hash=content_hash,
+                                supplier_obj=supplier,
+                            )
                             continue
                         matched_supplier = supplier
                     else:
@@ -846,6 +1115,22 @@ def run_import(
                                 _log_line(
                                     f"{mailbox.name}: UNMATCHED '{filename}' from={_short(from_addr, 80)} subject='{_short(subject, 100)}'."
                                 )
+                            record_diagnostic(
+                                decision=models.AttachmentDecision.SKIPPED,
+                                reason_code=models.AttachmentReason.SENDER_NOT_MATCHED,
+                                message="Spreadsheet did not match any active supplier sender/subject/filename pattern.",
+                                mailbox=mailbox,
+                                folder=item_folder,
+                                msg_id=msg_id,
+                                email_message_id=message_id,
+                                message_date=received_at,
+                                sender=from_addr,
+                                subject=subject,
+                                filename=filename,
+                                content_type=content_type,
+                                payload=payload,
+                                content_hash=content_hash,
+                            )
                             continue
                     summary["matched_files"] += 1
                     _log_line(
@@ -878,23 +1163,9 @@ def run_import(
                     )
                     stats["matched"] = stats.get("matched", 0) + 1
 
-                    if file_kind == models.FileKind.PRICE:
-                        lower_name = filename.lower()
-                        if not lower_name.endswith((".csv", ".xlsx", ".xls")):
-                            if run_id:
-                                models.EmailImportRun.objects.filter(id=run_id).update(
-                                    last_message=f"Skipped unsupported file: {filename}"
-                                )
-                            summary["skipped_unsupported_extension"] += 1
-                            _log_line(
-                                f"{mailbox.name}: SKIP '{filename}' - unsupported extension for price import."
-                            )
-                            last_message = f"Skipped unsupported file: {filename}"
-                            stats["skipped"] = stats.get("skipped", 0) + 1
-                            continue
                     valid_attachment_processed = True
 
-                    content_hash = hashlib.sha256(payload).hexdigest()
+                    summary["price_candidates"] += 1
                     if dedupe_same_day_only and received_at:
                         day_start_utc, day_end_utc = _local_day_window_bounds(
                             received_at, dedupe_day_window
@@ -922,8 +1193,26 @@ def run_import(
                         ).exists()
                     if exists:
                         summary["skipped_duplicates"] += 1
+                        summary["skipped_files"] += 1
                         _log_line(
                             f"{mailbox.name}: SKIP duplicate '{filename}' (supplier={matched_supplier.name}, hash={content_hash[:10]}...)."
+                        )
+                        record_diagnostic(
+                            decision=models.AttachmentDecision.DUPLICATE,
+                            reason_code=models.AttachmentReason.DUPLICATE_HASH,
+                            message="Duplicate price attachment hash.",
+                            mailbox=mailbox,
+                            folder=item_folder,
+                            msg_id=msg_id,
+                            email_message_id=message_id,
+                            message_date=received_at,
+                            sender=from_addr,
+                            subject=subject,
+                            filename=filename,
+                            content_type=content_type,
+                            payload=payload,
+                            content_hash=content_hash,
+                            supplier_obj=matched_supplier,
                         )
                         if run_id:
                             models.EmailImportRun.objects.filter(id=run_id).update(
@@ -972,18 +1261,68 @@ def run_import(
                             )
                         batch_by_supplier[matched_supplier.id] = batch
 
+                    mapping = models.SupplierFileMapping.objects.filter(
+                        supplier=matched_supplier,
+                        file_kind=file_kind,
+                        is_active=True,
+                    ).order_by("-id").first()
                     import_file = models.ImportFile.objects.create(
                         import_batch=batch,
-                        mapping=models.SupplierFileMapping.objects.filter(
-                            supplier=matched_supplier,
-                            file_kind=file_kind,
-                            is_active=True,
-                        ).order_by("-id").first(),
+                        mapping=mapping,
                         file_kind=file_kind,
                         filename=filename,
                         content_hash=content_hash,
                         status=models.ImportStatus.PENDING,
                     )
+                    if not mapping and file_kind == models.FileKind.PRICE:
+                        import_file.storage_type = models.ImportFileStorage.QUARANTINE
+                        import_file.status = models.ImportStatus.FAILED
+                        import_file.reason_code = models.AttachmentReason.MAPPING_MISSING
+                        import_file.quarantine_until = timezone.now() + timezone.timedelta(
+                            days=int(settings_obj.quarantine_retention_days or 30)
+                        )
+                        import_file.file.save(filename, ContentFile(payload), save=True)
+                        import_file.save(
+                            update_fields=[
+                                "storage_type",
+                                "status",
+                                "reason_code",
+                                "quarantine_until",
+                            ]
+                        )
+                        batch.status = models.ImportStatus.FAILED
+                        batch.error_message = "Mapping is missing."
+                        batch.save(update_fields=["status", "error_message"])
+                        summary["errors"] += 1
+                        summary["failed_files"] += 1
+                        summary["quarantined_files"] += 1
+                        stats["errors"] = stats.get("errors", 0) + 1
+                        stats["last_message"] = "Mapping is missing."
+                        record_diagnostic(
+                            decision=models.AttachmentDecision.QUARANTINED,
+                            reason_code=models.AttachmentReason.MAPPING_MISSING,
+                            message="Mapping is missing.",
+                            mailbox=mailbox,
+                            folder=item_folder,
+                            msg_id=msg_id,
+                            email_message_id=message_id,
+                            message_date=received_at,
+                            sender=from_addr,
+                            subject=subject,
+                            filename=filename,
+                            content_type=content_type,
+                            payload=payload,
+                            content_hash=content_hash,
+                            supplier_obj=matched_supplier,
+                            batch=batch,
+                            import_file=import_file,
+                        )
+                        if run_id:
+                            models.EmailImportRun.objects.filter(id=run_id).update(
+                                errors=F("errors") + 1,
+                                last_message="Mapping is missing.",
+                            )
+                        continue
                     import_file.file.save(filename, ContentFile(payload), save=True)
                     _log_line(
                         f"{mailbox.name}: PROCESS file='{filename}' supplier='{matched_supplier.name}' kind={file_kind} import_file_id={import_file.id}."
@@ -997,21 +1336,82 @@ def run_import(
                         _log_line(
                             f"{mailbox.name}: OK file='{filename}' supplier='{matched_supplier.name}' import_file_id={import_file.id}."
                         )
+                        record_diagnostic(
+                            decision=models.AttachmentDecision.IMPORTED,
+                            message="Price file imported successfully.",
+                            mailbox=mailbox,
+                            folder=item_folder,
+                            msg_id=msg_id,
+                            email_message_id=message_id,
+                            message_date=received_at,
+                            sender=from_addr,
+                            subject=subject,
+                            filename=filename,
+                            content_type=content_type,
+                            payload=payload,
+                            content_hash=content_hash,
+                            supplier_obj=matched_supplier,
+                            batch=batch,
+                            import_file=import_file,
+                        )
                         stats["processed"] = stats.get("processed", 0) + 1
                         if run_id:
                             models.EmailImportRun.objects.filter(id=run_id).update(
                                 processed_files=F("processed_files") + 1
                             )
                     except Exception as exc:
+                        reason_code = _reason_from_error(str(exc))
+                        try:
+                            if import_file.file:
+                                import_file.file.delete(save=False)
+                        except Exception as delete_exc:
+                            _log_line(
+                                f"{mailbox.name}: failed to remove permanent file before quarantine: {_short(delete_exc, 180)}"
+                            )
+                        import_file.storage_type = models.ImportFileStorage.QUARANTINE
                         import_file.status = models.ImportStatus.FAILED
+                        import_file.reason_code = reason_code
+                        import_file.quarantine_until = timezone.now() + timezone.timedelta(
+                            days=int(settings_obj.quarantine_retention_days or 30)
+                        )
                         import_file.error_message = str(exc)
-                        import_file.save(update_fields=["status", "error_message"])
+                        import_file.file.save(filename, ContentFile(payload), save=True)
+                        import_file.save(
+                            update_fields=[
+                                "storage_type",
+                                "status",
+                                "reason_code",
+                                "quarantine_until",
+                                "error_message",
+                            ]
+                        )
                         batch.status = models.ImportStatus.FAILED
                         batch.error_message = str(exc)
                         batch.save(update_fields=["status", "error_message"])
                         summary["errors"] += 1
+                        summary["failed_files"] += 1
+                        summary["quarantined_files"] += 1
                         _log_line(
                             f"{mailbox.name}: FAIL file='{filename}' supplier='{matched_supplier.name}' import_file_id={import_file.id} error={_short(exc, 260)}"
+                        )
+                        record_diagnostic(
+                            decision=models.AttachmentDecision.QUARANTINED,
+                            reason_code=reason_code,
+                            message=str(exc),
+                            mailbox=mailbox,
+                            folder=item_folder,
+                            msg_id=msg_id,
+                            email_message_id=message_id,
+                            message_date=received_at,
+                            sender=from_addr,
+                            subject=subject,
+                            filename=filename,
+                            content_type=content_type,
+                            payload=payload,
+                            content_hash=content_hash,
+                            supplier_obj=matched_supplier,
+                            batch=batch,
+                            import_file=import_file,
                         )
                         stats["errors"] = stats.get("errors", 0) + 1
                         if run_id:
@@ -1098,7 +1498,9 @@ def run_import(
         elif not timed_out:
             final_message = (
                 f"Imported {summary['processed_files']} of {summary['matched_files']} matched file(s); "
-                f"duplicates {summary['skipped_duplicates']}, errors {summary['errors']}, "
+                f"duplicates {summary['skipped_duplicates']}, skipped {summary['skipped_files']}, "
+                f"failed {summary['failed_files']}, quarantined {summary['quarantined_files']}, "
+                f"errors {summary['errors']}, "
                 f"remaining backlog {summary['remaining_backlog']}."
             )
             models.EmailImportRun.objects.filter(id=run_id).update(
@@ -1130,6 +1532,10 @@ def run_import(
             f"no_payload={summary['skipped_no_payload']} "
             f"blacklist={summary['skipped_blacklist']} "
             f"unsupported_ext={summary['skipped_unsupported_extension']} "
+            f"price_candidates={summary['price_candidates']} "
+            f"skipped={summary['skipped_files']} "
+            f"failed={summary['failed_files']} "
+            f"quarantined={summary['quarantined_files']} "
             f"remaining_backlog={summary['remaining_backlog']}",
         )
     if run_id:

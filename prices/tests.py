@@ -1,14 +1,26 @@
+import io
+import shutil
+import tempfile
 from datetime import datetime, timedelta
+from pathlib import Path
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
+from django.core.files.base import ContentFile
+from django.core.management import call_command
 from django.test import TestCase
+from django.test.utils import override_settings
 from django.urls import reverse
 from django.utils import timezone
 
 from catalog.models import Brand, Perfume, PerfumeVariant
 from prices import models
 from prices.management.commands.import_emails import _get_supplier_latest_batch_time
+from prices.services.email_importer import (
+    _is_non_price_filename,
+    _reason_from_error,
+    _validate_spreadsheet_payload,
+)
 from prices.views import (
     _batch_activity_datetime,
     _build_supplier_board_row,
@@ -241,6 +253,185 @@ class SupplierImportBoundaryTests(TestCase):
 
         self.assertEqual(row["health_code"], "fresh")
         self.assertIn("Mon", row["health_note"])
+
+    def test_supplier_board_surfaces_latest_attachment_diagnostic(self):
+        diagnostic = models.EmailAttachmentDiagnostic.objects.create(
+            supplier=self.supplier,
+            mailbox=self.mailbox,
+            message_folder="INBOX",
+            message_uid="123",
+            sender="supplier@example.com",
+            subject="price",
+            filename="bad.xlsx",
+            decision=models.AttachmentDecision.QUARANTINED,
+            reason_code=models.AttachmentReason.MAPPING_MISSING,
+            message="Mapping is missing.",
+        )
+
+        row = _build_supplier_board_row(
+            supplier=self.supplier,
+            successful_batch=None,
+            latest_run=None,
+            latest_diagnostic=diagnostic,
+        )
+
+        self.assertEqual(row["latest_reason_code"], models.AttachmentReason.MAPPING_MISSING)
+        self.assertEqual(row["source_mailbox_folder"], "supplier-mailbox/INBOX")
+        self.assertIn("bad.xlsx", row["problem_note"])
+        self.assertIn("Mapping is missing", row["problem_note"])
+
+
+class ImportAttachmentPreflightTests(TestCase):
+    def test_non_price_classifier_rejects_images_invoices_and_reports(self):
+        self.assertTrue(_is_non_price_filename("photo.png", "image/png"))
+        self.assertTrue(_is_non_price_filename("invoice_123.xlsx", "application/vnd.ms-excel"))
+        self.assertTrue(_is_non_price_filename("акт сверки.xls", "application/vnd.ms-excel"))
+        self.assertFalse(_is_non_price_filename("price_24_04.csv", "text/csv"))
+
+    def test_spreadsheet_payload_validation_accepts_csv_and_rejects_bad_xlsx(self):
+        valid, error = _validate_spreadsheet_payload("price.csv", b"name,price\nA,10\n")
+        self.assertTrue(valid)
+        self.assertEqual(error, "")
+
+        valid, error = _validate_spreadsheet_payload("price.xlsx", b"not a workbook")
+        self.assertFalse(valid)
+        self.assertTrue(error)
+
+    def test_processing_errors_map_to_structured_reason_codes(self):
+        self.assertEqual(
+            _reason_from_error("Mapping is missing."),
+            models.AttachmentReason.MAPPING_MISSING,
+        )
+        self.assertEqual(
+            _reason_from_error("Too few products parsed: expected at least 100."),
+            models.AttachmentReason.TOO_FEW_PRODUCTS,
+        )
+        self.assertEqual(
+            _reason_from_error("Something unexpected"),
+            models.AttachmentReason.PROCESSING_ERROR,
+        )
+
+
+class ImportMediaHygieneTests(TestCase):
+    def setUp(self):
+        self.temp_media = tempfile.mkdtemp()
+        self.settings_override = override_settings(MEDIA_ROOT=self.temp_media)
+        self.settings_override.enable()
+        self.supplier = models.Supplier.objects.create(name="Media Supplier", code="media-supplier")
+        self.mailbox = models.Mailbox.objects.create(
+            name="media-mailbox",
+            host="imap.example.com",
+            username="media@example.com",
+            password="secret",
+        )
+        self.batch = models.ImportBatch.objects.create(
+            supplier=self.supplier,
+            mailbox=self.mailbox,
+            message_id="<media@example.com>",
+            status=models.ImportStatus.PENDING,
+        )
+
+    def tearDown(self):
+        self.settings_override.disable()
+        shutil.rmtree(self.temp_media, ignore_errors=True)
+
+    def test_successful_and_quarantined_files_use_separate_media_roots(self):
+        permanent = models.ImportFile.objects.create(
+            import_batch=self.batch,
+            file_kind=models.FileKind.PRICE,
+            filename="price.csv",
+            content_hash="hash-permanent",
+            status=models.ImportStatus.PROCESSED,
+        )
+        permanent.file.save("price.csv", ContentFile(b"name,price\nA,10\n"), save=True)
+
+        quarantined = models.ImportFile.objects.create(
+            import_batch=self.batch,
+            file_kind=models.FileKind.PRICE,
+            filename="bad.csv",
+            content_hash="hash-quarantine",
+            storage_type=models.ImportFileStorage.QUARANTINE,
+            status=models.ImportStatus.FAILED,
+            reason_code=models.AttachmentReason.MAPPING_MISSING,
+            quarantine_until=timezone.now() + timedelta(days=30),
+        )
+        quarantined.file.save("bad.csv", ContentFile(b"name,price\nA,10\n"), save=True)
+
+        self.assertTrue(permanent.file.name.startswith("imports/"))
+        self.assertTrue(quarantined.file.name.startswith("imports_quarantine/"))
+
+    def test_cleanup_import_media_deletes_expired_quarantine_files(self):
+        quarantined = models.ImportFile.objects.create(
+            import_batch=self.batch,
+            file_kind=models.FileKind.PRICE,
+            filename="expired.csv",
+            content_hash="hash-expired",
+            storage_type=models.ImportFileStorage.QUARANTINE,
+            status=models.ImportStatus.FAILED,
+            reason_code=models.AttachmentReason.PROCESSING_ERROR,
+            quarantine_until=timezone.now() - timedelta(days=1),
+        )
+        quarantined.file.save("expired.csv", ContentFile(b"name,price\nA,10\n"), save=True)
+        saved_path = quarantined.file.path
+
+        out = io.StringIO()
+        call_command("cleanup_import_media", "--delete", stdout=out)
+
+        quarantined.refresh_from_db()
+        self.assertFalse(quarantined.file)
+        self.assertFalse(Path(saved_path).exists())
+        self.assertIn("deleted: 1", out.getvalue())
+
+
+class ImportDiagnosticsPageTests(TestCase):
+    def setUp(self):
+        user = get_user_model().objects.create_user(
+            username="diagnostics-staff",
+            password="password",
+            is_staff=True,
+        )
+        self.client.force_login(user)
+        self.supplier = models.Supplier.objects.create(name="Diagnostic Supplier")
+        self.mailbox = models.Mailbox.objects.create(
+            name="diagnostic-mailbox",
+            host="imap.example.com",
+            username="diagnostic@example.com",
+            password="secret",
+        )
+        models.EmailAttachmentDiagnostic.objects.create(
+            supplier=self.supplier,
+            mailbox=self.mailbox,
+            message_folder="INBOX",
+            sender="supplier@example.com",
+            subject="daily price",
+            filename="daily-price.xlsx",
+            decision=models.AttachmentDecision.QUARANTINED,
+            reason_code=models.AttachmentReason.MAPPING_MISSING,
+            message="Mapping is missing.",
+            size_bytes=1234,
+        )
+
+    def test_detailed_logs_page_renders_attachment_decisions_and_filters(self):
+        response = self.client.get(
+            reverse("prices:import_detailed_logs"),
+            {
+                "supplier": str(self.supplier.id),
+                "reason": models.AttachmentReason.MAPPING_MISSING,
+                "filename": "daily",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Attachment decisions")
+        self.assertContains(response, "daily-price.xlsx")
+        self.assertContains(response, "mapping_missing")
+
+    def test_supplier_overview_renders_diagnostic_problem_text(self):
+        response = self.client.get(reverse("prices:supplier_overview"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "daily-price.xlsx")
+        self.assertContains(response, "Mapping is missing")
 
 
 class HiddenProductKeywordTests(TestCase):

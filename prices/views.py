@@ -370,6 +370,61 @@ def _collect_latest_failed_import_files() -> dict[int, models.ImportFile]:
     return latest
 
 
+def _collect_latest_attachment_diagnostics() -> dict[int, models.EmailAttachmentDiagnostic]:
+    diagnostics = (
+        models.EmailAttachmentDiagnostic.objects.select_related("supplier")
+        .filter(supplier__isnull=False)
+        .order_by("-created_at", "-id")
+    )
+    latest: dict[int, models.EmailAttachmentDiagnostic] = {}
+    for diagnostic in diagnostics:
+        supplier_id = diagnostic.supplier_id
+        if supplier_id not in latest:
+            latest[supplier_id] = diagnostic
+    return latest
+
+
+def _collect_attachment_diagnostic_summaries() -> dict[int, dict[str, int]]:
+    diagnostics = models.EmailAttachmentDiagnostic.objects.filter(supplier__isnull=False)
+    summaries: dict[int, dict[str, int]] = {}
+    for supplier_id, decision, reason_code in diagnostics.values_list(
+        "supplier_id", "decision", "reason_code"
+    ):
+        bucket = summaries.setdefault(
+            supplier_id,
+            {
+                "price_candidates": 0,
+                "imported": 0,
+                "duplicates": 0,
+                "skipped": 0,
+                "failed": 0,
+                "quarantined": 0,
+                "backlog": 0,
+            },
+        )
+        if decision in {
+            models.AttachmentDecision.IMPORTED,
+            models.AttachmentDecision.DUPLICATE,
+            models.AttachmentDecision.FAILED,
+            models.AttachmentDecision.QUARANTINED,
+        }:
+            bucket["price_candidates"] += 1
+        if decision == models.AttachmentDecision.IMPORTED:
+            bucket["imported"] += 1
+        elif decision == models.AttachmentDecision.DUPLICATE:
+            bucket["duplicates"] += 1
+        elif decision == models.AttachmentDecision.SKIPPED:
+            bucket["skipped"] += 1
+        elif decision == models.AttachmentDecision.FAILED:
+            bucket["failed"] += 1
+        elif decision == models.AttachmentDecision.QUARANTINED:
+            bucket["failed"] += 1
+            bucket["quarantined"] += 1
+        if reason_code == models.AttachmentReason.BACKLOG_REMAINING:
+            bucket["backlog"] += 1
+    return summaries
+
+
 def _collect_active_price_mappings() -> dict[int, models.SupplierFileMapping]:
     mappings = (
         models.SupplierFileMapping.objects.filter(
@@ -760,7 +815,13 @@ def _supplier_log_url(supplier_id: int, run=None, batch=None) -> str:
     return f"{base_url}?{query}{anchor}"
 
 
-def _summarize_latest_files(supplier, latest_run) -> str:
+def _attachment_reason_label(reason_code: str, decision: str = "") -> str:
+    reason_labels = dict(models.AttachmentReason.choices)
+    decision_labels = dict(models.AttachmentDecision.choices)
+    return reason_labels.get(reason_code) or decision_labels.get(decision) or "Attachment decision"
+
+
+def _summarize_latest_files(supplier, latest_run, diagnostic_summary=None) -> str:
     if latest_run:
         parts = [
             f"matched {latest_run.matched_files}",
@@ -771,6 +832,19 @@ def _summarize_latest_files(supplier, latest_run) -> str:
         if latest_run.errors:
             parts.append(f"failed {latest_run.errors}")
         return " / ".join(parts)
+    if diagnostic_summary:
+        parts = [
+            f"candidates {diagnostic_summary.get('price_candidates', 0)}",
+            f"imported {diagnostic_summary.get('imported', 0)}",
+            f"duplicates {diagnostic_summary.get('duplicates', 0)}",
+            f"skipped {diagnostic_summary.get('skipped', 0)}",
+            f"failed {diagnostic_summary.get('failed', 0)}",
+        ]
+        if diagnostic_summary.get("quarantined"):
+            parts.append(f"quarantine {diagnostic_summary.get('quarantined', 0)}")
+        if diagnostic_summary.get("backlog"):
+            parts.append("backlog")
+        return " / ".join(parts)
     if supplier.last_email_check_at:
         return (
             f"matched {supplier.last_email_matched} / "
@@ -780,7 +854,16 @@ def _summarize_latest_files(supplier, latest_run) -> str:
     return "No check yet"
 
 
-def _build_problem_note(supplier, latest_check, health, latest_failed_file=None) -> str:
+def _build_problem_note(supplier, latest_check, health, latest_failed_file=None, latest_diagnostic=None) -> str:
+    if latest_diagnostic and latest_diagnostic.decision != models.AttachmentDecision.IMPORTED:
+        message = (latest_diagnostic.message or "").strip()
+        filename = latest_diagnostic.filename or "attachment"
+        reason = _attachment_reason_label(
+            latest_diagnostic.reason_code, latest_diagnostic.decision
+        )
+        if message:
+            return f"{filename}: {reason} - {message[:160]}"
+        return f"{filename}: {reason}"
     if latest_failed_file:
         filename = latest_failed_file.filename or "file"
         error = (latest_failed_file.error_message or "").strip()
@@ -797,13 +880,23 @@ def _build_problem_note(supplier, latest_check, health, latest_failed_file=None)
     return str(health.get("note") or "")
 
 
-def _build_supplier_board_row(supplier, successful_batch, latest_run, streak_count: int = 1, latest_failed_file=None) -> dict[str, object]:
+def _build_supplier_board_row(
+    supplier,
+    successful_batch,
+    latest_run,
+    streak_count: int = 1,
+    latest_failed_file=None,
+    latest_diagnostic=None,
+    diagnostic_summary=None,
+) -> dict[str, object]:
     last_import = _build_last_import_info(successful_batch)
     latest_check = _build_latest_check_info(supplier, latest_run, streak_count)
     latest_check = _clarify_latest_check_with_last_success(latest_check, last_import)
     health = _build_business_health_info(supplier, last_import, latest_check, streak_count)
-    file_summary = _summarize_latest_files(supplier, latest_run)
-    problem_note = _build_problem_note(supplier, latest_check, health, latest_failed_file)
+    file_summary = _summarize_latest_files(supplier, latest_run, diagnostic_summary)
+    problem_note = _build_problem_note(
+        supplier, latest_check, health, latest_failed_file, latest_diagnostic
+    )
     return {
         "supplier": supplier,
         "has_email_route": bool(supplier.from_address_pattern),
@@ -832,6 +925,13 @@ def _build_supplier_board_row(supplier, successful_batch, latest_run, streak_cou
         "file_summary": file_summary,
         "problem_note": problem_note,
         "latest_log_url": _supplier_log_url(supplier.id, run=latest_run, batch=successful_batch),
+        "latest_reason_code": getattr(latest_diagnostic, "reason_code", "") if latest_diagnostic else "",
+        "source_mailbox_folder": (
+            f"{latest_diagnostic.mailbox.name if latest_diagnostic.mailbox else ''}"
+            f"/{latest_diagnostic.message_folder or ''}"
+            if latest_diagnostic
+            else ""
+        ).strip("/"),
     }
 
 
@@ -1413,6 +1513,8 @@ class SupplierOverviewView(LoginRequiredMixin, TemplateView):
         suppliers = list(models.Supplier.objects.order_by("name"))
         latest_successful_imports = _collect_latest_successful_imports()
         latest_failed_import_files = _collect_latest_failed_import_files()
+        latest_attachment_diagnostics = _collect_latest_attachment_diagnostics()
+        attachment_diagnostic_summaries = _collect_attachment_diagnostic_summaries()
         active_price_mappings = _collect_active_price_mappings()
         _expire_stale_email_import_runs()
         latest_runs, run_streaks = _collect_latest_runs_and_streaks()
@@ -1508,6 +1610,8 @@ class SupplierOverviewView(LoginRequiredMixin, TemplateView):
                     latest_run=latest_runs.get(supplier.id),
                     streak_count=run_streaks.get(supplier.id, 1),
                     latest_failed_file=latest_failed_import_files.get(supplier.id),
+                    latest_diagnostic=latest_attachment_diagnostics.get(supplier.id),
+                    diagnostic_summary=attachment_diagnostic_summaries.get(supplier.id),
                 )
             )
             rows[-1]["has_quick_upload"] = supplier.id in active_price_mappings
@@ -1549,6 +1653,13 @@ class ImportDetailedLogsView(LoginRequiredMixin, TemplateView):
         supplier_filter = _serialize_supplier_filter_ids(supplier_filter_ids)
         status_filter = self.request.GET.get("run_status", "").strip()
         batch_status_filter = self.request.GET.get("batch_status", "").strip()
+        decision_filter = self.request.GET.get("decision", "").strip()
+        reason_filter = self.request.GET.get("reason", "").strip()
+        mailbox_filter = self.request.GET.get("mailbox", "").strip()
+        filename_filter = self.request.GET.get("filename", "").strip()
+        sender_filter = self.request.GET.get("sender", "").strip()
+        date_from_raw = self.request.GET.get("date_from", "").strip()
+        date_to_raw = self.request.GET.get("date_to", "").strip()
         runs = models.EmailImportRun.objects.select_related("supplier").order_by("-started_at")
         if supplier_filter_ids:
             runs = runs.filter(supplier_id__in=supplier_filter_ids)
@@ -1575,6 +1686,34 @@ class ImportDetailedLogsView(LoginRequiredMixin, TemplateView):
         batch_paginator = Paginator(batches, 20)
         batch_page = batch_paginator.get_page(self.request.GET.get("bpage", "1"))
         batch_items = list(batch_page.object_list)
+
+        diagnostics = models.EmailAttachmentDiagnostic.objects.select_related(
+            "supplier", "mailbox", "import_batch", "import_file"
+        ).order_by("-created_at", "-id")
+        if supplier_filter_ids:
+            diagnostics = diagnostics.filter(supplier_id__in=supplier_filter_ids)
+        if decision_filter:
+            diagnostics = diagnostics.filter(decision=decision_filter)
+        if reason_filter:
+            diagnostics = diagnostics.filter(reason_code=reason_filter)
+        if mailbox_filter:
+            diagnostics = diagnostics.filter(mailbox_id=mailbox_filter)
+        if filename_filter:
+            diagnostics = diagnostics.filter(filename__icontains=filename_filter)
+        if sender_filter:
+            diagnostics = diagnostics.filter(sender__icontains=sender_filter)
+        try:
+            if date_from_raw:
+                date_from = timezone.make_aware(datetime.fromisoformat(date_from_raw))
+                diagnostics = diagnostics.filter(created_at__gte=date_from)
+            if date_to_raw:
+                date_to = timezone.make_aware(datetime.fromisoformat(date_to_raw)) + timezone.timedelta(days=1)
+                diagnostics = diagnostics.filter(created_at__lt=date_to)
+        except ValueError:
+            pass
+        diagnostics_page = Paginator(diagnostics, 40).get_page(
+            self.request.GET.get("dpage", "1")
+        )
 
         for run in run_items:
             run.console_log = run.detailed_log or ""
@@ -1645,10 +1784,21 @@ class ImportDetailedLogsView(LoginRequiredMixin, TemplateView):
 
         context["runs_page"] = page
         context["batches_page"] = batch_page
+        context["diagnostics_page"] = diagnostics_page
         context["supplier_filter"] = supplier_filter
         context["status_filter"] = status_filter
         context["batch_status_filter"] = batch_status_filter
+        context["decision_filter"] = decision_filter
+        context["reason_filter"] = reason_filter
+        context["mailbox_filter"] = mailbox_filter
+        context["filename_filter"] = filename_filter
+        context["sender_filter"] = sender_filter
+        context["date_from"] = date_from_raw
+        context["date_to"] = date_to_raw
         context["supplier_options"] = models.Supplier.objects.order_by("name")
+        context["mailbox_options"] = models.Mailbox.objects.order_by("name")
+        context["decision_options"] = models.AttachmentDecision.choices
+        context["reason_options"] = models.AttachmentReason.choices
         context["run_status_options"] = [
             models.EmailImportStatus.RUNNING,
             models.EmailImportStatus.FINISHED,
@@ -2442,6 +2592,8 @@ class SupplierEmailImportStatusAllView(LoginRequiredMixin, View):
         suppliers = list(models.Supplier.objects.order_by("name"))
         latest_successful_imports = _collect_latest_successful_imports()
         latest_failed_import_files = _collect_latest_failed_import_files()
+        latest_attachment_diagnostics = _collect_latest_attachment_diagnostics()
+        attachment_diagnostic_summaries = _collect_attachment_diagnostic_summaries()
         latest_runs, run_streaks = _collect_latest_runs_and_streaks()
         rows = {}
         for supplier in suppliers:
@@ -2451,6 +2603,8 @@ class SupplierEmailImportStatusAllView(LoginRequiredMixin, View):
                 latest_run=latest_runs.get(supplier.id),
                 streak_count=run_streaks.get(supplier.id, 1),
                 latest_failed_file=latest_failed_import_files.get(supplier.id),
+                latest_diagnostic=latest_attachment_diagnostics.get(supplier.id),
+                diagnostic_summary=attachment_diagnostic_summaries.get(supplier.id),
             )
             rows[str(supplier.id)] = {
                 "is_running": row["is_running"],
@@ -2474,6 +2628,8 @@ class SupplierEmailImportStatusAllView(LoginRequiredMixin, View):
                 "expected_at": row["expected_at"],
                 "file_summary": row["file_summary"],
                 "problem_note": row["problem_note"],
+                "latest_reason_code": row["latest_reason_code"],
+                "source_mailbox_folder": row["source_mailbox_folder"],
             }
         return JsonResponse(
             {

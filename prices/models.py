@@ -18,6 +18,36 @@ class ImportStatus(models.TextChoices):
     FAILED = "failed", "Failed"
 
 
+class ImportFileStorage(models.TextChoices):
+    PERMANENT = "permanent", "Permanent"
+    QUARANTINE = "quarantine", "Quarantine"
+
+
+class AttachmentDecision(models.TextChoices):
+    IMPORTED = "imported", "Imported"
+    DUPLICATE = "duplicate", "Duplicate"
+    SKIPPED = "skipped", "Skipped"
+    FAILED = "failed", "Failed"
+    QUARANTINED = "quarantined", "Quarantined"
+
+
+class AttachmentReason(models.TextChoices):
+    SENDER_NOT_MATCHED = "sender_not_matched", "Sender not matched"
+    SUBJECT_NOT_MATCHED = "subject_not_matched", "Subject not matched"
+    FILENAME_BLACKLISTED = "filename_blacklisted", "Filename blacklisted"
+    UNSUPPORTED_EXTENSION = "unsupported_extension", "Unsupported extension"
+    INVOICE_OR_REPORT = "invoice_or_report", "Invoice or report"
+    EMPTY_PAYLOAD = "empty_payload", "Empty payload"
+    DUPLICATE_HASH = "duplicate_hash", "Duplicate hash"
+    MAPPING_MISSING = "mapping_missing", "Mapping missing"
+    NO_ROWS_PARSED = "no_rows_parsed", "No rows parsed"
+    TOO_FEW_PRODUCTS = "too_few_products", "Too few products"
+    MISSING_EXCHANGE_RATE = "missing_exchange_rate", "Missing exchange rate"
+    PROCESSING_ERROR = "processing_error", "Processing error"
+    BACKLOG_REMAINING = "backlog_remaining", "Backlog remaining"
+    WORKBOOK_UNREADABLE = "workbook_unreadable", "Workbook unreadable"
+
+
 class FileKind(models.TextChoices):
     PRICE = "price", "Price"
     STOCK = "stock", "Stock"
@@ -299,7 +329,12 @@ def build_import_file_path(import_file: "ImportFile", filename: str) -> str:
     original_part = _safe_file_part(normalized_stem)
     base_prefix = f"{dt_prefix}_{supplier_slug_file}_"
 
-    folder_prefix = f"imports/{supplier_folder}/"
+    root_folder = (
+        "imports_quarantine"
+        if getattr(import_file, "storage_type", "") == ImportFileStorage.QUARANTINE
+        else "imports"
+    )
+    folder_prefix = f"{root_folder}/{supplier_folder}/"
     reserved = len(folder_prefix) + len(base_prefix) + len(safe_ext)
     available_for_original = max(8, max_path_len - reserved)
     shortened_original = original_part[:available_for_original]
@@ -312,7 +347,7 @@ def build_import_file_path(import_file: "ImportFile", filename: str) -> str:
     if len(path) > max_path_len:
         overflow = len(path) - max_path_len
         trimmed_folder = supplier_folder[:-overflow] if overflow < len(supplier_folder) else str(supplier_id)
-        path = f"imports/{trimmed_folder}/{dt_prefix}_{supplier_id}{safe_ext}"
+        path = f"{root_folder}/{trimmed_folder}/{dt_prefix}_{supplier_id}{safe_ext}"
     return path[:max_path_len]
 
 
@@ -329,6 +364,13 @@ class ImportFile(models.Model):
     filename = models.CharField(max_length=255)
     file = models.FileField(upload_to=import_file_upload_to, null=True, blank=True)
     content_hash = models.CharField(max_length=64, blank=True)
+    storage_type = models.CharField(
+        max_length=20,
+        choices=ImportFileStorage.choices,
+        default=ImportFileStorage.PERMANENT,
+    )
+    reason_code = models.CharField(max_length=50, blank=True)
+    quarantine_until = models.DateTimeField(null=True, blank=True)
     status = models.CharField(
         max_length=20, choices=ImportStatus.choices, default=ImportStatus.PENDING
     )
@@ -413,6 +455,49 @@ class EmailImportRun(models.Model):
         return f"{self.supplier} {self.started_at:%Y-%m-%d %H:%M}"
 
 
+class EmailAttachmentDiagnostic(models.Model):
+    run = models.ForeignKey(
+        EmailImportRun, on_delete=models.SET_NULL, null=True, blank=True
+    )
+    supplier = models.ForeignKey(
+        Supplier, on_delete=models.SET_NULL, null=True, blank=True
+    )
+    mailbox = models.ForeignKey(
+        Mailbox, on_delete=models.SET_NULL, null=True, blank=True
+    )
+    import_batch = models.ForeignKey(
+        ImportBatch, on_delete=models.SET_NULL, null=True, blank=True
+    )
+    import_file = models.ForeignKey(
+        ImportFile, on_delete=models.SET_NULL, null=True, blank=True
+    )
+    message_folder = models.CharField(max_length=255, blank=True)
+    message_uid = models.CharField(max_length=64, blank=True)
+    message_id = models.CharField(max_length=255, blank=True)
+    message_date = models.DateTimeField(null=True, blank=True)
+    sender = models.CharField(max_length=300, blank=True)
+    subject = models.CharField(max_length=500, blank=True)
+    filename = models.CharField(max_length=255, blank=True)
+    content_type = models.CharField(max_length=200, blank=True)
+    size_bytes = models.PositiveIntegerField(default=0)
+    content_hash = models.CharField(max_length=64, blank=True)
+    decision = models.CharField(max_length=30, choices=AttachmentDecision.choices)
+    reason_code = models.CharField(max_length=50, blank=True)
+    message = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["supplier", "-created_at"], name="prices_diag_supplier_idx"),
+            models.Index(fields=["reason_code", "-created_at"], name="prices_diag_reason_idx"),
+            models.Index(fields=["decision", "-created_at"], name="prices_diag_decision_idx"),
+            models.Index(fields=["mailbox", "-created_at"], name="prices_diag_mailbox_idx"),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.decision} {self.filename or self.message_uid}"
+
+
 class ImportSettings(models.Model):
     enabled = models.BooleanField(default=True)
     interval_minutes = models.PositiveIntegerField(default=120)
@@ -427,6 +512,9 @@ class ImportSettings(models.Model):
         blank=True,
         default="сверка\nнакладная\ninvoice\nакт\nreport\nнакл",
     )
+    quarantine_retention_days = models.PositiveIntegerField(default=30)
+    skipped_attachment_storage = models.CharField(max_length=20, default="log_only")
+    minimum_price_rows = models.PositiveIntegerField(default=100)
     last_run_at = models.DateTimeField(null=True, blank=True)
 
     def __str__(self) -> str:

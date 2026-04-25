@@ -75,6 +75,7 @@
                             <th>Kind</th>
                             <th>Filename</th>
                             <th>Status</th>
+                            <th>Storage</th>
                             <th>Processed at</th>
                             <th>Mapping</th>
                             <th>Error</th>
@@ -86,6 +87,7 @@
                                 <td data-label="Kind">{{ f.file_kind }}</td>
                                 <td data-label="Filename">{{ f.filename }}</td>
                                 <td data-label="Status">{{ f.status }}</td>
+                                <td data-label="Storage">{{ f.storage_type }}{% if f.quarantine_until %} until {{ f.quarantine_until|timezone:"Europe/Moscow"|date:"d/m/Y" }}{% endif %}</td>
                                 <td data-label="Processed at">{{ f.processed_at|timezone:"Europe/Moscow"|date:"d/m/Y H:i" }}</td>
                                 <td data-label="Mapping">{{ f.mapping|default:"-" }}</td>
                                 <td data-label="Error">{{ f.error_message|default:"-" }}</td>

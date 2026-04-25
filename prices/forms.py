@@ -169,6 +169,9 @@ class ImportSettingsForm(forms.ModelForm):
             "deactivate_products_after_days",
             "cbr_markup_percent",
             "filename_blacklist_terms",
+            "quarantine_retention_days",
+            "skipped_attachment_storage",
+            "minimum_price_rows",
         )
         labels = {
             "enabled": "Enable auto email checks",
@@ -179,6 +182,9 @@ class ImportSettingsForm(forms.ModelForm):
             "deactivate_products_after_days": "Deactivate products after no price for (days)",
             "cbr_markup_percent": "CBR markup (%)",
             "filename_blacklist_terms": "Filename blacklist terms",
+            "quarantine_retention_days": "Quarantine retention (days)",
+            "skipped_attachment_storage": "Skipped attachment storage",
+            "minimum_price_rows": "Minimum price rows",
         }
         help_texts = {
             "interval_minutes": "How often to check all mailboxes for new price lists.",
@@ -188,6 +194,9 @@ class ImportSettingsForm(forms.ModelForm):
             "deactivate_products_after_days": "Set 0 to disable. Active supplier products older than this threshold are set inactive.",
             "cbr_markup_percent": "Applied to daily USD->RUB CBR rate (e.g. 3.0).",
             "filename_blacklist_terms": "If filename contains any term, the file is skipped. One term per line (or comma-separated).",
+            "quarantine_retention_days": "Failed price-like files are kept in quarantine for this many days.",
+            "skipped_attachment_storage": "Use log_only to avoid saving invoices, reports, images, and unsupported attachments.",
+            "minimum_price_rows": "Minimum parsed unique products required before a price import is accepted.",
         }
         widgets = {
             "interval_minutes": forms.NumberInput(attrs={"min": 5, "step": 5}),
@@ -196,6 +205,9 @@ class ImportSettingsForm(forms.ModelForm):
             "deactivate_products_after_days": forms.NumberInput(attrs={"min": 0, "step": 1}),
             "cbr_markup_percent": forms.NumberInput(attrs={"min": 0, "step": 0.001}),
             "filename_blacklist_terms": forms.Textarea(attrs={"rows": 6}),
+            "quarantine_retention_days": forms.NumberInput(attrs={"min": 1, "step": 1}),
+            "skipped_attachment_storage": forms.TextInput(attrs={"readonly": "readonly"}),
+            "minimum_price_rows": forms.NumberInput(attrs={"min": 1, "step": 1}),
         }
 
 

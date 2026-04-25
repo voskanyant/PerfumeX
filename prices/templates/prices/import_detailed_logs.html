@@ -56,6 +56,49 @@
                             {% endfor %}
                         </select>
                     </div>
+                    <div class="span-12 md-span-4">
+                        <label for="decision-filter" class="form-label">Attachment decision</label>
+                        <select id="decision-filter" name="decision">
+                            <option value="">All</option>
+                            {% for value, label in decision_options %}
+                                <option value="{{ value }}"{% if decision_filter == value %} selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="span-12 md-span-4">
+                        <label for="reason-filter" class="form-label">Reason</label>
+                        <select id="reason-filter" name="reason">
+                            <option value="">All</option>
+                            {% for value, label in reason_options %}
+                                <option value="{{ value }}"{% if reason_filter == value %} selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="span-12 md-span-4">
+                        <label for="mailbox-filter" class="form-label">Mailbox</label>
+                        <select id="mailbox-filter" name="mailbox">
+                            <option value="">All</option>
+                            {% for mailbox in mailbox_options %}
+                                <option value="{{ mailbox.id }}"{% if mailbox_filter == mailbox.id|stringformat:"s" %} selected{% endif %}>{{ mailbox.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="span-12 md-span-3">
+                        <label for="filename-filter" class="form-label">Filename</label>
+                        <input id="filename-filter" name="filename" value="{{ filename_filter }}" placeholder="24.04.xls">
+                    </div>
+                    <div class="span-12 md-span-3">
+                        <label for="sender-filter" class="form-label">Sender</label>
+                        <input id="sender-filter" name="sender" value="{{ sender_filter }}" placeholder="supplier@example.com">
+                    </div>
+                    <div class="span-12 md-span-3">
+                        <label for="date-from-filter" class="form-label">From</label>
+                        <input id="date-from-filter" name="date_from" type="date" value="{{ date_from }}">
+                    </div>
+                    <div class="span-12 md-span-3">
+                        <label for="date-to-filter" class="form-label">To</label>
+                        <input id="date-to-filter" name="date_to" type="date" value="{{ date_to }}">
+                    </div>
                     <div class="span-12">
                         <button class="button secondary" type="submit">Apply filters</button>
                     </div>
@@ -132,6 +175,64 @@
                     {% endif %}
                 {% else %}
                     <div class="products-empty-state">No run logs yet.</div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="settings-section">
+            <div class="settings-section-header">
+                <div>
+                    <span class="card-label">Attachments</span>
+                    <h2 class="card-title">Attachment decisions</h2>
+                </div>
+            </div>
+            <div class="settings-body">
+                {% if diagnostics_page.object_list %}
+                    <div class="display-grid gap-md settings-row-full">
+                        {% for diagnostic in diagnostics_page.object_list %}
+                            <div class="run-log-card" id="diagnostic-{{ diagnostic.id }}">
+                                <div class="run-log-head">
+                                    <div class="layout-column gap-xs">
+                                        <strong>{{ diagnostic.filename|default:"Attachment" }}</strong>
+                                        <div class="run-log-meta">
+                                            <span class="run-log-status {{ diagnostic.decision|lower }}">{{ diagnostic.get_decision_display }}</span>
+                                            {% if diagnostic.reason_code %}<span>{{ diagnostic.reason_code }}</span>{% endif %}
+                                            <span>{{ diagnostic.created_at|timezone:"Europe/Moscow"|date:"d/m/Y H:i:s" }}</span>
+                                            <span>Supplier: {% if diagnostic.supplier %}{{ diagnostic.supplier.name }}{% else %}-{% endif %}</span>
+                                            <span>Mailbox: {% if diagnostic.mailbox %}{{ diagnostic.mailbox.name }}{% else %}-{% endif %}{% if diagnostic.message_folder %}/{{ diagnostic.message_folder }}{% endif %}</span>
+                                            <span>Sender: {{ diagnostic.sender|default:"-" }}</span>
+                                            <span>Size: {{ diagnostic.size_bytes }} bytes</span>
+                                        </div>
+                                    </div>
+                                    {% if diagnostic.import_batch %}
+                                        <a class="button secondary" href="{% url 'prices:import_detail' diagnostic.import_batch.id %}">Open batch</a>
+                                    {% endif %}
+                                </div>
+                                <pre class="run-log-pre">subject={{ diagnostic.subject|default:"-" }}
+message_uid={{ diagnostic.message_uid|default:"-" }}
+message_id={{ diagnostic.message_id|default:"-" }}
+content_type={{ diagnostic.content_type|default:"-" }}
+hash={{ diagnostic.content_hash|default:"-" }}
+reason={{ diagnostic.message|default:"-" }}</pre>
+                            </div>
+                        {% endfor %}
+                    </div>
+                    {% if diagnostics_page.paginator.num_pages > 1 %}
+                        <nav class="pagination-shell settings-row-full" aria-label="Attachment diagnostics pagination">
+                            <div class="pagination-list">
+                                {% if diagnostics_page.has_previous %}
+                                    <a class="page-link" href="?dpage={{ diagnostics_page.previous_page_number }}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if decision_filter %}&decision={{ decision_filter }}{% endif %}{% if reason_filter %}&reason={{ reason_filter }}{% endif %}{% if mailbox_filter %}&mailbox={{ mailbox_filter }}{% endif %}{% if filename_filter %}&filename={{ filename_filter }}{% endif %}{% if sender_filter %}&sender={{ sender_filter }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}">Previous</a>
+                                {% endif %}
+                                <span class="page-link is-active">{{ diagnostics_page.number }}</span>
+                                {% if diagnostics_page.has_next %}
+                                    <a class="page-link" href="?dpage={{ diagnostics_page.next_page_number }}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if decision_filter %}&decision={{ decision_filter }}{% endif %}{% if reason_filter %}&reason={{ reason_filter }}{% endif %}{% if mailbox_filter %}&mailbox={{ mailbox_filter }}{% endif %}{% if filename_filter %}&filename={{ filename_filter }}{% endif %}{% if sender_filter %}&sender={{ sender_filter }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}">Next</a>
+                                {% endif %}
+                            </div>
+                            <div class="pagination-summary">Page {{ diagnostics_page.number }} of {{ diagnostics_page.paginator.num_pages }}</div>
+                        </nav>
+                    {% endif %}
+                {% else %}
+                    <div class="products-empty-state">No attachment diagnostics yet.</div>
                 {% endif %}
             </div>
         </div>

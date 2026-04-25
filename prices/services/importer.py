@@ -707,9 +707,10 @@ def process_import_file(import_file: models.ImportFile) -> None:
             price=normalized_price,
             currency=supplier_currency,
         )
-    if len(unique_rows) < 100:
+    minimum_rows = int(models.ImportSettings.get_solo().minimum_price_rows or 100)
+    if len(unique_rows) < minimum_rows:
         raise RuntimeError(
-            f"Too few products ({len(unique_rows)}). Expected at least 100."
+            f"Too few products ({len(unique_rows)}). Expected at least {minimum_rows}."
         )
 
     supplier = import_file.import_batch.supplier
