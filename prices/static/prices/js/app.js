@@ -44,8 +44,8 @@
     });
 
     document.querySelectorAll("table").forEach(function (table) {
-        if (!table.classList.contains("table")) {
-            table.classList.add("table", "table-sm");
+        if (!table.classList.contains("data-table")) {
+            table.classList.add("data-table");
         }
     });
 

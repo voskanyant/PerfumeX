@@ -63,7 +63,7 @@
             }
             return "<tr>" + cells + "</tr>";
         }).join("");
-        preview.innerHTML = "<table class='table table-sm table-hover space-bottom-none'>" + header + body + "</table>";
+        preview.innerHTML = "<table class='data-table import-preview-table space-bottom-none'>" + header + body + "</table>";
         preview.querySelectorAll("th[data-col]").forEach(function (th) {
             th.addEventListener("click", function () {
                 var col = th.getAttribute("data-col");
