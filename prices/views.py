@@ -568,16 +568,16 @@ def _build_latest_check_info(
 
 
 def _build_supplier_email_fallback_check(supplier, fallback_dt) -> dict[str, str | int | None | bool]:
-    if supplier.last_email_errors:
-        label = "failed"
-        class_name = "is-warning"
-        code = "failed"
-        note = f"{supplier.last_email_errors} import issue(s)"
-    elif supplier.last_email_processed:
+    if supplier.last_email_processed:
         label = "imported"
         class_name = "is-success"
         code = "successful"
         note = f"{supplier.last_email_processed} file(s) imported"
+    elif supplier.last_email_errors:
+        label = "failed"
+        class_name = "is-warning"
+        code = "failed"
+        note = f"{supplier.last_email_errors} import issue(s)"
     elif supplier.last_email_matched:
         label = "no change"
         class_name = "is-neutral"
@@ -603,6 +603,20 @@ def _build_supplier_email_fallback_check(supplier, fallback_dt) -> dict[str, str
     }
 
 
+def _is_benign_attachment_diagnostic(diagnostic) -> bool:
+    return bool(
+        diagnostic
+        and diagnostic.decision == models.AttachmentDecision.SKIPPED
+        and diagnostic.reason_code
+        in {
+            models.AttachmentReason.INVOICE_OR_REPORT,
+            models.AttachmentReason.FILENAME_BLACKLISTED,
+            models.AttachmentReason.UNSUPPORTED_EXTENSION,
+            models.AttachmentReason.EMPTY_PAYLOAD,
+        }
+    )
+
+
 def _build_diagnostic_event_check(diagnostic) -> dict[str, str | int | None | bool]:
     decision = diagnostic.decision
     filename = _format_event_filename(diagnostic.filename)
@@ -625,6 +639,11 @@ def _build_diagnostic_event_check(diagnostic) -> dict[str, str | int | None | bo
         class_name = "is-warning"
         code = "failed"
         note = f"{filename}: {reason}" if filename else reason
+    elif _is_benign_attachment_diagnostic(diagnostic):
+        label = "ignored"
+        class_name = "is-neutral"
+        code = "ignored"
+        note = f"{filename}: ignored non-price file" if filename else "Ignored non-price file"
     else:
         label = "no valid file"
         class_name = "is-warning"
@@ -977,6 +996,8 @@ def _summarize_latest_files(supplier, latest_run, latest_diagnostic=None) -> str
         }:
             return "Import issue"
         if latest_diagnostic.decision == models.AttachmentDecision.SKIPPED:
+            if _is_benign_attachment_diagnostic(latest_diagnostic):
+                return "Ignored non-price file"
             return "Price file found, not imported"
     if supplier.last_email_check_at:
         if supplier.last_email_processed:

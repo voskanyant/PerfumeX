@@ -802,6 +802,96 @@ class SupplierImportBoundaryTests(TestCase):
         self.assertEqual(row["health_code"], "fresh")
         self.assertEqual(row["problem_note"], "")
 
+    def test_imported_file_wins_over_non_price_attachment_error(self):
+        now = timezone.now().replace(microsecond=0)
+        self.supplier.from_address_pattern = "supplier@example.com"
+        self.supplier.expected_import_interval_hours = 24
+        self.supplier.last_email_check_at = now
+        self.supplier.last_email_matched = 2
+        self.supplier.last_email_processed = 1
+        self.supplier.last_email_errors = 1
+        self.supplier.last_email_last_message = "1 imported, 1 skipped"
+        self.supplier.save(
+            update_fields=[
+                "from_address_pattern",
+                "expected_import_interval_hours",
+                "last_email_check_at",
+                "last_email_matched",
+                "last_email_processed",
+                "last_email_errors",
+                "last_email_last_message",
+            ]
+        )
+        batch = models.ImportBatch.objects.create(
+            supplier=self.supplier,
+            mailbox=self.mailbox,
+            message_id="<price-and-invoice@example.com>",
+            received_at=now,
+            status=models.ImportStatus.PROCESSED,
+        )
+        models.ImportFile.objects.create(
+            import_batch=batch,
+            file_kind=models.FileKind.PRICE,
+            filename="price.xlsx",
+            content_hash="price-hash",
+            status=models.ImportStatus.PROCESSED,
+            processed_at=now,
+        )
+
+        row = _build_supplier_board_row(
+            supplier=self.supplier,
+            successful_batch=batch,
+            latest_run=None,
+        )
+
+        self.assertEqual(row["check_code"], "successful")
+        self.assertEqual(row["health_code"], "fresh")
+        self.assertEqual(row["problem_note"], "")
+
+    def test_invoice_skip_is_neutral_when_latest_price_is_fresh(self):
+        now = timezone.now().replace(microsecond=0)
+        self.supplier.from_address_pattern = "supplier@example.com"
+        self.supplier.expected_import_interval_hours = 24
+        self.supplier.save(update_fields=["from_address_pattern", "expected_import_interval_hours"])
+        batch = models.ImportBatch.objects.create(
+            supplier=self.supplier,
+            mailbox=self.mailbox,
+            message_id="<fresh-price@example.com>",
+            received_at=now - timedelta(minutes=5),
+            status=models.ImportStatus.PROCESSED,
+        )
+        models.ImportBatch.objects.filter(id=batch.id).update(created_at=now - timedelta(minutes=5))
+        batch.refresh_from_db()
+        models.ImportFile.objects.create(
+            import_batch=batch,
+            file_kind=models.FileKind.PRICE,
+            filename="fresh-price.xlsx",
+            content_hash="fresh-price-hash",
+            status=models.ImportStatus.PROCESSED,
+            processed_at=now - timedelta(minutes=5),
+        )
+        diagnostic = models.EmailAttachmentDiagnostic.objects.create(
+            supplier=self.supplier,
+            mailbox=self.mailbox,
+            message_folder="INBOX",
+            filename="invoice.xlsx",
+            decision=models.AttachmentDecision.SKIPPED,
+            reason_code=models.AttachmentReason.INVOICE_OR_REPORT,
+            message="Attachment looks like an invoice, report, image, or non-price document.",
+            message_date=now,
+        )
+
+        row = _build_supplier_board_row(
+            supplier=self.supplier,
+            successful_batch=batch,
+            latest_run=None,
+            latest_diagnostic=diagnostic,
+        )
+
+        self.assertEqual(row["check_code"], "ignored")
+        self.assertEqual(row["health_code"], "fresh")
+        self.assertEqual(row["problem_note"], "")
+
     def test_stale_duplicate_event_explains_stale_import(self):
         now = timezone.make_aware(datetime(2026, 4, 27, 12, 0, 0))
         old = timezone.make_aware(datetime(2026, 4, 22, 10, 0, 0))
