@@ -1058,25 +1058,20 @@ def run_import(
             except Exception:
                 pass
     if not supplier and fallback_suppliers is not None:
-        for fallback_supplier in fallback_suppliers:
-            stats = supplier_stats.get(
-                fallback_supplier.id,
-                {
-                    "matched": 0,
-                    "processed": 0,
-                    "errors": 0,
-                    "duplicates": 0,
-                    "skipped": 0,
-                    "last_message": "No matching emails.",
-                },
-            )
+        fallback_by_id = {
+            fallback_supplier.id: fallback_supplier for fallback_supplier in fallback_suppliers
+        }
+        for supplier_id_for_stats, stats in supplier_stats.items():
+            fallback_supplier = fallback_by_id.get(supplier_id_for_stats)
+            if not fallback_supplier:
+                continue
             if not stats.get("last_message"):
                 parts = []
                 if stats.get("duplicates"):
                     parts.append(f"{stats.get('duplicates')} duplicate(s)")
                 if stats.get("skipped"):
                     parts.append(f"{stats.get('skipped')} skipped")
-                stats["last_message"] = ", ".join(parts) if parts else "No matching emails."
+                stats["last_message"] = ", ".join(parts) if parts else "Matching email handled."
             fallback_supplier.last_email_check_at = run_started
             fallback_supplier.last_email_matched = stats.get("matched", 0)
             fallback_supplier.last_email_processed = stats.get("processed", 0)
