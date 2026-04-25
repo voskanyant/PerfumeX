@@ -1315,6 +1315,17 @@ def _build_cron_line(script_path: Path, interval_minutes: int | None = None) -> 
 def _get_cron_status() -> dict:
     script_path = _runner_script_path()
     expected_line = _build_cron_line(script_path)
+    settings_obj = models.ImportSettings.get_solo()
+    now = timezone.now()
+    next_run_at = None
+    late_by_seconds = 0
+    grace_seconds = max(300, int(settings_obj.interval_minutes or 5) * 60 // 2)
+    if settings_obj.last_run_at:
+        next_run_at = settings_obj.last_run_at + timezone.timedelta(
+            minutes=settings_obj.interval_minutes
+        )
+        late_by_seconds = max(int((now - next_run_at).total_seconds()), 0)
+    stale = bool(next_run_at and late_by_seconds > grace_seconds)
     try:
         lines = _read_crontab_lines()
         cron_line = next((line for line in lines if CRON_MARKER in line), "")
@@ -1327,6 +1338,9 @@ def _get_cron_status() -> dict:
             "script_path": str(script_path),
             "script_exists": script_path.exists(),
             "log_path": str(Path(settings.BASE_DIR) / "logs" / "perfumex_email_import.log"),
+            "stale": stale,
+            "late_by_seconds": late_by_seconds,
+            "late_by_minutes": late_by_seconds // 60,
         }
     except Exception as exc:
         return {
@@ -1338,6 +1352,9 @@ def _get_cron_status() -> dict:
             "script_path": str(script_path),
             "script_exists": script_path.exists(),
             "log_path": str(Path(settings.BASE_DIR) / "logs" / "perfumex_email_import.log"),
+            "stale": stale,
+            "late_by_seconds": late_by_seconds,
+            "late_by_minutes": late_by_seconds // 60,
             "error": str(exc),
         }
 

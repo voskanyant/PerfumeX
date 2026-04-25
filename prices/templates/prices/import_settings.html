@@ -154,6 +154,9 @@
                         {% if cron_status.needs_reinstall %}
                             <div class="scheduler-warning">Scheduler needs reinstall because the cron line does not match current settings.</div>
                         {% endif %}
+                        {% if cron_status.stale %}
+                            <div class="scheduler-warning">Scheduler is late by {{ cron_status.late_by_minutes }} minute(s). Cron is installed, but no completed run updated the system after the expected time.</div>
+                        {% endif %}
                         {% if cron_status.error %}
                             <div class="scheduler-warning">Scheduler error: {{ cron_status.error }}</div>
                         {% endif %}

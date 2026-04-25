@@ -28,6 +28,7 @@ from prices.views import (
     _build_cron_line,
     _build_supplier_board_row,
     _collect_latest_successful_imports,
+    _get_cron_status,
     _render_runner_script,
 )
 
@@ -480,6 +481,18 @@ class ImportSchedulerTests(TestCase):
         self.assertIn("if [ -f .env ]; then", script)
         self.assertNotIn("/var/log/perfumex_email_import.log", script)
         self.assertNotIn("source .venv/bin/activate", script)
+
+    @patch("prices.views._read_crontab_lines", return_value=["* * * * echo ok # PERFUMEX_IMPORT_CRON"])
+    def test_cron_status_marks_late_scheduler_stale(self, _mock_read_crontab):
+        settings_obj = models.ImportSettings.get_solo()
+        settings_obj.interval_minutes = 20
+        settings_obj.last_run_at = timezone.now() - timedelta(hours=1)
+        settings_obj.save(update_fields=["interval_minutes", "last_run_at"])
+
+        status = _get_cron_status()
+
+        self.assertTrue(status["stale"])
+        self.assertGreaterEqual(status["late_by_minutes"], 30)
 
 
 class HiddenProductKeywordTests(TestCase):
