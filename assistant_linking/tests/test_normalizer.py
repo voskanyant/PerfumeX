@@ -145,6 +145,31 @@ class NormalizerTests(TestCase):
         self.assertEqual(parsed.size_ml, Decimal("50.00"))
         self.assertTrue(parsed.is_tester)
 
+    def test_product_alias_does_not_invent_missing_supplier_concentration(self):
+        brand = Brand.objects.create(name="Francis Kurkdjian")
+        BrandAlias.objects.create(brand=brand, alias_text="Francis Kurkdjian", normalized_alias="francis kurkdjian")
+        ProductAlias.objects.create(
+            brand=brand,
+            alias_text="a la rose",
+            canonical_text="A La Rose",
+            concentration="Eau de Parfum",
+            priority=40,
+            active=True,
+        )
+        product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="shower-cream-no-concentration",
+            name="Francis Kurkdjian A La Rose Shower Cream 250ml Tester",
+        )
+
+        parsed = parse_supplier_product(product)
+
+        self.assertEqual(parsed.product_name_text, "A La Rose")
+        self.assertEqual(parsed.concentration, "")
+        self.assertIn("concentration missing", parsed.warnings)
+        self.assertEqual(parsed.size_ml, Decimal("250.00"))
+        self.assertTrue(parsed.is_tester)
+
     def test_parses_multi_pack_sizes_as_set_size_label(self):
         brand = Brand.objects.create(name="Vilhelm Parfumerie")
         BrandAlias.objects.create(brand=brand, alias_text="Vilhelm Parfumerie", normalized_alias="vilhelm parfumerie")
