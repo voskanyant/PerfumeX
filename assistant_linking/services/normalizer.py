@@ -227,6 +227,28 @@ def parse_supplier_product(product: SupplierProduct) -> ParseResult:
                 result.supplier_gender_hint = product_alias.audience
             break
 
+    # A confirmed catalogue link is stronger than supplier text and should
+    # keep reparses aligned with the canonical catalogue identity.
+    if product.catalog_perfume_id:
+        perfume = product.catalog_perfume
+        result.normalized_brand = perfume.brand
+        result.detected_brand_text = perfume.brand.name
+        result.product_name_text = perfume.name
+        if perfume.concentration:
+            result.concentration = perfume.concentration
+        if perfume.audience:
+            result.supplier_gender_hint = perfume.audience
+        if product.catalog_variant_id:
+            variant = product.catalog_variant
+            if variant.size_ml:
+                result.size_ml = variant.size_ml
+            result.packaging = variant.packaging or ""
+            result.variant_type = variant.variant_type or "standard"
+            result.is_tester = variant.is_tester
+            result.is_sample = result.variant_type == "sample"
+            result.is_travel = result.variant_type == "travel"
+            result.is_set = result.variant_type == "set"
+
     if not result.product_name_text:
         remaining = text
         for term in [result.raw_size_text, result.concentration, "tester", "sample", "travel", "set", "no box", "without box"]:

@@ -289,9 +289,18 @@ class ParsedProductDetailView(StaffAssistantMixin, DetailView):
     context_object_name = "product"
     pk_url_kwarg = "supplier_product_id"
 
+    def get_queryset(self):
+        return SupplierProduct.objects.select_related(
+            "supplier",
+            "catalog_perfume__brand",
+            "catalog_variant",
+        )
+
     def get_context_data(self, **kwargs):
         product = self.object
         parsed = save_parse(product)
+        canonical_perfume = product.catalog_perfume
+        canonical_variant = product.catalog_variant
         product_alias_text = parsed.product_name_text or product.name
         brand_alias_text = parsed.detected_brand_text or product.brand
         existing_alias = None
@@ -307,20 +316,20 @@ class ParsedProductDetailView(StaffAssistantMixin, DetailView):
         existing_blockers = existing_alias.excluded_terms if existing_alias else ""
         teach_initial = {
             "supplier_brand_text": brand_alias_text,
-            "brand_name": parsed.normalized_brand.name if parsed.normalized_brand_id else parsed.detected_brand_text,
+            "brand_name": canonical_perfume.brand.name if canonical_perfume else (parsed.normalized_brand.name if parsed.normalized_brand_id else parsed.detected_brand_text),
             "supplier_product_text": product_alias_text,
-            "product_name": parsed.product_name_text,
+            "product_name": canonical_perfume.name if canonical_perfume else parsed.product_name_text,
             "product_excluded_terms": existing_blockers,
             "supplier_concentration_text": parsed.concentration,
-            "concentration": parsed.concentration,
+            "concentration": canonical_perfume.concentration if canonical_perfume else parsed.concentration,
             "supplier_size_text": parsed.raw_size_text or product.size,
-            "size_ml": parsed.size_ml,
+            "size_ml": canonical_variant.size_ml if canonical_variant and canonical_variant.size_ml else parsed.size_ml,
             "supplier_audience_text": parsed.supplier_gender_hint,
-            "audience": parsed.supplier_gender_hint,
+            "audience": canonical_perfume.audience if canonical_perfume and canonical_perfume.audience else parsed.supplier_gender_hint,
             "supplier_type_text": parsed.variant_type,
-            "variant_type": parsed.variant_type,
+            "variant_type": canonical_variant.variant_type if canonical_variant and canonical_variant.variant_type else parsed.variant_type,
             "supplier_packaging_text": parsed.packaging,
-            "packaging": parsed.packaging,
+            "packaging": canonical_variant.packaging if canonical_variant and canonical_variant.packaging else parsed.packaging,
             "alias_scope": forms.ParseTeachingForm.SCOPE_GLOBAL,
             "lock_parse": True,
             "reparse_similar": False,
