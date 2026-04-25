@@ -687,7 +687,7 @@ class SupplierImportBoundaryTests(TestCase):
             )
 
         self.assertEqual(row["health_code"], "fresh")
-        self.assertIn("Mon", row["health_note"])
+        self.assertIn("warning after 4d", row["health_note"])
 
     def test_supplier_board_surfaces_latest_attachment_diagnostic(self):
         diagnostic = models.EmailAttachmentDiagnostic.objects.create(
@@ -892,7 +892,7 @@ class SupplierImportBoundaryTests(TestCase):
         self.assertEqual(row["health_code"], "fresh")
         self.assertEqual(row["problem_note"], "")
 
-    def test_stale_duplicate_event_explains_stale_import(self):
+    def test_four_day_old_duplicate_event_warns_without_stale(self):
         now = timezone.make_aware(datetime(2026, 4, 27, 12, 0, 0))
         old = timezone.make_aware(datetime(2026, 4, 22, 10, 0, 0))
         self.supplier.from_address_pattern = "supplier@example.com"
@@ -935,8 +935,41 @@ class SupplierImportBoundaryTests(TestCase):
             )
 
         self.assertEqual(row["check_code"], "no-change")
-        self.assertIn(row["health_code"], {"stale", "critical"})
+        self.assertEqual(row["health_code"], "warning")
         self.assertIn("Duplicate found", row["problem_note"])
+
+    def test_six_day_old_import_becomes_stale(self):
+        now = timezone.make_aware(datetime(2026, 4, 27, 12, 0, 0))
+        old = timezone.make_aware(datetime(2026, 4, 21, 10, 0, 0))
+        self.supplier.from_address_pattern = "supplier@example.com"
+        self.supplier.expected_import_interval_hours = 24
+        self.supplier.save(update_fields=["from_address_pattern", "expected_import_interval_hours"])
+        batch = models.ImportBatch.objects.create(
+            supplier=self.supplier,
+            mailbox=self.mailbox,
+            message_id="<six-day-old@example.com>",
+            received_at=old,
+            status=models.ImportStatus.PROCESSED,
+        )
+        models.ImportBatch.objects.filter(id=batch.id).update(created_at=old)
+        batch.refresh_from_db()
+        models.ImportFile.objects.create(
+            import_batch=batch,
+            file_kind=models.FileKind.PRICE,
+            filename="old.xlsx",
+            content_hash="six-day-old-hash",
+            status=models.ImportStatus.PROCESSED,
+            processed_at=old,
+        )
+
+        with patch("prices.views.timezone.now", return_value=now):
+            row = _build_supplier_board_row(
+                supplier=self.supplier,
+                successful_batch=batch,
+                latest_run=None,
+            )
+
+        self.assertEqual(row["health_code"], "stale")
 
     @patch("prices.views._read_crontab_lines", return_value=[])
     def test_autoimport_scan_status_reports_recent_backlog(self, _mock_crontab):

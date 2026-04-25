@@ -867,7 +867,19 @@ def _build_business_health_info(supplier, last_import_info, latest_check_info, s
         else None
     )
     expected_label = _format_expected_deadline(expected_deadline)
-    grace_seconds = expected_hours * 3600
+    raw_success_age_seconds = last_import_info.get("sort_age_seconds")
+    success_age_seconds = int(
+        raw_success_age_seconds if raw_success_age_seconds is not None else 10**12
+    )
+    warning_after_seconds = 4 * 24 * 60 * 60
+    stale_after_seconds = 6 * 24 * 60 * 60
+    critical_after_seconds = 10 * 24 * 60 * 60
+    success_age_days = max(success_age_seconds // (24 * 60 * 60), 0)
+    age_note = (
+        f"{success_age_days}d since last successful import"
+        if success_age_days
+        else "Last successful import today"
+    )
 
     if not supplier.from_address_pattern:
         return {
@@ -888,6 +900,15 @@ def _build_business_health_info(supplier, last_import_info, latest_check_info, s
             "expected_at": expected_label,
         }
     if code == "failed" and streak_count >= 2:
+        if success_age_seconds < warning_after_seconds:
+            return {
+                "label": "warning",
+                "class_name": "is-warning",
+                "note": f"Recent success - {streak_count} failed checks in a row",
+                "code": "warning",
+                "severity": 2,
+                "expected_at": expected_label,
+            }
         return {
             "label": "critical",
             "class_name": "is-critical",
@@ -896,11 +917,11 @@ def _build_business_health_info(supplier, last_import_info, latest_check_info, s
             "severity": 0,
             "expected_at": expected_label,
         }
-    if overdue_seconds is not None and overdue_seconds > grace_seconds * 2:
+    if success_age_seconds >= critical_after_seconds:
         return {
             "label": "critical",
             "class_name": "is-critical",
-            "note": f"Overdue since {expected_label}",
+            "note": f"{age_note} - expected {cadence_label}",
             "code": "critical",
             "severity": 0,
             "expected_at": expected_label,
@@ -918,29 +939,29 @@ def _build_business_health_info(supplier, last_import_info, latest_check_info, s
             "severity": 2,
             "expected_at": expected_label,
         }
-    if code == "no-files" and streak_count >= 3 and overdue_seconds is not None and overdue_seconds > 0:
-        return {
-            "label": "stale",
-            "class_name": "is-stale",
-            "note": f"{streak_count} no-file checks in a row - expected {cadence_label}",
-            "code": "stale",
-            "severity": 1,
-            "expected_at": expected_label,
-        }
-    if overdue_seconds is not None and overdue_seconds > grace_seconds:
-        return {
-            "label": "stale",
-            "class_name": "is-stale",
-            "note": f"Past expected time {expected_label}",
-            "code": "stale",
-            "severity": 1,
-            "expected_at": expected_label,
-        }
-    if overdue_seconds is not None and overdue_seconds > 0:
+    if code == "no-files" and streak_count >= 3 and success_age_seconds >= warning_after_seconds:
         return {
             "label": "warning",
             "class_name": "is-warning",
-            "note": f"Expected by {expected_label}",
+            "note": f"{streak_count} no-file checks in a row - {age_note}",
+            "code": "warning",
+            "severity": 2,
+            "expected_at": expected_label,
+        }
+    if success_age_seconds >= stale_after_seconds:
+        return {
+            "label": "stale",
+            "class_name": "is-stale",
+            "note": f"{age_note} - expected {cadence_label}",
+            "code": "stale",
+            "severity": 1,
+            "expected_at": expected_label,
+        }
+    if success_age_seconds >= warning_after_seconds:
+        return {
+            "label": "warning",
+            "class_name": "is-warning",
+            "note": f"{age_note} - expected {cadence_label}",
             "code": "warning",
             "severity": 2,
             "expected_at": expected_label,
@@ -948,7 +969,7 @@ def _build_business_health_info(supplier, last_import_info, latest_check_info, s
     return {
         "label": "fresh",
         "class_name": "is-success",
-        "note": f"Next expected by {expected_label}",
+        "note": f"Fresh - warning after 4d without a successful import",
         "code": "fresh",
         "severity": 3,
         "expected_at": expected_label,
@@ -1028,9 +1049,9 @@ def _build_problem_note(supplier, latest_check, health, latest_failed_file=None,
     if (
         latest_diagnostic
         and latest_diagnostic.decision == models.AttachmentDecision.DUPLICATE
-        and health_code in {"stale", "critical"}
+        and health_code in {"warning", "stale", "critical"}
     ):
-        return "Duplicate found, but last import is stale."
+        return "Duplicate found, but last import needs update."
     if latest_failed_file:
         filename = latest_failed_file.filename or "file"
         error = (latest_failed_file.error_message or "").strip()
