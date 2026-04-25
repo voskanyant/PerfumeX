@@ -242,6 +242,23 @@ class NormalizerTests(TestCase):
         self.assertEqual(men_parse.supplier_gender_hint, "Men")
         self.assertEqual(men_parse.product_name_text, "authentic")
 
+    def test_parenthetical_l_is_exact_woman_marker_not_product_name(self):
+        brand = Brand.objects.create(name="Kenzo")
+        BrandAlias.objects.create(brand=brand, alias_text="Kenzo", normalized_alias="kenzo")
+        product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="kenzo-ciel-l",
+            name="Kenzo Ciel Magnolia (L) 75 ml EDP TECTEP",
+        )
+
+        parsed = parse_supplier_product(product)
+
+        self.assertEqual(parsed.supplier_gender_hint, "Woman")
+        self.assertEqual(parsed.product_name_text, "ciel magnolia")
+        self.assertEqual(parsed.concentration, "Eau de Parfum")
+        self.assertEqual(parsed.size_ml, Decimal("75.00"))
+        self.assertTrue(parsed.is_tester)
+
     def test_display_identity_title_cases_scent_but_keeps_joiners_lowercase(self):
         product = SupplierProduct.objects.create(
             supplier=self.supplier,
