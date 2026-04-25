@@ -31,6 +31,16 @@ def query_without(context, *keys):
     return query.urlencode()
 
 
+@register.simple_tag(takes_context=True)
+def page_query(context, page_number, page_param="page"):
+    request = context.get("request")
+    if not request:
+        return ""
+    query = request.GET.copy()
+    query[page_param or "page"] = page_number
+    return query.urlencode()
+
+
 @register.filter
 @stringfilter
 def active_class(value, expected):

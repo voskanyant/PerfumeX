@@ -2,13 +2,8 @@
 {% block title %}Edit Catalogue{% endblock %}
 {% block topbar_label %}Assistant{% endblock %}
 {% block content %}
-<div class="page-head">
-    <div>
-        <span class="page-kicker">Catalogue</span>
-        <h1 class="page-title">Edit catalogue record</h1>
-    </div>
-    {% include "assistant_core/catalog/_nav.html" %}
-</div>
+{% include "prices/components/page_header.html" with kicker="Catalogue" title="Edit catalogue record" %}
+{% include "assistant_core/catalog/_nav.html" %}
 <div class="workspace-block form-shell">
     <form method="post">
         {% csrf_token %}

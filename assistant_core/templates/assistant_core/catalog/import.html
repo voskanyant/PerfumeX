@@ -2,14 +2,8 @@
 {% block title %}Import Catalogue{% endblock %}
 {% block topbar_label %}Assistant{% endblock %}
 {% block content %}
-<div class="page-head">
-    <div>
-        <span class="page-kicker">Catalogue</span>
-        <h1 class="page-title">Import catalogue</h1>
-        <div class="page-meta">Upload Excel or CSV with brand and scent/name columns. Extra columns are imported when present.</div>
-    </div>
-    {% include "assistant_core/catalog/_nav.html" %}
-</div>
+{% include "prices/components/page_header.html" with kicker="Catalogue" title="Import catalogue" meta="Upload Excel or CSV with brand and scent/name columns. Extra columns are imported when present." %}
+{% include "assistant_core/catalog/_nav.html" %}
 
 <div class="page-grid-3">
     <div class="workspace-block">
@@ -46,13 +40,15 @@
     </div>
     {% if result.skipped_rows %}
         <h3 class="kpi-link-title space-top-sm">Skipped rows</h3>
-        <table class="data-table">
-            <tbody>
-            {% for row in result.skipped_rows %}
-                <tr><td>{{ row }}</td></tr>
-            {% endfor %}
-            </tbody>
-        </table>
+        <div class="table-wrap table-scroll-x">
+            <table class="table data-table">
+                <tbody>
+                {% for row in result.skipped_rows %}
+                    <tr><td>{{ row }}</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
     {% endif %}
 </div>
 {% endif %}

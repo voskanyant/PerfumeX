@@ -2,17 +2,8 @@
 {% block title %}Aliases{% endblock %}
 {% block topbar_label %}Assistant / Knowledge{% endblock %}
 {% block content %}
-<div class="page-head">
-    <div>
-        <span class="page-kicker">Assistant</span>
-        <h1 class="page-title">Alias dictionaries</h1>
-        <div class="page-meta">Manage taught normalization dictionaries with search, filters, and direct editing.</div>
-    </div>
-    <div class="page-actions">
-        <a class="button primary" href="{{ create_url }}">Add entry</a>
-        <a class="button ghost" href="{% url 'assistant_core:knowledge' %}">Knowledge base</a>
-    </div>
-</div>
+{% url 'assistant_core:knowledge' as knowledge_url %}
+{% include "prices/components/page_header.html" with kicker="Assistant" title="Alias dictionaries" meta="Manage taught normalization dictionaries with search, filters, and direct editing." primary_url=create_url primary_label="Add entry" secondary_url=knowledge_url secondary_label="Knowledge base" %}
 
 <div class="workspace-block">
     <div class="layout-inline gap-sm flex-wrap">
@@ -159,36 +150,6 @@
         </table>
     </div>
 
-    {% if page_obj.paginator.num_pages > 1 %}
-        <nav class="pagination-shell space-top-md" aria-label="Alias pagination">
-            <div class="pagination-list">
-                {% if page_obj.has_previous %}
-                    <a class="page-link" href="?section={{ active_section }}&q={{ query|urlencode }}&scope={{ scope }}&status={{ status }}&page={{ page_obj.previous_page_number }}">Previous</a>
-                {% endif %}
-                {% for page_num in page_obj.paginator.page_range %}
-                    {% if page_num <= 5 or page_num > page_obj.paginator.num_pages|add:-3 %}
-                        {% if page_num == page_obj.number %}
-                            <span class="page-link is-active">{{ page_num }}</span>
-                        {% else %}
-                            <a class="page-link" href="?section={{ active_section }}&q={{ query|urlencode }}&scope={{ scope }}&status={{ status }}&page={{ page_num }}">{{ page_num }}</a>
-                        {% endif %}
-                    {% endif %}
-                {% endfor %}
-                {% if page_obj.has_next %}
-                    <a class="page-link" href="?section={{ active_section }}&q={{ query|urlencode }}&scope={{ scope }}&status={{ status }}&page={{ page_obj.next_page_number }}">Next</a>
-                {% endif %}
-            </div>
-            <form class="pagination-jump" method="get">
-                <input type="hidden" name="section" value="{{ active_section }}">
-                <input type="hidden" name="q" value="{{ query }}">
-                <input type="hidden" name="scope" value="{{ scope }}">
-                <input type="hidden" name="status" value="{{ status }}">
-                <label for="aliases-page-jump">Page</label>
-                <input id="aliases-page-jump" type="number" name="page" min="1" max="{{ page_obj.paginator.num_pages }}" value="{{ page_obj.number }}">
-                <button class="button secondary" type="submit">Go</button>
-            </form>
-            <div class="pagination-summary">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</div>
-        </nav>
-    {% endif %}
+    {% include "prices/components/pagination.html" with page_obj=page_obj class_name="space-top-md" label="Alias pagination" jump_id="aliases-page-jump" %}
 </div>
 {% endblock %}

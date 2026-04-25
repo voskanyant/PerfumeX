@@ -2,13 +2,7 @@
 {% block title %}Assistant{% endblock %}
 {% block topbar_label %}Assistant{% endblock %}
 {% block content %}
-<div class="page-head">
-    <div>
-        <span class="page-kicker">Assistant</span>
-        <h1 class="page-title">Assistant control room</h1>
-        <div class="page-meta">Staff-only review queues for catalogue, linking, research, and drafts.</div>
-    </div>
-</div>
+{% include "prices/components/page_header.html" with kicker="Assistant" title="Assistant control room" meta="Staff-only review queues for catalogue, linking, research, and drafts." %}
 <div class="workspace-block">
     <strong>Safety mode:</strong> no catalogue changes are published automatically. Assistant actions create suggestions only.
 </div>
@@ -27,14 +21,16 @@
         <span>Low-confidence parses: {{ low_confidence }}</span>
     </div>
     <h3 class="kpi-link-title space-top-sm">Recent manual decisions</h3>
-    <table class="data-table">
+    <div class="table-wrap table-scroll-x">
+    <table class="table data-table">
         <tbody>
         {% for decision in recent_decisions %}
             <tr><td>{{ decision.supplier_product }}</td><td>{{ decision.decision_type }}</td><td>{{ decision.created_at }}</td></tr>
         {% empty %}
-            <tr><td>No decisions yet.</td></tr>
+            {% include "prices/components/table_empty.html" with colspan=3 message="No decisions yet." %}
         {% endfor %}
         </tbody>
     </table>
+    </div>
 </div>
 {% endblock %}

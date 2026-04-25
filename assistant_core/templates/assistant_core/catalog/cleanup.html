@@ -2,14 +2,8 @@
 {% block title %}Catalogue Cleanup{% endblock %}
 {% block topbar_label %}Assistant{% endblock %}
 {% block content %}
-<div class="page-head">
-    <div>
-        <span class="page-kicker">Catalogue</span>
-        <h1 class="page-title">Cleanup</h1>
-        <div class="page-meta">Find duplicate-looking records and merge mistakes from imported catalogue files.</div>
-    </div>
-    {% include "assistant_core/catalog/_nav.html" %}
-</div>
+{% include "prices/components/page_header.html" with kicker="Catalogue" title="Cleanup" meta="Find duplicate-looking records and merge mistakes from imported catalogue files." %}
+{% include "assistant_core/catalog/_nav.html" %}
 
 <div class="page-grid-3">
     <div class="workspace-block">
@@ -36,31 +30,35 @@
 
 <div class="workspace-block space-top-md">
     <h2 class="kpi-link-title">Possible duplicate brands</h2>
-    <table class="data-table">
-        <tbody>
-        {% for group in brand_duplicates %}
-            <tr>
-                <td>{% for brand in group %}{{ brand.name }}{% if not forloop.last %}, {% endif %}{% endfor %}</td>
-            </tr>
-        {% empty %}
-            <tr><td>No exact normalized brand duplicates found.</td></tr>
-        {% endfor %}
-        </tbody>
-    </table>
+    <div class="table-wrap table-scroll-x">
+        <table class="table data-table">
+            <tbody>
+            {% for group in brand_duplicates %}
+                <tr>
+                    <td>{% for brand in group %}{{ brand.name }}{% if not forloop.last %}, {% endif %}{% endfor %}</td>
+                </tr>
+            {% empty %}
+                {% include "prices/components/table_empty.html" with colspan=1 message="No exact normalized brand duplicates found." %}
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
 </div>
 
 <div class="workspace-block space-top-md">
     <h2 class="kpi-link-title">Possible duplicate perfumes</h2>
-    <table class="data-table">
-        <tbody>
-        {% for group in perfume_duplicates %}
-            <tr>
-                <td>{% for perfume in group %}{{ perfume }}{% if not forloop.last %}, {% endif %}{% endfor %}</td>
-            </tr>
-        {% empty %}
-            <tr><td>No exact normalized perfume duplicates found.</td></tr>
-        {% endfor %}
-        </tbody>
-    </table>
+    <div class="table-wrap table-scroll-x">
+        <table class="table data-table">
+            <tbody>
+            {% for group in perfume_duplicates %}
+                <tr>
+                    <td>{% for perfume in group %}{{ perfume }}{% if not forloop.last %}, {% endif %}{% endfor %}</td>
+                </tr>
+            {% empty %}
+                {% include "prices/components/table_empty.html" with colspan=1 message="No exact normalized perfume duplicates found." %}
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
 </div>
 {% endblock %}

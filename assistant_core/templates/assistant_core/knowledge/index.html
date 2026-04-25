@@ -2,19 +2,8 @@
 {% block title %}Knowledge Base{% endblock %}
 {% block topbar_label %}Assistant / Knowledge{% endblock %}
 {% block content %}
-<div class="page-head">
-    <div>
-        <span class="page-kicker">Assistant</span>
-        <h1 class="page-title">Knowledge Base</h1>
-        <div class="page-meta">Search and edit assistant rules, notes, aliases, and decisions.</div>
-    </div>
-    <div class="page-actions">
-        <a class="button primary" href="{% url 'assistant_core:global_rule_create' %}">New global rule</a>
-        <a class="button ghost" href="{% url 'assistant_core:supplier_rule_create' %}">New supplier rule</a>
-        <a class="button ghost" href="{% url 'assistant_core:knowledge_note_create' %}">New note</a>
-        <a class="button ghost" href="{% url 'assistant_core:aliases' %}">Alias editor</a>
-    </div>
-</div>
+{% url 'assistant_core:global_rule_create' as global_rule_url %}
+{% include "prices/components/page_header.html" with kicker="Assistant" title="Knowledge Base" meta="Search and edit assistant rules, notes, aliases, and decisions." primary_url=global_rule_url primary_label="New global rule" actions_template="assistant_core/knowledge/_knowledge_actions.html" %}
 
 <div class="workspace-block">
     <div class="layout-inline gap-sm flex-wrap">
@@ -192,36 +181,6 @@
         </table>
     </div>
 
-    {% if page_obj.paginator.num_pages > 1 %}
-        <nav class="pagination-shell space-top-md" aria-label="Knowledge pagination">
-            <div class="pagination-list">
-                {% if page_obj.has_previous %}
-                    <a class="page-link" href="?section={{ active_section }}&q={{ query|urlencode }}&scope={{ scope }}&status={{ status }}&page={{ page_obj.previous_page_number }}">Previous</a>
-                {% endif %}
-                {% for page_num in page_obj.paginator.page_range %}
-                    {% if page_num <= 5 or page_num > page_obj.paginator.num_pages|add:-3 %}
-                        {% if page_num == page_obj.number %}
-                            <span class="page-link is-active">{{ page_num }}</span>
-                        {% else %}
-                            <a class="page-link" href="?section={{ active_section }}&q={{ query|urlencode }}&scope={{ scope }}&status={{ status }}&page={{ page_num }}">{{ page_num }}</a>
-                        {% endif %}
-                    {% endif %}
-                {% endfor %}
-                {% if page_obj.has_next %}
-                    <a class="page-link" href="?section={{ active_section }}&q={{ query|urlencode }}&scope={{ scope }}&status={{ status }}&page={{ page_obj.next_page_number }}">Next</a>
-                {% endif %}
-            </div>
-            <form class="pagination-jump" method="get">
-                <input type="hidden" name="section" value="{{ active_section }}">
-                <input type="hidden" name="q" value="{{ query }}">
-                <input type="hidden" name="scope" value="{{ scope }}">
-                <input type="hidden" name="status" value="{{ status }}">
-                <label for="knowledge-page-jump">Page</label>
-                <input id="knowledge-page-jump" type="number" name="page" min="1" max="{{ page_obj.paginator.num_pages }}" value="{{ page_obj.number }}">
-                <button class="button secondary" type="submit">Go</button>
-            </form>
-            <div class="pagination-summary">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</div>
-        </nav>
-    {% endif %}
+    {% include "prices/components/pagination.html" with page_obj=page_obj class_name="space-top-md" label="Knowledge pagination" jump_id="knowledge-page-jump" %}
 </div>
 {% endblock %}
