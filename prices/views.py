@@ -969,7 +969,7 @@ def _build_business_health_info(supplier, last_import_info, latest_check_info, s
     return {
         "label": "fresh",
         "class_name": "is-success",
-        "note": f"Fresh - warning after 4d without a successful import",
+        "note": "Fresh - warning after 4d without a successful import",
         "code": "fresh",
         "severity": 3,
         "expected_at": expected_label,
