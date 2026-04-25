@@ -25,17 +25,27 @@ jobs:
             pwd
             git pull origin main
             /opt/perfumex/PerfumeX/.venv/bin/pip install -r requirements.txt
-            set -a
-            . /opt/perfumex/PerfumeX/.env
-            set +a
+            while IFS='=' read -r key value || [ -n "$key" ]; do
+              key="${key%%[[:space:]]*}"
+              case "$key" in
+                ''|\#*) continue ;;
+              esac
+              case "$key" in
+                [A-Za-z_][A-Za-z0-9_]*)
+                  value="$(printf '%s' "$value" | tr -d '\r')"
+                  export "$key=$value"
+                  ;;
+              esac
+            done < /opt/perfumex/PerfumeX/.env
             if [ -z "${FERNET_KEYS:-}" ] && [ -z "${SALT_KEY:-}" ]; then
               if [ -z "${SECRET_KEY:-}" ]; then
                 echo "SECRET_KEY is required before deriving FERNET_KEYS"
                 exit 1
               fi
               umask 077
-              printf '\nFERNET_KEYS=%s\n' "$SECRET_KEY" >> /opt/perfumex/PerfumeX/.env
-              export FERNET_KEYS="$SECRET_KEY"
+              FERNET_KEYS="$(printf '%s' "$SECRET_KEY" | sha256sum | awk '{print $1}')"
+              printf '\nFERNET_KEYS=%s\n' "$FERNET_KEYS" >> /opt/perfumex/PerfumeX/.env
+              export FERNET_KEYS
             elif [ -z "${FERNET_KEYS:-}" ]; then
               export FERNET_KEYS="$SALT_KEY"
             fi
