@@ -11,6 +11,37 @@ from catalog.models import compact_decimal_text
 
 CONCENTRATION_ALIAS_CACHE_KEY = "assistant_linking:concentration_aliases:v1"
 REDOS_REGEX_SHAPES = (r"(.+)+", r"(.*)*", r"(.+)*", r"(\w+)+")
+TITLECASE_LOWER_WORDS = {
+    "a",
+    "an",
+    "and",
+    "as",
+    "at",
+    "by",
+    "de",
+    "del",
+    "della",
+    "des",
+    "di",
+    "du",
+    "el",
+    "en",
+    "for",
+    "from",
+    "in",
+    "la",
+    "le",
+    "les",
+    "of",
+    "on",
+    "or",
+    "the",
+    "to",
+    "van",
+    "von",
+    "with",
+}
+TITLECASE_APOSTROPHE_SUFFIXES = {"d", "ll", "m", "re", "s", "t", "ve"}
 
 
 def display_label(value: str, *, default: str = "") -> str:
@@ -18,6 +49,36 @@ def display_label(value: str, *, default: str = "") -> str:
     if not text:
         return ""
     return " ".join(part[:1].upper() + part[1:] for part in text.split())
+
+
+def display_title(value: str) -> str:
+    text = (value or "").strip()
+    if not text:
+        return ""
+
+    def title_piece(piece: str, *, lower_allowed: bool) -> str:
+        if not piece:
+            return piece
+        if lower_allowed and piece.lower() in TITLECASE_LOWER_WORDS:
+            return piece.lower()
+        return piece[:1].upper() + piece[1:]
+
+    words = []
+    for index, word in enumerate(text.split()):
+        lower_allowed = index > 0
+        hyphen_parts = []
+        for hyphen_part in word.split("-"):
+            apostrophe_parts = hyphen_part.split("'")
+            hyphen_parts.append(
+                "'".join(
+                    part.lower()
+                    if sub_index > 0 and part.lower() in TITLECASE_APOSTROPHE_SUFFIXES
+                    else title_piece(part, lower_allowed=lower_allowed and sub_index == 0)
+                    for sub_index, part in enumerate(apostrophe_parts)
+                )
+            )
+        words.append("-".join(hyphen_parts))
+    return " ".join(words)
 
 
 class TimeStampedModel(models.Model):
@@ -168,6 +229,10 @@ class ParsedSupplierProduct(TimeStampedModel):
         return f"{compact_decimal_text(self.size_ml)}ml"
 
     @property
+    def display_product_name(self) -> str:
+        return display_title(self.product_name_text)
+
+    @property
     def display_variant_type(self) -> str:
         if self.is_tester or self.variant_type == "tester":
             return "Tester"
@@ -201,7 +266,7 @@ class ParsedSupplierProduct(TimeStampedModel):
     def display_identity(self) -> str:
         parts = [
             self.display_brand,
-            self.product_name_text,
+            self.display_product_name,
             self.concentration,
             self.display_size,
             self.identity_variant_label,
@@ -256,12 +321,16 @@ class MatchGroup(TimeStampedModel):
         return display_label(self.packaging, default="Standard")
 
     @property
+    def display_canonical_name(self) -> str:
+        return display_title(self.canonical_name)
+
+    @property
     def display_identity(self) -> str:
         variant = self.display_variant_type
         packaging = self.display_packaging
         parts = [
             str(self.normalized_brand) if self.normalized_brand_id else "",
-            self.canonical_name,
+            self.display_canonical_name,
             self.concentration,
             self.display_size,
             variant if variant != "Standard" else "",

@@ -5,7 +5,7 @@
 <div class="page-head">
     <div>
         <span class="page-kicker">Group</span>
-        <h1 class="page-title">{{ group.canonical_name }}</h1>
+        <h1 class="page-title">{{ group.display_canonical_name }}</h1>
         <div class="page-meta">{{ group.group_key }}</div>
     </div>
     <div class="page-actions">
@@ -20,7 +20,7 @@
     </div>
 </div>
 {% url 'assistant_linking:group_queue' as group_queue_url %}
-{% include "prices/_breadcrumbs.html" with parent_label="Group queue" parent_url=group_queue_url current_label=group.canonical_name %}
+{% include "prices/_breadcrumbs.html" with parent_label="Group queue" parent_url=group_queue_url current_label=group.display_canonical_name %}
 <form method="post" action="{% url 'assistant_linking:group_action' group.pk 'exclude' %}" class="workspace-block">
     {% csrf_token %}
     <div class="run-log-meta">

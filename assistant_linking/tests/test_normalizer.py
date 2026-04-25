@@ -4,7 +4,7 @@ from django.test import TestCase
 from unittest.mock import patch
 
 from assistant_core.models import GlobalRule
-from assistant_linking.models import BrandAlias, ConcentrationAlias, ProductAlias
+from assistant_linking.models import BrandAlias, ConcentrationAlias, ParsedSupplierProduct, ProductAlias
 from assistant_linking.services.normalizer import parse_supplier_product, save_parse
 from catalog.models import Brand
 from prices.models import Supplier, SupplierProduct
@@ -99,6 +99,25 @@ class NormalizerTests(TestCase):
         self.assertTrue(woman_parse.is_tester)
         self.assertEqual(men_parse.supplier_gender_hint, "Men")
         self.assertEqual(men_parse.product_name_text, "authentic")
+
+    def test_display_identity_title_cases_scent_but_keeps_joiners_lowercase(self):
+        product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="title-case",
+            name="Example",
+        )
+        parsed = ParsedSupplierProduct.objects.create(
+            supplier_product=product,
+            raw_name=product.name,
+            normalized_text="example",
+            detected_brand_text="Byredo",
+            product_name_text="rose of no man's land in bloom",
+            concentration="Eau de Parfum",
+            size_ml="100",
+        )
+
+        self.assertEqual(parsed.display_product_name, "Rose of No Man's Land in Bloom")
+        self.assertEqual(parsed.display_identity, "Byredo / Rose of No Man's Land in Bloom / Eau de Parfum / 100ml")
 
     def test_femme_keeps_supplier_style_but_matches_women_group(self):
         product = SupplierProduct.objects.create(
