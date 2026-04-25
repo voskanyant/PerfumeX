@@ -7,6 +7,8 @@
 
 {% block content %}
     <div class="page-stack">
+        {% url 'prices:our_product_list' as our_product_list_url %}
+        {% include "prices/_breadcrumbs.html" with parent_label="Our products" parent_url=our_product_list_url current_label=object.name %}
         <div class="section-card">
             <div class="layout-row layout-row--wrap items-start justify-between gap-md">
                 <div>
@@ -15,7 +17,6 @@
                     <p class="page-subtitle space-bottom-none">{{ object.brand }} {{ object.size }}</p>
                 </div>
                 <div class="form-actions">
-                    <a class="button ghost" href="{% url 'prices:our_product_list' %}">Back to our products</a>
                     <a class="button secondary icon" href="{% url 'prices:our_product_update' object.pk %}" title="Edit" aria-label="Edit">
                         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                             <path d="M12 20h9"/>
@@ -53,12 +54,20 @@
                                 <td data-label="Price">{{ offer.current_price|default:"-" }} {{ offer.currency|currency_symbol }}</td>
                                 <td data-label="Last imported">{{ offer.last_imported_at|date:"d/m/Y H:i" }}</td>
                             </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="5" class="empty-state">
+                                    No supplier offers linked yet. <a href="{% url 'prices:product_linking' %}">Link products</a>
+                                </td>
+                            </tr>
                         {% endfor %}
                     </tbody>
                     </table>
                 </div>
             {% else %}
-                <p class="muted space-top-sm">No supplier offers linked yet.</p>
+                <div class="empty-state space-top-sm">
+                    No supplier offers linked yet. <a href="{% url 'prices:product_linking' %}">Link products</a>
+                </div>
             {% endif %}
         </div>
     </div>

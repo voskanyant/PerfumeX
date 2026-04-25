@@ -174,7 +174,7 @@
                         </nav>
                     {% endif %}
                 {% else %}
-                    <div class="products-empty-state">No run logs yet.</div>
+                    <div class="products-empty-state">No run logs yet. <a href="{% url 'prices:supplier_overview' %}">Run an import</a></div>
                 {% endif %}
             </div>
         </div>
@@ -232,7 +232,7 @@ reason={{ diagnostic.message|default:"-" }}</pre>
                         </nav>
                     {% endif %}
                 {% else %}
-                    <div class="products-empty-state">No attachment diagnostics yet.</div>
+                    <div class="products-empty-state">No attachment diagnostics yet. <a href="{% url 'prices:supplier_overview' %}">Run an import</a></div>
                 {% endif %}
             </div>
         </div>
@@ -286,7 +286,7 @@ reason={{ diagnostic.message|default:"-" }}</pre>
                         </nav>
                     {% endif %}
                 {% else %}
-                    <div class="products-empty-state">No import batches yet.</div>
+                    <div class="products-empty-state">No import batches yet. <a href="{% url 'prices:supplier_overview' %}">Run an import</a></div>
                 {% endif %}
             </div>
         </div>

@@ -2,9 +2,11 @@ import os
 import re
 
 from django.db import models
+from django.db.models import Q
 from django.utils import timezone
 from django.conf import settings
 from django.utils.text import slugify
+from encrypted_fields import EncryptedCharField
 
 
 class Currency(models.TextChoices):
@@ -95,7 +97,7 @@ class Mailbox(models.Model):
     host = models.CharField(max_length=200)
     port = models.PositiveIntegerField(default=993)
     username = models.CharField(max_length=200)
-    password = models.CharField(max_length=200)
+    password = EncryptedCharField(max_length=200)
     use_ssl = models.BooleanField(default=True)
     is_active = models.BooleanField(default=True)
     priority = models.PositiveIntegerField(default=100, db_index=True)
@@ -260,6 +262,15 @@ class ImportBatch(models.Model):
     )
     error_message = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["mailbox", "message_id"],
+                condition=Q(message_id__isnull=False) & ~Q(message_id=""),
+                name="uniq_batch_mailbox_message_id",
+            ),
+        ]
 
     def __str__(self) -> str:
         return f"{self.supplier} / {self.created_at:%Y-%m-%d %H:%M}"
@@ -435,12 +446,19 @@ class EmailImportStatus(models.TextChoices):
     CANCELED = "canceled", "Canceled"
 
 
+class EmailImportRunQuerySet(models.QuerySet):
+    def update(self, **kwargs):
+        kwargs.setdefault("updated_at", timezone.now())
+        return super().update(**kwargs)
+
+
 class EmailImportRun(models.Model):
     supplier = models.ForeignKey(Supplier, on_delete=models.CASCADE)
     status = models.CharField(
         max_length=20, choices=EmailImportStatus.choices, default=EmailImportStatus.RUNNING
     )
     started_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
     finished_at = models.DateTimeField(null=True, blank=True)
     total_messages = models.PositiveIntegerField(default=0)
     processed_messages = models.PositiveIntegerField(default=0)
@@ -450,6 +468,8 @@ class EmailImportRun(models.Model):
     errors = models.PositiveIntegerField(default=0)
     last_message = models.TextField(blank=True)
     detailed_log = models.TextField(blank=True)
+
+    objects = EmailImportRunQuerySet.as_manager()
 
     def __str__(self) -> str:
         return f"{self.supplier} {self.started_at:%Y-%m-%d %H:%M}"

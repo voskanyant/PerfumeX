@@ -1,3 +1,40 @@
 {% extends "prices/base.html" %}
 {% block title %}{{ perfume.name }} Research{% endblock %}
-{% block content %}<div class="page-head"><div><span class="page-kicker">Perfume review</span><h1 class="page-title">{{ perfume }}</h1></div><form method="post" action="{% url 'assistant_core:generate_draft' perfume.pk %}">{% csrf_token %}<button class="button primary">Generate draft</button></form></div><div class="workspace-block"><h2 class="kpi-link-title">Sources</h2><table class="data-table"><tbody>{% for source in perfume.sources.all %}<tr><td>{{ source.source_type }}</td><td>{{ source.url }}</td><td>{{ source.reliability }}</td></tr>{% empty %}<tr><td>No sources.</td></tr>{% endfor %}</tbody></table></div><div class="workspace-block space-top-md"><h2 class="kpi-link-title">Claims</h2><table class="data-table"><tbody>{% for claim in perfume.fact_claims.all %}<tr><td>{{ claim.field_name }}</td><td>{{ claim.status }}</td><td>{{ claim.value_json }}</td></tr>{% empty %}<tr><td>No claims.</td></tr>{% endfor %}</tbody></table></div>{% endblock %}
+{% block content %}
+{% url 'assistant_core:research_jobs' as research_jobs_url %}
+{% include "prices/_breadcrumbs.html" with parent_label="Research jobs" parent_url=research_jobs_url current_label=perfume.name %}
+<div class="page-head">
+    <div>
+        <span class="page-kicker">Perfume review</span>
+        <h1 class="page-title">{{ perfume }}</h1>
+    </div>
+    <form method="post" action="{% url 'assistant_core:generate_draft' perfume.pk %}">
+        {% csrf_token %}
+        <button class="button primary">Generate draft</button>
+    </form>
+</div>
+<div class="workspace-block">
+    <h2 class="kpi-link-title">Sources</h2>
+    <table class="data-table">
+        <tbody>
+        {% for source in perfume.sources.all %}
+            <tr><td>{{ source.source_type }}</td><td>{{ source.url }}</td><td>{{ source.reliability }}</td></tr>
+        {% empty %}
+            {% include "prices/components/table_empty.html" with colspan=3 message="No sources." cta_url=research_jobs_url cta_label="Open research jobs" %}
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+<div class="workspace-block space-top-md">
+    <h2 class="kpi-link-title">Claims</h2>
+    <table class="data-table">
+        <tbody>
+        {% for claim in perfume.fact_claims.all %}
+            <tr><td>{{ claim.field_name }}</td><td>{{ claim.status }}</td><td>{{ claim.value_json }}</td></tr>
+        {% empty %}
+            {% include "prices/components/table_empty.html" with colspan=3 message="No claims." cta_url=research_jobs_url cta_label="Open research jobs" %}
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

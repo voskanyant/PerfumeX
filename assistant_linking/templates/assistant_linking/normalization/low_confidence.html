@@ -46,7 +46,11 @@
                 <td>{{ parsed.confidence }}</td>
             </tr>
         {% empty %}
-            <tr><td colspan="5">No low-confidence rows.</td></tr>
+            <tr>
+                <td colspan="5" class="empty-state">
+                    No low-confidence rows. <a href="{% url 'assistant_linking:normalization_dashboard' %}">Back to dashboard</a>
+                </td>
+            </tr>
         {% endfor %}
         </tbody>
     </table>

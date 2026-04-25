@@ -13,7 +13,7 @@
     <p>Delete <strong>{{ object }}</strong>?</p>
     <form method="post">
         {% csrf_token %}
-        <button class="button danger" type="submit">Delete</button>
+        <button class="button danger" type="submit" data-confirm="Delete this catalogue record?">Delete</button>
         <a class="button ghost" href="{% url 'assistant_core:catalog_perfumes' %}">Cancel</a>
     </form>
 </div>

@@ -30,4 +30,6 @@ urlpatterns = [
     path("linking/product/<int:supplier_product_id>/", views.ProductWorkbenchView.as_view(), name="product_workbench"),
     path("linking/product/<int:supplier_product_id>/suggest/", views.GenerateSuggestionsView.as_view(), name="generate_suggestions"),
     path("linking/product/<int:supplier_product_id>/bulk-link/", views.BulkLinkView.as_view(), name="bulk_link"),
+    path("linking/bulk/<int:action_id>/status/", views.BulkLinkStatusView.as_view(), name="bulk_link_status"),
+    path("linking/actions/<int:action_id>/undo/", views.UndoLinkActionView.as_view(), name="undo_link_action"),
 ]

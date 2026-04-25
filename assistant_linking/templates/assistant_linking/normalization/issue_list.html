@@ -38,7 +38,11 @@
                 <td>{{ parsed.confidence }}</td>
             </tr>
         {% empty %}
-            <tr><td colspan="5">No rows in this queue.</td></tr>
+            <tr>
+                <td colspan="5" class="empty-state">
+                    No rows in this queue. <a href="{% url 'assistant_linking:normalization_dashboard' %}">Back to dashboard</a>
+                </td>
+            </tr>
         {% endfor %}
         </tbody>
     </table>

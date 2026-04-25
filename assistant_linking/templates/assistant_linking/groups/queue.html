@@ -1,4 +1,5 @@
 {% extends "prices/base.html" %}
+{% load static %}
 {% block title %}Linking Workbench{% endblock %}
 {% block topbar_label %}Assistant / Linking{% endblock %}
 {% block content %}
@@ -8,14 +9,24 @@
         <h1 class="page-title">Group queue</h1>
         <div class="page-meta">Parsed supplier rows grouped by brand, scent, concentration, size, packaging, and modifiers.</div>
     </div>
-    <form method="post" action="{% url 'assistant_linking:rebuild_groups' %}">
-        {% csrf_token %}
-        <button class="button primary">Rebuild groups</button>
-    </form>
+    <div class="page-actions">
+        {% if last_link_action %}
+        <form method="post" action="{% url 'assistant_linking:undo_link_action' last_link_action.pk %}">
+            {% csrf_token %}
+            <input type="hidden" name="next" value="{{ request.get_full_path }}">
+            <button class="button ghost" type="submit" data-undo-link-action>Undo</button>
+        </form>
+        {% endif %}
+        <button class="button ghost" type="button" data-shortcut-help>Shortcuts</button>
+        <form method="post" action="{% url 'assistant_linking:rebuild_groups' %}">
+            {% csrf_token %}
+            <button class="button primary">Rebuild groups</button>
+        </form>
+    </div>
 </div>
 <div class="workspace-block">
     <form method="get" class="search-wrap">
-        <input type="text" name="brand" value="{{ request.GET.brand }}" placeholder="Search brand or scent...">
+        <input type="text" name="brand" value="{{ request.GET.brand }}" placeholder="Search brand or scent..." data-queue-search>
         <select name="status">
             <option value="">All statuses</option>
             <option value="open" {% if request.GET.status == "open" %}selected{% endif %}>Open</option>
@@ -29,18 +40,41 @@
         <thead><tr><th>Group</th><th>Brand</th><th>Rows</th><th>Status</th><th>Confidence</th><th></th></tr></thead>
         <tbody>
         {% for group in groups %}
-            <tr>
+            <tr data-queue-row>
                 <td><a href="{% url 'assistant_linking:group_detail' group.pk %}">{{ group.canonical_name }}</a></td>
                 <td>{{ group.normalized_brand }}</td>
                 <td>{{ group.item_count }}</td>
                 <td>{{ group.status }}</td>
                 <td>{{ group.confidence }}</td>
-                <td><a class="button ghost" href="{% url 'assistant_linking:group_detail' group.pk %}">Open</a></td>
+                <td><a class="button ghost" href="{% url 'assistant_linking:group_detail' group.pk %}" data-queue-accept>Open</a></td>
             </tr>
         {% empty %}
-            <tr><td colspan="6">No groups yet.</td></tr>
+            <tr>
+                <td colspan="6" class="empty-state">
+                    No groups yet. Use Rebuild groups to create the queue.
+                </td>
+            </tr>
         {% endfor %}
         </tbody>
     </table>
 </div>
+<dialog class="modal" data-shortcut-dialog>
+    <div class="modal-panel">
+        <h2 class="page-title">Queue shortcuts</h2>
+        <table class="data-table">
+            <tbody>
+                <tr><td><kbd>j</kbd> / <kbd>ArrowDown</kbd></td><td>Next item</td></tr>
+                <tr><td><kbd>k</kbd> / <kbd>ArrowUp</kbd></td><td>Previous item</td></tr>
+                <tr><td><kbd>a</kbd> / <kbd>Enter</kbd></td><td>Open current item</td></tr>
+                <tr><td><kbd>u</kbd></td><td>Undo last link action</td></tr>
+                <tr><td><kbd>/</kbd></td><td>Focus search</td></tr>
+                <tr><td><kbd>?</kbd></td><td>Show this help</td></tr>
+            </tbody>
+        </table>
+        <button class="button primary" type="button" data-dialog-close>Close</button>
+    </div>
+</dialog>
+{% endblock %}
+{% block extra_scripts %}
+<script src="{% static 'assistant_linking/js/queue-keys.js' %}"></script>
 {% endblock %}

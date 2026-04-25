@@ -8,7 +8,7 @@
 <div class="page-grid-3">
     <div class="workspace-block">
         <h2 class="kpi-link-title">Merge brands</h2>
-        <form method="post" action="{% url 'assistant_core:catalog_brand_merge' %}" class="form-shell">
+        <form id="brand-merge-form" method="post" action="{% url 'assistant_core:catalog_brand_merge' %}#brand-merge-form" class="form-shell">
             {% csrf_token %}
             {{ brand_merge_form.as_p }}
             <button class="button primary" type="submit">Merge brand</button>
@@ -16,7 +16,7 @@
     </div>
     <div class="workspace-block">
         <h2 class="kpi-link-title">Merge perfumes</h2>
-        <form method="post" action="{% url 'assistant_core:catalog_perfume_merge' %}" class="form-shell">
+        <form id="perfume-merge-form" method="post" action="{% url 'assistant_core:catalog_perfume_merge' %}#perfume-merge-form" class="form-shell">
             {% csrf_token %}
             {{ perfume_merge_form.as_p }}
             <button class="button primary" type="submit">Merge perfume</button>
@@ -38,7 +38,7 @@
                     <td>{% for brand in group %}{{ brand.name }}{% if not forloop.last %}, {% endif %}{% endfor %}</td>
                 </tr>
             {% empty %}
-                {% include "prices/components/table_empty.html" with colspan=1 message="No exact normalized brand duplicates found." %}
+                {% include "prices/components/table_empty.html" with colspan=1 message="No exact normalized brand duplicates found." cta_url="#brand-merge-form" cta_label="Merge manually" %}
             {% endfor %}
             </tbody>
         </table>
@@ -55,7 +55,7 @@
                     <td>{% for perfume in group %}{{ perfume }}{% if not forloop.last %}, {% endif %}{% endfor %}</td>
                 </tr>
             {% empty %}
-                {% include "prices/components/table_empty.html" with colspan=1 message="No exact normalized perfume duplicates found." %}
+                {% include "prices/components/table_empty.html" with colspan=1 message="No exact normalized perfume duplicates found." cta_url="#perfume-merge-form" cta_label="Merge manually" %}
             {% endfor %}
             </tbody>
         </table>

@@ -45,7 +45,7 @@
                     <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="8" cy="5" r="3"/><path d="M2 14c0-3.3 2.7-6 6-6s6 2.7 6 6"/></svg>
                     <span>Suppliers</span>
                 </a>
-                <a href="{% url 'prices:supplier_overview' %}" class="sidebar-link {% if request.resolver_match.url_name == 'supplier_overview' or request.resolver_match.url_name == 'supplier_import' or request.resolver_match.url_name == 'supplier_import_email' or request.resolver_match.url_name == 'supplier_import_email_backfill_bulk' or request.resolver_match.url_name == 'supplier_rates_recalculate' or request.resolver_match.url_name == 'import_detailed_logs' %}active{% endif %}">
+                <a href="{% url 'prices:supplier_overview' %}" class="sidebar-link {% if request.resolver_match.url_name == 'supplier_overview' or request.resolver_match.url_name == 'supplier_import' or request.resolver_match.url_name == 'supplier_import_email' or request.resolver_match.url_name == 'supplier_import_email_backfill_bulk' or request.resolver_match.url_name == 'supplier_rates_recalculate' or request.resolver_match.url_name == 'import_detailed_logs' or request.resolver_match.url_name == 'stuck_email_import_runs' %}active{% endif %}">
                     <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M8 2v8"/><path d="m5 7 3 3 3-3"/><path d="M3 13h10"/></svg>
                     <span>Import Prices</span>
                 </a>
@@ -175,7 +175,7 @@
                     <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="8" cy="5" r="3"/><path d="M2 14c0-3.3 2.7-6 6-6s6 2.7 6 6"/></svg>
                     <span>Suppliers</span>
                 </a>
-                <a href="{% url 'prices:supplier_overview' %}" class="sidebar-link {% if request.resolver_match.url_name == 'supplier_overview' or request.resolver_match.url_name == 'supplier_import' or request.resolver_match.url_name == 'supplier_import_email' or request.resolver_match.url_name == 'supplier_import_email_backfill_bulk' or request.resolver_match.url_name == 'supplier_rates_recalculate' or request.resolver_match.url_name == 'import_detailed_logs' %}active{% endif %}">
+                <a href="{% url 'prices:supplier_overview' %}" class="sidebar-link {% if request.resolver_match.url_name == 'supplier_overview' or request.resolver_match.url_name == 'supplier_import' or request.resolver_match.url_name == 'supplier_import_email' or request.resolver_match.url_name == 'supplier_import_email_backfill_bulk' or request.resolver_match.url_name == 'supplier_rates_recalculate' or request.resolver_match.url_name == 'import_detailed_logs' or request.resolver_match.url_name == 'stuck_email_import_runs' %}active{% endif %}">
                     <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M8 2v8"/><path d="m5 7 3 3 3-3"/><path d="M3 13h10"/></svg>
                     <span>Import Prices</span>
                 </a>

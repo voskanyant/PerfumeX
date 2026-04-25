@@ -7,6 +7,7 @@
 
 {% block content %}
     <div class="page-stack">
+        {% include "prices/_breadcrumbs.html" with parent_label="Import logs" parent_url=back_url current_label=object.pk %}
         <div class="section-card">
             <div class="layout-row layout-row--wrap items-start justify-between gap-md">
                 <div>
@@ -15,11 +16,10 @@
                     <p class="page-subtitle space-bottom-none">Same details as Import Log row, with full batch metadata.</p>
                 </div>
                 <div class="form-actions">
-                    <a class="button ghost" href="{{ back_url }}">Back</a>
-                    <form method="post" action="{% url 'prices:import_delete' object.pk %}" onsubmit="return confirm('Delete this import batch and all related product/snapshot changes?');">
+                    <form method="post" action="{% url 'prices:import_delete' object.pk %}">
                         {% csrf_token %}
                         <input type="hidden" name="next" value="{{ back_url }}">
-                        <button class="button danger" type="submit">Delete batch</button>
+                        <button class="button danger" type="submit" data-confirm="Delete this import batch and all related product/snapshot changes?">Delete batch</button>
                     </form>
                 </div>
             </div>
@@ -92,12 +92,20 @@
                                 <td data-label="Mapping">{{ f.mapping|default:"-" }}</td>
                                 <td data-label="Error">{{ f.error_message|default:"-" }}</td>
                             </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="7" class="empty-state">
+                                    No files in this import. <a href="{% url 'prices:supplier_overview' %}">Run an import</a>
+                                </td>
+                            </tr>
                         {% endfor %}
                     </tbody>
                     </table>
                 </div>
             {% else %}
-                <p class="muted space-top-md">No files in this import.</p>
+                <div class="empty-state space-top-md">
+                    No files in this import. <a href="{% url 'prices:supplier_overview' %}">Run an import</a>
+                </div>
             {% endif %}
         </div>
     </div>

@@ -1,4 +1,5 @@
 {% extends "prices/base.html" %}
+{% load static %}
 {% block title %}Match Group{% endblock %}
 {% block content %}
 <div class="page-head">
@@ -7,8 +8,19 @@
         <h1 class="page-title">{{ group.canonical_name }}</h1>
         <div class="page-meta">{{ group.group_key }}</div>
     </div>
-    <a class="button ghost" href="{% url 'assistant_linking:group_queue' %}">Back to groups</a>
+    <div class="page-actions">
+        {% if last_link_action %}
+        <form method="post" action="{% url 'assistant_linking:undo_link_action' last_link_action.pk %}">
+            {% csrf_token %}
+            <input type="hidden" name="next" value="{{ request.get_full_path }}">
+            <button class="button ghost" type="submit" data-undo-link-action>Undo</button>
+        </form>
+        {% endif %}
+        <button class="button ghost" type="button" data-shortcut-help>Shortcuts</button>
+    </div>
 </div>
+{% url 'assistant_linking:group_queue' as group_queue_url %}
+{% include "prices/_breadcrumbs.html" with parent_label="Group queue" parent_url=group_queue_url current_label=group.canonical_name %}
 <form method="post" action="{% url 'assistant_linking:group_action' group.pk 'exclude' %}" class="workspace-block">
     {% csrf_token %}
     <div class="run-log-meta">
@@ -21,21 +33,44 @@
         <thead><tr><th></th><th>Supplier</th><th>Product</th><th>Active</th><th>Role</th><th>Catalogue link</th></tr></thead>
         <tbody>
         {% for item in items %}
-            <tr>
+            <tr data-queue-row>
                 <td><input type="checkbox" name="item_ids" value="{{ item.pk }}"></td>
                 <td>{{ item.supplier_product.supplier }}</td>
-                <td><a href="{% url 'assistant_linking:product_workbench' item.supplier_product_id %}">{{ item.supplier_product.name }}</a></td>
+                <td><a href="{% url 'assistant_linking:product_workbench' item.supplier_product_id %}" data-queue-accept>{{ item.supplier_product.name }}</a></td>
                 <td>{{ item.supplier_product.is_active|yesno:"active,inactive" }}</td>
                 <td>{{ item.role }}</td>
                 <td>{{ item.supplier_product.catalog_perfume|default:"unlinked" }}</td>
             </tr>
         {% empty %}
-            <tr><td colspan="6">No rows.</td></tr>
+            <tr>
+                <td colspan="6" class="empty-state">
+                    No rows in this group. <a href="{% url 'assistant_linking:group_queue' %}">Return to queue</a>
+                </td>
+            </tr>
         {% endfor %}
         </tbody>
     </table>
     <textarea name="reason" rows="3" placeholder="Reason"></textarea>
-    <button class="button ghost" type="submit">Exclude selected</button>
+    <button class="button ghost" type="submit" data-queue-reject data-confirm="Exclude the selected rows from this group?">Exclude selected</button>
     <button class="button ghost" formaction="{% url 'assistant_linking:group_action' group.pk 'split' %}">Split selected</button>
 </form>
+<dialog class="modal" data-shortcut-dialog>
+    <div class="modal-panel">
+        <h2 class="page-title">Queue shortcuts</h2>
+        <table class="data-table">
+            <tbody>
+                <tr><td><kbd>j</kbd> / <kbd>ArrowDown</kbd></td><td>Next item</td></tr>
+                <tr><td><kbd>k</kbd> / <kbd>ArrowUp</kbd></td><td>Previous item</td></tr>
+                <tr><td><kbd>a</kbd> / <kbd>Enter</kbd></td><td>Open current item</td></tr>
+                <tr><td><kbd>r</kbd></td><td>Exclude current item</td></tr>
+                <tr><td><kbd>u</kbd></td><td>Undo last link action</td></tr>
+                <tr><td><kbd>?</kbd></td><td>Show this help</td></tr>
+            </tbody>
+        </table>
+        <button class="button primary" type="button" data-dialog-close>Close</button>
+    </div>
+</dialog>
+{% endblock %}
+{% block extra_scripts %}
+<script src="{% static 'assistant_linking/js/queue-keys.js' %}"></script>
 {% endblock %}

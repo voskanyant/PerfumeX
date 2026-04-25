@@ -1,10 +1,56 @@
 name: CI
 
 on:
+  push:
   pull_request:
 
+env:
+  PYTHON_VERSION: "3.13"
+  DATABASE_ENGINE: postgres
+  POSTGRES_HOST: 127.0.0.1
+  POSTGRES_PORT: "5432"
+  POSTGRES_DB: perfumex_ci
+  POSTGRES_USER: postgres
+  POSTGRES_PASSWORD: postgres
+  SECRET_KEY: ci-only-not-secret-8f6a90e4d2b64782a4d4c3b2452dd6d7f7e83bb164f24c86
+  FERNET_KEYS: ci-only-fernet-key-8f6a90e4d2b64782a4d4c3b2452dd6d7
+  DEBUG: "0"
+  ALLOWED_HOSTS: 127.0.0.1,localhost
+  CSRF_TRUSTED_ORIGINS: https://127.0.0.1,https://localhost
+  ASSISTANT_USE_OPENAI: "false"
+
 jobs:
-  django:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.npm
+            node_modules
+          key: ${{ runner.os }}-node-${{ hashFiles('package.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+      - run: python -m pip install --upgrade pip
+      - run: pip install -r requirements-dev.txt
+      - run: npm install
+      - run: ruff check .
+      - run: black --check .
+      - run: djlint --check prices/templates assistant_core/templates assistant_linking/templates
+      - run: npx eslint prices/static/prices/js
+
+  migrations:
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -20,25 +66,63 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
-    env:
-      DATABASE_ENGINE: postgres
-      POSTGRES_HOST: 127.0.0.1
-      POSTGRES_PORT: 5432
-      POSTGRES_DB: perfumex_ci
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      SECRET_KEY: ci-secret
-      DEBUG: "0"
-      ALLOWED_HOSTS: 127.0.0.1,localhost
-      ASSISTANT_USE_OPENAI: "false"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.13"
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
       - run: python -m pip install --upgrade pip
-      - run: pip install -r requirements.txt
+      - run: pip install -r requirements-dev.txt
       - run: python manage.py makemigrations --check --dry-run
-      - run: python manage.py migrate
-      - run: python manage.py check
-      - run: python manage.py test
+      - run: python manage.py migrate --plan
+
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: perfumex_ci
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
+      - run: python -m pip install --upgrade pip
+      - run: pip install -r requirements-dev.txt
+      - run: coverage run manage.py test --verbosity=2
+      - run: coverage report --fail-under=30
+
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
+      - run: python -m pip install --upgrade pip
+      - run: pip install -r requirements-dev.txt
+      - run: pip-audit --strict
+      - run: python manage.py check --deploy
+      - run: bandit -r prices assistant_core assistant_linking catalog

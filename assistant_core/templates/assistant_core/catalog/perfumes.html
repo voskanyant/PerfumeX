@@ -31,7 +31,7 @@
                     </td>
                 </tr>
             {% empty %}
-                {% include "prices/components/table_empty.html" with colspan=8 message="No perfumes yet." %}
+                {% include "prices/components/table_empty.html" with colspan=8 message="No perfumes yet." cta_url=create_url cta_label="Add perfume" %}
             {% endfor %}
             </tbody>
         </table>

@@ -11,8 +11,10 @@ __pycache__/
 local_settings.py
 .env
 .env.*
+!.env.example
 
 # Database
+db.sqlite3
 *.sqlite3
 
 # Media & uploads
@@ -21,6 +23,9 @@ local_settings.py
 # OS
 .DS_Store
 Thumbs.db
+
+# Local scratch/output
+tmp/
 
 # Local sync config (contains server details/secrets)
 scripts/db_sync.config.cmd

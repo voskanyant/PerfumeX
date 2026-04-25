@@ -41,6 +41,38 @@
     var isPinnedSearch = false;
     var tableCard = document.querySelector(".products-table-shell, .generic-table-shell, .workspace-table-wrap, .card.p-2.p-md-3");
     var useServerSearch = input.getAttribute("data-server-search") === "1";
+    var SVG_NS = "http://www.w3.org/2000/svg";
+
+    function clearNode(node) {
+        if (!node) return;
+        while (node.firstChild) {
+            node.removeChild(node.firstChild);
+        }
+    }
+
+    function el(tagName, className, text) {
+        var node = document.createElement(tagName);
+        if (className) {
+            node.className = className;
+        }
+        if (text !== undefined && text !== null) {
+            node.textContent = String(text);
+        }
+        return node;
+    }
+
+    function setAttrs(node, attrs) {
+        Object.keys(attrs || {}).forEach(function (key) {
+            var value = attrs[key];
+            if (value === null || value === undefined || value === false) return;
+            node.setAttribute(key, String(value));
+        });
+        return node;
+    }
+
+    function svgEl(tagName, attrs) {
+        return setAttrs(document.createElementNS(SVG_NS, tagName), attrs || {});
+    }
 
     function getStickyTopOffset() {
         var topbar = document.querySelector(".mobile-topbar") || document.querySelector(".topbar");
@@ -216,7 +248,7 @@
         if (!pagination) return;
         var page = Number(data.page || 1);
         var hasKnownTotal = data.num_pages !== null && data.num_pages !== undefined;
-        var html = "<nav class='space-top-md' aria-label='Pagination'><ul class='pagination-list'>";
+        clearNode(pagination);
         if (hasKnownTotal) {
             var totalPages = Number(data.num_pages || 1);
             if (totalPages <= 1) {
@@ -225,35 +257,40 @@
             }
             var start = Math.max(1, page - 2);
             var end = Math.min(totalPages, page + 2);
+            var knownNav = el("nav", "space-top-md");
+            knownNav.setAttribute("aria-label", "Pagination");
+            var knownList = el("ul", "pagination-list");
+            knownNav.appendChild(knownList);
             if (data.has_previous) {
-                html += "<li class='page-item'><a class='page-link' href='#' data-page='" + data.previous_page + "'>Previous</a></li>";
+                knownList.appendChild(buildPageItem(data.previous_page, "Previous", false));
             }
             for (var p = start; p <= end; p += 1) {
-                if (p === page) {
-                    html += "<li class='page-item active'><span class='page-link'>" + p + "</span></li>";
-                } else {
-                    html += "<li class='page-item'><a class='page-link' href='#' data-page='" + p + "'>" + p + "</a></li>";
-                }
+                knownList.appendChild(buildPageItem(p, p, p === page));
             }
             if (data.has_next) {
-                html += "<li class='page-item'><a class='page-link' href='#' data-page='" + data.next_page + "'>Next</a></li>";
+                knownList.appendChild(buildPageItem(data.next_page, "Next", false));
             }
-            html += "</ul><div class='muted space-top-sm'>Page " + page + " of " + totalPages + "</div></nav>";
+            knownNav.appendChild(el("div", "muted space-top-sm", "Page " + page + " of " + totalPages));
+            pagination.appendChild(knownNav);
         } else {
             if (!data.has_previous && !data.has_next) {
                 pagination.style.display = "none";
                 return;
             }
+            var unknownNav = el("nav", "space-top-md");
+            unknownNav.setAttribute("aria-label", "Pagination");
+            var unknownList = el("ul", "pagination-list");
+            unknownNav.appendChild(unknownList);
             if (data.has_previous) {
-                html += "<li class='page-item'><a class='page-link' href='#' data-page='" + data.previous_page + "'>Previous</a></li>";
+                unknownList.appendChild(buildPageItem(data.previous_page, "Previous", false));
             }
-            html += "<li class='page-item active'><span class='page-link'>" + page + "</span></li>";
+            unknownList.appendChild(buildPageItem(page, page, true));
             if (data.has_next) {
-                html += "<li class='page-item'><a class='page-link' href='#' data-page='" + data.next_page + "'>Next</a></li>";
+                unknownList.appendChild(buildPageItem(data.next_page, "Next", false));
             }
-            html += "</ul><div class='muted space-top-sm'>Page " + page + "</div></nav>";
+            unknownNav.appendChild(el("div", "muted space-top-sm", "Page " + page));
+            pagination.appendChild(unknownNav);
         }
-        pagination.innerHTML = html;
         pagination.style.display = "";
         pagination.querySelectorAll("a[data-page]").forEach(function (link) {
             link.addEventListener("click", function (event) {
@@ -262,6 +299,19 @@
                 runAjaxSearch(query, nextPage, true);
             });
         });
+    }
+
+    function buildPageItem(pageNumber, label, active) {
+        var item = el("li", active ? "page-item active" : "page-item");
+        if (active) {
+            item.appendChild(el("span", "page-link", label));
+            return item;
+        }
+        var link = el("a", "page-link", label);
+        link.href = "#";
+        link.dataset.page = String(pageNumber || 1);
+        item.appendChild(link);
+        return item;
     }
 
     function applyLastViewedHighlight() {
@@ -343,20 +393,21 @@
 
     function renderSupplierSelectedChips() {
         if (!supplierSelectedChips) return;
+        clearNode(supplierSelectedChips);
         if (!selectedSupplierIds.length) {
-            supplierSelectedChips.innerHTML = "";
             return;
         }
-        supplierSelectedChips.innerHTML = selectedSupplierIds.map(function (sid) {
+        selectedSupplierIds.forEach(function (sid) {
             var match = supplierOptions.find(function (opt) { return opt.id === sid; });
             var label = match ? match.name : ("Supplier #" + sid);
-            return (
-                "<span class='supplier-selected-chip'>" +
-                escapeHtml(label) +
-                "<button type='button' data-remove-supplier-id='" + escapeHtml(sid) + "' aria-label='Remove supplier'>x</button>" +
-                "</span>"
-            );
-        }).join("");
+            var chip = el("span", "supplier-selected-chip", label);
+            var button = el("button", "", "x");
+            button.type = "button";
+            button.dataset.removeSupplierId = sid;
+            button.setAttribute("aria-label", "Remove supplier");
+            chip.appendChild(button);
+            supplierSelectedChips.appendChild(chip);
+        });
     }
 
     function hydrateSupplierSelection() {
@@ -369,7 +420,7 @@
     function hideSupplierSuggest() {
         if (supplierSuggest) {
             supplierSuggest.style.display = "none";
-            supplierSuggest.innerHTML = "";
+            clearNode(supplierSuggest);
         }
     }
 
@@ -392,9 +443,13 @@
             hideSupplierSuggest();
             return;
         }
-        supplierSuggest.innerHTML = matches.map(function (opt) {
-            return "<div class='supplier-suggest-item' data-id='" + escapeHtml(opt.id) + "' data-name='" + escapeHtml(opt.name) + "'>" + escapeHtml(opt.name) + "</div>";
-        }).join("");
+        clearNode(supplierSuggest);
+        matches.forEach(function (opt) {
+            var item = el("div", "supplier-suggest-item", opt.name);
+            item.dataset.id = opt.id;
+            item.dataset.name = opt.name;
+            supplierSuggest.appendChild(item);
+        });
         supplierSuggest.style.display = "block";
     }
 
@@ -413,52 +468,87 @@
         window.location.href = url.toString();
     }
 
-    function escapeHtml(value) {
-        return String(value || "")
-            .replace(/&/g, "&amp;")
-            .replace(/</g, "&lt;")
-            .replace(/>/g, "&gt;")
-            .replace(/"/g, "&quot;")
-            .replace(/'/g, "&#39;");
-    }
-
-    function buildSparkline(values, deltaDir) {
+    function buildSparkline(values, deltaDir, deltaPercent) {
         var w = 200, h = 32, pad = 3;
         var color = deltaDir === "down" ? "#22c55e" : deltaDir === "up" ? "#ef4444" : "#c8c8c8";
-        var svgOpen = "<svg class=\"product-sparkline\" width=\"100%\" height=\"" + h +
-            "\" viewBox=\"0 0 " + w + " " + h + "\" preserveAspectRatio=\"none\" fill=\"none\" aria-hidden=\"true\">";
-        // No data or single point — flat grey line
+        var dayCount = values && values.length ? values.length : 0;
+        var changeText = deltaPercent ? String(deltaPercent) + "% change" : "no percentage change";
+        var svg = svgEl("svg", {
+            class: "product-sparkline",
+            width: "100%",
+            height: h,
+            viewBox: "0 0 " + w + " " + h,
+            preserveAspectRatio: "none",
+            fill: "none",
+            role: "img",
+            "aria-label": "Price trend over last " + dayCount + " days, " + changeText
+        });
+        // No data or single point: flat grey line.
         if (!values || values.length < 2) {
             var mid = (h / 2).toFixed(1);
-            return svgOpen + "<line x1=\"0\" y1=\"" + mid + "\" x2=\"" + w + "\" y2=\"" + mid +
-                "\" stroke=\"#e2e2e2\" stroke-width=\"1.5\"/></svg>";
+            svg.appendChild(svgEl("line", {
+                x1: "0",
+                y1: mid,
+                x2: w,
+                y2: mid,
+                stroke: "#e2e2e2",
+                "stroke-width": "1.5"
+            }));
+            return svg;
         }
         var min = Math.min.apply(null, values);
         var max = Math.max.apply(null, values);
         var range = max - min || 1;
-        var pts = values.map(function(v, i) {
+        var pts = values.map(function (v, i) {
             var x = pad + (i / (values.length - 1)) * (w - pad * 2);
             var y = (h - pad) - ((v - min) / range) * (h - pad * 2);
             return x.toFixed(1) + "," + y.toFixed(1);
         }).join(" ");
-        return svgOpen + "<polyline points=\"" + pts + "\" stroke=\"" + color +
-            "\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg>";
+        svg.appendChild(svgEl("polyline", {
+            points: pts,
+            stroke: color,
+            "stroke-width": "1.5",
+            "stroke-linecap": "round",
+            "stroke-linejoin": "round"
+        }));
+        return svg;
     }
 
     function buildProductNameCell(nameText, detailUrl) {
-        var escapedName = escapeHtml(nameText);
+        var name = String(nameText || "");
         if (!detailUrl) {
-            return "<span class='cell-name'>" + escapedName + "</span>";
+            return el("span", "cell-name", name);
         }
-        var iconSvg = "<svg viewBox='0 0 16 16' fill='none' stroke='currentColor' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round' aria-hidden='true'>" +
-            "<path d='M6 3H3.75A1.75 1.75 0 0 0 2 4.75v7.5C2 13.216 2.784 14 3.75 14h7.5A1.75 1.75 0 0 0 13 12.25V10'></path>" +
-            "<path d='M9 2h5v5'></path>" +
-            "<path d='M14 2 7.5 8.5'></path>" +
-            "</svg>";
-        return "<span class='cell-name-wrap'>" +
-            "<button class='cell-name cell-name-copy' type='button' data-copy-product-name='" + escapedName + "' aria-label='Copy product name'>" + escapedName + "</button>" +
-            "<a class='cell-name-open' data-product-detail-link href='" + detailUrl + "' aria-label='Open product page' title='Open product page'>" + iconSvg + "</a>" +
-            "</span>";
+        var wrap = el("span", "cell-name-wrap");
+        var button = el("button", "cell-name cell-name-copy", name);
+        button.type = "button";
+        button.dataset.copyProductName = name;
+        button.setAttribute("aria-label", "Copy product name");
+        wrap.appendChild(button);
+        var link = el("a", "cell-name-open");
+        link.dataset.productDetailLink = "";
+        link.href = detailUrl;
+        link.setAttribute("aria-label", "Open product page");
+        link.title = "Open product page";
+        var icon = svgEl("svg", {
+            viewBox: "0 0 16 16",
+            fill: "none",
+            stroke: "currentColor",
+            "stroke-width": "1.6",
+            "stroke-linecap": "round",
+            "stroke-linejoin": "round",
+            "aria-hidden": "true"
+        });
+        [
+            "M6 3H3.75A1.75 1.75 0 0 0 2 4.75v7.5C2 13.216 2.784 14 3.75 14h7.5A1.75 1.75 0 0 0 13 12.25V10",
+            "M9 2h5v5",
+            "M14 2 7.5 8.5"
+        ].forEach(function (pathData) {
+            icon.appendChild(svgEl("path", { d: pathData }));
+        });
+        link.appendChild(icon);
+        wrap.appendChild(link);
+        return wrap;
     }
 
     function ensureCopyToast() {
@@ -526,119 +616,175 @@
         var csrfEl = document.querySelector("input[name='csrfmiddlewaretoken']");
         var csrfValue = csrfEl ? csrfEl.value : "";
         var nextValue = window.location.pathname + window.location.search;
-        var rows = "";
+        clearNode(tbody);
         var inactiveDividerInserted = false;
+        var renderedCount = 0;
+        var hasActions = showActions && !!(editPattern || deletePattern);
+        var colCount = bulkEnabled ? (hasActions ? 8 : 7) : (hasActions ? 7 : 6);
         items.forEach(function (item) {
-            var supplier = escapeHtml(item.supplier);
-            var supplierId = escapeHtml(String(item.supplier_id || ""));
-            var sku = escapeHtml(item.supplier_sku);
+            var supplier = String(item.supplier || "");
+            var supplierId = String(item.supplier_id || "");
+            var sku = String(item.supplier_sku || "");
             var rawName = String(item.name || "");
-            var name = "<span class='cell-name'>" + escapeHtml(rawName) + "</span>";
-            var price = escapeHtml(item.current_price);
-            var originalPrice = escapeHtml(item.original_price || "");
+            var price = String(item.current_price || "");
+            var originalPrice = String(item.original_price || "");
             var deltaDirection = item.price_delta_direction || "";
-            var deltaValue = escapeHtml(item.price_delta_value || "");
-            var deltaPercent = escapeHtml(item.price_delta_percent || "");
+            var deltaValue = String(item.price_delta_value || "");
+            var deltaPercent = String(item.price_delta_percent || "");
             var originalPriceText = originalPrice ? "Original: " + originalPrice : "";
-            var priceAttrs = originalPriceText
-                ? " title='" + originalPriceText + "' data-original-price='" + originalPriceText + "'"
-                : "";
-            var desktopPriceHtml = "<div class='cell-price-main'" + priceAttrs + ">" + price + "</div>";
+            var priceStack = el("div", "desktop-price-stack");
+            var priceMain = el("div", "cell-price-main", price);
+            if (originalPriceText) {
+                priceMain.title = originalPriceText;
+                priceMain.dataset.originalPrice = originalPriceText;
+            }
+            priceStack.appendChild(priceMain);
+            var deltaWrap = el("div", "price-delta-wrap");
+            var deltaBadge = el("span", "price-delta-badge");
             if (deltaDirection && deltaValue) {
                 var arrow = deltaDirection === "down" ? "↓" : "↑";
                 var deltaTail = deltaPercent ? " (" + deltaPercent + ")" : "";
-                desktopPriceHtml += "<div class='price-delta-wrap'><span class='price-delta-badge " +
-                    escapeHtml(deltaDirection) + "'>" + arrow + " " + deltaValue + deltaTail +
-                    "</span></div>";
+                deltaBadge.classList.add(deltaDirection);
+                deltaBadge.appendChild(el("span", "visually-hidden", deltaDirection === "down" ? "Decreased" : "Increased"));
+                deltaBadge.appendChild(document.createTextNode(arrow + " " + deltaValue + deltaTail));
             } else {
-                desktopPriceHtml += "<div class='price-delta-wrap'><span class='price-delta-badge neutral'>- No change</span></div>";
+                deltaBadge.classList.add("neutral");
+                deltaBadge.appendChild(el("span", "visually-hidden", "Unchanged"));
+                deltaBadge.appendChild(document.createTextNode("- No change"));
             }
-            var importedTitle = escapeHtml(item.last_imported_at_full || "");
-            var importedAgeClass = escapeHtml(item.last_imported_age_class || "");
-            var imported = "<span class='cell-imported " + importedAgeClass + "'" + (importedTitle ? " title='" + importedTitle + "' data-full-datetime='" + importedTitle + "'" : "") + ">" + escapeHtml(item.last_imported_at) + "</span>";
-            var mobileSupplier = supplierId
-                ? "<a href='?supplier=" + encodeURIComponent(String(item.supplier_id || "")) + "' class='supplier-filter-link cell-supplier' data-supplier-id='" + supplierId + "'>" + supplier + "</a>"
-                : "<span class='cell-supplier'>" + supplier + "</span>";
-            var priceHtml = "<div class='desktop-price-stack'>" + desktopPriceHtml + "</div>";
+            deltaWrap.appendChild(deltaBadge);
+            priceStack.appendChild(deltaWrap);
+
+            var importedTitle = String(item.last_imported_at_full || "");
+            var importedAgeClass = String(item.last_imported_age_class || "");
+            var imported = el("span", "cell-imported", item.last_imported_at || "");
+            if (importedAgeClass) {
+                imported.classList.add(importedAgeClass);
+            }
+            if (importedTitle) {
+                imported.title = importedTitle;
+                imported.dataset.fullDatetime = importedTitle;
+            }
+
+            var mobileSupplier = supplierId ? el("a", "supplier-filter-link cell-supplier", supplier) : el("span", "cell-supplier", supplier);
+            if (supplierId) {
+                mobileSupplier.href = "?supplier=" + encodeURIComponent(String(item.supplier_id || ""));
+                mobileSupplier.dataset.supplierId = supplierId;
+            }
 
             var detailUrl = "";
             if (detailBase && item.id) {
                 detailUrl = detailBase + item.id + "/?next=" + encodeURIComponent(nextValue) + "&from=" + item.id;
             }
-            name = buildProductNameCell(rawName, detailUrl);
 
-            var checkboxCell = bulkEnabled
-                ? "<td class='select-col bulk-col'><input type='checkbox' name='product_ids' value='" + item.id + "'></td>"
-                : "";
-
-            var actionsCell = "";
-            if (showActions && (editPattern || deletePattern)) {
-                var editUrl = editPattern ? editPattern.replace("/0/", "/" + item.id + "/") : "";
-                var deleteUrl = deletePattern ? deletePattern.replace("/0/", "/" + item.id + "/") : "";
-                actionsCell = "<td class='actions' data-label='Actions'>" +
-                    "<div class='actions-desktop layout-inline items-center gap-sm'>" +
-                    "<details class='actions-menu-desktop'>" +
-                    "<summary aria-label='More actions'>...</summary>" +
-                    "<div class='actions-menu-pop layout-row layout-column gap-sm'>";
-                if (editUrl) {
-                    actionsCell += "<a class='button secondary' href='" + editUrl + "'>Edit</a>";
-                }
-                if (deleteUrl) {
-                    actionsCell += "<form method='post' action='" + deleteUrl + "'>" +
-                        "<input type='hidden' name='csrfmiddlewaretoken' value='" + escapeHtml(csrfValue) + "'>" +
-                        "<input type='hidden' name='next' value='" + escapeHtml(nextValue) + "'>" +
-                        "<button class='button danger' type='submit'>Delete</button></form>";
-                }
-                actionsCell += "</div></details></div><div class='actions-mobile'>" +
-                    "<details class='mobile-actions-menu'>" +
-                    "<summary aria-label='Actions'>...</summary>" +
-                    "<div class='mobile-actions-pop layout-row layout-column gap-sm'>";
-                if (editUrl) {
-                    actionsCell += "<a class='button secondary' href='" + editUrl + "'>Edit</a>";
-                }
-                if (deleteUrl) {
-                    actionsCell += "<form method='post' action='" + deleteUrl + "'>" +
-                        "<input type='hidden' name='csrfmiddlewaretoken' value='" + escapeHtml(csrfValue) + "'>" +
-                        "<input type='hidden' name='next' value='" + escapeHtml(nextValue) + "'>" +
-                        "<button class='button danger' type='submit'>Delete</button></form>";
-                }
-                actionsCell += "</div></details></div></td>";
-            }
-
-            var hasActions = showActions && !!(editPattern || deletePattern);
-            var colCount = bulkEnabled ? (hasActions ? 7 : 6) : (hasActions ? 6 : 5);
-            var rowClass = item.is_active ? "" : "inactive-product-row";
-            var deltaAttr = deltaDirection ? " data-delta='" + escapeHtml(deltaDirection) + "'" : "";
-            var rowClassAttr = rowClass ? " class='" + rowClass + "'" : "";
             if (item.is_active === false && !inactiveDividerInserted) {
-                rows += "<tr class='inactive-divider-row'><td colspan='" + colCount + "'>Inactive products</td></tr>";
+                var dividerRow = el("tr", "inactive-divider-row");
+                var dividerCell = el("td", "", "Inactive products");
+                dividerCell.colSpan = colCount;
+                dividerRow.appendChild(dividerCell);
+                tbody.appendChild(dividerRow);
                 inactiveDividerInserted = true;
             }
 
-            var sparklineHtml = buildSparkline(item.sparkline, deltaDirection);
-            var sparklineCell = "<td data-field='sparkline' class='sparkline-cell'>" + sparklineHtml + "</td>";
-
-            rows += "<tr data-product-id='" + item.id + "'" + rowClassAttr + deltaAttr + ">" +
-                checkboxCell +
-                "<td data-field='supplier_sku' data-label='SKU'><span class='cell-sku'>" + sku + "</span></td>" +
-                "<td data-field='name' data-label='Name'>" + name + "</td>" +
-                "<td data-field='current_price' data-label='Price'>" + priceHtml + "</td>" +
-                "<td data-field='supplier' data-label='Supplier'>" + mobileSupplier + "</td>" +
-                "<td data-field='last_imported_at' data-label='Last imported'>" + imported + "</td>" +
-                sparklineCell +
-                actionsCell +
-            "</tr>";
+            var row = el("tr", item.is_active ? "" : "inactive-product-row");
+            row.dataset.productId = String(item.id || "");
+            if (deltaDirection) {
+                row.dataset.delta = deltaDirection;
+            }
+            if (bulkEnabled) {
+                var checkboxCell = el("td", "select-col bulk-col");
+                var checkbox = document.createElement("input");
+                checkbox.type = "checkbox";
+                checkbox.name = "product_ids";
+                checkbox.value = String(item.id || "");
+                checkboxCell.appendChild(checkbox);
+                row.appendChild(checkboxCell);
+            }
+            row.appendChild(fieldCell("supplier_sku", "SKU", el("span", "cell-sku", sku)));
+            row.appendChild(fieldCell("name", "Name", buildProductNameCell(rawName, detailUrl)));
+            row.appendChild(fieldCell("current_price", "Price", priceStack));
+            row.appendChild(fieldCell("supplier", "Supplier", mobileSupplier));
+            row.appendChild(fieldCell("last_imported_at", "Last imported", imported));
+            row.appendChild(fieldCell("sparkline", "", buildSparkline(item.sparkline, deltaDirection, deltaPercent), "sparkline-cell"));
+            if (hasActions) {
+                row.appendChild(buildActionsCell(item.id, editPattern, deletePattern, csrfValue, nextValue));
+            }
+            tbody.appendChild(row);
+            renderedCount += 1;
         });
 
-        if (!rows) {
-            var hasActions = !!(editPattern || deletePattern);
-            var emptyColspan = bulkEnabled ? (hasActions ? 7 : 6) : (hasActions ? 6 : 5);
-            rows = "<tr><td colspan='" + emptyColspan + "' class='muted'>No records yet.</td></tr>";
+        if (!renderedCount) {
+            var emptyRow = el("tr");
+            var emptyCell = el("td", "muted", "No records yet.");
+            emptyCell.colSpan = colCount;
+            emptyRow.appendChild(emptyCell);
+            tbody.appendChild(emptyRow);
         }
-        tbody.innerHTML = rows;
         decorateButtons(tbody);
         bindMobileDetailTooltips(tbody);
         applyLastViewedHighlight();
+    }
+
+    function fieldCell(field, label, child, className) {
+        var cell = el("td", className || "");
+        cell.dataset.field = field;
+        if (label) {
+            cell.dataset.label = label;
+        }
+        if (child) {
+            cell.appendChild(child);
+        }
+        return cell;
+    }
+
+    function buildActionsCell(itemId, editPattern, deletePattern, csrfValue, nextValue) {
+        var cell = el("td", "actions");
+        cell.dataset.label = "Actions";
+        cell.appendChild(buildActionMenu("actions-desktop layout-inline items-center gap-sm", "actions-menu-desktop", "More actions", "actions-menu-pop layout-row layout-column gap-sm", itemId, editPattern, deletePattern, csrfValue, nextValue));
+        cell.appendChild(buildActionMenu("actions-mobile", "mobile-actions-menu", "Actions", "mobile-actions-pop layout-row layout-column gap-sm", itemId, editPattern, deletePattern, csrfValue, nextValue));
+        return cell;
+    }
+
+    function buildActionMenu(wrapperClass, detailsClass, label, popClass, itemId, editPattern, deletePattern, csrfValue, nextValue) {
+        var wrapper = el("div", wrapperClass);
+        var details = el("details", detailsClass);
+        var summary = el("summary", "", "...");
+        summary.setAttribute("aria-label", label);
+        details.appendChild(summary);
+        var pop = el("div", popClass);
+        var editUrl = editPattern ? editPattern.replace("/0/", "/" + itemId + "/") : "";
+        var deleteUrl = deletePattern ? deletePattern.replace("/0/", "/" + itemId + "/") : "";
+        if (editUrl) {
+            var editLink = el("a", "button secondary", "Edit");
+            editLink.href = editUrl;
+            pop.appendChild(editLink);
+        }
+        if (deleteUrl) {
+            pop.appendChild(buildDeleteForm(deleteUrl, csrfValue, nextValue));
+        }
+        details.appendChild(pop);
+        wrapper.appendChild(details);
+        return wrapper;
+    }
+
+    function buildDeleteForm(deleteUrl, csrfValue, nextValue) {
+        var form = document.createElement("form");
+        form.method = "post";
+        form.action = deleteUrl;
+        var csrf = document.createElement("input");
+        csrf.type = "hidden";
+        csrf.name = "csrfmiddlewaretoken";
+        csrf.value = csrfValue || "";
+        form.appendChild(csrf);
+        var next = document.createElement("input");
+        next.type = "hidden";
+        next.name = "next";
+        next.value = nextValue || "";
+        form.appendChild(next);
+        var button = el("button", "button danger", "Delete");
+        button.type = "submit";
+        form.appendChild(button);
+        return form;
     }
 
     function bindTooltipGroup(container, selector, activeClass, groupName) {

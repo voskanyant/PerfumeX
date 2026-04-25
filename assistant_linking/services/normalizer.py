@@ -6,8 +6,11 @@ from dataclasses import dataclass, field
 from decimal import Decimal, ROUND_HALF_UP
 
 from django.core.cache import cache
+from django.core.mail import mail_admins
 from django.db.models import Q
 from django.utils import timezone
+import logging
+import regex
 
 from assistant_linking.models import (
     CONCENTRATION_ALIAS_CACHE_KEY,
@@ -17,22 +20,32 @@ from assistant_linking.models import (
     ProductAlias,
 )
 from assistant_linking.services.garbage import GARBAGE_MODIFIER, GARBAGE_WARNING_PREFIX, match_garbage_keyword
+from assistant_linking.services.parser_rules import get_parser_terms, get_regex_preprocess_rules
+from assistant_linking.utils.text import normalize_alias_value
 from catalog.models import Brand
 from prices.models import SupplierProduct
 
 
+logger = logging.getLogger(__name__)
 PARSER_VERSION = "deterministic-v1"
+REGEX_ALIAS_TIMEOUT_SECONDS = 1.0
 
 DEFAULT_CONCENTRATION_ALIASES = (
     ("extrait de parfum", "Extrait de Parfum"),
     ("extrait", "Extrait de Parfum"),
+    ("pure perfume", "Extrait de Parfum"),
+    ("perfume", "Extrait de Parfum"),
+    ("parfume", "Extrait de Parfum"),
+    ("parfum", "Extrait de Parfum"),
+    ("духи", "Extrait de Parfum"),
+    ("парфюмированная вода", "Eau de Parfum"),
+    ("парфюмированная", "Eau de Parfum"),
     ("eau de parfum", "Eau de Parfum"),
     ("edp", "Eau de Parfum"),
     ("eau de toilette", "Eau de Toilette"),
     ("edt", "Eau de Toilette"),
     ("eau de cologne", "Eau de Cologne"),
     ("edc", "Eau de Cologne"),
-    ("parfum", "Parfum"),
     ("perfume oil", "Perfume Oil"),
 )
 
@@ -45,10 +58,12 @@ GENDER_ALIASES = (
 MODIFIER_TERMS = ("intense", "elixir", "absolu", "eau intense", "extreme", "sport", "fraiche", "fraicheur")
 TESTER_TERMS = ("tester", "test", "тестер", "тест")
 SAMPLE_TERMS = ("sample", "пробник", "vial")
-TRAVEL_TERMS = ("travel", "мини", "mini")
+TRAVEL_TERMS = ("travel",)
 SET_TERMS = ("set", "набор", "coffret")
 NO_BOX_TERMS = ("no box", "without box", "без короб")
 GENDER_TERMS = ("pour homme", "homme", "uomo", "men", "man", "pour femme", "femme", "donna", "women", "woman", "lady", "unisex", "унисекс", "уни")
+REFILL_MODIFIER = "refill"
+MINI_MODIFIER = "mini"
 
 
 @dataclass
@@ -75,6 +90,12 @@ class ParseResult:
 
 def normalize_text(value: str) -> str:
     text = unicodedata.normalize("NFKC", value or "").lower()
+    for pattern, replacement in get_regex_preprocess_rules():
+        text = _safe_regex_sub(pattern, replacement, text)
+    text = re.sub(r"\beau de (?:parfum(?:e|ume)?|perfume)\b", "eau de parfum", text)
+    text = re.sub(r"\beau de parf\b(?!um)", "eau de parfum", text)
+    text = re.sub(r"(\d+)\.0\s*(?=мл|ml)", r"\1 ", text)
+    text = re.sub(r"(\d+)\s*мл\.?", r"\1 ml", text)
     text = re.sub(r"\b(edp|edt|edc)(?=\d)", r"\1 ", text)
     text = re.sub(r"(?<=\d)(edp|edt|edc)\b", r" \1", text)
     text = re.sub(r"\b(eau de parfum|eau de toilette|eau de cologne|extrait de parfum|extrait|parfum)(?=\d)", r"\1 ", text)
@@ -92,10 +113,14 @@ def get_concentration_alias_rows():
     rows = list(
         ConcentrationAlias.objects.filter(active=True)
         .order_by("supplier__name", "priority", "alias_text")
-        .values_list("supplier_id", "normalized_alias", "concentration", "is_regex")
+        .values_list("supplier_id", "normalized_alias", "concentration", "is_regex", "id", "priority")
     )
     if not rows:
-        rows = [(None, normalize_text(alias_text), concentration, False) for alias_text, concentration in DEFAULT_CONCENTRATION_ALIASES]
+        rows = [
+            (None, normalize_alias_value(alias_text), concentration, False, None, 100)
+            for alias_text, concentration in DEFAULT_CONCENTRATION_ALIASES
+        ]
+    rows = sorted(rows, key=lambda row: (row[5], -len(row[1] or ""), row[1] or ""))
     cache.set(CONCENTRATION_ALIAS_CACHE_KEY, rows, 300)
     return rows
 
@@ -110,6 +135,101 @@ def _contains_phrase(text: str, phrase: str) -> bool:
 
 def _contains_any_phrase(text: str, terms: tuple[str, ...]) -> bool:
     return any(_contains_phrase(text, term) for term in terms)
+
+
+def _kb_terms(rule_kind: str, defaults: tuple[str, ...]) -> tuple[str, ...]:
+    terms = [*defaults, *get_parser_terms(rule_kind)]
+    seen: set[str] = set()
+    normalized_terms: list[str] = []
+    for term in terms:
+        normalized = normalize_text(term)
+        if not normalized or normalized in seen:
+            continue
+        seen.add(normalized)
+        normalized_terms.append(normalized)
+    return tuple(sorted(normalized_terms, key=len, reverse=True))
+
+
+def _tester_terms() -> tuple[str, ...]:
+    return _kb_terms("parser_tester_term", TESTER_TERMS)
+
+
+def _sample_terms() -> tuple[str, ...]:
+    return _kb_terms("parser_sample_term", SAMPLE_TERMS)
+
+
+def _travel_terms() -> tuple[str, ...]:
+    return _kb_terms("parser_travel_term", TRAVEL_TERMS)
+
+
+def _mini_terms() -> tuple[str, ...]:
+    return _kb_terms("parser_mini_term", (MINI_MODIFIER, "мини"))
+
+
+def _set_terms() -> tuple[str, ...]:
+    return _kb_terms("parser_set_term", SET_TERMS)
+
+
+def _refill_terms() -> tuple[str, ...]:
+    return _kb_terms("parser_refill_term", ())
+
+
+def _disable_regex_alias(alias, *, pattern: str, exc) -> None:
+    logger.warning(
+        "regex alias disabled after timeout/error: model=%s id=%s pattern=%s error=%s",
+        alias.__class__.__name__,
+        alias.pk,
+        pattern,
+        exc,
+    )
+    alias.active = False
+    alias.save(update_fields=["active", "updated_at"])
+    mail_admins(
+        "PerfumeX regex alias disabled",
+        (
+            f"{alias.__class__.__name__} #{alias.pk} was disabled because pattern "
+            f"{pattern!r} timed out or failed during matching: {exc}"
+        ),
+        fail_silently=True,
+    )
+
+
+def _safe_regex_search(pattern: str, text: str, alias=None):
+    try:
+        return regex.search(pattern, text, timeout=REGEX_ALIAS_TIMEOUT_SECONDS)
+    except TimeoutError as exc:
+        if alias is not None:
+            _disable_regex_alias(alias, pattern=pattern, exc=exc)
+        else:
+            logger.warning("regex alias skipped after timeout: pattern=%s", pattern)
+        return None
+    except regex.error as exc:
+        if alias is not None:
+            _disable_regex_alias(alias, pattern=pattern, exc=exc)
+        else:
+            logger.warning("regex alias skipped after compile error: pattern=%s error=%s", pattern, exc)
+        return None
+
+
+def _safe_regex_sub(pattern: str, replacement: str, text: str, alias=None) -> str:
+    try:
+        return regex.sub(pattern, replacement, text, timeout=REGEX_ALIAS_TIMEOUT_SECONDS)
+    except TimeoutError as exc:
+        if alias is not None:
+            _disable_regex_alias(alias, pattern=pattern, exc=exc)
+        else:
+            logger.warning("regex alias substitution skipped after timeout: pattern=%s", pattern)
+        return text
+    except regex.error as exc:
+        if alias is not None:
+            _disable_regex_alias(alias, pattern=pattern, exc=exc)
+        else:
+            logger.warning(
+                "regex alias substitution skipped after compile error: pattern=%s error=%s",
+                pattern,
+                exc,
+            )
+        return text
 
 
 def _strip_known_terms(text: str, terms: list[str]) -> str:
@@ -163,6 +283,7 @@ def _extract_loose_trailing_size(text: str) -> tuple[Decimal | None, str, str]:
         "Ð¼Ð¸Ð½Ð¸",
         "Ð½Ð°Ð±Ð¾Ñ€",
     )
+    trailing_terms = tuple({*trailing_terms, *_tester_terms(), *_sample_terms(), *_travel_terms(), *_mini_terms(), *_set_terms(), *_refill_terms()})
     trailing_pattern = "|".join(re.escape(term) for term in trailing_terms)
     match = re.search(
         rf"(?P<prefix>.*?)(?:^|\s)(?P<size>\d+(?:[.,]\d+)?)(?:\s+(?:{trailing_pattern}))*\s*$",
@@ -188,9 +309,9 @@ def _match_aliases(text: str, supplier_id: int | None):
     supplier_aliases = [alias for alias in aliases if alias.supplier_id == supplier_id]
     global_aliases = [alias for alias in aliases if alias.supplier_id is None]
     for alias in supplier_aliases + global_aliases:
-        pattern = alias.normalized_alias or normalize_text(alias.alias_text)
+        pattern = alias.normalized_alias or normalize_alias_value(alias.alias_text)
         if alias.is_regex:
-            if re.search(pattern, text):
+            if _safe_regex_search(pattern, text, alias=alias):
                 return alias, alias.brand
         elif re.search(rf"(^|\s){re.escape(pattern)}($|\s)", text):
             return alias, alias.brand
@@ -220,13 +341,16 @@ def parse_supplier_product(product: SupplierProduct) -> ParseResult:
     concentration_alias_rows = get_concentration_alias_rows()
     supplier_aliases = [row for row in concentration_alias_rows if row[0] == product.supplier_id]
     global_aliases = [row for row in concentration_alias_rows if row[0] is None]
-    for _, needle, value, is_regex in supplier_aliases + global_aliases:
+    for row in supplier_aliases + global_aliases:
+        _, needle, value, is_regex, *rest = row
+        alias_id = rest[0] if rest else None
         if is_regex:
-            matched = re.search(needle, text)
+            alias = ConcentrationAlias.objects.filter(pk=alias_id).first() if alias_id else None
+            matched = _safe_regex_search(needle, text, alias=alias)
             if not matched:
                 continue
             result.concentration = value
-            text = re.sub(needle, " ", text).strip()
+            text = _safe_regex_sub(needle, " ", text, alias=alias).strip()
             break
         if re.search(rf"(^|\s){re.escape(needle)}($|\s)", text):
             result.concentration = value
@@ -238,13 +362,25 @@ def parse_supplier_product(product: SupplierProduct) -> ParseResult:
             result.supplier_gender_hint = value
             break
 
-    result.is_tester = _contains_any_phrase(text, TESTER_TERMS)
-    result.is_sample = _contains_any_phrase(text, SAMPLE_TERMS)
-    result.is_travel = _contains_any_phrase(text, TRAVEL_TERMS)
-    result.is_set = _contains_any_phrase(text, SET_TERMS)
+    tester_terms = _tester_terms()
+    sample_terms = _sample_terms()
+    travel_terms = _travel_terms()
+    mini_terms = _mini_terms()
+    set_terms = _set_terms()
+    refill_terms = _refill_terms()
+
+    result.is_tester = _contains_any_phrase(text, tester_terms)
+    result.is_sample = _contains_any_phrase(text, sample_terms)
+    result.is_travel = _contains_any_phrase(text, travel_terms)
+    is_mini = _contains_any_phrase(text, mini_terms)
+    result.is_set = _contains_any_phrase(text, set_terms)
     result.packaging = "no_box" if _contains_any_phrase(text, NO_BOX_TERMS) else ""
-    result.variant_type = "sample" if result.is_sample else ("travel" if result.is_travel else ("set" if result.is_set else ("tester" if result.is_tester else "standard")))
+    result.variant_type = "sample" if result.is_sample else ("travel" if result.is_travel else ("mini" if is_mini else ("set" if result.is_set else ("tester" if result.is_tester else "standard"))))
     result.modifiers = [term for term in MODIFIER_TERMS if re.search(rf"(^|\s){re.escape(term)}($|\s)", text)]
+    if is_mini and MINI_MODIFIER not in result.modifiers:
+        result.modifiers.append(MINI_MODIFIER)
+    if _contains_any_phrase(text, refill_terms):
+        result.modifiers.append(REFILL_MODIFIER)
 
     alias, brand = _match_aliases(text, product.supplier_id)
     if brand:
@@ -306,10 +442,12 @@ def parse_supplier_product(product: SupplierProduct) -> ParseResult:
                 result.raw_size_text,
                 result.concentration,
                 *GENDER_TERMS,
-                *TESTER_TERMS,
-                *SAMPLE_TERMS,
-                *TRAVEL_TERMS,
-                *SET_TERMS,
+                *tester_terms,
+                *sample_terms,
+                *travel_terms,
+                *mini_terms,
+                *set_terms,
+                *refill_terms,
                 *NO_BOX_TERMS,
             ],
         )

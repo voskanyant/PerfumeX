@@ -8,15 +8,14 @@
         <div class="page-meta">{{ product.supplier }} &middot; {{ product.supplier_sku }}</div>
     </div>
     <div class="page-actions">
-        <a class="button ghost" href="{% url 'assistant_linking:normalization_dashboard' %}">Back</a>
         <form method="post" action="{% url 'assistant_linking:normalization_reparse' product.pk %}">
             {% csrf_token %}
-            <button class="button ghost">Reparse</button>
+            <button class="button ghost" type="submit" data-confirm="Reparse this supplier row?">Reparse</button>
         </form>
         <form method="post" action="{% url 'assistant_linking:normalization_reparse' product.pk %}">
             {% csrf_token %}
             <input type="hidden" name="force" value="1">
-            <button class="button ghost">Force reparse</button>
+            <button class="button ghost" type="submit" data-confirm="Force reparse this supplier row and overwrite parser output?">Force reparse</button>
         </form>
         <form method="post" action="{% url 'assistant_linking:normalization_lock' product.pk %}">
             {% csrf_token %}
@@ -25,6 +24,8 @@
         <a class="button primary" href="{% url 'assistant_linking:product_workbench' product.pk %}">Open linking workbench</a>
     </div>
 </div>
+{% url 'assistant_linking:normalization_dashboard' as normalization_dashboard_url %}
+{% include "prices/_breadcrumbs.html" with parent_label="Normalisation" parent_url=normalization_dashboard_url current_label=product.name %}
 
 <div class="page-grid-3">
     <div class="workspace-block">
@@ -100,7 +101,11 @@
                 </td>
             </tr>
         {% empty %}
-            <tr><td colspan="6">No catalogue candidates yet. Add/import catalogue records first.</td></tr>
+            <tr>
+                <td colspan="6" class="empty-state">
+                    No catalogue candidates yet. <a href="{% url 'assistant_core:catalog_import' %}">Import catalogue records</a>
+                </td>
+            </tr>
         {% endfor %}
         </tbody>
     </table>
@@ -108,8 +113,9 @@
 
 <div class="workspace-block space-top-md">
     <h2 class="kpi-link-title">Teach this product</h2>
-    <form method="post" action="{% url 'assistant_linking:normalization_teach' product.pk %}" class="form-shell">
+    <form id="teach-form" method="post" action="{% url 'assistant_linking:normalization_teach' product.pk %}#teach-form" class="form-shell">
         {% csrf_token %}
+        {{ teach_form.non_field_errors }}
         <div class="table-wrap">
             <table class="data-table">
                 <thead>
@@ -122,44 +128,87 @@
                 <tbody>
                     <tr>
                         <td>Brand</td>
-                        <td>{{ teach_form.supplier_brand_text }}</td>
-                        <td>{{ teach_form.brand_name }}</td>
+                        <td>
+                            {{ teach_form.supplier_brand_text }}
+                            {% if teach_form.supplier_brand_text.errors %}<div class="field-errors" id="id_supplier_brand_text_errors">{{ teach_form.supplier_brand_text.errors }}</div>{% endif %}
+                        </td>
+                        <td>
+                            {{ teach_form.brand_name }}
+                            {% if teach_form.brand_name.errors %}<div class="field-errors" id="id_brand_name_errors">{{ teach_form.brand_name.errors }}</div>{% endif %}
+                        </td>
                     </tr>
                     <tr>
                         <td>Scent name</td>
-                        <td>{{ teach_form.supplier_product_text }}</td>
-                        <td>{{ teach_form.product_name }}</td>
+                        <td>
+                            {{ teach_form.supplier_product_text }}
+                            {% if teach_form.supplier_product_text.errors %}<div class="field-errors" id="id_supplier_product_text_errors">{{ teach_form.supplier_product_text.errors }}</div>{% endif %}
+                        </td>
+                        <td>
+                            {{ teach_form.product_name }}
+                            {% if teach_form.product_name.errors %}<div class="field-errors" id="id_product_name_errors">{{ teach_form.product_name.errors }}</div>{% endif %}
+                        </td>
                     </tr>
                     <tr>
                         <td>Blockers</td>
                         <td colspan="2">
                             {{ teach_form.product_excluded_terms }}
+                            {% if teach_form.product_excluded_terms.errors %}<div class="field-errors" id="id_product_excluded_terms_errors">{{ teach_form.product_excluded_terms.errors }}</div>{% endif %}
                         </td>
                     </tr>
                     <tr>
                         <td>Concentration</td>
-                        <td>{{ teach_form.supplier_concentration_text }}</td>
-                        <td>{{ teach_form.concentration }}</td>
+                        <td>
+                            {{ teach_form.supplier_concentration_text }}
+                            {% if teach_form.supplier_concentration_text.errors %}<div class="field-errors" id="id_supplier_concentration_text_errors">{{ teach_form.supplier_concentration_text.errors }}</div>{% endif %}
+                        </td>
+                        <td>
+                            {{ teach_form.concentration }}
+                            {% if teach_form.concentration.errors %}<div class="field-errors" id="id_concentration_errors">{{ teach_form.concentration.errors }}</div>{% endif %}
+                        </td>
                     </tr>
                     <tr>
                         <td>Size</td>
-                        <td>{{ teach_form.supplier_size_text }}</td>
-                        <td>{{ teach_form.size_ml }}</td>
+                        <td>
+                            {{ teach_form.supplier_size_text }}
+                            {% if teach_form.supplier_size_text.errors %}<div class="field-errors" id="id_supplier_size_text_errors">{{ teach_form.supplier_size_text.errors }}</div>{% endif %}
+                        </td>
+                        <td>
+                            {{ teach_form.size_ml }}
+                            {% if teach_form.size_ml.errors %}<div class="field-errors" id="id_size_ml_errors">{{ teach_form.size_ml.errors }}</div>{% endif %}
+                        </td>
                     </tr>
                     <tr>
                         <td>Audience</td>
-                        <td>{{ teach_form.supplier_audience_text }}</td>
-                        <td>{{ teach_form.audience }}</td>
+                        <td>
+                            {{ teach_form.supplier_audience_text }}
+                            {% if teach_form.supplier_audience_text.errors %}<div class="field-errors" id="id_supplier_audience_text_errors">{{ teach_form.supplier_audience_text.errors }}</div>{% endif %}
+                        </td>
+                        <td>
+                            {{ teach_form.audience }}
+                            {% if teach_form.audience.errors %}<div class="field-errors" id="id_audience_errors">{{ teach_form.audience.errors }}</div>{% endif %}
+                        </td>
                     </tr>
                     <tr>
                         <td>Product type</td>
-                        <td>{{ teach_form.supplier_type_text }}</td>
-                        <td>{{ teach_form.variant_type }}</td>
+                        <td>
+                            {{ teach_form.supplier_type_text }}
+                            {% if teach_form.supplier_type_text.errors %}<div class="field-errors" id="id_supplier_type_text_errors">{{ teach_form.supplier_type_text.errors }}</div>{% endif %}
+                        </td>
+                        <td>
+                            {{ teach_form.variant_type }}
+                            {% if teach_form.variant_type.errors %}<div class="field-errors" id="id_variant_type_errors">{{ teach_form.variant_type.errors }}</div>{% endif %}
+                        </td>
                     </tr>
                     <tr>
                         <td>Packaging</td>
-                        <td>{{ teach_form.supplier_packaging_text }}</td>
-                        <td>{{ teach_form.packaging }}</td>
+                        <td>
+                            {{ teach_form.supplier_packaging_text }}
+                            {% if teach_form.supplier_packaging_text.errors %}<div class="field-errors" id="id_supplier_packaging_text_errors">{{ teach_form.supplier_packaging_text.errors }}</div>{% endif %}
+                        </td>
+                        <td>
+                            {{ teach_form.packaging }}
+                            {% if teach_form.packaging.errors %}<div class="field-errors" id="id_packaging_errors">{{ teach_form.packaging.errors }}</div>{% endif %}
+                        </td>
                     </tr>
                 </tbody>
             </table>
@@ -192,7 +241,10 @@
             <option value="set"></option>
         </datalist>
         <div class="page-grid-3 space-top-md">
-            <p>{{ teach_form.alias_scope.label_tag }}{{ teach_form.alias_scope }}</p>
+            <p>
+                {{ teach_form.alias_scope.label_tag }}{{ teach_form.alias_scope }}
+                {% if teach_form.alias_scope.errors %}<div class="field-errors" id="id_alias_scope_errors">{{ teach_form.alias_scope.errors }}</div>{% endif %}
+            </p>
             <p>
                 <label>{{ teach_form.lock_parse }} Lock this corrected parse</label>
                 <label>{{ teach_form.reparse_similar }} Apply teaching to selected preview rows now</label>
@@ -228,6 +280,12 @@
                         <td><a href="{% url 'assistant_linking:normalization_detail' example.product.pk %}">{{ example.product.name }}</a></td>
                         <td>{% if example.blocked %}blocked by term{% else %}would be affected{% endif %}</td>
                     </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="4" class="empty-state">
+                            No preview rows matched this teaching rule.
+                        </td>
+                    </tr>
                 {% endfor %}
                 </tbody>
             </table>
@@ -248,7 +306,11 @@
                 <td>{{ row.is_active|yesno:"active,inactive" }}</td>
             </tr>
         {% empty %}
-            <tr><td>No similar supplier rows found.</td></tr>
+            <tr>
+                <td colspan="3" class="empty-state">
+                    No similar supplier rows found. <a href="{% url 'assistant_linking:normalization_dashboard' %}">Back to dashboard</a>
+                </td>
+            </tr>
         {% endfor %}
         </tbody>
     </table>

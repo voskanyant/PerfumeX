@@ -10,6 +10,6 @@
         <div class="kpi-link-title">{{ profile.brand.name }}</div>
         <div class="metric-meta">Last run {{ profile.last_success_at|default:"never" }}</div>
     </a>
-{% empty %}<div class="workspace-block">No brand watch profiles.</div>{% endfor %}
+{% empty %}<div class="workspace-block">No brand watch profiles. <a href="{% url 'assistant_core:brand_manager_create' %}">Create one</a></div>{% endfor %}
 </div>
 {% endblock %}

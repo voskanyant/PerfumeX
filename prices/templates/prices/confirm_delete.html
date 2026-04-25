@@ -10,7 +10,7 @@
             <form method="post" class="space-top-md">
                 {% csrf_token %}
                 <div class="form-actions">
-                    <button class="button danger" type="submit">Confirm delete</button>
+                    <button class="button danger" type="submit" data-confirm="Delete this record? This cannot be undone.">Confirm delete</button>
                     <a class="button ghost" href="javascript:history.back()">Cancel</a>
                 </div>
             </form>

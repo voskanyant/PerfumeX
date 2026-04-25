@@ -66,6 +66,32 @@
                 </div>
             </div>
         </form>
+    {% elif active_section == "parser_terms" %}
+        <form method="post" action="{% url 'assistant_core:parser_term_create' %}" class="space-top-md">
+            {% csrf_token %}
+            <div class="layout-grid-12 gap-md items-end">
+                <div class="span-12 md-span-3">
+                    <label class="form-label" for="parser-rule-kind">Rule kind</label>
+                    <select id="parser-rule-kind" name="rule_kind">
+                        <option value="parser_tester_term">Tester term</option>
+                        <option value="parser_sample_term">Sample term</option>
+                        <option value="parser_mini_term">Mini term</option>
+                        <option value="parser_travel_term">Travel term</option>
+                        <option value="parser_set_term">Set term</option>
+                        <option value="parser_refill_term">Refill term</option>
+                        <option value="regex_preprocess">Regex preprocess</option>
+                    </select>
+                </div>
+                <div class="span-12 md-span-6">
+                    <label class="form-label" for="parser-terms">Add term(s)</label>
+                    <textarea id="parser-terms" name="terms" rows="2" placeholder="One term per line. Regex rules use: pattern => replacement"></textarea>
+                </div>
+                <div class="span-12 md-span-3">
+                    <button class="button primary" type="submit">Add parser rule</button>
+                    <p class="page-meta space-top-sm">Approved parser terms affect new parses after reparse.</p>
+                </div>
+            </div>
+        </form>
     {% endif %}
 </div>
 
@@ -73,7 +99,7 @@
     <div class="table-wrap table-scroll-x">
         <table class="data-table">
             <thead>
-                {% if active_section == "global_rules" or active_section == "garbage_keywords" %}
+                {% if active_section == "global_rules" or active_section == "garbage_keywords" or active_section == "parser_terms" %}
                     <tr><th>Title</th><th>Kind</th><th>Keyword / Rule</th><th>Confidence</th><th>Status</th><th>Actions</th></tr>
                 {% elif active_section == "supplier_rules" %}
                     <tr><th>Supplier</th><th>Brand</th><th>Title</th><th>Kind</th><th>Applies to</th><th>Confidence</th><th>Status</th></tr>
@@ -92,21 +118,22 @@
             <tbody>
                 {% for item in items %}
                     <tr>
-                        {% if active_section == "global_rules" or active_section == "garbage_keywords" %}
+                        {% if active_section == "global_rules" or active_section == "garbage_keywords" or active_section == "parser_terms" %}
                             <td>{{ item.title }}</td>
                             <td>{{ item.rule_kind }}</td>
                             <td>{{ item.rule_text }}</td>
                             <td>{{ item.confidence }}</td>
                             <td>{{ item.active|yesno:"active,inactive" }}</td>
                             <td class="actions">
-                                {% if item.active %}
-                                    <form method="post" action="{% url 'assistant_core:rule_disable' 'global' item.pk %}">
-                                        {% csrf_token %}
-                                        <button class="button ghost" type="submit">Disable</button>
-                                    </form>
-                                {% else %}
-                                    -
-                                {% endif %}
+                                <div class="layout-inline gap-sm">
+                                    <a class="button ghost" href="{% url 'assistant_core:global_rule_update' item.pk %}">Edit</a>
+                                    {% if item.active %}
+                                        <form method="post" action="{% url 'assistant_core:rule_disable' 'global' item.pk %}">
+                                            {% csrf_token %}
+                                            <button class="button ghost" type="submit">Disable</button>
+                                        </form>
+                                    {% endif %}
+                                </div>
                             </td>
                         {% elif active_section == "supplier_rules" %}
                             <td>{{ item.supplier }}</td>
@@ -175,7 +202,11 @@
                         {% endif %}
                     </tr>
                 {% empty %}
-                    <tr><td colspan="9">No entries match the current filters.</td></tr>
+                    <tr>
+                        <td colspan="9" class="empty-state">
+                            No entries match the current filters. <a href="{% url 'assistant_core:knowledge' %}?section={{ active_section }}">Reset filters</a>
+                        </td>
+                    </tr>
                 {% endfor %}
             </tbody>
         </table>

@@ -12,6 +12,7 @@
   --grey-700: #303030;
   --success: #22c55e;
   --danger: #ef4444;
+  --sidebar-link-fg: #b0b0b0;
   --sidebar-w: 224px;
   --transition: 0.16s ease;
   --radius-sm: 5px;
@@ -113,7 +114,7 @@ a:hover { color: inherit; }
   gap: 10px;
   width: 100%;
   padding: 9px 24px;
-  color: #888 !important;
+  color: var(--sidebar-link-fg) !important;
   text-decoration: none;
   font-size: 12.5px;
   font-weight: 400;
@@ -233,6 +234,40 @@ a:hover { color: inherit; }
 }
 
 .topbar-breadcrumb span { color: var(--black); }
+
+.breadcrumbs {
+  margin-bottom: 14px;
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--grey-500);
+}
+
+.breadcrumbs ol {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.breadcrumbs li:not(:last-child)::after {
+  content: "/";
+  margin-left: 8px;
+  color: var(--grey-300);
+}
+
+.breadcrumbs a {
+  color: var(--grey-600);
+  text-decoration: none;
+}
+
+.breadcrumbs a:hover {
+  color: var(--black);
+  text-decoration: underline;
+}
 
 .topbar-right {
   margin-left: auto;
@@ -961,6 +996,64 @@ select:focus {
 .search-input-wrap { position: relative; flex: 1; }
 .search-input-wrap input { padding-right: 44px !important; }
 
+.search-input-wrap.is-loading::after,
+.button.is-loading::after,
+button[aria-busy="true"]::after {
+  content: "";
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  margin-left: 8px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  vertical-align: -2px;
+  animation: spin 0.75s linear infinite;
+}
+
+.search-input-wrap.is-loading::after {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  margin-left: 0;
+  margin-top: -6px;
+  color: var(--grey-500);
+}
+
+.search-input-wrap.is-loading .search-clear-text {
+  display: none;
+}
+
+.email-update-banner {
+  display: none;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--grey-200);
+  border-radius: var(--radius-md);
+  background: var(--grey-50);
+  color: var(--grey-700);
+}
+
+.email-update-banner.is-visible {
+  display: flex;
+}
+
+.email-update-banner::before {
+  content: "";
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--grey-600);
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.75s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
 @media (max-width: 767.98px) {
   .search-clear-text {
     right: 2px;
@@ -1059,7 +1152,14 @@ tbody td,
   font-size: 10px;
   font-weight: 400;
   letter-spacing: 0.06em;
+  text-decoration-line: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
 }
+
+.price-delta-badge.up { text-decoration-style: double; }
+.price-delta-badge.down { text-decoration-style: solid; }
+.price-delta-badge.neutral { text-decoration-style: dotted; }
 
 .price-delta-badge.up,
 .price-change-neg,

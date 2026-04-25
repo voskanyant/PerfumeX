@@ -30,7 +30,7 @@
                     </td>
                 </tr>
             {% empty %}
-                {% include "prices/components/table_empty.html" with colspan=7 message="No variants yet." %}
+                {% include "prices/components/table_empty.html" with colspan=7 message="No variants yet." cta_url=create_url cta_label="Add variant" %}
             {% endfor %}
             </tbody>
         </table>

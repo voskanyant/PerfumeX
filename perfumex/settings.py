@@ -11,8 +11,12 @@ https://docs.djangoproject.com/en/5.0/ref/settings/
 """
 
 from pathlib import Path
+from django.core.exceptions import ImproperlyConfigured
+from django.core.management.utils import get_random_secret_key
+import logging
 import os
 
+# Production is safe-by-default: DEBUG now defaults to off. Set DEBUG=1 only for local development.
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -21,21 +25,57 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.getenv("SECRET_KEY", "django-insecure-change-me")
+DEBUG = os.getenv("DEBUG", "0").lower() in {"1", "true", "yes", "on"}
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.getenv("DEBUG", "1") == "1"
+SECRET_KEY = os.getenv("SECRET_KEY", "").strip()
+if not SECRET_KEY:
+    if DEBUG:
+        SECRET_KEY = get_random_secret_key()
+        logging.getLogger(__name__).warning(
+            "SECRET_KEY is missing; using an ephemeral dev-only key because DEBUG is enabled."
+        )
+    else:
+        raise ImproperlyConfigured("SECRET_KEY must be set when DEBUG=False.")
 
-ALLOWED_HOSTS = [
-    host.strip()
-    for host in os.getenv("ALLOWED_HOSTS", "127.0.0.1,localhost").split(",")
-    if host.strip()
+FERNET_KEYS = [
+    key.strip()
+    for key in os.getenv("FERNET_KEYS", os.getenv("SALT_KEY", "")).split(",")
+    if key.strip()
 ]
+if not FERNET_KEYS:
+    if DEBUG:
+        FERNET_KEYS = ["dev-only-fernet-salt-key"]
+        logging.getLogger(__name__).warning(
+            "FERNET_KEYS is missing; using a dev-only encryption salt because DEBUG is enabled."
+        )
+    else:
+        raise ImproperlyConfigured("FERNET_KEYS must be set when DEBUG=False.")
+SALT_KEY = FERNET_KEYS
+
+ALLOWED_HOSTS = [host.strip() for host in os.getenv("ALLOWED_HOSTS", "").split(",") if host.strip()]
 CSRF_TRUSTED_ORIGINS = [
     origin.strip()
     for origin in os.getenv("CSRF_TRUSTED_ORIGINS", "").split(",")
     if origin.strip()
 ]
+if DEBUG and not ALLOWED_HOSTS:
+    ALLOWED_HOSTS = ["127.0.0.1", "localhost"]
+if not DEBUG:
+    if not ALLOWED_HOSTS:
+        raise ImproperlyConfigured("ALLOWED_HOSTS must be set when DEBUG=False.")
+    if not CSRF_TRUSTED_ORIGINS:
+        raise ImproperlyConfigured("CSRF_TRUSTED_ORIGINS must be set when DEBUG=False.")
+
+if not DEBUG:
+    SECURE_SSL_REDIRECT = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_HSTS_SECONDS = 31536000
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+    SECURE_REFERRER_POLICY = "same-origin"
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    X_FRAME_OPTIONS = "DENY"
 
 
 # Application definition
@@ -97,6 +137,7 @@ if DATABASE_ENGINE != "postgres":
         "Set DATABASE_ENGINE=postgres."
     )
 
+# Stray local sqlite files are ignored by runtime PostgreSQL settings and must not be committed.
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
@@ -149,6 +190,10 @@ STATICFILES_STORAGE = "whitenoise.storage.CompressedStaticFilesStorage"
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
+FILE_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10 MB
+DATA_UPLOAD_MAX_MEMORY_SIZE = 25 * 1024 * 1024  # 25 MB
+DATA_UPLOAD_MAX_NUMBER_FIELDS = 2000
+
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.0/ref/settings/#default-auto-field
 
@@ -162,3 +207,55 @@ ASSISTANT_USE_OPENAI = os.getenv("ASSISTANT_USE_OPENAI", "false").lower() in {"1
 OPENAI_MODEL_SUGGESTION = os.getenv("OPENAI_MODEL_SUGGESTION", "gpt-5.4-mini")
 OPENAI_MODEL_RESEARCH = os.getenv("OPENAI_MODEL_RESEARCH", "gpt-5.4")
 OPENAI_MODEL_WRITER = os.getenv("OPENAI_MODEL_WRITER", "gpt-5.4-mini")
+
+LOG_DIR = BASE_DIR / "logs"
+LOG_DIR.mkdir(parents=True, exist_ok=True)
+
+_LOGGING_HANDLERS = {
+    "file": {
+        "class": "logging.handlers.RotatingFileHandler",
+        "filename": str(LOG_DIR / "perfumex.log"),
+        "maxBytes": 10 * 1024 * 1024,
+        "backupCount": 5,
+        "formatter": "standard",
+        "level": "INFO",
+    }
+}
+if DEBUG:
+    _LOGGING_HANDLERS["stderr"] = {
+        "class": "logging.StreamHandler",
+        "formatter": "standard",
+        "level": "ERROR",
+    }
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "standard": {
+            "format": "%(asctime)s %(levelname)s [%(name)s] %(message)s",
+        },
+    },
+    "handlers": _LOGGING_HANDLERS,
+    "root": {
+        "handlers": ["stderr"] if DEBUG else [],
+        "level": "INFO",
+    },
+    "loggers": {
+        "prices": {
+            "handlers": ["file"] + (["stderr"] if DEBUG else []),
+            "level": "INFO",
+            "propagate": False,
+        },
+        "assistant_core": {
+            "handlers": ["file"] + (["stderr"] if DEBUG else []),
+            "level": "INFO",
+            "propagate": False,
+        },
+        "assistant_linking": {
+            "handlers": ["file"] + (["stderr"] if DEBUG else []),
+            "level": "INFO",
+            "propagate": False,
+        },
+    },
+}

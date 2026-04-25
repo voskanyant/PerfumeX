@@ -1,22 +1,15 @@
 import re
-import unicodedata
 
 from django.conf import settings
 from django.core.cache import cache
+from django.core.exceptions import ValidationError
 from django.db import models
+
+from assistant_linking.utils.text import normalize_alias_value
 
 
 CONCENTRATION_ALIAS_CACHE_KEY = "assistant_linking:concentration_aliases:v1"
-
-
-def normalize_alias_value(value: str) -> str:
-    text = unicodedata.normalize("NFKC", value or "").lower()
-    text = re.sub(r"\b(edp|edt|edc)(?=\d)", r"\1 ", text)
-    text = re.sub(r"\b(eau de parfum|eau de toilette|eau de cologne|extrait de parfum|extrait|parfum)(?=\d)", r"\1 ", text)
-    text = re.sub(r"[\u00a0_/,;:|()\[\]{}]+", " ", text)
-    text = re.sub(r"(?<=\d),(?=\d)", ".", text)
-    text = re.sub(r"\s+", " ", text).strip()
-    return text
+REDOS_REGEX_SHAPES = (r"(.+)+", r"(.*)*", r"(.+)*", r"(\w+)+")
 
 
 class TimeStampedModel(models.Model):
@@ -45,6 +38,34 @@ class BrandAlias(TimeStampedModel):
     def __str__(self) -> str:
         scope = self.supplier.name if self.supplier_id else "global"
         return f"{self.alias_text} -> {self.brand} ({scope})"
+
+    def clean(self):
+        super().clean()
+        if not self.normalized_alias and self.alias_text:
+            self.normalized_alias = normalize_alias_value(self.alias_text)
+        pattern = self.normalized_alias or self.alias_text
+        if self.is_regex and pattern:
+            try:
+                re.compile(pattern)
+            except re.error as exc:
+                raise ValidationError({"normalized_alias": f"Invalid regex: {exc}"})
+            if len(pattern) > 200:
+                raise ValidationError({"normalized_alias": "Pattern too long (max 200 chars)."})
+            for bad in REDOS_REGEX_SHAPES:
+                if bad in pattern:
+                    raise ValidationError(
+                        {
+                            "normalized_alias": (
+                                f"Pattern contains catastrophic-backtracking shape: {bad}"
+                            )
+                        }
+                    )
+
+    def save(self, *args, **kwargs):
+        if not self.normalized_alias:
+            self.normalized_alias = normalize_alias_value(self.alias_text)
+        self.full_clean()
+        return super().save(*args, **kwargs)
 
 
 class ProductAlias(TimeStampedModel):
@@ -215,6 +236,48 @@ class ManualLinkDecision(models.Model):
         return f"{self.supplier_product} / {self.decision_type}"
 
 
+class ManualLinkDecisionAudit(models.Model):
+    previous_pk = models.PositiveBigIntegerField(db_index=True)
+    previous_decision_json = models.JSONField()
+    replaced_by = models.ForeignKey(
+        ManualLinkDecision,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="replacement_audits",
+    )
+    replaced_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ("-replaced_at",)
+
+    def __str__(self) -> str:
+        return f"ManualLinkDecision#{self.previous_pk} replaced"
+
+
+class LinkAction(models.Model):
+    ACTION_BULK_LINK = "bulk_link"
+    ACTION_UNDO_BULK_LINK = "undo_bulk_link"
+    ACTION_CHOICES = (
+        (ACTION_BULK_LINK, "Bulk link"),
+        (ACTION_UNDO_BULK_LINK, "Undo bulk link"),
+    )
+
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="assistant_link_actions")
+    action_type = models.CharField(max_length=40, choices=ACTION_CHOICES, db_index=True)
+    payload_json = models.JSONField(default=dict)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ("-created_at", "-id")
+        indexes = [
+            models.Index(fields=["user", "-created_at"], name="alink_action_user_created_idx"),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.user} / {self.action_type} / {self.created_at:%Y-%m-%d %H:%M:%S}"
+
+
 class LinkSuggestion(TimeStampedModel):
     STATUS_PENDING = "pending"
     STATUS_APPROVED = "approved"
@@ -243,6 +306,12 @@ class LinkSuggestion(TimeStampedModel):
 
     class Meta:
         ordering = ("-confidence", "-created_at")
+        indexes = [
+            models.Index(
+                fields=["supplier_product", "status"],
+                name="alink_sugg_product_status_idx",
+            ),
+        ]
 
     def __str__(self) -> str:
         return f"{self.supplier_product} / {self.confidence}"

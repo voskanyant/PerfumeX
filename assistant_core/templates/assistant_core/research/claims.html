@@ -1,3 +1,34 @@
 {% extends "prices/base.html" %}
-{% block title %}Fact Claims{% endblock %}
-{% block content %}<div class="page-head"><div><span class="page-kicker">Research</span><h1 class="page-title">Fact claims</h1></div></div><div class="workspace-block"><table class="data-table"><tbody>{% for claim in claims %}<tr><td>{{ claim.perfume }}</td><td>{{ claim.field_name }}</td><td>{{ claim.status }}</td><td><form method="post" action="{% url 'assistant_core:claim_status' claim.pk 'approved' %}">{% csrf_token %}<button class="button ghost">Approve</button></form></td><td><form method="post" action="{% url 'assistant_core:claim_status' claim.pk 'rejected' %}">{% csrf_token %}<button class="button ghost">Reject</button></form></td></tr>{% empty %}<tr><td>No claims.</td></tr>{% endfor %}</tbody></table></div>{% endblock %}
+{% block content %}
+<div class="page-head">
+    <div><span class="page-kicker">Research</span><h1 class="page-title">Fact claims</h1></div>
+</div>
+<div class="workspace-block">
+    <table class="data-table">
+        <tbody>
+        {% for claim in claims %}
+            <tr>
+                <td>{{ claim.perfume }}</td>
+                <td>{{ claim.field_name }}</td>
+                <td>{{ claim.status }}</td>
+                <td>
+                    <form method="post" action="{% url 'assistant_core:claim_status' claim.pk 'approved' %}">
+                        {% csrf_token %}
+                        <button class="button ghost">Approve</button>
+                    </form>
+                </td>
+                <td>
+                    <form method="post" action="{% url 'assistant_core:claim_status' claim.pk 'rejected' %}">
+                        {% csrf_token %}
+                        <button class="button ghost">Reject</button>
+                    </form>
+                </td>
+            </tr>
+        {% empty %}
+            {% url 'assistant_core:research_jobs' as research_jobs_url %}
+            {% include "prices/components/table_empty.html" with colspan=5 message="No claims." cta_url=research_jobs_url cta_label="Open research jobs" %}
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

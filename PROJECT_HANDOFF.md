@@ -97,11 +97,32 @@ This is separate from the custom workspace and should be treated as secondary, n
 
 - Applies only to `/admin/`.
 - Redirects anonymous users to login.
-- Redirects authenticated non-staff users back to `/`.
+- Redirects authenticated non-staff users back to `/` for safe requests.
+- Returns `403` for authenticated non-staff unsafe requests so POST bulk actions cannot silently redirect after denial.
 
 ### Staff-only management screens
 
 User and group views use `StaffRequiredMixin` in addition to the `/admin/` middleware.
+
+### Authentication And Access Rules
+
+The custom `/admin/` workspace is staff-only at middleware level, but destructive POST actions also use explicit Django model permissions and return `403` when an authenticated user lacks the permission.
+
+Permission gates for bulk or cleanup actions:
+
+- `ImportDeleteBulkView`: `prices.delete_importbatch`
+- `SupplierProductCleanupView`: `prices.delete_supplierproduct`
+- `SupplierProductInactiveCleanupView`: `prices.delete_supplierproduct`
+- `SupplierProductBulkDeleteView`: `prices.delete_supplierproduct`
+- `SupplierEmailBackfillBulkView`: `prices.add_emailimportrun`
+- `SupplierRatesRecalculateView`: `prices.change_exchangerate`
+- `SupplierEmailImportAllView`: `prices.add_emailimportrun`
+- `SupplierPriceReimportAllView`: `prices.change_importbatch`
+- `CurrencyRateBulkDeleteView`: `prices.delete_exchangerate`
+
+Single-object delete views inherit their delete permission from the target model through `BaseDeleteView`. The mapping preview upload endpoint relies on normal Django CSRF protection; keep `{% csrf_token %}` in the supplier import form and send `X-CSRFToken` from JavaScript previews.
+
+Assistant linking routes use `StaffAssistantMixin`; POST handlers there require an authenticated staff user before any mutation runs.
 
 ## 5. Data Model And Responsibilities
 
@@ -486,13 +507,63 @@ Because of `--noreload`, changes often look "not applied" until the local server
 
 This has already caused confusion during UI work and should be remembered before debugging stale templates or CSS.
 
+### Manual UI verification
+
+Keyboard-test the mobile drawer focus trap after front-end changes:
+
+```js
+// Playwright snippet, run against a local dev server.
+await page.goto("http://127.0.0.1:8000/admin/products/");
+await page.getByRole("button", { name: /filters/i }).click();
+const drawer = page.locator("[data-drawer='product-filters']");
+await expect(drawer).toHaveClass(/is-open/);
+await page.keyboard.press("Tab");
+await expect(drawer.locator(":focus")).toHaveCount(1);
+await page.keyboard.press("Shift+Tab");
+await expect(drawer.locator(":focus")).toHaveCount(1);
+await page.keyboard.press("Escape");
+await expect(drawer).not.toHaveClass(/is-open/);
+```
+
 ### Local database reality
 
-- repository contains `db.sqlite3`
+- a local checkout may contain a large `db.sqlite3` artifact
 - current Django settings do not allow SQLite
 - local app still needs PostgreSQL
 
 Treat `db.sqlite3` as an artifact, not the active runtime database.
+
+### Removing sqlite from git history
+
+If `db.sqlite3` ever appears in Git history, coordinate a short maintenance window before rewriting history because every collaborator and deployment checkout will need to rebase or reclone afterward. Do not run these commands casually on a shared branch.
+
+Preferred `git filter-repo` flow:
+
+1. Confirm the file is tracked or present in history:
+   `git ls-files | grep sqlite3`
+   `git log --all --oneline -- db.sqlite3`
+2. Make a fresh mirror clone outside the working copy:
+   `git clone --mirror <repo-url> perfumex-history-cleanup.git`
+3. Rewrite history in that mirror:
+   `git filter-repo --path db.sqlite3 --invert-paths`
+4. Inspect the result:
+   `git log --all --oneline -- db.sqlite3`
+5. Force-push all rewritten refs only after operator approval:
+   `git push --force --mirror`
+
+BFG alternative:
+
+1. Make a fresh mirror clone:
+   `git clone --mirror <repo-url> perfumex-history-cleanup.git`
+2. Remove sqlite blobs:
+   `bfg --delete-files db.sqlite3`
+3. Expire and compact old objects:
+   `git reflog expire --expire=now --all`
+   `git gc --prune=now --aggressive`
+4. Force-push the cleaned mirror only after operator approval:
+   `git push --force --mirror`
+
+After either method, rotate any secrets that might have been present in the database and ask every clone to fetch the rewritten branch cleanly.
 
 ## 13. Management Commands
 

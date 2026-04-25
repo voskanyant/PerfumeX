@@ -4,6 +4,7 @@ from catalog.models import Brand, Perfume
 from prices.models import Supplier
 
 from . import models
+from .utils.text import normalize_alias_value
 
 
 class BrandAliasForm(forms.ModelForm):
@@ -30,7 +31,7 @@ class BrandAliasForm(forms.ModelForm):
     def clean(self):
         cleaned = super().clean()
         if not cleaned.get("normalized_alias") and cleaned.get("alias_text"):
-            cleaned["normalized_alias"] = models.normalize_alias_value(cleaned["alias_text"])
+            cleaned["normalized_alias"] = normalize_alias_value(cleaned["alias_text"])
         return cleaned
 
 
@@ -93,7 +94,7 @@ class ConcentrationAliasForm(forms.ModelForm):
     def clean(self):
         cleaned = super().clean()
         if not cleaned.get("normalized_alias") and cleaned.get("alias_text"):
-            cleaned["normalized_alias"] = models.normalize_alias_value(cleaned["alias_text"])
+            cleaned["normalized_alias"] = normalize_alias_value(cleaned["alias_text"])
         return cleaned
 
 

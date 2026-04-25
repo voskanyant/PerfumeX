@@ -1,4 +1,5 @@
 {% extends "prices/base.html" %}
+{% load static %}
 {% block title %}Product Workbench{% endblock %}
 {% block content %}
 <div class="page-head">
@@ -8,7 +9,13 @@
         <div class="page-meta">{{ product.supplier }} &middot; {{ product.supplier_sku }}</div>
     </div>
     <div class="page-actions">
-        <a class="button ghost" href="{% url 'assistant_linking:group_queue' %}">Back to groups</a>
+        {% if last_link_action %}
+        <form method="post" action="{% url 'assistant_linking:undo_link_action' last_link_action.pk %}">
+            {% csrf_token %}
+            <input type="hidden" name="next" value="{{ request.get_full_path }}">
+            <button class="button ghost" type="submit" data-undo-link-action>Undo</button>
+        </form>
+        {% endif %}
         <form method="post" action="{% url 'assistant_linking:generate_suggestions' product.pk %}">
             {% csrf_token %}
             <button class="button primary">Generate suggestions</button>
@@ -26,7 +33,7 @@
         {% for row in same_supplier %}
             <div>{{ row.name }}</div>
         {% empty %}
-            <div>No related rows.</div>
+            <div class="empty-state">No related rows. <a href="{% url 'assistant_linking:group_queue' %}">Open queue</a></div>
         {% endfor %}
     </div>
     <div class="workspace-block">
@@ -45,13 +52,19 @@
                 </form>
             </div>
         {% empty %}
-            <p>No suggestions yet.</p>
+            <div class="empty-state">No suggestions yet. Generate suggestions to review catalogue candidates.</div>
         {% endfor %}
     </div>
     <div class="workspace-block">
         <h2 class="kpi-link-title">Similar products</h2>
-        <form method="post" action="{% url 'assistant_linking:bulk_link' product.pk %}">
+        <form method="post" action="{% url 'assistant_linking:bulk_link' product.pk %}" data-bulk-link-form>
             {% csrf_token %}
+            <div class="run-log-meta" data-bulk-progress hidden>
+                <span data-bulk-status>Queued</span>
+                <progress value="0" max="100" data-bulk-progress-bar></progress>
+                <span data-bulk-counts></span>
+                <a href="#" data-bulk-undo hidden>Undo</a>
+            </div>
             <table class="data-table">
                 <tbody>
                 {% for row in similar %}
@@ -62,7 +75,11 @@
                         <td>{{ row.catalog_perfume|default:"unlinked" }}</td>
                     </tr>
                 {% empty %}
-                    <tr><td>No similar products.</td></tr>
+                    <tr>
+                        <td colspan="4" class="empty-state">
+                            No similar products. <a href="{% url 'assistant_linking:group_queue' %}">Open queue</a>
+                        </td>
+                    </tr>
                 {% endfor %}
                 </tbody>
             </table>
@@ -71,4 +88,87 @@
         </form>
     </div>
 </div>
+{% url 'assistant_linking:group_queue' as group_queue_url %}
+{% include "prices/_breadcrumbs.html" with parent_label="Group queue" parent_url=group_queue_url current_label=product.name %}
+{% endblock %}
+{% block extra_scripts %}
+<script>
+(function () {
+    var form = document.querySelector("[data-bulk-link-form]");
+    if (!form) return;
+    var panel = document.querySelector("[data-bulk-progress]");
+    var statusText = document.querySelector("[data-bulk-status]");
+    var progressBar = document.querySelector("[data-bulk-progress-bar]");
+    var counts = document.querySelector("[data-bulk-counts]");
+    var undoLink = document.querySelector("[data-bulk-undo]");
+
+    function csrfToken() {
+        var token = form.querySelector("input[name='csrfmiddlewaretoken']");
+        return token ? token.value : "";
+    }
+
+    function updateProgress(data) {
+        if (!panel) return;
+        panel.hidden = false;
+        statusText.textContent = data.status || "RUNNING";
+        progressBar.value = data.percent || 0;
+        counts.textContent = "Matched " + (data.matched || 0) + ", linked " + (data.linked || 0) + ", skipped " + (data.skipped || 0);
+        if (data.status === "COMPLETE" && data.undo_url) {
+            undoLink.hidden = false;
+            undoLink.href = data.undo_url;
+        }
+    }
+
+    function pollStatus(url) {
+        window.setTimeout(function () {
+            fetch(url, {headers: {"X-Requested-With": "XMLHttpRequest"}})
+                .then(function (response) { return response.json(); })
+                .then(function (data) {
+                    updateProgress(data);
+                    if (data.status !== "COMPLETE" && data.status !== "FAILED") pollStatus(url);
+                });
+        }, 1000);
+    }
+
+    form.addEventListener("submit", function (event) {
+        event.preventDefault();
+        panel.hidden = false;
+        statusText.textContent = "Submitting";
+        fetch(form.action, {
+            method: "POST",
+            body: new FormData(form),
+            headers: {"X-Requested-With": "XMLHttpRequest"}
+        }).then(function (response) {
+            if (response.status === 202) return response.json();
+            window.location.reload();
+            return null;
+        }).then(function (data) {
+            if (!data) return;
+            statusText.textContent = "Accepted";
+            if (data.undo_url) {
+                undoLink.href = data.undo_url;
+            }
+            pollStatus(data.status_url);
+        });
+    });
+
+    if (undoLink) {
+        undoLink.addEventListener("click", function (event) {
+            event.preventDefault();
+            fetch(undoLink.href, {
+                method: "POST",
+                headers: {
+                    "X-CSRFToken": csrfToken(),
+                    "X-Requested-With": "XMLHttpRequest"
+                }
+            }).then(function (response) {
+                if (response.ok) {
+                    statusText.textContent = "UNDONE";
+                    undoLink.hidden = true;
+                }
+            });
+        });
+    }
+})();
+</script>
 {% endblock %}

@@ -1,5 +1,6 @@
 from django.contrib import admin
 
+from . import forms
 from . import models
 
 
@@ -12,6 +13,7 @@ class SupplierAdmin(admin.ModelAdmin):
 
 @admin.register(models.Mailbox)
 class MailboxAdmin(admin.ModelAdmin):
+    form = forms.MailboxForm
     list_display = ("name", "protocol", "host", "username", "is_active")
     search_fields = ("name", "host", "username")
     list_filter = ("protocol", "is_active")

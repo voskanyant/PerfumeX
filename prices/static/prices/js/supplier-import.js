@@ -9,6 +9,15 @@
     var modeStatus = document.getElementById("mode-status");
     if (!fileInput || !supplierId) return;
 
+    function getCookie(name) {
+        var value = "; " + document.cookie;
+        var parts = value.split("; " + name + "=");
+        if (parts.length === 2) {
+            return decodeURIComponent(parts.pop().split(";").shift());
+        }
+        return "";
+    }
+
     function setMode(next) {
         mode = next;
         if (modeStatus) {
@@ -77,7 +86,10 @@
         var url = "/suppliers/" + supplierId + "/mapping-preview/";
         fetch(url, {
             method: "POST",
-            headers: { "X-Requested-With": "XMLHttpRequest" },
+            headers: {
+                "X-Requested-With": "XMLHttpRequest",
+                "X-CSRFToken": getCookie("csrftoken")
+            },
             body: formData
         }).then(function (res) { return res.json(); })
           .then(function (data) {

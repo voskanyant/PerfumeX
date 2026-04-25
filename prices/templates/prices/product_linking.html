@@ -55,6 +55,12 @@
                                     <td data-label="SKU">{{ product.supplier_sku|fix_text }}</td>
                                     <td data-label="Name">{{ product.name|fix_text }}</td>
                                 </tr>
+                            {% empty %}
+                                <tr>
+                                    <td colspan="3" class="empty-state">
+                                        No supplier products found. <a href="{% url 'prices:supplier_overview' %}">Run an import</a>
+                                    </td>
+                                </tr>
                             {% endfor %}
                         </tbody>
                         </table>

@@ -7,7 +7,7 @@ from collections import defaultdict
 
 from django.db import transaction
 from django.db.models import Count, Q
-from django.shortcuts import get_object_or_404, redirect
+from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse_lazy
 from django.utils import timezone
 from django.core.paginator import Paginator
@@ -63,6 +63,7 @@ class KnowledgeView(StaffAssistantMixin, TemplateView):
     paginate_by = 50
 
     SECTION_GARBAGE_KEYWORDS = "garbage_keywords"
+    SECTION_PARSER_TERMS = "parser_terms"
     SECTION_GLOBAL_RULES = "global_rules"
     SECTION_SUPPLIER_RULES = "supplier_rules"
     SECTION_NOTES = "notes"
@@ -79,6 +80,7 @@ class KnowledgeView(StaffAssistantMixin, TemplateView):
         SECTION_CONCENTRATION_ALIASES,
         SECTION_DECISIONS,
         SECTION_GARBAGE_KEYWORDS,
+        SECTION_PARSER_TERMS,
     }
 
     def _active_section(self):
@@ -104,10 +106,22 @@ class KnowledgeView(StaffAssistantMixin, TemplateView):
     def _queryset_for_section(self, section, query):
         from assistant_linking.models import BrandAlias, ConcentrationAlias, ManualLinkDecision, ProductAlias
 
-        if section in {self.SECTION_GLOBAL_RULES, self.SECTION_GARBAGE_KEYWORDS}:
+        if section in {self.SECTION_GLOBAL_RULES, self.SECTION_GARBAGE_KEYWORDS, self.SECTION_PARSER_TERMS}:
             queryset = models.GlobalRule.objects.order_by("priority", "title")
             if section == self.SECTION_GARBAGE_KEYWORDS:
                 queryset = queryset.filter(rule_kind__in=("garbage_keyword", "exclude_keyword"))
+            elif section == self.SECTION_PARSER_TERMS:
+                queryset = queryset.filter(
+                    rule_kind__in=(
+                        "parser_tester_term",
+                        "parser_sample_term",
+                        "parser_mini_term",
+                        "parser_travel_term",
+                        "parser_set_term",
+                        "parser_refill_term",
+                        "regex_preprocess",
+                    )
+                )
             if query:
                 queryset = queryset.filter(
                     Q(title__icontains=query)
@@ -221,6 +235,21 @@ class KnowledgeView(StaffAssistantMixin, TemplateView):
             {"key": self.SECTION_PRODUCT_ALIASES, "label": "Product aliases", "count": ProductAlias.objects.count()},
             {"key": self.SECTION_CONCENTRATION_ALIASES, "label": "Concentration aliases", "count": ConcentrationAlias.objects.count()},
             {"key": self.SECTION_GARBAGE_KEYWORDS, "label": "Garbage keywords", "count": models.GlobalRule.objects.filter(rule_kind__in=("garbage_keyword", "exclude_keyword")).count()},
+            {
+                "key": self.SECTION_PARSER_TERMS,
+                "label": "Parser terms",
+                "count": models.GlobalRule.objects.filter(
+                    rule_kind__in=(
+                        "parser_tester_term",
+                        "parser_sample_term",
+                        "parser_mini_term",
+                        "parser_travel_term",
+                        "parser_set_term",
+                        "parser_refill_term",
+                        "regex_preprocess",
+                    )
+                ).count(),
+            },
             {"key": self.SECTION_GLOBAL_RULES, "label": "Global rules", "count": models.GlobalRule.objects.count()},
             {"key": self.SECTION_SUPPLIER_RULES, "label": "Supplier rules", "count": models.SupplierRule.objects.count()},
             {"key": self.SECTION_NOTES, "label": "Notes", "count": models.KnowledgeNote.objects.count()},
@@ -503,6 +532,13 @@ class GlobalRuleCreateView(StaffAssistantMixin, CreateView):
         return super().form_valid(form)
 
 
+class GlobalRuleUpdateView(StaffAssistantMixin, UpdateView):
+    model = models.GlobalRule
+    form_class = forms.GlobalRuleForm
+    template_name = "assistant_core/form.html"
+    success_url = reverse_lazy("assistant_core:knowledge")
+
+
 class SupplierRuleCreateView(GlobalRuleCreateView):
     model = models.SupplierRule
     form_class = forms.SupplierRuleForm
@@ -523,6 +559,10 @@ class RuleDisableView(StaffAssistantMixin, View):
             from assistant_linking.services.garbage import clear_garbage_keyword_cache
 
             clear_garbage_keyword_cache()
+        if model_name == "global" and (rule.rule_kind.startswith("parser_") or rule.rule_kind == "regex_preprocess"):
+            from assistant_linking.services.parser_rules import clear_parser_rule_cache
+
+            clear_parser_rule_cache()
         messages.success(request, "Rule disabled.")
         return redirect("assistant_core:knowledge")
 
@@ -556,6 +596,54 @@ class GarbageKeywordCreateView(StaffAssistantMixin, View):
         clear_garbage_keyword_cache()
         messages.success(request, f"Saved {len(keywords.splitlines())} garbage keyword(s).")
         return redirect(f"{reverse_lazy('assistant_core:knowledge')}?section=garbage_keywords")
+
+
+class ParserTermCreateView(StaffAssistantMixin, View):
+    allowed_kinds = {
+        "parser_tester_term",
+        "parser_sample_term",
+        "parser_mini_term",
+        "parser_travel_term",
+        "parser_set_term",
+        "parser_refill_term",
+        "regex_preprocess",
+    }
+
+    def post(self, request):
+        from assistant_linking.services.parser_rules import clear_parser_rule_cache, normalize_parser_terms
+
+        rule_kind = request.POST.get("rule_kind", "").strip()
+        raw_terms = request.POST.get("terms", "")
+        if rule_kind not in self.allowed_kinds:
+            messages.error(request, "Choose a valid parser rule kind.")
+            return redirect(f"{reverse_lazy('assistant_core:knowledge')}?section=parser_terms")
+
+        if rule_kind == "regex_preprocess":
+            terms = [line.strip() for line in raw_terms.splitlines() if line.strip()]
+        else:
+            terms = normalize_parser_terms(raw_terms)
+        if not terms:
+            messages.error(request, "Add at least one parser term.")
+            return redirect(f"{reverse_lazy('assistant_core:knowledge')}?section=parser_terms")
+
+        for term in terms:
+            models.GlobalRule.objects.update_or_create(
+                rule_kind=rule_kind,
+                scope_type="global",
+                rule_text=term,
+                defaults={
+                    "title": f"{rule_kind}: {term}",
+                    "scope_value": "",
+                    "priority": 50,
+                    "confidence": 100,
+                    "active": True,
+                    "approved": True,
+                    "created_by": request.user,
+                },
+            )
+        clear_parser_rule_cache()
+        messages.success(request, f"Saved {len(terms)} parser rule(s).")
+        return redirect(f"{reverse_lazy('assistant_core:knowledge')}?section=parser_terms")
 
 
 class TeachFromDecisionView(StaffAssistantMixin, View):
@@ -727,19 +815,26 @@ class CatalogCleanupView(StaffAssistantMixin, TemplateView):
     template_name = "assistant_core/catalog/cleanup.html"
 
     def get_context_data(self, **kwargs):
-        brand_groups = defaultdict(list)
-        for brand in Brand.objects.order_by("name"):
-            brand_groups[_catalog_key(brand.name)].append(brand)
-        perfume_groups = defaultdict(list)
-        for perfume in Perfume.objects.select_related("brand").order_by("brand__name", "name"):
-            perfume_groups[(perfume.brand_id, _catalog_key(perfume.name), perfume.concentration or "")].append(perfume)
-        return {
-            **super().get_context_data(**kwargs),
-            "brand_duplicates": [items for items in brand_groups.values() if len(items) > 1],
-            "perfume_duplicates": [items for items in perfume_groups.values() if len(items) > 1],
-            "brand_merge_form": forms.CatalogBrandMergeForm(),
-            "perfume_merge_form": forms.CatalogPerfumeMergeForm(),
-        }
+        context = build_catalog_cleanup_context(
+            brand_merge_form=kwargs.get("brand_merge_form"),
+            perfume_merge_form=kwargs.get("perfume_merge_form"),
+        )
+        return {**super().get_context_data(**kwargs), **context}
+
+
+def build_catalog_cleanup_context(*, brand_merge_form=None, perfume_merge_form=None):
+    brand_groups = defaultdict(list)
+    for brand in Brand.objects.order_by("name"):
+        brand_groups[_catalog_key(brand.name)].append(brand)
+    perfume_groups = defaultdict(list)
+    for perfume in Perfume.objects.select_related("brand").order_by("brand__name", "name"):
+        perfume_groups[(perfume.brand_id, _catalog_key(perfume.name), perfume.concentration or "")].append(perfume)
+    return {
+        "brand_duplicates": [items for items in brand_groups.values() if len(items) > 1],
+        "perfume_duplicates": [items for items in perfume_groups.values() if len(items) > 1],
+        "brand_merge_form": brand_merge_form or forms.CatalogBrandMergeForm(),
+        "perfume_merge_form": perfume_merge_form or forms.CatalogPerfumeMergeForm(),
+    }
 
 
 class CatalogBrandMergeView(StaffAssistantMixin, View):
@@ -747,7 +842,11 @@ class CatalogBrandMergeView(StaffAssistantMixin, View):
         form = forms.CatalogBrandMergeForm(request.POST)
         if not form.is_valid():
             messages.error(request, "Brand merge was not saved.")
-            return redirect("assistant_core:catalog_cleanup")
+            return render(
+                request,
+                CatalogCleanupView.template_name,
+                build_catalog_cleanup_context(brand_merge_form=form),
+            )
         source = form.cleaned_data["source"]
         target = form.cleaned_data["target"]
         with transaction.atomic():
@@ -766,7 +865,11 @@ class CatalogPerfumeMergeView(StaffAssistantMixin, View):
         form = forms.CatalogPerfumeMergeForm(request.POST)
         if not form.is_valid():
             messages.error(request, "Perfume merge was not saved.")
-            return redirect("assistant_core:catalog_cleanup")
+            return render(
+                request,
+                CatalogCleanupView.template_name,
+                build_catalog_cleanup_context(perfume_merge_form=form),
+            )
         source = form.cleaned_data["source"]
         target = form.cleaned_data["target"]
         with transaction.atomic():

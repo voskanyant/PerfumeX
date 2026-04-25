@@ -1,0 +1,77 @@
+{% extends "prices/base.html" %}
+{% load static tz %}
+
+{% block title %}Stuck Import Runs{% endblock %}
+{% block body_data %}data-page="stuck-import-runs"{% endblock %}
+
+{% block extra_head %}
+    <link href="{% static 'prices/css/imports.css' %}" rel="stylesheet">
+{% endblock %}
+
+{% block content %}
+    <div class="page-stack">
+        {% include "prices/_import_tabs.html" %}
+
+        <div class="page-header">
+            <div>
+                <span class="page-kicker">Recovery</span>
+                <h1 class="page-title">Stuck Import Runs</h1>
+                <div class="page-meta">Running imports with no activity for more than 30 minutes.</div>
+            </div>
+        </div>
+
+        <div class="settings-section">
+            <div class="settings-section-header">
+                <div>
+                    <span class="card-label">EmailImportRun</span>
+                    <h2 class="card-title">Needs operator review</h2>
+                </div>
+                <a class="button secondary" href="{% url 'prices:import_detailed_logs' %}?run_status=running">Open running logs</a>
+            </div>
+            <div class="settings-body settings-body--single">
+                {% if stuck_runs %}
+                    <div class="table-wrap table-scroll-x">
+                        <table class="table space-bottom-none">
+                            <thead>
+                                <tr>
+                                    <th>Supplier</th>
+                                    <th>Started</th>
+                                    <th>Last activity</th>
+                                    <th>Progress</th>
+                                    <th>Last message</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for run in stuck_runs %}
+                                    <tr>
+                                        <td>{{ run.supplier.name }}</td>
+                                        <td>{{ run.started_at|timezone:"Europe/Moscow"|date:"d/m/Y H:i:s" }}</td>
+                                        <td>{{ run.updated_at|timezone:"Europe/Moscow"|date:"d/m/Y H:i:s" }}</td>
+                                        <td>{{ run.processed_messages }}/{{ run.total_messages }} messages, {{ run.processed_files }} files</td>
+                                        <td title="{{ run.last_message|default:'-' }}">{{ run.last_message|default:"-"|truncatechars:140 }}</td>
+                                        <td>
+                                            <form method="post">
+                                                {% csrf_token %}
+                                                <input type="hidden" name="run_id" value="{{ run.id }}">
+                                                <button class="button danger" type="submit" data-confirm="Mark this stuck import run as failed?">Mark failed</button>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                {% empty %}
+                                    <tr>
+                                        <td colspan="6" class="empty-state">
+                                            No stuck import runs. <a href="{% url 'prices:supplier_overview' %}">Return to import board</a>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="products-empty-state">No stuck import runs. <a href="{% url 'prices:supplier_overview' %}">Return to import board</a></div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+{% endblock %}

@@ -1,0 +1,10 @@
+{
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "lint:js": "eslint prices/static/prices/js"
+  },
+  "devDependencies": {
+    "eslint": "^9.36.0"
+  }
+}

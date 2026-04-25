@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+from datetime import timedelta
+
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
+from django.http import Http404, HttpResponse, JsonResponse
+from django.db import transaction
 from django.db.models import Count, Q
-from django.shortcuts import get_object_or_404, redirect
+from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse_lazy
 from django.utils import timezone
 from django.views.generic import DetailView, ListView, TemplateView, View
@@ -23,6 +27,8 @@ from prices.services.product_visibility import (
 )
 
 
+BULK_LINK_PRODUCT_CAP = 200
+UNDO_WINDOW_SECONDS = 30
 SUPPLIER_PRODUCT_HIDDEN_FIELDS = ("name", "brand", "supplier_sku")
 PARSED_PRODUCT_HIDDEN_FIELDS = (
     "supplier_product__name",
@@ -53,6 +59,154 @@ def _hide_parsed_products(queryset, request):
 
 def _exclude_garbage_parses(queryset):
     return queryset.exclude(modifiers__contains=[GARBAGE_MODIFIER])
+
+
+def _manual_decision_snapshot(decision):
+    return {
+        "id": decision.id,
+        "supplier_product_id": decision.supplier_product_id,
+        "perfume_id": decision.perfume_id,
+        "variant_id": decision.variant_id,
+        "decision_type": decision.decision_type,
+        "reason": decision.reason,
+        "apply_to_similar": decision.apply_to_similar,
+        "created_by_id": decision.created_by_id,
+        "created_at": decision.created_at.isoformat() if decision.created_at else None,
+    }
+
+
+def _record_manual_link_decision(*, supplier_product, perfume_id, variant_id, decision_type, reason, apply_to_similar, created_by, allow_overwrite=False):
+    previous = None
+    if allow_overwrite:
+        previous = (
+            models.ManualLinkDecision.objects.select_for_update()
+            .filter(supplier_product=supplier_product)
+            .order_by("-created_at", "-id")
+            .first()
+        )
+    decision = models.ManualLinkDecision.objects.create(
+        supplier_product=supplier_product,
+        perfume_id=perfume_id or None,
+        variant_id=variant_id or None,
+        decision_type=decision_type,
+        reason=reason,
+        apply_to_similar=apply_to_similar,
+        created_by=created_by,
+    )
+    if previous:
+        models.ManualLinkDecisionAudit.objects.create(
+            previous_pk=previous.pk,
+            previous_decision_json=_manual_decision_snapshot(previous),
+            replaced_by=decision,
+        )
+    return decision
+
+
+def _prune_link_actions(user):
+    stale_ids = list(
+        models.LinkAction.objects.filter(user=user)
+        .order_by("-created_at", "-id")
+        .values_list("id", flat=True)[50:]
+    )
+    if stale_ids:
+        models.LinkAction.objects.filter(id__in=stale_ids).delete()
+
+
+def _latest_undoable_action(user):
+    cutoff = timezone.now() - timedelta(seconds=UNDO_WINDOW_SECONDS)
+    return (
+        models.LinkAction.objects.filter(
+            user=user,
+            action_type=models.LinkAction.ACTION_BULK_LINK,
+            created_at__gte=cutoff,
+        )
+        .exclude(payload_json__status="UNDONE")
+        .order_by("-created_at", "-id")
+        .first()
+    )
+
+
+def _bulk_link_products(*, user, product_ids, perfume_id, variant_id, allow_overwrite, apply_to_similar, reason):
+    payload_items = []
+    linked = 0
+    skipped = 0
+    with transaction.atomic():
+        products = list(
+            SupplierProduct.objects.select_for_update()
+            .filter(id__in=product_ids)
+            .order_by("id")
+        )
+        for product in products:
+            had_link = bool(product.catalog_perfume_id or product.catalog_variant_id)
+            previous = {
+                "product_id": product.id,
+                "catalog_perfume_id": product.catalog_perfume_id,
+                "catalog_variant_id": product.catalog_variant_id,
+            }
+            if had_link and not allow_overwrite:
+                skipped += 1
+                payload_items.append({**previous, "linked": False, "skipped": True})
+                continue
+            product.catalog_perfume_id = perfume_id or None
+            product.catalog_variant_id = variant_id or None
+            product.save(update_fields=["catalog_perfume", "catalog_variant", "updated_at"])
+            _record_manual_link_decision(
+                supplier_product=product,
+                perfume_id=perfume_id or None,
+                variant_id=variant_id or None,
+                decision_type=models.ManualLinkDecision.DECISION_APPROVE_VARIANT if variant_id else models.ManualLinkDecision.DECISION_APPROVE_PERFUME,
+                reason=reason,
+                apply_to_similar=apply_to_similar or len(product_ids) > 1,
+                created_by=user,
+                allow_overwrite=allow_overwrite and had_link,
+            )
+            linked += 1
+            payload_items.append(
+                {
+                    **previous,
+                    "linked": True,
+                    "skipped": False,
+                    "new_catalog_perfume_id": perfume_id or None,
+                    "new_catalog_variant_id": variant_id or None,
+                }
+            )
+    action = models.LinkAction.objects.create(
+        user=user,
+        action_type=models.LinkAction.ACTION_BULK_LINK,
+        payload_json={
+            "status": "COMPLETE",
+            "matched": len(product_ids),
+            "linked": linked,
+            "skipped": skipped,
+            "items": payload_items,
+        },
+    )
+    _prune_link_actions(user)
+    return action
+
+
+def _undo_link_action(action, user):
+    payload = action.payload_json or {}
+    items = payload.get("items") or []
+    restored = 0
+    with transaction.atomic():
+        for item in items:
+            if not item.get("linked"):
+                continue
+            product = SupplierProduct.objects.select_for_update().get(pk=item["product_id"])
+            product.catalog_perfume_id = item.get("catalog_perfume_id")
+            product.catalog_variant_id = item.get("catalog_variant_id")
+            product.save(update_fields=["catalog_perfume", "catalog_variant", "updated_at"])
+            restored += 1
+        models.LinkAction.objects.create(
+            user=user,
+            action_type=models.LinkAction.ACTION_UNDO_BULK_LINK,
+            payload_json={"undone_action_id": action.id, "restored": restored},
+        )
+        action.payload_json = {**payload, "status": "UNDONE", "undone_at": timezone.now().isoformat()}
+        action.save(update_fields=["payload_json"])
+    _prune_link_actions(user)
+    return restored
 
 
 class StaffAssistantMixin(LoginRequiredMixin, UserPassesTestMixin):
@@ -369,7 +523,9 @@ class ParsedProductDetailView(StaffAssistantMixin, DetailView):
         return {
             **super().get_context_data(**kwargs),
             "parsed": parsed,
-            "teach_form": forms.ParseTeachingForm(initial=teach_initial),
+            "teach_form": kwargs.get("teach_form") or forms.ParseTeachingForm(initial=teach_initial),
+            "brand_alias_form": kwargs.get("brand_alias_form"),
+            "product_alias_form": kwargs.get("product_alias_form"),
             "catalog_candidates": catalog_candidates,
             "is_garbage": is_garbage,
             "suggested_catalog_candidate": suggested_candidate,
@@ -392,72 +548,111 @@ class ParsedProductDetailView(StaffAssistantMixin, DetailView):
         }
 
 
+def _mark_invalid_fields_for_a11y(form):
+    for field_name in form.errors:
+        if field_name in form.fields:
+            form.fields[field_name].widget.attrs["aria-describedby"] = f"id_{field_name}_errors"
+            form.fields[field_name].widget.attrs["aria-invalid"] = "true"
+
+
+def _render_normalization_detail(request, product, **context_overrides):
+    view = ParsedProductDetailView()
+    view.setup(request, supplier_product_id=product.pk)
+    view.object = product
+    context = view.get_context_data(object=product, **context_overrides)
+    return render(request, view.template_name, context)
+
+
 class AcceptCatalogCandidateView(StaffAssistantMixin, View):
     def post(self, request, supplier_product_id):
-        product = get_object_or_404(SupplierProduct.objects.select_related("supplier"), pk=supplier_product_id)
-        parsed = save_parse(product)
         perfume = get_object_or_404(Perfume.objects.select_related("brand"), pk=request.POST.get("perfume_id"))
         variant = None
         if request.POST.get("variant_id"):
             variant = get_object_or_404(PerfumeVariant, pk=request.POST.get("variant_id"), perfume=perfume)
 
-        brand_alias_text = (parsed.detected_brand_text or product.brand or perfume.brand.name).strip()
-        product_alias_text = (parsed.product_name_text or perfume.name).strip()
-        supplier = product.supplier if request.POST.get("alias_scope") == forms.ParseTeachingForm.SCOPE_SUPPLIER else None
-
-        if brand_alias_text:
-            models.BrandAlias.objects.update_or_create(
-                brand=perfume.brand,
-                supplier=supplier,
-                alias_text=brand_alias_text,
-                defaults={"normalized_alias": normalize_query(brand_alias_text), "priority": 10 if supplier else 50, "active": True},
+        with transaction.atomic():
+            product = get_object_or_404(
+                SupplierProduct.objects.select_for_update().select_related("supplier"),
+                pk=supplier_product_id,
             )
-        if product_alias_text:
-            models.ProductAlias.objects.update_or_create(
-                brand=perfume.brand,
-                perfume=perfume,
-                supplier=supplier,
-                alias_text=product_alias_text,
-                defaults={
-                    "canonical_text": perfume.name,
-                    "concentration": perfume.concentration,
-                    "audience": perfume.audience,
-                    "excluded_terms": request.POST.get("excluded_terms", ""),
-                    "priority": 10 if supplier else 50,
-                    "active": True,
-                },
+            suggestion = (
+                models.LinkSuggestion.objects.select_for_update()
+                .filter(
+                    supplier_product=product,
+                    suggested_perfume=perfume,
+                    suggested_variant=variant,
+                )
+                .order_by("-created_at", "-id")
+                .first()
             )
+            if suggestion and suggestion.status != models.LinkSuggestion.STATUS_PENDING:
+                messages.warning(request, "This suggestion was already handled by another user.")
+                return redirect("assistant_linking:normalization_detail", supplier_product_id=supplier_product_id)
 
-        parsed.normalized_brand = perfume.brand
-        parsed.detected_brand_text = brand_alias_text or perfume.brand.name
-        parsed.product_name_text = perfume.name
-        parsed.concentration = perfume.concentration
-        parsed.supplier_gender_hint = perfume.audience
-        if variant:
-            parsed.size_ml = variant.size_ml
-            parsed.packaging = variant.packaging
-            parsed.variant_type = variant.variant_type
-            parsed.is_tester = variant.is_tester
-        parsed.confidence = 100
-        parsed.warnings = []
-        parsed.locked_by_human = True
-        parsed.last_parsed_at = timezone.now()
-        parsed.save()
+            parsed = save_parse(product)
+            brand_alias_text = (parsed.detected_brand_text or product.brand or perfume.brand.name).strip()
+            product_alias_text = (parsed.product_name_text or perfume.name).strip()
+            supplier = product.supplier if request.POST.get("alias_scope") == forms.ParseTeachingForm.SCOPE_SUPPLIER else None
 
-        product.catalog_perfume = perfume
-        if variant:
+            if brand_alias_text:
+                models.BrandAlias.objects.update_or_create(
+                    brand=perfume.brand,
+                    supplier=supplier,
+                    alias_text=brand_alias_text,
+                    defaults={"normalized_alias": normalize_query(brand_alias_text), "priority": 10 if supplier else 50, "active": True},
+                )
+            if product_alias_text:
+                models.ProductAlias.objects.update_or_create(
+                    brand=perfume.brand,
+                    perfume=perfume,
+                    supplier=supplier,
+                    alias_text=product_alias_text,
+                    defaults={
+                        "canonical_text": perfume.name,
+                        "concentration": perfume.concentration,
+                        "audience": perfume.audience,
+                        "excluded_terms": request.POST.get("excluded_terms", ""),
+                        "priority": 10 if supplier else 50,
+                        "active": True,
+                    },
+                )
+
+            parsed.normalized_brand = perfume.brand
+            parsed.detected_brand_text = brand_alias_text or perfume.brand.name
+            parsed.product_name_text = perfume.name
+            parsed.concentration = perfume.concentration
+            parsed.supplier_gender_hint = perfume.audience
+            if variant:
+                parsed.size_ml = variant.size_ml
+                parsed.packaging = variant.packaging
+                parsed.variant_type = variant.variant_type
+                parsed.is_tester = variant.is_tester
+            parsed.confidence = 100
+            parsed.warnings = []
+            parsed.locked_by_human = True
+            parsed.last_parsed_at = timezone.now()
+            parsed.save()
+
+            had_link = bool(product.catalog_perfume_id or product.catalog_variant_id)
+            product.catalog_perfume = perfume
             product.catalog_variant = variant
-        product.save(update_fields=["catalog_perfume", "catalog_variant", "updated_at"])
+            product.save(update_fields=["catalog_perfume", "catalog_variant", "updated_at"])
 
-        models.ManualLinkDecision.objects.create(
-            supplier_product=product,
-            perfume=perfume,
-            variant=variant,
-            decision_type=models.ManualLinkDecision.DECISION_APPROVE_VARIANT if variant else models.ManualLinkDecision.DECISION_APPROVE_PERFUME,
-            reason="Accepted from normalization catalogue candidates.",
-            apply_to_similar=False,
-            created_by=request.user,
-        )
+            _record_manual_link_decision(
+                supplier_product=product,
+                perfume_id=perfume.id,
+                variant_id=variant.id if variant else None,
+                decision_type=models.ManualLinkDecision.DECISION_APPROVE_VARIANT if variant else models.ManualLinkDecision.DECISION_APPROVE_PERFUME,
+                reason="Accepted from normalization catalogue candidates.",
+                apply_to_similar=False,
+                created_by=request.user,
+                allow_overwrite=had_link,
+            )
+            if suggestion:
+                suggestion.status = models.LinkSuggestion.STATUS_APPROVED
+                suggestion.reviewed_by = request.user
+                suggestion.reviewed_at = timezone.now()
+                suggestion.save(update_fields=["status", "reviewed_by", "reviewed_at", "updated_at"])
         messages.success(request, "Catalogue candidate accepted and parse locked.")
         return redirect("assistant_linking:normalization_detail", supplier_product_id=supplier_product_id)
 
@@ -513,23 +708,29 @@ class LockParseView(StaffAssistantMixin, View):
 
 class SaveBrandAliasView(StaffAssistantMixin, View):
     def post(self, request, supplier_product_id):
+        product = get_object_or_404(SupplierProduct.objects.select_related("supplier"), pk=supplier_product_id)
         form = forms.BrandAliasForm(request.POST)
         if form.is_valid():
             form.save()
             messages.success(request, "Brand alias saved.")
         else:
             messages.error(request, "Brand alias was not saved.")
+            _mark_invalid_fields_for_a11y(form)
+            return _render_normalization_detail(request, product, brand_alias_form=form)
         return redirect("assistant_linking:normalization_detail", supplier_product_id=supplier_product_id)
 
 
 class SaveProductAliasView(StaffAssistantMixin, View):
     def post(self, request, supplier_product_id):
+        product = get_object_or_404(SupplierProduct.objects.select_related("supplier"), pk=supplier_product_id)
         form = forms.ProductAliasForm(request.POST)
         if form.is_valid():
             form.save()
             messages.success(request, "Product alias saved.")
         else:
             messages.error(request, "Product alias was not saved.")
+            _mark_invalid_fields_for_a11y(form)
+            return _render_normalization_detail(request, product, product_alias_form=form)
         return redirect("assistant_linking:normalization_detail", supplier_product_id=supplier_product_id)
 
 
@@ -540,7 +741,8 @@ class TeachParseView(StaffAssistantMixin, View):
         form = forms.ParseTeachingForm(request.POST)
         if not form.is_valid():
             messages.error(request, "Teaching form has invalid values.")
-            return redirect("assistant_linking:normalization_detail", supplier_product_id=supplier_product_id)
+            _mark_invalid_fields_for_a11y(form)
+            return _render_normalization_detail(request, product, teach_form=form)
 
         data = form.cleaned_data
         brand_name = data["brand_name"].strip()
@@ -638,6 +840,9 @@ class GroupQueueView(StaffAssistantMixin, ListView):
             queryset = queryset.filter(Q(normalized_brand__name__icontains=brand) | Q(canonical_name__icontains=brand))
         return queryset.order_by("status", "-confidence", "canonical_name")
 
+    def get_context_data(self, **kwargs):
+        return {**super().get_context_data(**kwargs), "last_link_action": _latest_undoable_action(self.request.user)}
+
 
 class GroupDetailView(StaffAssistantMixin, DetailView):
     model = models.MatchGroup
@@ -647,7 +852,7 @@ class GroupDetailView(StaffAssistantMixin, DetailView):
 
     def get_context_data(self, **kwargs):
         items = self.object.items.select_related("supplier_product", "supplier_product__supplier", "parsed_product")
-        return {**super().get_context_data(**kwargs), "items": items}
+        return {**super().get_context_data(**kwargs), "items": items, "last_link_action": _latest_undoable_action(self.request.user)}
 
 
 class RebuildGroupsView(StaffAssistantMixin, View):
@@ -659,29 +864,30 @@ class RebuildGroupsView(StaffAssistantMixin, View):
 
 class GroupActionView(StaffAssistantMixin, View):
     def post(self, request, group_id, action):
-        group = get_object_or_404(models.MatchGroup, pk=group_id)
-        item_ids = request.POST.getlist("item_ids")
-        items = group.items.filter(id__in=item_ids)
-        if action == "exclude":
-            items.update(role=models.MatchGroupItem.ROLE_EXCLUDED, reasoning=request.POST.get("reason", ""))
-        elif action == "split":
-            for item in items:
-                new_group = models.MatchGroup.objects.create(
-                    group_key=f"{group.group_key}|split|{item.supplier_product_id}|{timezone.now().timestamp()}",
-                    normalized_brand=group.normalized_brand,
-                    canonical_name=group.canonical_name,
-                    concentration=group.concentration,
-                    audience_hint=group.audience_hint,
-                    size_ml=group.size_ml,
-                    packaging=group.packaging,
-                    variant_type=group.variant_type,
-                    status=models.MatchGroup.STATUS_OPEN,
-                    confidence=max(group.confidence - 10, 0),
-                )
-                item.match_group = new_group
-                item.role = models.MatchGroupItem.ROLE_SPLIT
-                item.reasoning = request.POST.get("reason", "Split by operator")
-                item.save()
+        with transaction.atomic():
+            group = get_object_or_404(models.MatchGroup.objects.select_for_update(), pk=group_id)
+            item_ids = request.POST.getlist("item_ids")
+            items = group.items.select_for_update().filter(id__in=item_ids)
+            if action == "exclude":
+                items.update(role=models.MatchGroupItem.ROLE_EXCLUDED, reasoning=request.POST.get("reason", ""))
+            elif action == "split":
+                for item in items:
+                    new_group = models.MatchGroup.objects.create(
+                        group_key=f"{group.group_key}|split|{item.supplier_product_id}|{timezone.now().timestamp()}",
+                        normalized_brand=group.normalized_brand,
+                        canonical_name=group.canonical_name,
+                        concentration=group.concentration,
+                        audience_hint=group.audience_hint,
+                        size_ml=group.size_ml,
+                        packaging=group.packaging,
+                        variant_type=group.variant_type,
+                        status=models.MatchGroup.STATUS_OPEN,
+                        confidence=max(group.confidence - 10, 0),
+                    )
+                    item.match_group = new_group
+                    item.role = models.MatchGroupItem.ROLE_SPLIT
+                    item.reasoning = request.POST.get("reason", "Split by operator")
+                    item.save()
         messages.success(request, "Group action applied.")
         return redirect("assistant_linking:group_detail", group_id=group_id)
 
@@ -704,6 +910,7 @@ class ProductWorkbenchView(StaffAssistantMixin, DetailView):
             "similar": similar,
             "suggestions": product.assistant_link_suggestions.select_related("suggested_perfume", "suggested_variant").order_by("-created_at")[:10],
             "same_supplier": SupplierProduct.objects.filter(supplier=product.supplier).exclude(pk=product.pk).order_by("-is_active", "name")[:25],
+            "last_link_action": _latest_undoable_action(self.request.user),
         }
 
 
@@ -716,32 +923,95 @@ class GenerateSuggestionsView(StaffAssistantMixin, View):
 
 class BulkLinkView(StaffAssistantMixin, View):
     def post(self, request, supplier_product_id):
-        source = get_object_or_404(SupplierProduct, pk=supplier_product_id)
+        source = get_object_or_404(
+            SupplierProduct.objects.select_related("catalog_perfume", "catalog_variant"),
+            pk=supplier_product_id,
+        )
         perfume_id = request.POST.get("perfume_id") or source.catalog_perfume_id
         variant_id = request.POST.get("variant_id") or source.catalog_variant_id
         if not perfume_id:
             messages.error(request, "Choose or approve a catalogue perfume before linking rows.")
             return redirect("assistant_linking:product_workbench", supplier_product_id=supplier_product_id)
         allow_overwrite = request.POST.get("confirm_overwrite") == "1"
-        product_ids = request.POST.getlist("supplier_product_ids") or [str(source.id)]
-        linked = 0
-        for product in SupplierProduct.objects.filter(id__in=product_ids):
-            if (product.catalog_perfume_id or product.catalog_variant_id) and not allow_overwrite:
-                continue
-            if perfume_id:
-                product.catalog_perfume_id = perfume_id
-            if variant_id:
-                product.catalog_variant_id = variant_id
-            product.save(update_fields=["catalog_perfume", "catalog_variant", "updated_at"])
-            models.ManualLinkDecision.objects.create(
-                supplier_product=product,
-                perfume_id=perfume_id or None,
-                variant_id=variant_id or None,
-                decision_type=models.ManualLinkDecision.DECISION_APPROVE_VARIANT if variant_id else models.ManualLinkDecision.DECISION_APPROVE_PERFUME,
-                reason=request.POST.get("reason", ""),
-                apply_to_similar=bool(product_ids),
-                created_by=request.user,
+        apply_to_similar = request.POST.get("apply_to_similar") == "1"
+        if apply_to_similar:
+            group = models.MatchGroup.objects.filter(items__supplier_product=source).first()
+            queryset = SupplierProduct.objects.filter(assistant_group_items__match_group=group) if group else SupplierProduct.objects.filter(pk=source.pk)
+            product_ids = list(queryset.order_by("id").values_list("id", flat=True))
+            if request.POST.get("confirm_apply_to_similar") != "1":
+                return HttpResponse(
+                    f"Confirm apply_to_similar before linking {len(product_ids)} matched products.",
+                    status=409,
+                )
+        else:
+            product_ids = [int(value) for value in request.POST.getlist("supplier_product_ids") if str(value).isdigit()] or [source.id]
+
+        product_ids = list(dict.fromkeys(product_ids))
+        if len(product_ids) > BULK_LINK_PRODUCT_CAP:
+            return HttpResponse(
+                f"Bulk link matched {len(product_ids)} products; narrow scope to {BULK_LINK_PRODUCT_CAP} or fewer.",
+                status=409,
             )
-            linked += 1
+
+        action = _bulk_link_products(
+            user=request.user,
+            product_ids=product_ids,
+            perfume_id=int(perfume_id) if perfume_id else None,
+            variant_id=int(variant_id) if variant_id else None,
+            allow_overwrite=allow_overwrite,
+            apply_to_similar=apply_to_similar,
+            reason=request.POST.get("reason", ""),
+        )
+        linked = action.payload_json.get("linked", 0)
+        if len(product_ids) > 20 or request.headers.get("x-requested-with") == "XMLHttpRequest":
+            return JsonResponse(
+                {
+                    "job_id": action.id,
+                    "status_url": reverse_lazy("assistant_linking:bulk_link_status", kwargs={"action_id": action.id}),
+                    "undo_url": reverse_lazy("assistant_linking:undo_link_action", kwargs={"action_id": action.id}),
+                },
+                status=202,
+            )
         messages.success(request, f"Linked {linked} products.")
         return redirect("assistant_linking:product_workbench", supplier_product_id=supplier_product_id)
+
+
+class BulkLinkStatusView(StaffAssistantMixin, View):
+    def get(self, request, action_id):
+        action = get_object_or_404(models.LinkAction, pk=action_id, user=request.user)
+        payload = action.payload_json or {}
+        matched = int(payload.get("matched") or 0)
+        linked = int(payload.get("linked") or 0)
+        skipped = int(payload.get("skipped") or 0)
+        processed = linked + skipped
+        return JsonResponse(
+            {
+                "job_id": action.id,
+                "status": payload.get("status", "COMPLETE"),
+                "matched": matched,
+                "linked": linked,
+                "skipped": skipped,
+                "processed": processed,
+                "percent": 100 if matched else 0,
+                "undo_url": reverse_lazy("assistant_linking:undo_link_action", kwargs={"action_id": action.id}),
+            }
+        )
+
+
+class UndoLinkActionView(StaffAssistantMixin, View):
+    def post(self, request, action_id):
+        cutoff = timezone.now() - timedelta(seconds=UNDO_WINDOW_SECONDS)
+        action = get_object_or_404(
+            models.LinkAction,
+            pk=action_id,
+            user=request.user,
+            action_type=models.LinkAction.ACTION_BULK_LINK,
+            created_at__gte=cutoff,
+        )
+        if (action.payload_json or {}).get("status") == "UNDONE":
+            raise Http404("Action already undone.")
+        restored = _undo_link_action(action, request.user)
+        if request.headers.get("x-requested-with") == "XMLHttpRequest":
+            return JsonResponse({"restored": restored, "status": "UNDONE"})
+        messages.success(request, f"Undid {restored} linked product(s).")
+        return redirect(request.POST.get("next") or "assistant_linking:group_queue")

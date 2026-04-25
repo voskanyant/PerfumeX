@@ -56,7 +56,11 @@
                 </td>
             </tr>
         {% empty %}
-            <tr><td colspan="7">No catalogue products yet.</td></tr>
+            <tr>
+                <td colspan="7" class="empty-state">
+                    No catalogue products yet. <a href="{% url 'assistant_core:catalog_import' %}">Import Excel</a>
+                </td>
+            </tr>
         {% endfor %}
         </tbody>
     </table>

@@ -13,9 +13,12 @@
         <div class="metric-value">{{ count }}</div>
         <div class="metric-meta">Open records</div>
     </a>
+    {% empty %}
+    <div class="empty-state">No assistant queues are configured. <a href="{% url 'assistant_core:knowledge' %}">Open knowledge base</a></div>
     {% endfor %}
 </div>
 <div class="workspace-block space-top-md">
+    {% url 'assistant_linking:group_queue' as linking_queue_url %}
     <div class="run-log-summary">
         <span>Pending approvals: {{ pending_approvals }}</span>
         <span>Low-confidence parses: {{ low_confidence }}</span>
@@ -27,7 +30,7 @@
         {% for decision in recent_decisions %}
             <tr><td>{{ decision.supplier_product }}</td><td>{{ decision.decision_type }}</td><td>{{ decision.created_at }}</td></tr>
         {% empty %}
-            {% include "prices/components/table_empty.html" with colspan=3 message="No decisions yet." %}
+            {% include "prices/components/table_empty.html" with colspan=3 message="No decisions yet." cta_url=linking_queue_url cta_label="Open linking queue" %}
         {% endfor %}
         </tbody>
     </table>

@@ -7,6 +7,8 @@
 
 {% block content %}
     <div class="page-stack">
+        {% url 'prices:supplier_list' as supplier_list_url %}
+        {% include "prices/_breadcrumbs.html" with parent_label="Suppliers" parent_url=supplier_list_url current_label=object.name %}
         <div class="section-card">
             <div class="layout-row layout-row--wrap items-start justify-between gap-md">
                 <div>

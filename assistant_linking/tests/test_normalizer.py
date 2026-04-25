@@ -1,9 +1,11 @@
 from django.core.cache import cache
+from django.core.exceptions import ValidationError
 from django.test import TestCase
+from unittest.mock import patch
 
 from assistant_core.models import GlobalRule
 from assistant_linking.models import BrandAlias, ConcentrationAlias, ProductAlias
-from assistant_linking.services.normalizer import parse_supplier_product, save_parse
+from assistant_linking.services.normalizer import normalize_text, parse_supplier_product, save_parse
 from catalog.models import Brand
 from prices.models import Supplier, SupplierProduct
 
@@ -123,6 +125,90 @@ class NormalizerTests(TestCase):
         self.assertEqual(parsed.size_ml, 100)
         self.assertTrue(parsed.is_tester)
 
+    def test_kb_regex_preprocess_handles_eau_de_perfume_as_eau_de_parfum(self):
+        for index, raw in enumerate(("eau de perfume", "eau de parfume", "eau de parf"), start=1):
+            product = SupplierProduct.objects.create(
+                supplier=self.supplier,
+                identity_key=f"eau-perfume-{index}",
+                name=f"Some Brand Scent {raw} 100ml",
+            )
+
+            parsed = parse_supplier_product(product)
+
+            self.assertEqual(parsed.concentration, "Eau de Parfum")
+            self.assertEqual(parsed.size_ml, 100)
+
+    def test_bare_perfume_and_parfume_mean_extrait(self):
+        for index, raw in enumerate(("perfume", "parfume"), start=1):
+            product = SupplierProduct.objects.create(
+                supplier=self.supplier,
+                identity_key=f"bare-perfume-{index}",
+                name=f"Some Brand Scent {raw} 100ml",
+            )
+
+            parsed = parse_supplier_product(product)
+
+            self.assertEqual(parsed.concentration, "Extrait de Parfum")
+            self.assertEqual(parsed.size_ml, 100)
+
+    def test_miniature_is_mini_not_travel(self):
+        product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="miniature",
+            name="Some Brand Scent миниатюра 10ml",
+        )
+
+        parsed = parse_supplier_product(product)
+
+        self.assertFalse(parsed.is_travel)
+        self.assertEqual(parsed.variant_type, "mini")
+        self.assertIn("mini", parsed.modifiers)
+
+    def test_rejected_sample_words_do_not_mark_sample(self):
+        for index, raw in enumerate(("decant", "отливант", "разлив", "split"), start=1):
+            product = SupplierProduct.objects.create(
+                supplier=self.supplier,
+                identity_key=f"not-sample-{index}",
+                name=f"Some Brand Scent {raw} 10ml",
+            )
+
+            parsed = parse_supplier_product(product)
+
+            self.assertFalse(parsed.is_sample)
+
+    def test_refill_terms_add_refill_modifier(self):
+        product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="refill",
+            name="Some Brand Scent refill 100ml",
+        )
+
+        parsed = parse_supplier_product(product)
+
+        self.assertIn("refill", parsed.modifiers)
+
+    def test_damage_terms_route_to_garbage_but_decode_does_not(self):
+        damaged = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="damaged",
+            name="Some Brand Scent подмят 100ml",
+        )
+        decoded = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="decoded",
+            name="Some Brand Scent декод 100ml",
+        )
+
+        damaged_parse = parse_supplier_product(damaged)
+        decoded_parse = parse_supplier_product(decoded)
+
+        self.assertEqual(damaged_parse.modifiers, ["garbage"])
+        self.assertNotEqual(decoded_parse.modifiers, ["garbage"])
+
+    def test_compact_decimal_and_russian_size_formats_are_normalized(self):
+        self.assertIn("100 ml", normalize_text("Foo 100.0ml"))
+        self.assertIn("100 ml", normalize_text("Foo 100мл"))
+
     def test_no_five_is_not_treated_as_size(self):
         brand = Brand.objects.create(name="Chanel")
         BrandAlias.objects.create(brand=brand, alias_text="Chanel", normalized_alias="chanel")
@@ -205,3 +291,54 @@ class NormalizerTests(TestCase):
         self.assertEqual(parsed.variant_type, "tester")
         self.assertEqual(parsed.supplier_gender_hint, "unisex")
         self.assertEqual(parsed.product_name_text, "ambre and tonka")
+
+    def test_brand_alias_rejects_bad_regex(self):
+        alias = BrandAlias(
+            brand=self.brand,
+            alias_text="bad regex",
+            normalized_alias="(",
+            is_regex=True,
+        )
+
+        with self.assertRaises(ValidationError) as ctx:
+            alias.full_clean()
+
+        self.assertIn("Invalid regex", str(ctx.exception))
+
+    def test_brand_alias_rejects_redos_shape(self):
+        alias = BrandAlias(
+            brand=self.brand,
+            alias_text="bad regex",
+            normalized_alias=r"(.+)+",
+            is_regex=True,
+        )
+
+        with self.assertRaises(ValidationError) as ctx:
+            alias.full_clean()
+
+        self.assertIn("catastrophic-backtracking shape", str(ctx.exception))
+
+    @patch("assistant_linking.services.normalizer.mail_admins")
+    @patch("assistant_linking.services.normalizer.regex.search", side_effect=TimeoutError)
+    def test_normalizer_skips_alias_on_regex_timeout(self, mock_search, mock_mail_admins):
+        brand = Brand.objects.create(name="Timeout Brand")
+        alias = BrandAlias.objects.create(
+            brand=brand,
+            alias_text="timeout",
+            normalized_alias="timeout",
+            is_regex=True,
+            active=True,
+        )
+        product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="timeout",
+            name="timeout scent 100ml",
+        )
+
+        parsed = parse_supplier_product(product)
+
+        alias.refresh_from_db()
+        self.assertFalse(alias.active)
+        self.assertIsNone(parsed.normalized_brand)
+        mock_search.assert_called()
+        mock_mail_admins.assert_called_once()

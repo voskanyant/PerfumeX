@@ -1,5 +1,6 @@
 from django.utils import timezone
 from django.shortcuts import redirect
+from django.http import HttpResponseForbidden
 
 
 class ForceMoscowTimezoneMiddleware:
@@ -28,5 +29,7 @@ class AdminPanelStaffOnlyMiddleware:
             if not user or not user.is_authenticated:
                 return redirect(f"/login/?next={request.path}")
             if not user.is_staff:
+                if request.method not in {"GET", "HEAD", "OPTIONS", "TRACE"}:
+                    return HttpResponseForbidden("Staff access required.")
                 return redirect("/")
         return self.get_response(request)

@@ -2,6 +2,46 @@
 {% block title %}{{ profile.brand.name }} Watch{% endblock %}
 {% block topbar_label %}Assistant / Brand Manager{% endblock %}
 {% block content %}
-<div class="page-head"><div><span class="page-kicker">Brand Manager</span><h1 class="page-title">{{ profile.brand.name }}</h1><div class="page-meta">{{ profile.official_url }}</div></div><form method="post" action="{% url 'assistant_core:brand_manager_run_mock' profile.pk %}">{% csrf_token %}<button class="button primary">Run mock scan</button></form></div>
-<div class="workspace-block"><h2 class="kpi-link-title">Detected changes</h2><table class="data-table"><tbody>{% for change in profile.detected_changes.all %}<tr><td>{{ change.change_type }}</td><td>{{ change.field_name }}</td><td>{{ change.confidence }}</td><td>{{ change.status }}</td><td><form method="post" action="{% url 'assistant_core:detected_change_status' change.pk 'approved' %}">{% csrf_token %}<button class="button ghost">Approve</button></form></td><td><form method="post" action="{% url 'assistant_core:detected_change_status' change.pk 'rejected' %}">{% csrf_token %}<button class="button ghost">Reject</button></form></td></tr>{% empty %}<tr><td>No changes.</td></tr>{% endfor %}</tbody></table></div>
+{% url 'assistant_core:brand_manager_list' as brand_managers_url %}
+{% include "prices/_breadcrumbs.html" with parent_label="Brand Managers" parent_url=brand_managers_url current_label=profile.brand.name %}
+<div class="page-head">
+    <div>
+        <span class="page-kicker">Brand Manager</span>
+        <h1 class="page-title">{{ profile.brand.name }}</h1>
+        <div class="page-meta">{{ profile.official_url }}</div>
+    </div>
+    <form method="post" action="{% url 'assistant_core:brand_manager_run_mock' profile.pk %}">
+        {% csrf_token %}
+        <button class="button primary">Run mock scan</button>
+    </form>
+</div>
+<div class="workspace-block">
+    <h2 class="kpi-link-title">Detected changes</h2>
+    <table class="data-table">
+        <tbody>
+        {% for change in profile.detected_changes.all %}
+            <tr>
+                <td>{{ change.change_type }}</td>
+                <td>{{ change.field_name }}</td>
+                <td>{{ change.confidence }}</td>
+                <td>{{ change.status }}</td>
+                <td>
+                    <form method="post" action="{% url 'assistant_core:detected_change_status' change.pk 'approved' %}">
+                        {% csrf_token %}
+                        <button class="button ghost">Approve</button>
+                    </form>
+                </td>
+                <td>
+                    <form method="post" action="{% url 'assistant_core:detected_change_status' change.pk 'rejected' %}">
+                        {% csrf_token %}
+                        <button class="button ghost">Reject</button>
+                    </form>
+                </td>
+            </tr>
+        {% empty %}
+            {% include "prices/components/table_empty.html" with colspan=6 message="No detected changes." cta_url=brand_managers_url cta_label="Back to profiles" %}
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
 {% endblock %}

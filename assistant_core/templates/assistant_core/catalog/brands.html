@@ -28,7 +28,7 @@
                     </td>
                 </tr>
             {% empty %}
-                {% include "prices/components/table_empty.html" with colspan=5 message="No brands yet." %}
+                {% include "prices/components/table_empty.html" with colspan=5 message="No brands yet." cta_url=create_url cta_label="Add brand" %}
             {% endfor %}
             </tbody>
         </table>

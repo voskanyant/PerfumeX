@@ -1,4 +1,4 @@
-from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
+from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin, UserPassesTestMixin
 from django.contrib.auth import get_user_model, update_session_auth_hash
 from django.contrib.auth.models import Group
 from django.urls import reverse_lazy
@@ -30,13 +30,11 @@ from django.core.management import call_command
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.utils.safestring import mark_safe
 from django.views.decorators.http import require_POST
-from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 from datetime import datetime, time
 import sys
 
 from decimal import Decimal, InvalidOperation
-import threading
 import re
 import unicodedata
 
@@ -60,9 +58,9 @@ from django.shortcuts import get_object_or_404, redirect
 
 from .services.importer import delete_import_batch, process_import_file
 from django.contrib import messages
-from django.db import close_old_connections
 
 from .services.importer import preview_mapping_file
+from .services.background import run_in_background
 from .services.cbr_rates import upsert_cbr_markup_rates, upsert_cbr_markup_rates_range
 from .services.email_import_lock import email_import_worker_is_busy
 from .services.product_visibility import (
@@ -1507,6 +1505,19 @@ class StaffRequiredMixin(UserPassesTestMixin):
         return redirect("prices:dashboard")
 
 
+class MutatingPermissionRequiredMixin(PermissionRequiredMixin):
+    raise_exception = True
+
+
+class ModelDeletePermissionMixin(MutatingPermissionRequiredMixin):
+    def get_permission_required(self):
+        model = getattr(self, "model", None)
+        if not model:
+            return super().get_permission_required()
+        opts = model._meta
+        return (f"{opts.app_label}.delete_{opts.model_name}",)
+
+
 class BaseListView(LoginRequiredMixin, ListView):
     template_name = "prices/list.html"
     paginate_by = 50
@@ -1575,7 +1586,7 @@ class BaseUpdateView(LoginRequiredMixin, UpdateView):
         return reverse_lazy(self.success_url_name)
 
 
-class BaseDeleteView(LoginRequiredMixin, DeleteView):
+class BaseDeleteView(ModelDeletePermissionMixin, LoginRequiredMixin, DeleteView):
     template_name = "prices/confirm_delete.html"
     success_url_name = ""
 
@@ -1947,6 +1958,45 @@ class ImportDetailedLogsView(LoginRequiredMixin, TemplateView):
         return context
 
 
+class StuckEmailImportRunsView(LoginRequiredMixin, TemplateView):
+    template_name = "prices/stuck_email_import_runs.html"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        cutoff = timezone.now() - timezone.timedelta(minutes=30)
+        stuck_runs = (
+            models.EmailImportRun.objects.select_related("supplier")
+            .filter(status=models.EmailImportStatus.RUNNING, updated_at__lt=cutoff)
+            .order_by("updated_at", "started_at", "id")
+        )
+        context["stuck_runs"] = stuck_runs
+        context["cutoff"] = cutoff
+        context["import_section"] = "stuck_runs"
+        context["detailed_logs_url"] = reverse_lazy("prices:import_detailed_logs")
+        context["overview_url"] = reverse_lazy("prices:supplier_overview")
+        return context
+
+    def post(self, request, *args, **kwargs):
+        run_id = request.POST.get("run_id", "").strip()
+        if not run_id.isdigit():
+            messages.error(request, "Select a valid import run.")
+            return redirect("prices:stuck_email_import_runs")
+        updated = models.EmailImportRun.objects.filter(
+            id=int(run_id),
+            status=models.EmailImportStatus.RUNNING,
+        ).update(
+            status=models.EmailImportStatus.FAILED,
+            finished_at=timezone.now(),
+            errors=F("errors") + 1,
+            last_message="Marked failed from stuck-run recovery.",
+        )
+        if updated:
+            messages.success(request, "Import run marked as failed.")
+        else:
+            messages.info(request, "Import run is no longer running.")
+        return redirect("prices:stuck_email_import_runs")
+
+
 class ImportSettingsView(LoginRequiredMixin, TemplateView):
     template_name = "prices/import_settings.html"
 
@@ -2078,7 +2128,9 @@ class ImportWizardView(LoginRequiredMixin, FormView):
         return super().form_valid(form)
 
 
-class ImportDeleteView(LoginRequiredMixin, View):
+class ImportDeleteView(MutatingPermissionRequiredMixin, LoginRequiredMixin, View):
+    permission_required = "prices.delete_importbatch"
+
     def post(self, request, pk):
         import_batch = get_object_or_404(models.ImportBatch, pk=pk)
         next_url = request.POST.get("next", "").strip()
@@ -2090,7 +2142,9 @@ class ImportDeleteView(LoginRequiredMixin, View):
         return redirect("prices:supplier_overview")
 
 
-class ImportDeleteBulkView(LoginRequiredMixin, View):
+class ImportDeleteBulkView(MutatingPermissionRequiredMixin, LoginRequiredMixin, View):
+    permission_required = "prices.delete_importbatch"
+
     def post(self, request):
         ids = request.POST.getlist("import_ids")
         if ids:
@@ -2121,7 +2175,9 @@ class ImportDetailView(LoginRequiredMixin, DetailView):
         return context
 
 
-class SupplierProductCleanupView(LoginRequiredMixin, View):
+class SupplierProductCleanupView(MutatingPermissionRequiredMixin, LoginRequiredMixin, View):
+    permission_required = "prices.delete_supplierproduct"
+
     def post(self, request):
         models.SupplierProduct.objects.filter(
             created_import_batch__isnull=True, last_import_batch__isnull=True
@@ -2129,7 +2185,9 @@ class SupplierProductCleanupView(LoginRequiredMixin, View):
         return redirect("prices:product_list")
 
 
-class SupplierProductInactiveCleanupView(LoginRequiredMixin, View):
+class SupplierProductInactiveCleanupView(MutatingPermissionRequiredMixin, LoginRequiredMixin, View):
+    permission_required = "prices.delete_supplierproduct"
+
     def post(self, request):
         supplier_ids = _parse_supplier_filter_ids(request.POST.get("supplier", ""))
         queryset = models.SupplierProduct.objects.filter(is_active=False)
@@ -2139,7 +2197,9 @@ class SupplierProductInactiveCleanupView(LoginRequiredMixin, View):
         return redirect("prices:product_list")
 
 
-class SupplierProductBulkDeleteView(LoginRequiredMixin, View):
+class SupplierProductBulkDeleteView(MutatingPermissionRequiredMixin, LoginRequiredMixin, View):
+    permission_required = "prices.delete_supplierproduct"
+
     def post(self, request):
         ids = request.POST.getlist("product_ids")
         if ids:
@@ -2487,7 +2547,9 @@ class SupplierEmailBackfillView(LoginRequiredMixin, View):
         return redirect("prices:supplier_import", pk=pk)
 
 
-class SupplierEmailBackfillBulkView(LoginRequiredMixin, View):
+class SupplierEmailBackfillBulkView(MutatingPermissionRequiredMixin, LoginRequiredMixin, View):
+    permission_required = "prices.add_emailimportrun"
+
     def post(self, request):
         if _has_running_email_imports():
             messages.info(request, EMAIL_IMPORT_BUSY_MESSAGE)
@@ -2554,7 +2616,9 @@ class SupplierEmailBackfillBulkView(LoginRequiredMixin, View):
         return redirect("prices:supplier_overview")
 
 
-class SupplierRatesRecalculateView(LoginRequiredMixin, View):
+class SupplierRatesRecalculateView(MutatingPermissionRequiredMixin, LoginRequiredMixin, View):
+    permission_required = "prices.change_exchangerate"
+
     def post(self, request):
         supplier_ids = request.POST.getlist("supplier_ids")
         start_raw = request.POST.get("start_date", "").strip()
@@ -2629,7 +2693,9 @@ class SupplierRatesRecalculateView(LoginRequiredMixin, View):
         return redirect("prices:supplier_overview")
 
 
-class SupplierEmailImportAllView(LoginRequiredMixin, View):
+class SupplierEmailImportAllView(MutatingPermissionRequiredMixin, LoginRequiredMixin, View):
+    permission_required = "prices.add_emailimportrun"
+
     def post(self, request):
         if _has_running_email_imports():
             messages.info(request, EMAIL_IMPORT_BUSY_MESSAGE)
@@ -2674,17 +2740,14 @@ class SupplierEmailImportAllView(LoginRequiredMixin, View):
         return redirect("prices:supplier_overview")
 
 
-class SupplierPriceReimportAllView(LoginRequiredMixin, View):
+class SupplierPriceReimportAllView(MutatingPermissionRequiredMixin, LoginRequiredMixin, View):
+    permission_required = "prices.change_importbatch"
+
     def post(self, request):
         def _run_reimport():
-            close_old_connections()
-            try:
-                call_command("repair_supplier_price_imports", all_suppliers=True)
-            except Exception:
-                logger.exception("Bulk reimport of all price files failed.")
+            call_command("repair_supplier_price_imports", all_suppliers=True)
 
-        thread = threading.Thread(target=_run_reimport, daemon=True)
-        thread.start()
+        run_in_background(_run_reimport, label="bulk-price-reimport")
         messages.success(
             request,
             "Reimport of all processed price files started in background.",
@@ -2790,7 +2853,6 @@ class SupplierEmailImportCancelView(LoginRequiredMixin, View):
         return redirect("prices:supplier_overview")
 
 
-@method_decorator(csrf_exempt, name="dispatch")
 @method_decorator(require_POST, name="dispatch")
 class SupplierMappingPreviewView(LoginRequiredMixin, View):
     def post(self, request, pk):
@@ -2870,29 +2932,19 @@ class CurrencyRateView(LoginRequiredMixin, TemplateView):
             start_date = range_form.cleaned_data["start_date"]
             end_date = range_form.cleaned_data.get("end_date") or start_date
 
-            # Long date ranges can exceed request timeouts; run in background.
-            def _sync_cbr_range_async(sync_start, sync_end, markup_percent):
-                close_old_connections()
-                try:
-                    upsert_cbr_markup_rates_range(
-                        start_date=sync_start,
-                        end_date=sync_end,
-                        markup_percent=markup_percent,
-                    )
-                except Exception:
-                    # Keep request stable; details can be inspected in server logs.
-                    pass
-
-            thread = threading.Thread(
-                target=_sync_cbr_range_async,
-                args=(start_date, end_date, settings_obj.cbr_markup_percent),
-                daemon=True,
-            )
-            thread.start()
-            messages.success(
-                request,
-                f"CBR range sync started in background: {start_date} to {end_date}.",
-            )
+            try:
+                upsert_cbr_markup_rates_range(
+                    start_date=start_date,
+                    end_date=end_date,
+                    markup_percent=settings_obj.cbr_markup_percent,
+                )
+            except Exception as exc:
+                messages.error(request, f"Failed to sync CBR range: {exc}")
+            else:
+                messages.success(
+                    request,
+                    f"CBR range synced: {start_date} to {end_date}.",
+                )
             return redirect("prices:currency_rates")
 
         form = forms.ExchangeRateForm(request.POST)
@@ -2916,7 +2968,9 @@ class CurrencyRateUpdateView(LoginRequiredMixin, View):
         return redirect("prices:currency_rates")
 
 
-class CurrencyRateDeleteView(LoginRequiredMixin, View):
+class CurrencyRateDeleteView(MutatingPermissionRequiredMixin, LoginRequiredMixin, View):
+    permission_required = "prices.delete_exchangerate"
+
     def post(self, request, pk):
         rate = get_object_or_404(models.ExchangeRate, pk=pk)
         rate.delete()
@@ -2926,7 +2980,9 @@ class CurrencyRateDeleteView(LoginRequiredMixin, View):
         return redirect("prices:currency_rates")
 
 
-class CurrencyRateBulkDeleteView(LoginRequiredMixin, View):
+class CurrencyRateBulkDeleteView(MutatingPermissionRequiredMixin, LoginRequiredMixin, View):
+    permission_required = "prices.delete_exchangerate"
+
     def post(self, request):
         ids = request.POST.getlist("rate_ids")
         if ids:

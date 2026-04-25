@@ -23,13 +23,16 @@
                 <a class="button secondary" href="{% url 'prices:import_settings' %}">Import settings</a>
                 <form action="{% url 'prices:supplier_reimport_all_prices' %}" method="post" class="layout-inline">
                     {% csrf_token %}
-                    <button class="button secondary" type="submit">Reimport all prices</button>
+                    <button class="button secondary" type="submit" data-confirm="Reimport all prices for all suppliers?">Reimport all prices</button>
                 </form>
                 <form action="{% url 'prices:supplier_import_email_all' %}" method="post" class="layout-inline" data-email-update-all-form>
                     {% csrf_token %}
                     <button class="button" type="submit" data-email-update-all{% if any_running %} disabled{% endif %}>Update all from email</button>
                 </form>
             </div>
+        </div>
+        <div class="email-update-banner{% if any_running %} is-visible{% endif %}" data-email-update-banner>
+            Email import is running. This board will refresh automatically.
         </div>
 
         <div class="import-scan-panel">
@@ -273,7 +276,7 @@
                                             </a>
                                             <form action="{% url 'prices:supplier_import_email_cancel' row.supplier.pk %}" method="post" class="import-action-form{% if not row.is_running %} is-hidden{% endif %}" data-email-cancel-wrap>
                                                 {% csrf_token %}
-                                                <button class="button secondary icon import-action-button" type="submit" data-email-cancel title="Cancel running email import" aria-label="Cancel running email import">
+                                                <button class="button secondary icon import-action-button" type="submit" data-email-cancel title="Cancel running email import" aria-label="Cancel running email import" data-confirm="Cancel this running email import?">
                                                     <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                                                         <rect x="6" y="6" width="12" height="12" rx="1"/>
                                                     </svg>
@@ -282,12 +285,18 @@
                                         </div>
                                     </td>
                                 </tr>
+                            {% empty %}
+                                <tr>
+                                    <td colspan="8" class="empty-state">
+                                        No suppliers yet. <a href="{% url 'prices:supplier_create' %}">Add a supplier</a>
+                                    </td>
+                                </tr>
                             {% endfor %}
                         </tbody>
                     </table>
                 </div>
             {% else %}
-                <div class="products-empty-state">No suppliers yet.</div>
+                <div class="products-empty-state">No suppliers yet. <a href="{% url 'prices:supplier_create' %}">Add a supplier</a></div>
             {% endif %}
         </div>
     </div>
@@ -510,9 +519,16 @@
                 var updateAllForm = event.target.closest("[data-email-update-all-form]");
                 if (updateAllForm) {
                     var updateAllBtn = updateAllForm.querySelector("[data-email-update-all]");
+                    var banner = document.querySelector("[data-email-update-banner]");
                     if (updateAllBtn) {
                         updateAllBtn.disabled = true;
+                        updateAllBtn.setAttribute("aria-busy", "true");
+                        updateAllBtn.classList.add("is-loading");
                         updateAllBtn.textContent = "Starting…";
+                    }
+                    if (banner) {
+                        banner.classList.add("is-visible");
+                        banner.textContent = "Email import is starting. This board will refresh automatically.";
                     }
                     document.querySelectorAll("[data-supplier-id]").forEach(function (row) {
                         var updateBtn = row.querySelector("[data-email-update]");
@@ -545,8 +561,18 @@
                         });
                         applySummary(data.summary || {});
                         var updateAllBtn = document.querySelector("[data-email-update-all]");
+                        var banner = document.querySelector("[data-email-update-banner]");
                         if (updateAllBtn) {
                             updateAllBtn.disabled = anyRunning;
+                            updateAllBtn.classList.toggle("is-loading", anyRunning);
+                            updateAllBtn.setAttribute("aria-busy", anyRunning ? "true" : "false");
+                            if (!anyRunning) {
+                                updateAllBtn.textContent = "Update all from email";
+                            }
+                        }
+                        if (banner) {
+                            banner.classList.toggle("is-visible", anyRunning);
+                            banner.textContent = anyRunning ? "Email import is running. This board will refresh automatically." : "";
                         }
                         if (anyRunning) {
                             hasSeenRunning = true;

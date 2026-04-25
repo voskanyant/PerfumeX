@@ -1,3 +1,17 @@
 {% extends "prices/base.html" %}
 {% block title %}Research Job{% endblock %}
-{% block content %}<div class="page-head"><div><span class="page-kicker">Research</span><h1 class="page-title">{{ job.job_type }}</h1><div class="page-meta">{{ job.status }}</div></div></div><div class="workspace-block"><p>{{ job.result_summary }}</p><pre class="run-log-pre">{{ job.raw_result_json }}</pre></div>{% endblock %}
+{% block content %}
+{% url 'assistant_core:research_jobs' as research_jobs_url %}
+{% include "prices/_breadcrumbs.html" with parent_label="Research jobs" parent_url=research_jobs_url current_label=job.job_type %}
+<div class="page-head">
+    <div>
+        <span class="page-kicker">Research</span>
+        <h1 class="page-title">{{ job.job_type }}</h1>
+        <div class="page-meta">{{ job.status }}</div>
+    </div>
+</div>
+<div class="workspace-block">
+    <p>{{ job.result_summary }}</p>
+    <pre class="run-log-pre">{{ job.raw_result_json }}</pre>
+</div>
+{% endblock %}

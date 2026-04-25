@@ -55,6 +55,37 @@
         }
     });
 
+    document.addEventListener("submit", function (event) {
+        var form = event.target;
+        if (!(form instanceof HTMLFormElement)) return;
+        var submitter = event.submitter || form.querySelector('button[type="submit"], input[type="submit"]');
+        var confirmMessage = (submitter && submitter.getAttribute("data-confirm")) || form.getAttribute("data-confirm");
+        if (confirmMessage && !window.confirm(confirmMessage)) {
+            event.preventDefault();
+            return;
+        }
+        if (form.dataset.noSubmitDisable === "1") return;
+        if (event.submitter && event.submitter.name && !event.submitter.disabled) {
+            var submitterValue = document.createElement("input");
+            submitterValue.type = "hidden";
+            submitterValue.name = event.submitter.name;
+            submitterValue.value = event.submitter.value || "";
+            form.appendChild(submitterValue);
+        }
+        var buttons = form.querySelectorAll('button[type="submit"], input[type="submit"]');
+        buttons.forEach(function (button) {
+            if (button.disabled) return;
+            button.disabled = true;
+            if (button instanceof HTMLInputElement) {
+                button.dataset.originalText = button.value || "";
+                button.value = button.dataset.busyText || "Working…";
+                return;
+            }
+            button.dataset.originalText = button.textContent || "";
+            button.textContent = button.dataset.busyText || "Working…";
+        });
+    });
+
     var path = window.location.pathname || "/";
     document.querySelectorAll(".sidebar .sidebar-link, #mobileNav .sidebar-link").forEach(function (link) {
         var href = link.getAttribute("href") || "";
@@ -73,6 +104,15 @@
 
     var drawerBackdrop = document.querySelector("[data-drawer-backdrop]");
     var activeDrawer = null;
+    var savedDrawerFocus = null;
+    var focusableSelector = [
+        "a[href]",
+        "button:not([disabled])",
+        "textarea:not([disabled])",
+        "input:not([disabled]):not([type='hidden'])",
+        "select:not([disabled])",
+        "[tabindex]:not([tabindex='-1'])"
+    ].join(",");
 
     function syncDrawerTriggers(name, isOpen) {
         document.querySelectorAll("[data-drawer-toggle='" + name + "']").forEach(function (trigger) {
@@ -93,6 +133,10 @@
             }
             document.body.classList.remove("drawer-open");
         }
+        if (savedDrawerFocus && typeof savedDrawerFocus.focus === "function" && document.contains(savedDrawerFocus)) {
+            savedDrawerFocus.focus();
+        }
+        savedDrawerFocus = null;
     }
 
     function openDrawer(drawer) {
@@ -100,6 +144,7 @@
         if (activeDrawer && activeDrawer !== drawer) {
             closeDrawer(activeDrawer);
         }
+        savedDrawerFocus = document.activeElement;
         var name = drawer.getAttribute("data-drawer") || "";
         drawer.classList.add("is-open");
         drawer.setAttribute("aria-hidden", "false");
@@ -109,6 +154,42 @@
             drawerBackdrop.hidden = false;
         }
         document.body.classList.add("drawer-open");
+        window.setTimeout(function () {
+            var focusable = getDrawerFocusable(drawer);
+            var focusTarget = focusable[0] || drawer;
+            if (!focusTarget.hasAttribute("tabindex") && focusTarget === drawer) {
+                focusTarget.setAttribute("tabindex", "-1");
+            }
+            focusTarget.focus();
+        }, 0);
+    }
+
+    function getDrawerFocusable(drawer) {
+        if (!drawer) return [];
+        return Array.from(drawer.querySelectorAll(focusableSelector)).filter(function (node) {
+            return node.offsetParent !== null || node === document.activeElement;
+        });
+    }
+
+    function trapDrawerFocus(event) {
+        if (!activeDrawer || event.key !== "Tab") return;
+        var focusable = getDrawerFocusable(activeDrawer);
+        if (!focusable.length) {
+            event.preventDefault();
+            activeDrawer.focus();
+            return;
+        }
+        var first = focusable[0];
+        var last = focusable[focusable.length - 1];
+        if (event.shiftKey && document.activeElement === first) {
+            event.preventDefault();
+            last.focus();
+            return;
+        }
+        if (!event.shiftKey && document.activeElement === last) {
+            event.preventDefault();
+            first.focus();
+        }
     }
 
     document.querySelectorAll("[data-drawer-toggle]").forEach(function (trigger) {
@@ -141,5 +222,6 @@
             closeDrawer(activeDrawer);
             return;
         }
+        trapDrawerFocus(event);
     });
 })();

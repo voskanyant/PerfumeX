@@ -1,3 +1,23 @@
 {% extends "prices/base.html" %}
-{% block title %}Research Jobs{% endblock %}
-{% block content %}<div class="page-head"><div><span class="page-kicker">Assistant</span><h1 class="page-title">Research jobs</h1></div></div><div class="workspace-block"><table class="data-table"><tbody>{% for job in jobs %}<tr><td><a href="{% url 'assistant_core:research_job_detail' job.pk %}">{{ job.job_type }}</a></td><td>{{ job.status }}</td><td>{{ job.result_summary }}</td><td>{{ job.created_at }}</td></tr>{% empty %}<tr><td>No jobs.</td></tr>{% endfor %}</tbody></table></div>{% endblock %}
+{% block content %}
+<div class="page-head">
+    <div><span class="page-kicker">Assistant</span><h1 class="page-title">Research jobs</h1></div>
+</div>
+<div class="workspace-block">
+    <table class="data-table">
+        <tbody>
+        {% for job in jobs %}
+            <tr>
+                <td><a href="{% url 'assistant_core:research_job_detail' job.pk %}">{{ job.job_type }}</a></td>
+                <td>{{ job.status }}</td>
+                <td>{{ job.result_summary }}</td>
+                <td>{{ job.created_at }}</td>
+            </tr>
+        {% empty %}
+            {% url 'assistant_core:dashboard' as assistant_dashboard_url %}
+            {% include "prices/components/table_empty.html" with colspan=4 message="No jobs." cta_url=assistant_dashboard_url cta_label="Open assistant dashboard" %}
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

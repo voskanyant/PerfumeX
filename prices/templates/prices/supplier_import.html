@@ -7,6 +7,8 @@
 
 {% block content %}
     <div class="page-stack">
+        {% url 'prices:supplier_overview' as supplier_overview_url %}
+        {% include "prices/_breadcrumbs.html" with parent_label="Import Prices" parent_url=supplier_overview_url current_label=supplier.name %}
         <div class="section-card" id="manual-upload">
             <div class="layout-row layout-row--wrap items-start justify-between gap-md">
                 <div>
@@ -14,7 +16,6 @@
                     <h1 class="page-title">Import Prices - {{ supplier.name }}</h1>
                     <p class="page-subtitle space-bottom-none">Upload price list and set mapping for this supplier.</p>
                 </div>
-                <a class="button ghost" href="{% url 'prices:supplier_overview' %}">Back</a>
             </div>
             <form method="post" enctype="multipart/form-data" class="space-top-md">
                 {% csrf_token %}

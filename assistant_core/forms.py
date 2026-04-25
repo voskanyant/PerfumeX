@@ -17,6 +17,10 @@ class GlobalRuleForm(forms.ModelForm):
             from assistant_linking.services.garbage import clear_garbage_keyword_cache
 
             clear_garbage_keyword_cache()
+        if instance.rule_kind.startswith("parser_") or instance.rule_kind == "regex_preprocess":
+            from assistant_linking.services.parser_rules import clear_parser_rule_cache
+
+            clear_parser_rule_cache()
         return instance
 
 

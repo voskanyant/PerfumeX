@@ -58,7 +58,7 @@
                 <form id="rate-bulk-delete-form" method="post" action="{% url 'prices:currency_rate_delete_bulk' %}" class="space-top-sm space-bottom-sm">
                     {% csrf_token %}
                     <input type="hidden" name="page" value="{{ rates_page.number }}">
-                    <button class="button danger" type="submit">
+                    <button class="button danger" type="submit" data-confirm="Delete the selected currency rates?">
                         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                             <path d="M3 6h18"/>
                             <path d="M8 6V4h8v2"/>
@@ -111,7 +111,7 @@
                                     <form method="post" action="{% url 'prices:currency_rate_delete' rate.pk %}">
                                         {% csrf_token %}
                                         <input type="hidden" name="page" value="{{ rates_page.number }}">
-                                        <button class="button danger icon" type="submit" title="Delete" aria-label="Delete">
+                                        <button class="button danger icon" type="submit" title="Delete" aria-label="Delete" data-confirm="Delete this currency rate?">
                                             <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                                                 <path d="M3 6h18"/>
                                                 <path d="M8 6V4h8v2"/>
@@ -124,13 +124,19 @@
                                 </div>
                             </td>
                         </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="7" class="empty-state">
+                                No rates yet. Add a manual rate or sync today from CBR.
+                            </td>
+                        </tr>
                     {% endfor %}
                 </tbody>
                     </table>
                 </div>
                 {% include "prices/components/pagination.html" with page_obj=rates_page class_name="space-top-md" label="Rates pagination" jump_id="rates-page-jump" %}
             {% else %}
-                <p class="muted space-top-sm">No rates yet.</p>
+                <div class="empty-state space-top-sm">No rates yet. Add a manual rate or sync today from CBR.</div>
             {% endif %}
         </div>
     </div>

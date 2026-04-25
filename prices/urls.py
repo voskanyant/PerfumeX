@@ -19,6 +19,11 @@ urlpatterns = [
         views.ImportDetailedLogsView.as_view(),
         name="import_detailed_logs",
     ),
+    path(
+        "suppliers/overview/stuck-runs/",
+        views.StuckEmailImportRunsView.as_view(),
+        name="stuck_email_import_runs",
+    ),
     path("imports/new/", views.ImportWizardView.as_view(), name="import_wizard"),
     path("imports/<int:pk>/", views.ImportDetailView.as_view(), name="import_detail"),
     path("imports/<int:pk>/delete/", views.ImportDeleteView.as_view(), name="import_delete"),

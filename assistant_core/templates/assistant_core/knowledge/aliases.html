@@ -141,8 +141,8 @@
                     </tr>
                 {% empty %}
                     <tr>
-                        <td colspan="{% if active_section == 'products' %}9{% elif active_section == 'concentrations' %}8{% else %}7{% endif %}">
-                            No entries match the current filters.
+                        <td colspan="{% if active_section == 'products' %}9{% elif active_section == 'concentrations' %}8{% else %}7{% endif %}" class="empty-state">
+                            No entries match the current filters. <a href="{% url 'assistant_core:aliases' %}?section={{ active_section }}">Reset filters</a>
                         </td>
                     </tr>
                 {% endfor %}

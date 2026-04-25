@@ -1,3 +1,35 @@
 {% extends "prices/base.html" %}
-{% block title %}AI Drafts{% endblock %}
-{% block content %}<div class="page-head"><div><span class="page-kicker">Research</span><h1 class="page-title">AI drafts</h1></div></div><div class="workspace-block"><table class="data-table"><tbody>{% for draft in drafts %}<tr><td>{{ draft.perfume }}</td><td>{{ draft.draft_type }}</td><td>{{ draft.status }}</td><td>{{ draft.content_json.short_description }}</td><td><form method="post" action="{% url 'assistant_core:draft_status' draft.pk 'approved' %}">{% csrf_token %}<button class="button ghost">Approve</button></form></td><td><form method="post" action="{% url 'assistant_core:draft_status' draft.pk 'needs_edits' %}">{% csrf_token %}<button class="button ghost">Needs edits</button></form></td></tr>{% empty %}<tr><td>No drafts.</td></tr>{% endfor %}</tbody></table></div>{% endblock %}
+{% block content %}
+<div class="page-head">
+    <div><span class="page-kicker">Research</span><h1 class="page-title">AI drafts</h1></div>
+</div>
+<div class="workspace-block">
+    <table class="data-table">
+        <tbody>
+        {% for draft in drafts %}
+            <tr>
+                <td>{{ draft.perfume }}</td>
+                <td>{{ draft.draft_type }}</td>
+                <td>{{ draft.status }}</td>
+                <td>{{ draft.content_json.short_description }}</td>
+                <td>
+                    <form method="post" action="{% url 'assistant_core:draft_status' draft.pk 'approved' %}">
+                        {% csrf_token %}
+                        <button class="button ghost">Approve</button>
+                    </form>
+                </td>
+                <td>
+                    <form method="post" action="{% url 'assistant_core:draft_status' draft.pk 'needs_edits' %}">
+                        {% csrf_token %}
+                        <button class="button ghost">Needs edits</button>
+                    </form>
+                </td>
+            </tr>
+        {% empty %}
+            {% url 'assistant_core:research_jobs' as research_jobs_url %}
+            {% include "prices/components/table_empty.html" with colspan=6 message="No drafts." cta_url=research_jobs_url cta_label="Open research jobs" %}
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

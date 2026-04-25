@@ -14,7 +14,7 @@
     <form method="post">
         {% csrf_token %}
         <div class="layout-inline gap-sm">
-            <button class="button danger" type="submit">Delete</button>
+            <button class="button danger" type="submit" data-confirm="Delete this dictionary entry?">Delete</button>
             <a class="button ghost" href="{{ return_url }}">Cancel</a>
         </div>
     </form>

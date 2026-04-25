@@ -38,10 +38,24 @@ class SupplierForm(forms.ModelForm):
 
 
 class MailboxForm(forms.ModelForm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance and self.instance.pk:
+            self.fields["password"].required = False
+            self.fields["password"].help_text = "Leave blank to keep current password."
+
     class Meta:
         model = models.Mailbox
         fields = "__all__"
-        widgets = {"password": forms.PasswordInput(render_value=True)}
+        widgets = {"password": forms.PasswordInput(render_value=False)}
+
+    def clean_password(self):
+        password = self.cleaned_data.get("password")
+        if password:
+            return password
+        if self.instance and self.instance.pk:
+            return self.instance.password
+        raise forms.ValidationError("Password is required.")
 
 
 class SupplierMailboxRuleForm(forms.ModelForm):

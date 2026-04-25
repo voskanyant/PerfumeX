@@ -52,6 +52,13 @@ class ManualLinkDecisionAdmin(admin.ModelAdmin):
     list_filter = ("decision_type", "apply_to_similar")
 
 
+@admin.register(models.ManualLinkDecisionAudit)
+class ManualLinkDecisionAuditAdmin(admin.ModelAdmin):
+    list_display = ("previous_pk", "replaced_by", "replaced_at")
+    search_fields = ("previous_pk", "previous_decision_json")
+    readonly_fields = ("previous_pk", "previous_decision_json", "replaced_by", "replaced_at")
+
+
 @admin.register(models.LinkSuggestion)
 class LinkSuggestionAdmin(admin.ModelAdmin):
     list_display = ("supplier_product", "suggested_perfume", "suggested_variant", "confidence", "source_engine", "status")

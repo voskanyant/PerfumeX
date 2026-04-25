@@ -6,10 +6,14 @@ from email.message import EmailMessage
 from pathlib import Path
 from unittest.mock import patch
 
+from django.contrib.messages import get_messages
 from django.contrib.auth import get_user_model
 from django.core.files.base import ContentFile
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
-from django.test import TestCase
+from django.db import IntegrityError, connection, transaction
+from django.test import Client
+from django.test import TestCase, TransactionTestCase
 from django.test.utils import override_settings
 from django.template import Context, Template
 from django.test import RequestFactory
@@ -20,11 +24,14 @@ from catalog.models import Brand, Perfume, PerfumeVariant
 from prices import models
 from prices.management.commands.import_emails import _get_supplier_latest_batch_time
 from prices.services.email_importer import (
+    _advance_mailbox_uid_cursor,
     _is_non_price_filename,
     _is_unnamed_body_part,
     _reason_from_error,
+    run_import,
     _validate_spreadsheet_payload,
 )
+from prices.services.background import run_in_background
 from prices.views import (
     _batch_activity_datetime,
     _build_autoimport_scan_status,
@@ -57,6 +64,368 @@ class SharedUiComponentTests(TestCase):
         self.assertIn("q=mango", rendered)
         self.assertIn("sp_page=4", rendered)
         self.assertNotIn("sp_page=2", rendered)
+
+
+class FrontendHardeningTests(TestCase):
+    def setUp(self):
+        user = get_user_model().objects.create_user(
+            username="frontend-staff",
+            password="pass",
+            is_staff=True,
+        )
+        self.client.force_login(user)
+
+    def test_supplier_list_escapes_script_tag(self):
+        models.Supplier.objects.create(name="<script>alert(1)</script>")
+
+        response = self.client.get(reverse("prices:supplier_list"), secure=True)
+
+        self.assertEqual(response.status_code, 200)
+        html = response.content.decode()
+        self.assertIn("&lt;script&gt;alert(1)&lt;/script&gt;", html)
+        self.assertNotIn("<script>alert(1)</script>", html)
+
+    def test_supplier_list_renders_img_payload_as_text(self):
+        payload = "<img src=x onerror=alert(1)>"
+        models.Supplier.objects.create(name=payload)
+
+        response = self.client.get(reverse("prices:supplier_list"), secure=True)
+
+        self.assertEqual(response.status_code, 200)
+        html = response.content.decode()
+        self.assertIn("&lt;img src=x onerror=alert(1)&gt;", html)
+        self.assertNotIn(payload, html)
+
+    def test_product_filter_supplier_fixture_escapes_img_payload(self):
+        payload = "<img src=x onerror=alert(1)>"
+        supplier = models.Supplier.objects.create(name=payload)
+        models.SupplierProduct.objects.create(
+            supplier=supplier,
+            identity_key="xss-fixture-product",
+            name="XSS Fixture Product",
+        )
+
+        response = self.client.get(reverse("prices:product_list"), secure=True)
+
+        self.assertEqual(response.status_code, 200)
+        html = response.content.decode()
+        self.assertIn("&lt;img src=x onerror=alert(1)&gt;", html)
+        self.assertNotIn(payload, html)
+
+
+class MailboxPasswordSecurityTests(TestCase):
+    def test_mailbox_password_round_trip(self):
+        mailbox = models.Mailbox.objects.create(
+            name="secure-mailbox",
+            host="imap.example.com",
+            username="secure@example.com",
+            password="plain-secret-value",
+        )
+
+        mailbox.refresh_from_db()
+
+        self.assertEqual(mailbox.password, "plain-secret-value")
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT password FROM prices_mailbox WHERE id = %s", [mailbox.pk])
+            stored_password = cursor.fetchone()[0]
+        self.assertNotEqual(stored_password, "plain-secret-value")
+
+    def test_mailbox_password_not_in_admin_html(self):
+        user = get_user_model().objects.create_superuser(
+            username="admin",
+            email="admin@example.com",
+            password="password",
+        )
+        mailbox = models.Mailbox.objects.create(
+            name="admin-mailbox",
+            host="imap.example.com",
+            username="admin-mailbox@example.com",
+            password="html-secret-value",
+        )
+        self.client.force_login(user)
+
+        response = self.client.get(
+            reverse("admin:prices_mailbox_change", args=[mailbox.pk]),
+            secure=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "html-secret-value")
+
+
+class EmailImporterCursorTests(TestCase):
+    def setUp(self):
+        self.supplier = models.Supplier.objects.create(
+            name="Cursor Supplier",
+            code="cursor-supplier",
+            from_address_pattern="supplier@example.com",
+            price_subject_pattern="price",
+            price_filename_pattern="prices",
+        )
+        self.mailbox = models.Mailbox.objects.create(
+            name="cursor-mailbox",
+            host="imap.example.com",
+            username="cursor@example.com",
+            password="secret",
+        )
+
+    def test_import_batch_unique_constraint_enforced_for_mailbox_message_id(self):
+        models.ImportBatch.objects.create(
+            supplier=self.supplier,
+            mailbox=self.mailbox,
+            message_id="<unique@example.com>",
+            status=models.ImportStatus.PROCESSED,
+        )
+
+        with self.assertRaises(IntegrityError):
+            with transaction.atomic():
+                models.ImportBatch.objects.create(
+                    supplier=self.supplier,
+                    mailbox=self.mailbox,
+                    message_id="<unique@example.com>",
+                    status=models.ImportStatus.PENDING,
+                )
+
+        models.ImportBatch.objects.create(
+            supplier=self.supplier,
+            mailbox=self.mailbox,
+            message_id="",
+            status=models.ImportStatus.PENDING,
+        )
+        models.ImportBatch.objects.create(
+            supplier=self.supplier,
+            mailbox=self.mailbox,
+            message_id="",
+            status=models.ImportStatus.PENDING,
+        )
+        self.assertEqual(
+            models.ImportBatch.objects.filter(mailbox=self.mailbox, message_id="").count(),
+            2,
+        )
+
+    def test_uid_cursor_only_advances_after_commit(self):
+        with self.assertRaises(RuntimeError):
+            with transaction.atomic():
+                models.ImportBatch.objects.create(
+                    supplier=self.supplier,
+                    mailbox=self.mailbox,
+                    message_id="<rollback@example.com>",
+                    status=models.ImportStatus.PENDING,
+                )
+                _advance_mailbox_uid_cursor(self.mailbox.pk, "last_inbox_uid", 42)
+                raise RuntimeError("rollback transaction")
+
+        self.mailbox.refresh_from_db()
+        self.assertEqual(self.mailbox.last_inbox_uid, 0)
+        self.assertFalse(
+            models.ImportBatch.objects.filter(message_id="<rollback@example.com>").exists()
+        )
+
+        with transaction.atomic():
+            models.ImportBatch.objects.create(
+                supplier=self.supplier,
+                mailbox=self.mailbox,
+                message_id="<commit@example.com>",
+                status=models.ImportStatus.PENDING,
+            )
+            _advance_mailbox_uid_cursor(self.mailbox.pk, "last_inbox_uid", 42)
+
+        self.mailbox.refresh_from_db()
+        self.assertEqual(self.mailbox.last_inbox_uid, 42)
+        self.assertTrue(
+            models.ImportBatch.objects.filter(message_id="<commit@example.com>").exists()
+        )
+
+    def test_duplicate_message_id_skipped_not_crashed(self):
+        models.ImportBatch.objects.create(
+            supplier=self.supplier,
+            mailbox=self.mailbox,
+            message_id="<duplicate@example.com>",
+            status=models.ImportStatus.PROCESSED,
+        )
+        message = EmailMessage()
+        message["Subject"] = "Daily price"
+        message["From"] = "supplier@example.com"
+        message["Message-ID"] = "<duplicate@example.com>"
+        message["Date"] = "Sat, 25 Apr 2026 10:00:00 +0000"
+        message.set_content("attached")
+        message.add_attachment(
+            b"sku,price\nA,1\n",
+            maintype="text",
+            subtype="csv",
+            filename="prices.csv",
+        )
+
+        class FakeImapClient:
+            def search(self, charset, *criteria):
+                return "OK", [b"7"]
+
+            def fetch(self, msg_id, query):
+                if "RFC822.SIZE" in query:
+                    return "OK", [
+                        (
+                            b'7 (RFC822.SIZE 100 INTERNALDATE "25-Apr-2026 10:00:00 +0000")',
+                            b"",
+                        )
+                    ]
+                return "OK", [(b"7 (RFC822 {100}", message.as_bytes())]
+
+            def logout(self):
+                return "BYE", []
+
+        with patch(
+            "prices.services.email_importer._connect_imap",
+            return_value=FakeImapClient(),
+        ):
+            summary = run_import([self.mailbox], use_uid_cursor=True)
+
+        self.mailbox.refresh_from_db()
+        self.assertEqual(summary["skipped_duplicates"], 1)
+        self.assertEqual(models.ImportBatch.objects.count(), 1)
+        self.assertEqual(models.ImportFile.objects.count(), 0)
+        self.assertEqual(self.mailbox.last_inbox_uid, 7)
+
+
+class BulkMutationPermissionTests(TestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create_user(
+            username="bulk-user",
+            password="password",
+        )
+        self.client.force_login(self.user)
+        self.supplier = models.Supplier.objects.create(
+            name="Bulk Supplier",
+            code="bulk-supplier",
+            from_address_pattern="supplier@example.com",
+        )
+
+    def test_non_staff_user_cannot_post_bulk_mutation_endpoints(self):
+        endpoints = [
+            ("prices:import_delete_bulk", {}),
+            ("prices:product_cleanup", {}),
+            ("prices:product_cleanup_inactive", {}),
+            ("prices:product_bulk_delete", {}),
+            (
+                "prices:supplier_import_email_backfill_bulk",
+                {"supplier_ids": [str(self.supplier.id)], "start_date": "2026-04-01"},
+            ),
+            ("prices:supplier_rates_recalculate", {}),
+            ("prices:supplier_import_email_all", {}),
+            ("prices:supplier_reimport_all_prices", {}),
+            ("prices:currency_rate_delete_bulk", {}),
+        ]
+
+        for url_name, data in endpoints:
+            with self.subTest(url_name=url_name):
+                response = self.client.post(reverse(url_name), data, secure=True)
+                self.assertEqual(response.status_code, 403)
+
+    def test_mapping_preview_requires_csrf_and_accepts_token(self):
+        staff = get_user_model().objects.create_user(
+            username="preview-staff",
+            password="password",
+            is_staff=True,
+        )
+        csrf_client = Client(enforce_csrf_checks=True)
+        csrf_client.force_login(staff)
+
+        response = csrf_client.get(
+            reverse("prices:supplier_import", args=[self.supplier.pk]),
+            secure=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "csrfmiddlewaretoken")
+        token = csrf_client.cookies["csrftoken"].value
+
+        missing_token_response = csrf_client.post(
+            reverse("prices:supplier_mapping_preview", args=[self.supplier.pk]),
+            {"file": SimpleUploadedFile("prices.csv", b"sku,name,price\n1,A,10\n")},
+            secure=True,
+        )
+        self.assertEqual(missing_token_response.status_code, 403)
+
+        ok_response = csrf_client.post(
+            reverse("prices:supplier_mapping_preview", args=[self.supplier.pk]),
+            {
+                "csrfmiddlewaretoken": token,
+                "file": SimpleUploadedFile("prices.csv", b"sku,name,price\n1,A,10\n"),
+            },
+            HTTP_X_CSRFTOKEN=token,
+            HTTP_REFERER="https://testserver" + reverse("prices:supplier_import", args=[self.supplier.pk]),
+            secure=True,
+        )
+        self.assertEqual(ok_response.status_code, 200)
+        self.assertIn("rows", ok_response.json())
+
+
+class BackgroundRunSafetyTests(TransactionTestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create_user(
+            username="background-staff",
+            password="password",
+            is_staff=True,
+        )
+        self.client.force_login(self.user)
+        self.supplier = models.Supplier.objects.create(name="Background Supplier")
+
+    def test_background_failure_marks_email_run_failed(self):
+        run = models.EmailImportRun.objects.create(
+            supplier=self.supplier,
+            status=models.EmailImportStatus.RUNNING,
+        )
+
+        def failing_task():
+            raise RuntimeError("background broke")
+
+        with patch("prices.services.background.logger.exception"):
+            thread = run_in_background(failing_task, run_id=run.id, label="test-task")
+            thread.join(timeout=5)
+
+        run.refresh_from_db()
+        self.assertEqual(run.status, models.EmailImportStatus.FAILED)
+        self.assertIn("background broke", run.last_message)
+
+    def test_stuck_runs_view_lists_and_marks_failed(self):
+        old_activity = timezone.now() - timezone.timedelta(minutes=45)
+        run = models.EmailImportRun.objects.create(
+            supplier=self.supplier,
+            status=models.EmailImportStatus.RUNNING,
+            last_message="still running",
+        )
+        models.EmailImportRun.objects.filter(id=run.id).update(updated_at=old_activity)
+
+        response = self.client.get(reverse("prices:stuck_email_import_runs"), secure=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Background Supplier")
+        self.assertContains(response, "still running")
+
+        response = self.client.post(
+            reverse("prices:stuck_email_import_runs"),
+            {"run_id": str(run.id)},
+            secure=True,
+        )
+
+        self.assertEqual(response.status_code, 302)
+        run.refresh_from_db()
+        self.assertEqual(run.status, models.EmailImportStatus.FAILED)
+        self.assertEqual(run.last_message, "Marked failed from stuck-run recovery.")
+
+    def test_cbr_range_sync_failure_is_visible(self):
+        with patch("prices.views.upsert_cbr_markup_rates_range", side_effect=RuntimeError("CBR down")):
+            response = self.client.post(
+                reverse("prices:currency_rates"),
+                {
+                    "action": "sync_cbr_range",
+                    "start_date": "2026-04-24",
+                    "end_date": "2026-04-25",
+                },
+                secure=True,
+            )
+
+        self.assertEqual(response.status_code, 302)
+        messages = [str(message) for message in get_messages(response.wsgi_request)]
+        self.assertTrue(any("Failed to sync CBR range: CBR down" in message for message in messages))
 
 
 class OurProductCatalogueListTests(TestCase):
