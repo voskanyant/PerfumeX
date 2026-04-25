@@ -392,47 +392,6 @@ def _collect_latest_attachment_diagnostics() -> dict[int, models.EmailAttachment
     return latest
 
 
-def _collect_attachment_diagnostic_summaries() -> dict[int, dict[str, int]]:
-    diagnostics = models.EmailAttachmentDiagnostic.objects.filter(supplier__isnull=False)
-    summaries: dict[int, dict[str, int]] = {}
-    for supplier_id, decision, reason_code in diagnostics.values_list(
-        "supplier_id", "decision", "reason_code"
-    ):
-        bucket = summaries.setdefault(
-            supplier_id,
-            {
-                "price_candidates": 0,
-                "imported": 0,
-                "duplicates": 0,
-                "skipped": 0,
-                "failed": 0,
-                "quarantined": 0,
-                "backlog": 0,
-            },
-        )
-        if decision in {
-            models.AttachmentDecision.IMPORTED,
-            models.AttachmentDecision.DUPLICATE,
-            models.AttachmentDecision.FAILED,
-            models.AttachmentDecision.QUARANTINED,
-        }:
-            bucket["price_candidates"] += 1
-        if decision == models.AttachmentDecision.IMPORTED:
-            bucket["imported"] += 1
-        elif decision == models.AttachmentDecision.DUPLICATE:
-            bucket["duplicates"] += 1
-        elif decision == models.AttachmentDecision.SKIPPED:
-            bucket["skipped"] += 1
-        elif decision == models.AttachmentDecision.FAILED:
-            bucket["failed"] += 1
-        elif decision == models.AttachmentDecision.QUARANTINED:
-            bucket["failed"] += 1
-            bucket["quarantined"] += 1
-        if reason_code == models.AttachmentReason.BACKLOG_REMAINING:
-            bucket["backlog"] += 1
-    return summaries
-
-
 def _collect_active_price_mappings() -> dict[int, models.SupplierFileMapping]:
     mappings = (
         models.SupplierFileMapping.objects.filter(
@@ -508,17 +467,55 @@ def _build_last_import_info(batch) -> dict[str, str | int]:
     }
 
 
-def _build_latest_check_info(supplier, run, streak_count: int = 1) -> dict[str, str | int | None | bool]:
+def _diagnostic_activity_datetime(diagnostic):
+    if not diagnostic:
+        return None
+    return diagnostic.message_date or diagnostic.created_at
+
+
+def _failed_file_activity_datetime(import_file):
+    if not import_file:
+        return None
+    batch = getattr(import_file, "import_batch", None)
+    return (
+        import_file.processed_at
+        or (getattr(batch, "received_at", None) if batch else None)
+        or (getattr(batch, "created_at", None) if batch else None)
+    )
+
+
+def _format_event_filename(filename: str, limit: int = 48) -> str:
+    filename = (filename or "").strip()
+    if not filename:
+        return ""
+    if len(filename) <= limit:
+        return filename
+    return f"{filename[: limit - 3]}..."
+
+
+def _build_latest_check_info(
+    supplier,
+    run,
+    streak_count: int = 1,
+    latest_diagnostic=None,
+) -> dict[str, str | int | None | bool]:
     fallback_dt = supplier.last_email_check_at
+    diagnostic_dt = _diagnostic_activity_datetime(latest_diagnostic)
     if run:
         run_dt = _run_activity_datetime(run)
-        if fallback_dt:
-            fallback_compare_dt = fallback_dt
-            if timezone.is_naive(fallback_compare_dt):
-                fallback_compare_dt = timezone.make_aware(
-                    fallback_compare_dt, timezone.get_current_timezone()
+        newest_side_event_dt = max(
+            [dt for dt in (fallback_dt, diagnostic_dt) if dt],
+            default=None,
+        )
+        if newest_side_event_dt:
+            compare_dt = newest_side_event_dt
+            if timezone.is_naive(compare_dt):
+                compare_dt = timezone.make_aware(
+                    compare_dt, timezone.get_current_timezone()
                 )
-            if not run_dt or fallback_compare_dt > run_dt:
+            if not run_dt or compare_dt > run_dt:
+                if diagnostic_dt and compare_dt == diagnostic_dt:
+                    return _build_diagnostic_event_check(latest_diagnostic)
                 return _build_supplier_email_fallback_check(supplier, fallback_dt)
         run_status = _build_email_run_status(run)
         note = str(run_status.get("note") or "")
@@ -539,6 +536,9 @@ def _build_latest_check_info(supplier, run, streak_count: int = 1) -> dict[str, 
             "progress": run_status.get("progress"),
             "show_time": bool(run_dt),
         }
+
+    if diagnostic_dt and (not fallback_dt or diagnostic_dt >= fallback_dt):
+        return _build_diagnostic_event_check(latest_diagnostic)
 
     if fallback_dt:
         return _build_supplier_email_fallback_check(supplier, fallback_dt)
@@ -569,12 +569,12 @@ def _build_latest_check_info(supplier, run, streak_count: int = 1) -> dict[str, 
 
 def _build_supplier_email_fallback_check(supplier, fallback_dt) -> dict[str, str | int | None | bool]:
     if supplier.last_email_errors:
-        label = "issues"
+        label = "failed"
         class_name = "is-warning"
-        code = "warning"
-        note = f"{supplier.last_email_errors} error(s) on latest check"
+        code = "failed"
+        note = f"{supplier.last_email_errors} import issue(s)"
     elif supplier.last_email_processed:
-        label = "successful"
+        label = "imported"
         class_name = "is-success"
         code = "successful"
         note = f"{supplier.last_email_processed} file(s) imported"
@@ -582,14 +582,14 @@ def _build_supplier_email_fallback_check(supplier, fallback_dt) -> dict[str, str
         label = "no change"
         class_name = "is-neutral"
         code = "no-change"
-        note = "Price email found, but nothing new was imported"
+        note = "Price email found, nothing new"
     else:
-        label = "no file"
+        label = "manual: no email"
         class_name = "is-warning"
         code = "no-files"
         note = _normalize_supplier_check_message(
             supplier.last_email_last_message,
-            fallback="Supplier-specific check found no price email",
+            fallback="Manual check found no price email since last success",
         )
     return {
         "label": label,
@@ -603,13 +603,53 @@ def _build_supplier_email_fallback_check(supplier, fallback_dt) -> dict[str, str
     }
 
 
+def _build_diagnostic_event_check(diagnostic) -> dict[str, str | int | None | bool]:
+    decision = diagnostic.decision
+    filename = _format_event_filename(diagnostic.filename)
+    reason = _attachment_reason_label(diagnostic.reason_code, decision)
+    if decision == models.AttachmentDecision.IMPORTED:
+        label = "imported"
+        class_name = "is-success"
+        code = "successful"
+        note = f"{filename}: imported" if filename else "Price file imported"
+    elif decision == models.AttachmentDecision.DUPLICATE:
+        label = "no change"
+        class_name = "is-neutral"
+        code = "no-change"
+        note = f"{filename}: duplicate" if filename else "Duplicate price file"
+    elif decision in {
+        models.AttachmentDecision.FAILED,
+        models.AttachmentDecision.QUARANTINED,
+    }:
+        label = "failed"
+        class_name = "is-warning"
+        code = "failed"
+        note = f"{filename}: {reason}" if filename else reason
+    else:
+        label = "no valid file"
+        class_name = "is-warning"
+        code = "no-valid-file"
+        note = f"{filename}: {reason}" if filename else reason
+    event_dt = _diagnostic_activity_datetime(diagnostic)
+    return {
+        "label": label,
+        "class_name": class_name,
+        "code": code,
+        "note": note,
+        "relative": _short_relative_datetime(event_dt) if event_dt else "Checked",
+        "full": _format_local_datetime(event_dt),
+        "progress": None,
+        "show_time": bool(event_dt),
+    }
+
+
 def _normalize_supplier_check_message(message: str, fallback: str = "") -> str:
     note = (message or "").strip()
     if not note:
         return fallback
     lowered = note.lower()
     if lowered.startswith("no matching email"):
-        return fallback or "Supplier-specific check found no price email"
+        return fallback or "Manual check found no price email since last success"
     return note
 
 
@@ -915,7 +955,7 @@ def _attachment_reason_label(reason_code: str, decision: str = "") -> str:
     return reason_labels.get(reason_code) or decision_labels.get(decision) or "Attachment decision"
 
 
-def _summarize_latest_files(supplier, latest_run, diagnostic_summary=None) -> str:
+def _summarize_latest_files(supplier, latest_run, latest_diagnostic=None) -> str:
     if latest_run:
         if latest_run.processed_files:
             return f"Imported {latest_run.processed_files} file(s)"
@@ -926,18 +966,18 @@ def _summarize_latest_files(supplier, latest_run, diagnostic_summary=None) -> st
         if latest_run.matched_files:
             return "Price email found, no new file"
         return "No price email found"
-    if diagnostic_summary:
-        if diagnostic_summary.get("backlog"):
-            return "Backlog not fully scanned"
-        if diagnostic_summary.get("imported"):
-            return f"Imported {diagnostic_summary.get('imported')} file(s)"
-        if diagnostic_summary.get("failed") or diagnostic_summary.get("quarantined"):
-            return "Import issue"
-        if diagnostic_summary.get("duplicates"):
+    if latest_diagnostic:
+        if latest_diagnostic.decision == models.AttachmentDecision.IMPORTED:
+            return "Imported 1 file"
+        if latest_diagnostic.decision == models.AttachmentDecision.DUPLICATE:
             return "No change - duplicate price file"
-        if diagnostic_summary.get("price_candidates"):
+        if latest_diagnostic.decision in {
+            models.AttachmentDecision.FAILED,
+            models.AttachmentDecision.QUARANTINED,
+        }:
+            return "Import issue"
+        if latest_diagnostic.decision == models.AttachmentDecision.SKIPPED:
             return "Price file found, not imported"
-        return "No price file found"
     if supplier.last_email_check_at:
         if supplier.last_email_processed:
             return f"Imported {supplier.last_email_processed} file(s)"
@@ -950,7 +990,12 @@ def _summarize_latest_files(supplier, latest_run, diagnostic_summary=None) -> st
 
 
 def _build_problem_note(supplier, latest_check, health, latest_failed_file=None, latest_diagnostic=None) -> str:
-    if latest_diagnostic and latest_diagnostic.decision != models.AttachmentDecision.IMPORTED:
+    health_code = str(health.get("code") or "")
+    check_code = str(latest_check.get("code") or "")
+    if latest_diagnostic and latest_diagnostic.decision in {
+        models.AttachmentDecision.FAILED,
+        models.AttachmentDecision.QUARANTINED,
+    }:
         message = (latest_diagnostic.message or "").strip()
         filename = latest_diagnostic.filename or "attachment"
         reason = _attachment_reason_label(
@@ -959,20 +1004,23 @@ def _build_problem_note(supplier, latest_check, health, latest_failed_file=None,
         if message:
             return f"{filename}: {reason} - {message[:160]}"
         return f"{filename}: {reason}"
+    if (
+        latest_diagnostic
+        and latest_diagnostic.decision == models.AttachmentDecision.DUPLICATE
+        and health_code in {"stale", "critical"}
+    ):
+        return "Duplicate found, but last import is stale."
     if latest_failed_file:
         filename = latest_failed_file.filename or "file"
         error = (latest_failed_file.error_message or "").strip()
         if error:
             return f"{filename}: {error[:180]}"
         return f"{filename}: import failed"
-    check_code = str(latest_check.get("code") or "")
-    if check_code in {"failed", "warning", "no-files", "no-change", "canceled"}:
+    if check_code in {"failed", "warning", "no-files", "no-valid-file", "canceled"}:
         return str(latest_check.get("note") or "")
-    if str(health.get("code") or "") in {"warning", "stale", "critical"}:
+    if health_code in {"warning", "stale", "critical"}:
         return str(health.get("note") or "")
-    if supplier.last_email_check_at and supplier.last_email_matched and not supplier.last_email_processed:
-        return "Matching email found, but no new price file was imported."
-    return str(health.get("note") or "")
+    return ""
 
 
 def _build_supplier_board_row(
@@ -982,13 +1030,26 @@ def _build_supplier_board_row(
     streak_count: int = 1,
     latest_failed_file=None,
     latest_diagnostic=None,
-    diagnostic_summary=None,
 ) -> dict[str, object]:
     last_import = _build_last_import_info(successful_batch)
-    latest_check = _build_latest_check_info(supplier, latest_run, streak_count)
-    latest_check = _clarify_latest_check_with_last_success(latest_check, last_import)
+    last_success_dt = last_import.get("datetime")
+    if latest_diagnostic and last_success_dt:
+        diagnostic_dt = _diagnostic_activity_datetime(latest_diagnostic)
+        if (
+            diagnostic_dt
+            and diagnostic_dt <= last_success_dt
+            and latest_diagnostic.decision != models.AttachmentDecision.IMPORTED
+        ):
+            latest_diagnostic = None
+    if latest_failed_file and last_success_dt:
+        failed_dt = _failed_file_activity_datetime(latest_failed_file)
+        if failed_dt and failed_dt <= last_success_dt:
+            latest_failed_file = None
+    latest_check = _build_latest_check_info(
+        supplier, latest_run, streak_count, latest_diagnostic=latest_diagnostic
+    )
     health = _build_business_health_info(supplier, last_import, latest_check, streak_count)
-    file_summary = _summarize_latest_files(supplier, latest_run, diagnostic_summary)
+    file_summary = _summarize_latest_files(supplier, latest_run, latest_diagnostic)
     problem_note = _build_problem_note(
         supplier, latest_check, health, latest_failed_file, latest_diagnostic
     )
@@ -1665,7 +1726,6 @@ class SupplierOverviewView(LoginRequiredMixin, TemplateView):
         latest_successful_imports = _collect_latest_successful_imports()
         latest_failed_import_files = _collect_latest_failed_import_files()
         latest_attachment_diagnostics = _collect_latest_attachment_diagnostics()
-        attachment_diagnostic_summaries = _collect_attachment_diagnostic_summaries()
         active_price_mappings = _collect_active_price_mappings()
         _expire_stale_email_import_runs()
         latest_runs, run_streaks = _collect_latest_runs_and_streaks()
@@ -1762,7 +1822,6 @@ class SupplierOverviewView(LoginRequiredMixin, TemplateView):
                     streak_count=run_streaks.get(supplier.id, 1),
                     latest_failed_file=latest_failed_import_files.get(supplier.id),
                     latest_diagnostic=latest_attachment_diagnostics.get(supplier.id),
-                    diagnostic_summary=attachment_diagnostic_summaries.get(supplier.id),
                 )
             )
             rows[-1]["has_quick_upload"] = supplier.id in active_price_mappings
@@ -2710,43 +2769,11 @@ class SupplierEmailImportAllView(MutatingPermissionRequiredMixin, LoginRequiredM
         if _has_running_email_imports():
             messages.info(request, EMAIL_IMPORT_BUSY_MESSAGE)
             return redirect("prices:supplier_overview")
-        suppliers = list(
-            models.Supplier.objects.filter(
-                is_active=True, from_address_pattern__gt=""
-            ).order_by("name")
-        )
-        if not suppliers:
-            messages.info(
-                request, "No active suppliers with sender email configured."
-            )
-            return redirect("prices:supplier_overview")
-        settings_obj = models.ImportSettings.get_solo()
-        mark_seen = bool(settings_obj.auto_mark_seen)
-        runs_by_supplier_id = {
-            supplier.id: models.EmailImportRun.objects.create(
-                supplier=supplier,
-                status=models.EmailImportStatus.RUNNING,
-                last_message="Queued for update from email.",
-            )
-            for supplier in suppliers
-        }
-        command_args = ["process_email_runs"]
-        for run in runs_by_supplier_id.values():
-            command_args.extend(["--run-id", str(run.id)])
-        if mark_seen:
-            command_args.append("--mark-seen")
         try:
-            _spawn_management_command(*command_args)
+            _spawn_management_command("import_emails", "--force")
+            messages.info(request, "Mailbox scan started.")
         except Exception as exc:
-            models.EmailImportRun.objects.filter(
-                id__in=[run.id for run in runs_by_supplier_id.values()]
-            ).update(
-                status=models.EmailImportStatus.FAILED,
-                finished_at=timezone.now(),
-                errors=1,
-                last_message=f"Failed to start email updates: {exc}",
-            )
-            messages.error(request, f"Failed to start email updates: {exc}")
+            messages.error(request, f"Failed to start mailbox scan: {exc}")
         return redirect("prices:supplier_overview")
 
 
@@ -2798,7 +2825,6 @@ class SupplierEmailImportStatusAllView(LoginRequiredMixin, View):
         latest_successful_imports = _collect_latest_successful_imports()
         latest_failed_import_files = _collect_latest_failed_import_files()
         latest_attachment_diagnostics = _collect_latest_attachment_diagnostics()
-        attachment_diagnostic_summaries = _collect_attachment_diagnostic_summaries()
         latest_runs, run_streaks = _collect_latest_runs_and_streaks()
         rows = {}
         for supplier in suppliers:
@@ -2809,7 +2835,6 @@ class SupplierEmailImportStatusAllView(LoginRequiredMixin, View):
                 streak_count=run_streaks.get(supplier.id, 1),
                 latest_failed_file=latest_failed_import_files.get(supplier.id),
                 latest_diagnostic=latest_attachment_diagnostics.get(supplier.id),
-                diagnostic_summary=attachment_diagnostic_summaries.get(supplier.id),
             )
             rows[str(supplier.id)] = {
                 "is_running": row["is_running"],
@@ -2840,6 +2865,11 @@ class SupplierEmailImportStatusAllView(LoginRequiredMixin, View):
             {
                 "rows": rows,
                 "summary": _build_supplier_board_summary(list(rows.values())),
+                "scanner": {
+                    key: value
+                    for key, value in _build_autoimport_scan_status().items()
+                    if key != "cron_status"
+                },
                 "worker_busy": email_import_worker_is_busy(),
             }
         )

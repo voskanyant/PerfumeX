@@ -27,50 +27,59 @@
                 </form>
                 <form action="{% url 'prices:supplier_import_email_all' %}" method="post" class="layout-inline" data-email-update-all-form>
                     {% csrf_token %}
-                    <button class="button" type="submit" data-email-update-all{% if any_running %} disabled{% endif %}>Update all from email</button>
+                    <button class="button" type="submit" data-email-update-all{% if any_running %} disabled{% endif %}>Scan mailboxes now</button>
                 </form>
             </div>
         </div>
         <div class="email-update-banner{% if any_running %} is-visible{% endif %}" data-email-update-banner>
-            Email import is running. This board will refresh automatically.
+            Email scan is running. This board will refresh automatically.
         </div>
 
         <div class="import-scan-panel">
             <div class="import-scan-main">
-                <span class="card-label">Autoimport</span>
+                <span class="card-label">Mailbox scanner</span>
                 <div class="import-scan-title-row">
-                    <h2 class="card-title">Mailbox scan mode</h2>
+                    <h2 class="card-title">Email-level autoimport</h2>
                     <span class="import-status-chip {{ autoimport_scan_status.class_name }}">{{ autoimport_scan_status.mode_label }}</span>
                 </div>
                 <p class="card-desc">{{ autoimport_scan_status.mode_note }}</p>
-                <p class="card-desc">{{ autoimport_scan_status.cursor_note }}</p>
+                <div class="import-scanner-live{% if not any_running %} is-hidden{% endif %}" data-scanner-live>
+                    <div class="progress progress-thin">
+                        <div class="progress-bar" role="progressbar"></div>
+                    </div>
+                    <span>Scanning mailboxes</span>
+                </div>
+                <details class="import-scan-details">
+                    <summary>Mailbox cursor details</summary>
+                    <p class="card-desc">{{ autoimport_scan_status.cursor_note }}</p>
+                    {% if autoimport_scan_status.mailboxes %}
+                        <div class="import-scan-mailboxes">
+                            {% for mailbox in autoimport_scan_status.mailboxes %}
+                                <div class="import-scan-mailbox">
+                                    <strong>{{ mailbox.name }}</strong>
+                                    <span title="{{ mailbox.last_checked_full }}">{{ mailbox.last_checked }}</span>
+                                    <span>INBOX UID {{ mailbox.inbox_uid }}</span>
+                                    <span>All Mail UID {{ mailbox.all_mail_uid }}</span>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                </details>
             </div>
             <div class="import-scan-facts">
                 <div>
                     <span class="import-summary-label">Last auto run</span>
-                    <strong title="{{ autoimport_scan_status.last_run_full }}">{{ autoimport_scan_status.last_run }}</strong>
+                    <strong data-scanner-last-run title="{{ autoimport_scan_status.last_run_full }}">{{ autoimport_scan_status.last_run }}</strong>
                 </div>
                 <div>
                     <span class="import-summary-label">Next target</span>
-                    <strong>{{ autoimport_scan_status.next_target|default:"-" }}</strong>
+                    <strong data-scanner-next-target>{{ autoimport_scan_status.next_target|default:"-" }}</strong>
                 </div>
                 <div>
                     <span class="import-summary-label">Backlog</span>
-                    <strong>{{ autoimport_scan_status.remaining_backlog }}</strong>
+                    <strong data-scanner-backlog>{{ autoimport_scan_status.remaining_backlog }}</strong>
                 </div>
             </div>
-            {% if autoimport_scan_status.mailboxes %}
-                <div class="import-scan-mailboxes">
-                    {% for mailbox in autoimport_scan_status.mailboxes %}
-                        <div class="import-scan-mailbox">
-                            <strong>{{ mailbox.name }}</strong>
-                            <span title="{{ mailbox.last_checked_full }}">{{ mailbox.last_checked }}</span>
-                            <span>INBOX UID {{ mailbox.inbox_uid }}</span>
-                            <span>All Mail UID {{ mailbox.all_mail_uid }}</span>
-                        </div>
-                    {% endfor %}
-                </div>
-            {% endif %}
         </div>
 
         <div class="import-control-grid">
@@ -126,7 +135,7 @@
                 <div>
                     <span class="page-kicker">Suppliers</span>
                     <h2 class="page-title">Supplier import board</h2>
-                    <div class="page-meta">Attention-first board with last successful import, latest email check result, and supplier health.</div>
+                    <div class="page-meta">Compact board with last successful import, latest supplier event, and supplier health.</div>
                 </div>
             </div>
             <div class="import-summary-strip">
@@ -163,8 +172,7 @@
                                 <th><input type="checkbox" id="supplier-select-all"></th>
                                 <th>Supplier</th>
                                 <th>Last success</th>
-                                <th>Latest email check</th>
-                                <th>Files</th>
+                                <th>Latest event</th>
                                 <th>Health</th>
                                 <th>Problem</th>
                                 <th>Actions</th>
@@ -193,7 +201,7 @@
                                         >{{ row.last_import_relative }}</button>
                                         <div class="import-last-note" data-last-import-note>{{ row.last_import_note }}</div>
                                     </td>
-                                    <td class="import-col-check" data-label="Latest email check">
+                                    <td class="import-col-check" data-label="Latest event">
                                         <div class="import-check-stack">
                                             <div class="import-check-head">
                                                 <button
@@ -206,19 +214,11 @@
                                                 <span class="import-status-chip {{ row.check_class }}" data-check-status-chip>{{ row.check_label }}</span>
                                             </div>
                                             <div class="import-status-note" data-check-status-note title="{{ row.check_note }}">{{ row.check_note }}</div>
+                                            <div class="import-status-note import-source-note" data-source-mailbox-folder title="{{ row.source_mailbox_folder }}">{{ row.source_mailbox_folder }}</div>
                                             <div class="progress progress-thin import-row-progress{% if not row.is_running or row.check_progress is None %} is-hidden{% endif %}" data-email-progress-wrap>
                                                 <div class="progress-bar" data-email-progress role="progressbar"{% if row.check_progress is not None %} data-progress-value="{{ row.check_progress }}"{% endif %}></div>
                                             </div>
                                         </div>
-                                    </td>
-                                    <td class="import-col-files" data-label="Files">
-                                        <div class="import-status-note import-file-summary" data-file-summary title="{{ row.file_summary }}">{{ row.file_summary }}</div>
-                                        {% if row.source_mailbox_folder %}
-                                            <div class="import-status-note import-source-note" data-source-mailbox-folder title="{{ row.source_mailbox_folder }}">{{ row.source_mailbox_folder }}</div>
-                                        {% endif %}
-                                        {% if row.expected_at %}
-                                            <div class="import-status-note">Expected {{ row.expected_at }}</div>
-                                        {% endif %}
                                     </td>
                                     <td class="import-col-health" data-label="Health">
                                         <div class="import-health-stack">
@@ -377,7 +377,7 @@
                     check_label: "updating",
                     check_class: "is-running",
                     check_code: "running",
-                    check_note: "Starting background import…",
+                    check_note: "Starting email scan...",
                     check_relative: "Now",
                     check_full: "",
                     check_progress: 8,
@@ -394,8 +394,7 @@
                     })(),
                     health_code: "",
                     health_note: currentText("[data-health-note]", row),
-                    file_summary: currentText("[data-file-summary]", row),
-                    problem_note: "Starting background import...",
+                    problem_note: "",
                     source_mailbox_folder: currentText("[data-source-mailbox-folder]", row)
                 };
             }
@@ -431,7 +430,6 @@
                     state.health_label
                 );
                 applyText(row.querySelector("[data-health-note]"), state.health_note);
-                applyText(row.querySelector("[data-file-summary]"), state.file_summary);
                 applyText(row.querySelector("[data-problem-note]"), state.problem_note);
                 applyText(row.querySelector("[data-source-mailbox-folder]"), state.source_mailbox_folder || "");
                 applyProgress(row, state.is_running ? state.check_progress : null);
@@ -456,6 +454,19 @@
                         target.textContent = summary[key];
                     }
                 });
+            }
+
+            function applyScanner(scanner) {
+                if (!scanner) {
+                    return;
+                }
+                applyText(document.querySelector("[data-scanner-last-run]"), scanner.last_run || "Never");
+                var scannerLastRun = document.querySelector("[data-scanner-last-run]");
+                if (scannerLastRun) {
+                    scannerLastRun.title = scanner.last_run_full || "";
+                }
+                applyText(document.querySelector("[data-scanner-next-target]"), scanner.next_target || "-");
+                applyText(document.querySelector("[data-scanner-backlog]"), scanner.remaining_backlog || "0");
             }
 
             document.querySelectorAll("[data-email-progress][data-progress-value]").forEach(function (bar) {
@@ -524,20 +535,16 @@
                         updateAllBtn.disabled = true;
                         updateAllBtn.setAttribute("aria-busy", "true");
                         updateAllBtn.classList.add("is-loading");
-                        updateAllBtn.textContent = "Starting…";
+                        updateAllBtn.textContent = "Starting...";
                     }
                     if (banner) {
                         banner.classList.add("is-visible");
-                        banner.textContent = "Email import is starting. This board will refresh automatically.";
+                        banner.textContent = "Email scan is starting. This board will refresh automatically.";
                     }
-                    document.querySelectorAll("[data-supplier-id]").forEach(function (row) {
-                        var updateBtn = row.querySelector("[data-email-update]");
-                        if (!updateBtn || updateBtn.disabled) {
-                            return;
-                        }
-                        row.classList.add("is-row-pending");
-                        applyRowState(row, buildPendingState(row));
-                    });
+                    var scannerLive = document.querySelector("[data-scanner-live]");
+                    if (scannerLive) {
+                        scannerLive.classList.remove("is-hidden");
+                    }
                 }
             });
 
@@ -560,6 +567,7 @@
                             }
                         });
                         applySummary(data.summary || {});
+                        applyScanner(data.scanner || {});
                         var updateAllBtn = document.querySelector("[data-email-update-all]");
                         var banner = document.querySelector("[data-email-update-banner]");
                         if (updateAllBtn) {
@@ -567,12 +575,16 @@
                             updateAllBtn.classList.toggle("is-loading", anyRunning);
                             updateAllBtn.setAttribute("aria-busy", anyRunning ? "true" : "false");
                             if (!anyRunning) {
-                                updateAllBtn.textContent = "Update all from email";
+                                updateAllBtn.textContent = "Scan mailboxes now";
                             }
                         }
                         if (banner) {
                             banner.classList.toggle("is-visible", anyRunning);
-                            banner.textContent = anyRunning ? "Email import is running. This board will refresh automatically." : "";
+                            banner.textContent = anyRunning ? "Email scan is running. This board will refresh automatically." : "";
+                        }
+                        var scannerLive = document.querySelector("[data-scanner-live]");
+                        if (scannerLive) {
+                            scannerLive.classList.toggle("is-hidden", !anyRunning);
                         }
                         if (anyRunning) {
                             hasSeenRunning = true;

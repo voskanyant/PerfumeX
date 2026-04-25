@@ -46,6 +46,46 @@
   gap: 10px;
 }
 
+.import-scan-details {
+  margin-top: 10px;
+}
+
+.import-scan-details summary {
+  width: fit-content;
+  cursor: pointer;
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--grey-600);
+}
+
+.import-scan-details[open] summary {
+  margin-bottom: 10px;
+}
+
+.import-scanner-live {
+  display: grid;
+  grid-template-columns: minmax(80px, 180px) auto;
+  align-items: center;
+  gap: 10px;
+  width: fit-content;
+  margin-top: 12px;
+  color: var(--grey-600);
+  font-size: 11px;
+}
+
+.import-scanner-live .progress-thin {
+  width: 180px;
+}
+
+.import-scanner-live .progress-bar {
+  width: 28%;
+  background: linear-gradient(90deg, var(--black), var(--grey-500), var(--black));
+  background-size: 200% 100%;
+  animation: import-progress-scan 1.2s linear infinite;
+}
+
 .import-scan-facts {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -218,7 +258,6 @@
   color: var(--grey-500);
 }
 
-.import-file-summary,
 .import-problem-link {
   display: block;
   max-width: 220px;
@@ -229,6 +268,11 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.import-source-note:empty,
+.import-problem-link:empty {
+  display: none;
 }
 
 .import-problem-link {
@@ -661,7 +705,6 @@
       "supplier actions"
       "last last"
       "check check"
-      "files files"
       "health health"
       "problem problem";
     gap: 8px 12px;
@@ -705,10 +748,6 @@
 
   .supplier-import-table td.import-col-check {
     grid-area: check;
-  }
-
-  .supplier-import-table td.import-col-files {
-    grid-area: files;
   }
 
   .supplier-import-table td.import-col-health {

@@ -369,6 +369,7 @@ class BackgroundRunSafetyTests(TransactionTestCase):
             username="background-staff",
             password="password",
             is_staff=True,
+            is_superuser=True,
         )
         self.client.force_login(self.user)
         self.supplier = models.Supplier.objects.create(name="Background Supplier")
@@ -415,6 +416,20 @@ class BackgroundRunSafetyTests(TransactionTestCase):
         run.refresh_from_db()
         self.assertEqual(run.status, models.EmailImportStatus.FAILED)
         self.assertEqual(run.last_message, "Marked failed from stuck-run recovery.")
+
+    def test_scan_all_starts_mailbox_cursor_import_not_supplier_runs(self):
+        self.supplier.from_address_pattern = "supplier@example.com"
+        self.supplier.save(update_fields=["from_address_pattern"])
+
+        with patch("prices.views._spawn_management_command") as spawn:
+            response = self.client.post(
+                reverse("prices:supplier_import_email_all"),
+                secure=True,
+            )
+
+        self.assertEqual(response.status_code, 302)
+        spawn.assert_called_once_with("import_emails", "--force")
+        self.assertFalse(models.EmailImportRun.objects.exists())
 
     def test_cbr_range_sync_failure_is_visible(self):
         with patch("prices.views.upsert_cbr_markup_rates_range", side_effect=RuntimeError("CBR down")):
@@ -711,7 +726,112 @@ class SupplierImportBoundaryTests(TestCase):
         )
 
         self.assertEqual(row["check_code"], "no-files")
-        self.assertIn("Supplier-specific", row["check_note"])
+        self.assertIn("Manual check", row["check_note"])
+
+    def test_global_scan_without_supplier_event_does_not_touch_row_status(self):
+        now = timezone.now().replace(microsecond=0)
+        self.supplier.from_address_pattern = "supplier@example.com"
+        self.supplier.save(update_fields=["from_address_pattern"])
+        self.mailbox.last_checked_at = now
+        self.mailbox.last_inbox_uid = 123
+        self.mailbox.save(update_fields=["last_checked_at", "last_inbox_uid"])
+
+        row = _build_supplier_board_row(
+            supplier=self.supplier,
+            successful_batch=None,
+            latest_run=None,
+        )
+
+        self.assertEqual(row["check_code"], "idle")
+        self.assertEqual(row["check_relative"], "Not checked")
+
+    def test_fresh_duplicate_event_is_neutral_not_problem(self):
+        now = timezone.now().replace(microsecond=0)
+        self.supplier.from_address_pattern = "supplier@example.com"
+        self.supplier.expected_import_interval_hours = 24
+        self.supplier.save(update_fields=["from_address_pattern", "expected_import_interval_hours"])
+        batch = models.ImportBatch.objects.create(
+            supplier=self.supplier,
+            mailbox=self.mailbox,
+            message_id="<fresh-duplicate@example.com>",
+            received_at=now - timedelta(hours=1),
+            status=models.ImportStatus.PROCESSED,
+        )
+        models.ImportFile.objects.create(
+            import_batch=batch,
+            file_kind=models.FileKind.PRICE,
+            filename="fresh.xlsx",
+            content_hash="fresh-hash",
+            status=models.ImportStatus.PROCESSED,
+            processed_at=now - timedelta(hours=1),
+        )
+        diagnostic = models.EmailAttachmentDiagnostic.objects.create(
+            supplier=self.supplier,
+            mailbox=self.mailbox,
+            message_folder="INBOX",
+            filename="fresh.xlsx",
+            decision=models.AttachmentDecision.DUPLICATE,
+            reason_code=models.AttachmentReason.DUPLICATE_HASH,
+            message="Duplicate price attachment hash.",
+            created_at=now,
+        )
+
+        row = _build_supplier_board_row(
+            supplier=self.supplier,
+            successful_batch=batch,
+            latest_run=None,
+            latest_diagnostic=diagnostic,
+        )
+
+        self.assertEqual(row["check_code"], "no-change")
+        self.assertEqual(row["health_code"], "fresh")
+        self.assertEqual(row["problem_note"], "")
+
+    def test_stale_duplicate_event_explains_stale_import(self):
+        now = timezone.make_aware(datetime(2026, 4, 27, 12, 0, 0))
+        old = timezone.make_aware(datetime(2026, 4, 22, 10, 0, 0))
+        self.supplier.from_address_pattern = "supplier@example.com"
+        self.supplier.expected_import_interval_hours = 24
+        self.supplier.save(update_fields=["from_address_pattern", "expected_import_interval_hours"])
+        batch = models.ImportBatch.objects.create(
+            supplier=self.supplier,
+            mailbox=self.mailbox,
+            message_id="<stale-duplicate@example.com>",
+            received_at=old,
+            status=models.ImportStatus.PROCESSED,
+        )
+        models.ImportBatch.objects.filter(id=batch.id).update(created_at=old)
+        batch.refresh_from_db()
+        models.ImportFile.objects.create(
+            import_batch=batch,
+            file_kind=models.FileKind.PRICE,
+            filename="old.xlsx",
+            content_hash="old-hash",
+            status=models.ImportStatus.PROCESSED,
+            processed_at=old,
+        )
+        diagnostic = models.EmailAttachmentDiagnostic.objects.create(
+            supplier=self.supplier,
+            mailbox=self.mailbox,
+            message_folder="INBOX",
+            filename="old.xlsx",
+            decision=models.AttachmentDecision.DUPLICATE,
+            reason_code=models.AttachmentReason.DUPLICATE_HASH,
+            message="Duplicate price attachment hash.",
+            created_at=now,
+        )
+
+        with patch("prices.views.timezone.now", return_value=now):
+            row = _build_supplier_board_row(
+                supplier=self.supplier,
+                successful_batch=batch,
+                latest_run=None,
+                latest_diagnostic=diagnostic,
+            )
+
+        self.assertEqual(row["check_code"], "no-change")
+        self.assertIn(row["health_code"], {"stale", "critical"})
+        self.assertIn("Duplicate found", row["problem_note"])
 
     @patch("prices.views._read_crontab_lines", return_value=[])
     def test_autoimport_scan_status_reports_recent_backlog(self, _mock_crontab):
