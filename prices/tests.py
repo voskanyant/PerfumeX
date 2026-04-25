@@ -481,6 +481,21 @@ class OurProductCatalogueListTests(TestCase):
         self.assertContains(response, "tester")
         self.assertContains(response, "box")
 
+    def test_our_products_search_matches_multi_word_scent(self):
+        clive = Brand.objects.create(name="Clive Christian")
+        perfume = Perfume.objects.create(
+            brand=clive,
+            name="Blonde Amber",
+            concentration="Extrait de Parfum",
+        )
+        PerfumeVariant.objects.create(perfume=perfume, size_ml="50.00")
+
+        response = self.client.get(reverse("prices:our_product_list"), {"q": "blond amber"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Clive Christian")
+        self.assertContains(response, "Blonde Amber")
+
     def test_staff_can_inline_edit_catalogue_variant_row(self):
         response = self.client.post(
             reverse("prices:our_product_variant_inline_update", args=[self.variant.pk]),
