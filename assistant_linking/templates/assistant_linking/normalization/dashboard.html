@@ -37,7 +37,7 @@
         <a class="button ghost" href="{% url 'assistant_linking:normalization_parsed' %}">View complete parsed</a>
     </div>
     <table class="data-table">
-        <tbody>{% for parsed in recent %}<tr><td><a href="{% url 'assistant_linking:normalization_detail' parsed.supplier_product_id %}">{{ parsed.supplier_product }}</a></td><td>{{ parsed.normalized_brand }}</td><td>{{ parsed.product_name_text }}</td><td>{{ parsed.confidence }}</td></tr>{% empty %}<tr><td>No parsed rows.</td></tr>{% endfor %}</tbody>
+        <tbody>{% for parsed in recent %}<tr><td><a href="{% url 'assistant_linking:normalization_detail' parsed.supplier_product_id %}">{{ parsed.supplier_product }}</a></td><td colspan="2">{{ parsed.display_identity }}</td><td>{{ parsed.confidence }}</td></tr>{% empty %}<tr><td>No parsed rows.</td></tr>{% endfor %}</tbody>
     </table>
 </div>
 {% endblock %}

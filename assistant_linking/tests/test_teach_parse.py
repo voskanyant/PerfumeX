@@ -338,6 +338,45 @@ class TeachParseTests(TestCase):
         self.assertEqual(len(parses), 1)
         self.assertEqual(parses[0].supplier_product_id, matching.id)
 
+    def test_parsed_products_page_shows_tester_in_identity(self):
+        brand = Brand.objects.create(name="100 Bon")
+        BrandAlias.objects.create(
+            brand=brand,
+            alias_text="100 bon",
+            normalized_alias="100 bon",
+        )
+        product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="tester-display",
+            name="100 Bon Ambre Sensuel 50ml edt TESTER",
+        )
+        save_parse(product)
+
+        response = self.client.get(reverse("assistant_linking:normalization_parsed"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "100 Bon / ambre sensuel / Eau de Toilette / 50.00 / Tester")
+
+    def test_normalization_detail_capitalizes_tester_type(self):
+        brand = Brand.objects.create(name="100 Bon")
+        BrandAlias.objects.create(
+            brand=brand,
+            alias_text="100 bon",
+            normalized_alias="100 bon",
+        )
+        product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="tester-detail",
+            name="100 Bon Ambre Sensuel 50ml edt TESTER",
+        )
+        save_parse(product)
+
+        response = self.client.get(reverse("assistant_linking:normalization_detail", args=[product.id]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Type: Tester")
+        self.assertContains(response, "Normalized: 100 Bon / ambre sensuel / Eau de Toilette / 50.00 / Tester")
+
     def test_parsed_products_page_requires_complete_parse_fields(self):
         brand = Brand.objects.create(name="Montale")
         BrandAlias.objects.create(
@@ -474,7 +513,7 @@ class TeachParseTests(TestCase):
         )
 
         self.assertEqual(str(variant), "V Canto / Ricina / 100ml")
-        self.assertEqual(str(tester_variant), "V Canto / Ricina / 100ml / tester")
+        self.assertEqual(str(tester_variant), "V Canto / Ricina / 100ml / Tester")
 
     def test_teaching_reparses_only_selected_preview_rows(self):
         target_brand = Brand.objects.create(name="Philly & Phill")

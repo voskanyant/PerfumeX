@@ -12,6 +12,13 @@ CONCENTRATION_ALIAS_CACHE_KEY = "assistant_linking:concentration_aliases:v1"
 REDOS_REGEX_SHAPES = (r"(.+)+", r"(.*)*", r"(.+)*", r"(\w+)+")
 
 
+def display_label(value: str, *, default: str = "") -> str:
+    text = (value or default or "").replace("_", " ").strip()
+    if not text:
+        return ""
+    return " ".join(part[:1].upper() + part[1:] for part in text.split())
+
+
 class TimeStampedModel(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -147,6 +154,60 @@ class ParsedSupplierProduct(TimeStampedModel):
     def __str__(self) -> str:
         return f"Parsed: {self.supplier_product}"
 
+    @property
+    def display_brand(self) -> str:
+        if self.normalized_brand_id:
+            return str(self.normalized_brand)
+        return self.detected_brand_text
+
+    @property
+    def display_size(self) -> str:
+        if self.size_ml is None:
+            return ""
+        return str(self.size_ml)
+
+    @property
+    def display_variant_type(self) -> str:
+        if self.is_tester or self.variant_type == "tester":
+            return "Tester"
+        if self.is_sample or self.variant_type == "sample":
+            return "Sample"
+        if self.is_travel or self.variant_type == "travel":
+            return "Travel"
+        if self.is_set or self.variant_type == "set":
+            return "Set"
+        return display_label(self.variant_type, default="Standard")
+
+    @property
+    def display_packaging(self) -> str:
+        return display_label(self.packaging, default="Standard")
+
+    @property
+    def identity_variant_label(self) -> str:
+        variant = self.display_variant_type
+        if variant and variant != "Standard":
+            return variant
+        return ""
+
+    @property
+    def identity_packaging_label(self) -> str:
+        packaging = self.display_packaging
+        if packaging and packaging != "Standard" and packaging != self.identity_variant_label:
+            return packaging
+        return ""
+
+    @property
+    def display_identity(self) -> str:
+        parts = [
+            self.display_brand,
+            self.product_name_text,
+            self.concentration,
+            self.display_size,
+            self.identity_variant_label,
+            self.identity_packaging_label,
+        ]
+        return " / ".join(part for part in parts if part)
+
 
 class MatchGroup(TimeStampedModel):
     STATUS_OPEN = "open"
@@ -178,6 +239,34 @@ class MatchGroup(TimeStampedModel):
 
     def __str__(self) -> str:
         return self.group_key
+
+    @property
+    def display_size(self) -> str:
+        if self.size_ml is None:
+            return ""
+        return str(self.size_ml)
+
+    @property
+    def display_variant_type(self) -> str:
+        return display_label(self.variant_type, default="Standard")
+
+    @property
+    def display_packaging(self) -> str:
+        return display_label(self.packaging, default="Standard")
+
+    @property
+    def display_identity(self) -> str:
+        variant = self.display_variant_type
+        packaging = self.display_packaging
+        parts = [
+            str(self.normalized_brand) if self.normalized_brand_id else "",
+            self.canonical_name,
+            self.concentration,
+            self.display_size,
+            variant if variant != "Standard" else "",
+            packaging if packaging != "Standard" and packaging != variant else "",
+        ]
+        return " / ".join(part for part in parts if part)
 
 
 class MatchGroupItem(models.Model):

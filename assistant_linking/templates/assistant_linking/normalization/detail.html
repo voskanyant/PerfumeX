@@ -36,10 +36,11 @@
     </div>
     <div class="workspace-block">
         <h2 class="kpi-link-title">Supplier parsed fields</h2>
-        <p>Brand: {{ parsed.normalized_brand|default:parsed.detected_brand_text }}</p>
+        <p>Normalized: {{ parsed.display_identity }}</p>
+        <p>Brand: {{ parsed.display_brand }}</p>
         <p>Name: {{ parsed.product_name_text }}</p>
-        <p>{{ parsed.concentration }} &middot; {{ parsed.size_ml }} ml &middot; {{ parsed.supplier_gender_hint }}</p>
-        <p>Type: {{ parsed.variant_type|default:"unknown" }} &middot; Packaging: {{ parsed.packaging|default:"standard" }}</p>
+        <p>{{ parsed.concentration }} &middot; {{ parsed.display_size }} ml &middot; {{ parsed.supplier_gender_hint }}</p>
+        <p>Type: {{ parsed.display_variant_type }} &middot; Packaging: {{ parsed.display_packaging }}</p>
         <p>Confidence {{ parsed.confidence }}</p>
     </div>
     <div class="workspace-block">

@@ -26,8 +26,8 @@
     <div class="workspace-block">
         <h2 class="kpi-link-title">Selected supplier product</h2>
         <p>{{ product.name }}</p>
-        <p>{{ parsed.normalized_brand }} &middot; {{ parsed.product_name_text }}</p>
-        <p>{{ parsed.concentration }} &middot; {{ parsed.size_ml }} ml &middot; {{ parsed.supplier_gender_hint }}</p>
+        <p>{{ parsed.display_identity }}</p>
+        <p>{{ parsed.supplier_gender_hint }}</p>
         <p>{{ product.is_active|yesno:"active,inactive" }}</p>
         <h3 class="metric-label">Same supplier</h3>
         {% for row in same_supplier %}

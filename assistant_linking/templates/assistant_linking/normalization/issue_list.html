@@ -33,7 +33,7 @@
             <tr>
                 <td>{{ parsed.supplier_product.supplier }}</td>
                 <td><a href="{% url 'assistant_linking:normalization_detail' parsed.supplier_product_id %}">{{ parsed.supplier_product.name }}</a></td>
-                <td>{{ parsed.normalized_brand|default:parsed.detected_brand_text }} / {{ parsed.product_name_text }} / {{ parsed.concentration }} / {{ parsed.size_ml }}</td>
+                <td>{{ parsed.display_identity }}</td>
                 <td>{{ parsed.modifiers|join:", " }} {{ parsed.warnings|join:", " }}</td>
                 <td>{{ parsed.confidence }}</td>
             </tr>

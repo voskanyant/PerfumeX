@@ -24,9 +24,7 @@
 <form method="post" action="{% url 'assistant_linking:group_action' group.pk 'exclude' %}" class="workspace-block">
     {% csrf_token %}
     <div class="run-log-meta">
-        <span>{{ group.normalized_brand }}</span>
-        <span>{{ group.concentration }}</span>
-        <span>{{ group.size_ml }} ml</span>
+        <span>{{ group.display_identity }}</span>
         <span>{{ group.status }}</span>
     </div>
     <table class="data-table">

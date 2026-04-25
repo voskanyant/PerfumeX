@@ -35,6 +35,13 @@ def compact_decimal_text(value) -> str:
     return text or "0"
 
 
+def display_label(value: str) -> str:
+    text = (value or "").replace("_", " ").strip()
+    if not text:
+        return ""
+    return " ".join(part[:1].upper() + part[1:] for part in text.split())
+
+
 class Brand(TimeStampedModel):
     name = models.CharField(max_length=200, unique=True, db_index=True)
     slug = models.SlugField(max_length=220, unique=True, db_index=True, blank=True)
@@ -132,11 +139,11 @@ class PerfumeVariant(TimeStampedModel):
         if self.display_size:
             parts.append(self.display_size)
         if self.variant_type and self.variant_type != "standard":
-            parts.append(self.variant_type)
+            parts.append(display_label(self.variant_type))
         if self.packaging and self.packaging != "standard":
-            parts.append(self.packaging)
+            parts.append(display_label(self.packaging))
         if self.is_tester:
-            parts.append("tester")
+            parts.append("Tester")
         return " / ".join([part for part in parts if part])
 
     def _generated_sku_base(self) -> str:
