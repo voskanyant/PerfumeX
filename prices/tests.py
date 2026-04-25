@@ -27,6 +27,7 @@ from prices.services.email_importer import (
 )
 from prices.views import (
     _batch_activity_datetime,
+    _build_autoimport_scan_status,
     _build_cron_line,
     _build_supplier_board_row,
     _collect_latest_successful_imports,
@@ -309,6 +310,57 @@ class SupplierImportBoundaryTests(TestCase):
         self.assertEqual(row["source_mailbox_folder"], "supplier-mailbox/INBOX")
         self.assertIn("bad.xlsx", row["problem_note"])
         self.assertIn("Mapping is missing", row["problem_note"])
+
+    def test_supplier_no_file_copy_is_supplier_specific(self):
+        now = timezone.now().replace(microsecond=0)
+        self.supplier.from_address_pattern = "supplier@example.com"
+        self.supplier.last_email_check_at = now
+        self.supplier.last_email_matched = 0
+        self.supplier.last_email_processed = 0
+        self.supplier.last_email_errors = 0
+        self.supplier.last_email_last_message = ""
+        self.supplier.save(
+            update_fields=[
+                "from_address_pattern",
+                "last_email_check_at",
+                "last_email_matched",
+                "last_email_processed",
+                "last_email_errors",
+                "last_email_last_message",
+            ]
+        )
+
+        row = _build_supplier_board_row(
+            supplier=self.supplier,
+            successful_batch=None,
+            latest_run=None,
+        )
+
+        self.assertEqual(row["check_code"], "no-files")
+        self.assertIn("Supplier-specific", row["check_note"])
+
+    @patch("prices.views._read_crontab_lines", return_value=[])
+    def test_autoimport_scan_status_reports_recent_backlog(self, _mock_crontab):
+        now = timezone.now().replace(microsecond=0)
+        settings_obj = models.ImportSettings.get_solo()
+        settings_obj.last_run_at = now
+        settings_obj.interval_minutes = 20
+        settings_obj.save(update_fields=["last_run_at", "interval_minutes"])
+        self.mailbox.last_checked_at = now
+        self.mailbox.last_all_mail_uid = 12000
+        self.mailbox.save(update_fields=["last_checked_at", "last_all_mail_uid"])
+        models.EmailAttachmentDiagnostic.objects.create(
+            mailbox=self.mailbox,
+            decision=models.AttachmentDecision.SKIPPED,
+            reason_code=models.AttachmentReason.BACKLOG_REMAINING,
+            message="209 message(s) remain after this run.",
+        )
+
+        status = _build_autoimport_scan_status()
+
+        self.assertEqual(status["mode_label"], "Backlog catch-up")
+        self.assertEqual(status["remaining_backlog"], 209)
+        self.assertEqual(status["mailboxes"][0]["all_mail_uid"], 12000)
 
 
 class ImportAttachmentPreflightTests(TestCase):

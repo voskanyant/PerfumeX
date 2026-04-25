@@ -32,6 +32,44 @@
             </div>
         </div>
 
+        <div class="import-scan-panel">
+            <div class="import-scan-main">
+                <span class="card-label">Autoimport</span>
+                <div class="import-scan-title-row">
+                    <h2 class="card-title">Mailbox scan mode</h2>
+                    <span class="import-status-chip {{ autoimport_scan_status.class_name }}">{{ autoimport_scan_status.mode_label }}</span>
+                </div>
+                <p class="card-desc">{{ autoimport_scan_status.mode_note }}</p>
+                <p class="card-desc">{{ autoimport_scan_status.cursor_note }}</p>
+            </div>
+            <div class="import-scan-facts">
+                <div>
+                    <span class="import-summary-label">Last auto run</span>
+                    <strong title="{{ autoimport_scan_status.last_run_full }}">{{ autoimport_scan_status.last_run }}</strong>
+                </div>
+                <div>
+                    <span class="import-summary-label">Next target</span>
+                    <strong>{{ autoimport_scan_status.next_target|default:"-" }}</strong>
+                </div>
+                <div>
+                    <span class="import-summary-label">Backlog</span>
+                    <strong>{{ autoimport_scan_status.remaining_backlog }}</strong>
+                </div>
+            </div>
+            {% if autoimport_scan_status.mailboxes %}
+                <div class="import-scan-mailboxes">
+                    {% for mailbox in autoimport_scan_status.mailboxes %}
+                        <div class="import-scan-mailbox">
+                            <strong>{{ mailbox.name }}</strong>
+                            <span title="{{ mailbox.last_checked_full }}">{{ mailbox.last_checked }}</span>
+                            <span>INBOX UID {{ mailbox.inbox_uid }}</span>
+                            <span>All Mail UID {{ mailbox.all_mail_uid }}</span>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        </div>
+
         <div class="import-control-grid">
             <div class="import-control-panel">
                 <span class="card-label">History</span>

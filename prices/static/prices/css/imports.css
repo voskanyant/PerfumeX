@@ -24,11 +24,72 @@
 
 .import-control-panel,
 .import-board,
+.import-scan-panel,
 .settings-panel {
   border: 1px solid var(--grey-200);
   border-radius: var(--radius-md);
   padding: 24px;
   background: var(--white);
+}
+
+.import-scan-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 360px);
+  gap: 18px;
+  align-items: start;
+}
+
+.import-scan-title-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.import-scan-facts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.import-scan-facts > div {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--grey-200);
+  border-radius: var(--radius-sm);
+  background: var(--grey-50);
+}
+
+.import-scan-facts strong {
+  display: block;
+  margin-top: 4px;
+  font-size: 13px;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.import-scan-mailboxes {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.import-scan-mailbox {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--grey-200);
+  border-radius: var(--radius-sm);
+  background: var(--white);
+  font-size: 11px;
+  color: var(--grey-600);
+}
+
+.import-scan-mailbox strong {
+  color: var(--black);
+  overflow-wrap: anywhere;
 }
 
 .import-board .table-wrap,
@@ -490,6 +551,7 @@
 
 @media (max-width: 991.98px) {
   .import-control-grid,
+  .import-scan-panel,
   .settings-body {
     grid-template-columns: 1fr;
   }
@@ -503,8 +565,12 @@
   .import-summary-strip {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
+  .import-scan-mailboxes {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
   .import-control-panel,
   .import-board,
+  .import-scan-panel,
   .settings-panel { padding: 18px; }
   .import-overview-header,
   .import-board__head,
@@ -518,6 +584,7 @@
 
   .import-control-panel,
   .import-board,
+  .import-scan-panel,
   .settings-panel {
     padding: 16px;
   }
@@ -546,6 +613,11 @@
   .import-summary-strip {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 10px;
+  }
+
+  .import-scan-facts,
+  .import-scan-mailboxes {
+    grid-template-columns: 1fr;
   }
 
   .supplier-import-table,
