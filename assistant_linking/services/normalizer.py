@@ -27,7 +27,7 @@ from prices.models import SupplierProduct
 
 
 logger = logging.getLogger(__name__)
-PARSER_VERSION = "deterministic-v10"
+PARSER_VERSION = "deterministic-v11"
 REGEX_ALIAS_TIMEOUT_SECONDS = 1.0
 
 DEFAULT_CONCENTRATION_ALIASES = (
@@ -104,7 +104,8 @@ TRAVEL_TERMS = ("travel",)
 SET_TERMS = ("set", "набор", "coffret")
 NO_BOX_TERMS = ("no box", "without box", "без короб")
 GENDER_TERMS = tuple(alias for alias, _display, _group in DEFAULT_AUDIENCE_ALIASES)
-NAME_AUDIENCE_TERMS = ("pour femme", "femme", "donna", "pour homme", "homme", "uomo")
+NAME_AUDIENCE_TERMS = ("pour femme", "femme", "donna", "pour homme", "homme", "uomo", "man")
+NAME_BEARING_MODIFIER_PHRASES = ("eau fraiche", "eau fraicheur")
 REFILL_MODIFIER = "refill"
 MINI_MODIFIER = "mini"
 
@@ -362,6 +363,19 @@ def _clean_product_name_text(value: str) -> str:
 def _name_bearing_modifiers(product_alias: ProductAlias) -> set[str]:
     alias_identity = normalize_text(" ".join([product_alias.alias_text, product_alias.canonical_text]))
     return {modifier for modifier in MODIFIER_TERMS if _contains_phrase(alias_identity, normalize_text(modifier))}
+
+
+def _modifiers_from_name_bearing_phrases(product_name_text: str) -> set[str]:
+    normalized_name = normalize_text(product_name_text)
+    modifiers: set[str] = set()
+    for phrase in NAME_BEARING_MODIFIER_PHRASES:
+        if _contains_phrase(normalized_name, phrase):
+            modifiers.update(
+                modifier
+                for modifier in MODIFIER_TERMS
+                if _contains_phrase(phrase, normalize_text(modifier))
+            )
+    return modifiers
 
 
 def _audience_terms_to_strip(audience_aliases: tuple[tuple[str, str, str], ...]) -> list[str]:
@@ -638,6 +652,9 @@ def parse_supplier_product(product: SupplierProduct) -> ParseResult:
         result.warnings.append("brand missing")
     if not result.product_name_text:
         result.warnings.append("product name missing")
+    name_bearing_modifiers = _modifiers_from_name_bearing_phrases(result.product_name_text)
+    if name_bearing_modifiers:
+        result.modifiers = [modifier for modifier in result.modifiers if modifier not in name_bearing_modifiers]
     if not result.concentration:
         result.warnings.append("concentration missing")
     if not result.size_ml:

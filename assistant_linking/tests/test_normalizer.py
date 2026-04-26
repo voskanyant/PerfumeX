@@ -351,6 +351,25 @@ class NormalizerTests(TestCase):
         self.assertEqual(parsed.size_ml, Decimal("100.00"))
         self.assertEqual(parsed.supplier_gender_hint, "Pour Femme")
 
+    def test_man_eau_fraiche_is_name_bearing_not_modifier_warning(self):
+        brand = Brand.objects.create(name="Versace")
+        BrandAlias.objects.create(brand=brand, alias_text="VERSACE", normalized_alias="versace")
+        product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="versace-man-eau-fraiche",
+            name="VERSACE Man eau fraiche edt 30 ml",
+        )
+
+        parsed = parse_supplier_product(product)
+
+        self.assertEqual(parsed.normalized_brand, brand)
+        self.assertEqual(parsed.product_name_text, "man eau fraiche")
+        self.assertEqual(parsed.concentration, "Eau de Toilette")
+        self.assertEqual(parsed.size_ml, Decimal("30.00"))
+        self.assertEqual(parsed.supplier_gender_hint, "Men")
+        self.assertNotIn("fraiche", parsed.modifiers)
+        self.assertNotIn("fraiche detected", parsed.warnings)
+
     def test_pour_homme_stays_in_product_name_while_setting_audience(self):
         brand = Brand.objects.create(name="Issey Miyake")
         BrandAlias.objects.create(brand=brand, alias_text="Issey Miyake", normalized_alias="issey miyake")
