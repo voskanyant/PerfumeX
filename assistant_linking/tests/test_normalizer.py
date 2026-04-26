@@ -431,6 +431,33 @@ class NormalizerTests(TestCase):
         self.assertEqual(parsed.product_name_text, "Amber")
         self.assertEqual(parsed.collection_name, "Emporio Armani Stronger With You")
 
+    def test_product_alias_can_make_modifier_name_bearing(self):
+        armani = Brand.objects.create(name="Armani")
+        BrandAlias.objects.create(brand=armani, alias_text="Giorgio Armani", normalized_alias="giorgio armani", priority=20)
+        ProductAlias.objects.create(
+            brand=armani,
+            alias_text="acqua di gioia intense",
+            canonical_text="Acqua di Gioia Intense",
+            audience="Woman",
+            priority=20,
+            active=True,
+        )
+        product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="armani-acqua-intense",
+            name="Giorgio Armani Acqua Di Gioia (W) edp 100 ml intense tester",
+        )
+
+        parsed = save_parse(product, force=True)
+
+        self.assertEqual(parsed.normalized_brand, armani)
+        self.assertEqual(parsed.product_name_text, "Acqua di Gioia Intense")
+        self.assertEqual(parsed.supplier_gender_hint, "Woman")
+        self.assertTrue(parsed.is_tester)
+        self.assertNotIn("intense", parsed.modifiers)
+        self.assertNotIn("intense detected", parsed.warnings)
+        self.assertEqual(parsed.display_identity, "Armani / Acqua di Gioia Intense / Eau de Parfum / 100ml / Tester")
+
     def test_explicit_edp_wins_over_catalogue_link_concentration(self):
         brand = Brand.objects.create(name="Trussardi")
         BrandAlias.objects.create(brand=brand, alias_text="Trussardi", normalized_alias="trussardi")
@@ -789,6 +816,23 @@ class NormalizerTests(TestCase):
 
         self.assertEqual(parsed.concentration, "Perfume Oil")
         self.assertEqual(parsed.size_ml, 10)
+
+    def test_duplicate_concentration_aliases_are_not_left_in_product_name(self):
+        brand = Brand.objects.create(name="Morph")
+        BrandAlias.objects.create(brand=brand, alias_text="Morph", normalized_alias="morph")
+        product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="morph-duplicate-concentration",
+            name="Morph N.8 extrait de parfum 2 мл духи пробник",
+        )
+
+        parsed = parse_supplier_product(product)
+
+        self.assertEqual(parsed.normalized_brand, brand)
+        self.assertEqual(parsed.product_name_text, "n.8")
+        self.assertEqual(parsed.concentration, "Extrait de Parfum")
+        self.assertEqual(parsed.size_ml, Decimal("2.00"))
+        self.assertTrue(parsed.is_sample)
 
     def test_brand_alias_rejects_bad_regex(self):
         alias = BrandAlias(

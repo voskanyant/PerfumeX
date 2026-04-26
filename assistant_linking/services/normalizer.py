@@ -305,6 +305,26 @@ def _strip_known_terms(text: str, terms: list[str]) -> str:
     return re.sub(r"\s+", " ", remaining).strip()
 
 
+def _strip_concentration_aliases(text: str, rows: list[tuple]) -> str:
+    remaining = text
+    for row in rows:
+        _, needle, _value, is_regex, *rest = row
+        alias_id = rest[0] if rest else None
+        if not needle:
+            continue
+        if is_regex:
+            alias = ConcentrationAlias.objects.filter(pk=alias_id).first() if alias_id else None
+            remaining = _safe_regex_sub(needle, " ", remaining, alias=alias)
+        else:
+            remaining = re.sub(rf"(^|\s){re.escape(needle)}($|\s)", " ", remaining)
+    return re.sub(r"\s+", " ", remaining).strip()
+
+
+def _name_bearing_modifiers(product_alias: ProductAlias) -> set[str]:
+    alias_identity = normalize_text(" ".join([product_alias.alias_text, product_alias.canonical_text]))
+    return {modifier for modifier in MODIFIER_TERMS if _contains_phrase(alias_identity, normalize_text(modifier))}
+
+
 def _audience_terms_to_strip(audience_aliases: tuple[tuple[str, str, str], ...]) -> list[str]:
     preserved = {normalize_text(term) for term in NAME_AUDIENCE_TERMS}
     terms = [*GENDER_TERMS, *(alias for alias, _display, _group in audience_aliases)]
@@ -426,7 +446,8 @@ def parse_supplier_product(product: SupplierProduct) -> ParseResult:
     concentration_alias_rows = get_concentration_alias_rows()
     supplier_aliases = [row for row in concentration_alias_rows if row[0] == product.supplier_id]
     global_aliases = [row for row in concentration_alias_rows if row[0] is None]
-    for row in supplier_aliases + global_aliases:
+    applicable_concentration_aliases = supplier_aliases + global_aliases
+    for row in applicable_concentration_aliases:
         _, needle, value, is_regex, *rest = row
         alias_id = rest[0] if rest else None
         if is_regex:
@@ -441,6 +462,8 @@ def parse_supplier_product(product: SupplierProduct) -> ParseResult:
             result.concentration = value
             text = re.sub(rf"(^|\s){re.escape(needle)}($|\s)", " ", text).strip()
             break
+    if result.concentration:
+        text = _strip_concentration_aliases(text, applicable_concentration_aliases)
 
     audience_aliases = _audience_aliases()
     for alias_text, display_value, _group in audience_aliases:
@@ -486,16 +509,32 @@ def parse_supplier_product(product: SupplierProduct) -> ParseResult:
             result.raw_size_text = raw_size
             text = compact_text
 
+    product_alias_match_text = _strip_known_terms(
+        text,
+        [
+            *_audience_terms_to_strip(audience_aliases),
+            *tester_terms,
+            *sample_terms,
+            *travel_terms,
+            *mini_terms,
+            *set_terms,
+            *refill_terms,
+            *NO_BOX_TERMS,
+        ],
+    )
     product_aliases = ProductAlias.objects.filter(active=True).order_by("supplier_id", "priority", "-alias_text")
     if result.normalized_brand:
         product_aliases = product_aliases.filter(Q(brand_id=result.normalized_brand.id) | Q(brand__isnull=True))
     for product_alias in list(product_aliases.filter(supplier_id=product.supplier_id)) + list(product_aliases.filter(supplier__isnull=True)):
         alias_text = normalize_text(product_alias.alias_text)
         excluded_terms = _split_terms(product_alias.excluded_terms)
-        if alias_text and _contains_phrase(text, alias_text) and not any(_contains_phrase(text, term) for term in excluded_terms):
+        if alias_text and _contains_phrase(product_alias_match_text, alias_text) and not any(_contains_phrase(text, term) for term in excluded_terms):
             result.product_name_text = product_alias.canonical_text
             if product_alias.collection_name:
                 result.collection_name = product_alias.collection_name
+            name_modifiers = _name_bearing_modifiers(product_alias)
+            if name_modifiers:
+                result.modifiers = [modifier for modifier in result.modifiers if modifier not in name_modifiers]
             if product_alias.concentration and result.concentration and product_alias.supplier_id == product.supplier_id:
                 result.concentration = product_alias.concentration
             if product_alias.audience:
