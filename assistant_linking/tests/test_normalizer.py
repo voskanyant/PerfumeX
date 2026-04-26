@@ -877,6 +877,31 @@ class NormalizerTests(TestCase):
         self.assertEqual(parsed.size_ml, Decimal("150.00"))
         self.assertTrue(parsed.is_tester)
 
+    def test_chloe_atelier_collection_alias_keeps_unknown_scent_name(self):
+        brand = Brand.objects.create(name="Chloe")
+        BrandAlias.objects.create(brand=brand, alias_text="Chloe", normalized_alias="chloe")
+        ProductAlias.objects.create(
+            brand=brand,
+            alias_text="atelier",
+            canonical_text="",
+            collection_name="Atelier des Fleurs",
+            priority=30,
+        )
+        product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="chloe-atelier-magnolia-alba",
+            name="Chloe ATELIER Magnolia Alba 150ml edp TEST",
+        )
+
+        parsed = parse_supplier_product(product)
+
+        self.assertEqual(parsed.normalized_brand, brand)
+        self.assertEqual(parsed.collection_name, "Atelier des Fleurs")
+        self.assertEqual(parsed.product_name_text, "magnolia alba")
+        self.assertEqual(parsed.concentration, "Eau de Parfum")
+        self.assertEqual(parsed.size_ml, Decimal("150.00"))
+        self.assertTrue(parsed.is_tester)
+
     def test_xerjoff_casamorati_combination_maps_to_casamorati_brand(self):
         xerjoff = Brand.objects.create(name="Xerjoff")
         casamorati = Brand.objects.create(name="Casamorati")

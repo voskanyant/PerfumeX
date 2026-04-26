@@ -27,7 +27,7 @@ from prices.models import SupplierProduct
 
 
 logger = logging.getLogger(__name__)
-PARSER_VERSION = "deterministic-v6"
+PARSER_VERSION = "deterministic-v7"
 REGEX_ALIAS_TIMEOUT_SECONDS = 1.0
 
 DEFAULT_CONCENTRATION_ALIASES = (
@@ -535,9 +535,13 @@ def parse_supplier_product(product: SupplierProduct) -> ParseResult:
         alias_text = normalize_text(product_alias.alias_text)
         excluded_terms = _split_terms(product_alias.excluded_terms)
         if alias_text and _contains_phrase(product_alias_match_text, alias_text) and not any(_contains_phrase(text, term) for term in excluded_terms):
-            result.product_name_text = product_alias.canonical_text
             if product_alias.collection_name:
                 result.collection_name = product_alias.collection_name
+            if not product_alias.canonical_text:
+                text = _strip_known_terms(text, [alias_text])
+                product_alias_match_text = _strip_known_terms(product_alias_match_text, [alias_text])
+                continue
+            result.product_name_text = product_alias.canonical_text
             name_modifiers = _name_bearing_modifiers(product_alias)
             if name_modifiers:
                 result.modifiers = [modifier for modifier in result.modifiers if modifier not in name_modifiers]
