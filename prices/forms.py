@@ -157,13 +157,17 @@ class ImportWizardForm(forms.Form):
 
 
 class SupplierImportForm(forms.Form):
-    file = forms.FileField()
+    file = forms.FileField(required=False)
     sheet_selector = forms.CharField(
         required=False,
         help_text="Sheet names or indexes (0-based), comma-separated. Example: Sheet1, 2, Sheet3.",
     )
     header_row = forms.IntegerField(required=False, min_value=1, initial=1)
-    sku_column = forms.IntegerField(required=False, min_value=1)
+    sku_column = forms.IntegerField(
+        required=False,
+        min_value=1,
+        help_text="Optional. Leave empty when the price list has no stable SKU.",
+    )
     name_columns = forms.CharField(
         help_text="Comma-separated columns to concatenate, e.g. 3 or 3,4."
     )

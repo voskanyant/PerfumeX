@@ -270,6 +270,7 @@
   white-space: nowrap;
 }
 
+.import-status-note:empty,
 .import-source-note:empty,
 .import-problem-link:empty {
   display: none;

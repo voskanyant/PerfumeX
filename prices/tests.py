@@ -44,6 +44,7 @@ from prices.views import (
     _build_email_run_status,
     _build_supplier_board_row,
     _collect_latest_successful_imports,
+    _format_local_datetime,
     _get_cron_status,
     _process_supplier_price_payload,
     _render_runner_script,
@@ -1306,8 +1307,35 @@ class SupplierImportBoundaryTests(TestCase):
 
         summary = _summarize_latest_files(self.supplier, run)
 
-        self.assertEqual(summary, "Current - same price file")
+        self.assertEqual(summary, "Current")
         self.assertNotIn("1597", summary)
+
+    def test_supplier_board_check_time_uses_importer_check_not_email_date(self):
+        now = timezone.now().replace(microsecond=0)
+        old_email_date = now - timedelta(days=3)
+        self.supplier.from_address_pattern = "supplier@example.com"
+        self.supplier.save(update_fields=["from_address_pattern"])
+        diagnostic = models.EmailAttachmentDiagnostic.objects.create(
+            supplier=self.supplier,
+            mailbox=self.mailbox,
+            message_date=old_email_date,
+            sender="supplier@example.com",
+            subject="Price",
+            filename="price.xlsx",
+            decision=models.AttachmentDecision.IMPORTED,
+            reason_code="",
+        )
+        models.EmailAttachmentDiagnostic.objects.filter(pk=diagnostic.pk).update(created_at=now)
+        diagnostic.refresh_from_db()
+
+        row = _build_supplier_board_row(
+            supplier=self.supplier,
+            successful_batch=None,
+            latest_run=None,
+            latest_diagnostic=diagnostic,
+        )
+
+        self.assertEqual(row["check_full"], _format_local_datetime(now))
 
     def test_running_email_status_shows_live_activity(self):
         run = models.EmailImportRun.objects.create(

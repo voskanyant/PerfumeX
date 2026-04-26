@@ -216,8 +216,9 @@
                             </div>
                             <div class="supplier-mapping-grid">
                                 <div class="supplier-import-field">
-                                    <label for="{{ form.sku_column.id_for_label }}" class="form-label">SKU</label>
+                                    <label for="{{ form.sku_column.id_for_label }}" class="form-label">SKU <span class="tone-muted">optional</span></label>
                                     {{ form.sku_column }}
+                                    {% if form.sku_column.help_text %}<div class="field-help">{{ form.sku_column.help_text }}</div>{% endif %}
                                     {% if form.sku_column.errors %}<div class="field-errors">{{ form.sku_column.errors }}</div>{% endif %}
                                 </div>
                                 <div class="supplier-import-field">
@@ -241,7 +242,8 @@
                         </div>
 
                         <div class="supplier-import-actions">
-                            <button class="button" type="submit">Upload and import</button>
+                            <button class="button secondary" type="submit" name="action" value="save_mapping">Save mapping</button>
+                            <button class="button" type="submit" name="action" value="upload_import">Upload and import</button>
                         </div>
                     </section>
                 </form>

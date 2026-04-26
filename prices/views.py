@@ -295,35 +295,32 @@ def _build_email_run_status(run) -> dict[str, str | int | None]:
             }
         if not run.matched_files and not run.processed_files:
             return {
-                "label": "no file",
-                "class_name": "is-warning",
-                "note": "No matching price email in supplier-specific scan",
-                "code": "no-files",
+                "label": "current",
+                "class_name": "is-neutral",
+                "note": "",
+                "code": "no-change",
                 "progress": None,
             }
         if not run.processed_files and run.skipped_duplicates:
             return {
                 "label": "current",
                 "class_name": "is-neutral",
-                "note": f"{run.skipped_duplicates} same file(s) already imported",
+                "note": "",
                 "code": "no-change",
                 "progress": None,
             }
         if not run.processed_files:
             return {
-                "label": "checked",
+                "label": "current",
                 "class_name": "is-neutral",
-                "note": "Matching files found, but nothing new was imported",
+                "note": "",
                 "code": "no-change",
                 "progress": None,
             }
-        note = f"{run.processed_files} file(s) imported"
-        if run.skipped_duplicates:
-            note = f"{note}, {run.skipped_duplicates} duplicate(s) skipped"
         return {
-            "label": "updated",
-            "class_name": "is-success",
-            "note": note,
+            "label": "current",
+            "class_name": "is-neutral",
+            "note": "",
             "code": "successful",
             "progress": None,
         }
@@ -480,6 +477,12 @@ def _diagnostic_activity_datetime(diagnostic):
     return diagnostic.message_date or diagnostic.created_at
 
 
+def _diagnostic_check_datetime(diagnostic):
+    if not diagnostic:
+        return None
+    return diagnostic.created_at
+
+
 def _failed_file_activity_datetime(import_file):
     if not import_file:
         return None
@@ -507,7 +510,7 @@ def _build_latest_check_info(
     latest_diagnostic=None,
 ) -> dict[str, str | int | None | bool]:
     fallback_dt = supplier.last_email_check_at
-    diagnostic_dt = _diagnostic_activity_datetime(latest_diagnostic)
+    diagnostic_dt = _diagnostic_check_datetime(latest_diagnostic)
     if run:
         run_dt = _run_activity_datetime(run)
         newest_side_event_dt = max(
@@ -524,6 +527,7 @@ def _build_latest_check_info(
                 if diagnostic_dt and compare_dt == diagnostic_dt:
                     return _build_diagnostic_event_check(latest_diagnostic)
                 return _build_supplier_email_fallback_check(supplier, fallback_dt)
+        check_dt = max([dt for dt in (fallback_dt, run_dt) if dt], default=None)
         run_status = _build_email_run_status(run)
         note = str(run_status.get("note") or "")
         code = str(run_status.get("code") or "unknown")
@@ -538,10 +542,10 @@ def _build_latest_check_info(
             "class_name": str(run_status["class_name"]),
             "code": code,
             "note": note,
-            "relative": _short_relative_datetime(run_dt) if run_dt else "Checked",
-            "full": _format_local_datetime(run_dt),
+            "relative": _short_relative_datetime(check_dt) if check_dt else "Checked",
+            "full": _format_local_datetime(check_dt),
             "progress": run_status.get("progress"),
-            "show_time": bool(run_dt),
+            "show_time": bool(check_dt),
         }
 
     if diagnostic_dt and (not fallback_dt or diagnostic_dt >= fallback_dt):
@@ -576,10 +580,10 @@ def _build_latest_check_info(
 
 def _build_supplier_email_fallback_check(supplier, fallback_dt) -> dict[str, str | int | None | bool]:
     if supplier.last_email_processed:
-        label = "updated"
-        class_name = "is-success"
+        label = "current"
+        class_name = "is-neutral"
         code = "successful"
-        note = f"{supplier.last_email_processed} file(s) imported"
+        note = ""
     elif supplier.last_email_errors:
         label = "failed"
         class_name = "is-warning"
@@ -589,15 +593,12 @@ def _build_supplier_email_fallback_check(supplier, fallback_dt) -> dict[str, str
         label = "current"
         class_name = "is-neutral"
         code = "no-change"
-        note = "Price email found, no new file"
+        note = ""
     else:
-        label = "manual: no email"
-        class_name = "is-warning"
-        code = "no-files"
-        note = _normalize_supplier_check_message(
-            supplier.last_email_last_message,
-            fallback="Manual check found no price email since last success",
-        )
+        label = "current"
+        class_name = "is-neutral"
+        code = "no-change"
+        note = ""
     return {
         "label": label,
         "class_name": class_name,
@@ -629,15 +630,15 @@ def _build_diagnostic_event_check(diagnostic) -> dict[str, str | int | None | bo
     filename = _format_event_filename(diagnostic.filename)
     reason = _attachment_reason_label(diagnostic.reason_code, decision)
     if decision == models.AttachmentDecision.IMPORTED:
-        label = "updated"
-        class_name = "is-success"
+        label = "current"
+        class_name = "is-neutral"
         code = "successful"
-        note = f"{filename}: imported" if filename else "Price file imported"
+        note = ""
     elif decision == models.AttachmentDecision.DUPLICATE:
         label = "current"
         class_name = "is-neutral"
         code = "no-change"
-        note = f"{filename}: same file already imported" if filename else "Same price file already imported"
+        note = ""
     elif decision in {
         models.AttachmentDecision.FAILED,
         models.AttachmentDecision.QUARANTINED,
@@ -656,7 +657,7 @@ def _build_diagnostic_event_check(diagnostic) -> dict[str, str | int | None | bo
         class_name = "is-warning"
         code = "no-valid-file"
         note = f"{filename}: {reason}" if filename else reason
-    event_dt = _diagnostic_activity_datetime(diagnostic)
+    event_dt = _diagnostic_check_datetime(diagnostic)
     return {
         "label": label,
         "class_name": class_name,
@@ -1005,19 +1006,19 @@ def _attachment_reason_label(reason_code: str, decision: str = "") -> str:
 def _summarize_latest_files(supplier, latest_run, latest_diagnostic=None) -> str:
     if latest_run:
         if latest_run.processed_files:
-            return f"Imported {latest_run.processed_files} file(s)"
+            return "Current"
         if latest_run.errors:
             return "Import issue"
         if latest_run.skipped_duplicates:
-            return "Current - same price file"
+            return "Current"
         if latest_run.matched_files:
-            return "Price email found, no new file"
-        return "No price email found"
+            return "Current"
+        return "Current"
     if latest_diagnostic:
         if latest_diagnostic.decision == models.AttachmentDecision.IMPORTED:
-            return "Imported 1 file"
+            return "Current"
         if latest_diagnostic.decision == models.AttachmentDecision.DUPLICATE:
-            return "Current - same price file"
+            return "Current"
         if latest_diagnostic.decision in {
             models.AttachmentDecision.FAILED,
             models.AttachmentDecision.QUARANTINED,
@@ -1029,12 +1030,12 @@ def _summarize_latest_files(supplier, latest_run, latest_diagnostic=None) -> str
             return "Price file found, not imported"
     if supplier.last_email_check_at:
         if supplier.last_email_processed:
-            return f"Imported {supplier.last_email_processed} file(s)"
+            return "Current"
         if supplier.last_email_errors:
             return "Import issue"
         if supplier.last_email_matched:
-            return "Price email found, no new file"
-        return "No price email found"
+            return "Current"
+        return "Current"
     return "No check yet"
 
 
@@ -2543,7 +2544,18 @@ class SupplierImportView(LoginRequiredMixin, FormView):
     def form_valid(self, form):
         supplier = get_object_or_404(models.Supplier, pk=self.kwargs["pk"])
         mapping = _save_supplier_mapping_from_import_form(form, supplier)
-        upload = form.cleaned_data["file"]
+        action = self.request.POST.get("action", "upload_import")
+        if action == "save_mapping":
+            messages.success(request=self.request, message=f"{supplier.name}: mapping saved.")
+            active_source = self.request.GET.get("source", "file")
+            if active_source not in self.valid_sources:
+                active_source = "file"
+            return redirect(f"{reverse('prices:supplier_import', args=[supplier.pk])}?{urlencode({'source': active_source})}#mapping-preview")
+
+        upload = form.cleaned_data.get("file")
+        if not upload:
+            form.add_error("file", "Choose a spreadsheet to upload and import, or use Save mapping.")
+            return self.form_invalid(form)
         try:
             _process_supplier_price_upload(supplier, mapping, upload)
         except Exception as exc:
