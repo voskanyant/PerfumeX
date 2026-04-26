@@ -382,6 +382,55 @@ class NormalizerTests(TestCase):
         self.assertEqual(etoile_parse.supplier_gender_hint, "Woman")
         self.assertEqual(angel_parse.product_name_text, "Angel")
 
+    def test_product_alias_can_extract_collection_and_scent(self):
+        armani = Brand.objects.create(name="Armani")
+        BrandAlias.objects.create(brand=armani, alias_text="Giorgio Armani", normalized_alias="giorgio armani", priority=20)
+        ProductAlias.objects.create(
+            brand=armani,
+            alias_text="emporio armani stronger with amber exclusive edi",
+            canonical_text="Amber",
+            collection_name="Emporio Armani Stronger With You",
+            priority=20,
+            active=True,
+        )
+        Brand.objects.create(name="You")
+        product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="armani-amber",
+            name="Giorgio Armani Emporio Armani Stronger With You Amber Exclusive Edi edp 100 ml",
+        )
+
+        parsed = save_parse(product, force=True)
+
+        self.assertEqual(parsed.normalized_brand, armani)
+        self.assertEqual(parsed.product_name_text, "Amber")
+        self.assertEqual(parsed.collection_name, "Emporio Armani Stronger With You")
+        self.assertEqual(parsed.concentration, "Eau de Parfum")
+        self.assertEqual(parsed.size_ml, Decimal("100.00"))
+        self.assertEqual(
+            parsed.display_identity,
+            "Armani / Emporio Armani Stronger with You / Amber / Eau de Parfum / 100ml",
+        )
+
+    def test_catalog_link_copies_collection_name_to_parse(self):
+        armani = Brand.objects.create(name="Armani")
+        perfume = armani.perfumes.create(
+            name="Amber",
+            collection_name="Emporio Armani Stronger With You",
+            concentration="Eau de Parfum",
+        )
+        product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="armani-linked-amber",
+            name="Giorgio Armani Emporio Armani Stronger With Amber edp 100 ml",
+            catalog_perfume=perfume,
+        )
+
+        parsed = save_parse(product, force=True)
+
+        self.assertEqual(parsed.product_name_text, "Amber")
+        self.assertEqual(parsed.collection_name, "Emporio Armani Stronger With You")
+
     def test_explicit_edp_wins_over_catalogue_link_concentration(self):
         brand = Brand.objects.create(name="Trussardi")
         BrandAlias.objects.create(brand=brand, alias_text="Trussardi", normalized_alias="trussardi")

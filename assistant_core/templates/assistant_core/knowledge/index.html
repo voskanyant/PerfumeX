@@ -109,7 +109,7 @@
                 {% elif active_section == "notes" %}
                     <tr><th>Category</th><th>Title</th><th>Supplier</th><th>Brand</th><th>Perfume</th><th>Status</th></tr>
                 {% elif active_section == "product_aliases" %}
-                    <tr><th>Supplier text</th><th>Brand</th><th>Correct scent</th><th>Concentration</th><th>Audience</th><th>Blockers</th><th>Scope</th><th>Status</th><th>Actions</th></tr>
+                    <tr><th>Supplier text</th><th>Brand</th><th>Collection</th><th>Correct scent</th><th>Concentration</th><th>Audience</th><th>Blockers</th><th>Scope</th><th>Status</th><th>Actions</th></tr>
                 {% elif active_section == "concentration_aliases" %}
                     <tr><th>Supplier text</th><th>Normalized alias</th><th>Correct concentration</th><th>Scope</th><th>Priority</th><th>Matcher</th><th>Status</th><th>Actions</th></tr>
                 {% elif active_section == "decisions" %}
@@ -156,6 +156,7 @@
                         {% elif active_section == "product_aliases" %}
                             <td>{{ item.alias_text }}</td>
                             <td>{{ item.brand|default:"any brand" }}</td>
+                            <td>{{ item.collection_name|default:"-" }}</td>
                             <td>{{ item.canonical_text }}</td>
                             <td>{{ item.concentration|default:"-" }}</td>
                             <td>{{ item.audience|default:"-" }}</td>

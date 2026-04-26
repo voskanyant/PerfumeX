@@ -151,6 +151,7 @@ class ProductAlias(TimeStampedModel):
     brand = models.ForeignKey("catalog.Brand", on_delete=models.SET_NULL, null=True, blank=True, related_name="product_aliases", db_index=True)
     alias_text = models.CharField(max_length=255, db_index=True)
     canonical_text = models.CharField(max_length=255, db_index=True)
+    collection_name = models.CharField(max_length=180, blank=True, db_index=True)
     supplier = models.ForeignKey("prices.Supplier", on_delete=models.CASCADE, null=True, blank=True, related_name="product_aliases", db_index=True)
     concentration = models.CharField(max_length=80, blank=True)
     audience = models.CharField(max_length=80, blank=True)
@@ -202,6 +203,7 @@ class ParsedSupplierProduct(TimeStampedModel):
     detected_brand_text = models.CharField(max_length=255, blank=True)
     normalized_brand = models.ForeignKey("catalog.Brand", on_delete=models.SET_NULL, null=True, blank=True, db_index=True)
     product_name_text = models.CharField(max_length=255, blank=True, db_index=True)
+    collection_name = models.CharField(max_length=180, blank=True, db_index=True)
     concentration = models.CharField(max_length=80, blank=True, db_index=True)
     size_ml = models.DecimalField(max_digits=7, decimal_places=2, null=True, blank=True, db_index=True)
     raw_size_text = models.CharField(max_length=80, blank=True)
@@ -242,6 +244,10 @@ class ParsedSupplierProduct(TimeStampedModel):
     @property
     def display_product_name(self) -> str:
         return display_title(self.product_name_text)
+
+    @property
+    def display_collection_name(self) -> str:
+        return display_title(self.collection_name)
 
     @property
     def display_variant_type(self) -> str:
@@ -285,6 +291,7 @@ class ParsedSupplierProduct(TimeStampedModel):
     def display_identity(self) -> str:
         parts = [
             self.display_brand,
+            self.display_collection_name,
             self.display_product_name,
             self.concentration,
             self.display_size,
@@ -309,6 +316,7 @@ class MatchGroup(TimeStampedModel):
     group_key = models.CharField(max_length=500, unique=True, db_index=True)
     normalized_brand = models.ForeignKey("catalog.Brand", on_delete=models.SET_NULL, null=True, blank=True, db_index=True)
     canonical_name = models.CharField(max_length=255, db_index=True)
+    collection_name = models.CharField(max_length=180, blank=True, db_index=True)
     concentration = models.CharField(max_length=80, blank=True, db_index=True)
     audience_hint = models.CharField(max_length=80, blank=True, db_index=True)
     size_ml = models.DecimalField(max_digits=7, decimal_places=2, null=True, blank=True, db_index=True)
@@ -349,6 +357,7 @@ class MatchGroup(TimeStampedModel):
         packaging = self.display_packaging
         parts = [
             str(self.normalized_brand) if self.normalized_brand_id else "",
+            display_title(self.collection_name),
             self.display_canonical_name,
             self.concentration,
             self.display_size,

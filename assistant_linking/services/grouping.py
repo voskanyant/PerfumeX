@@ -14,6 +14,7 @@ def build_group_key(parsed: ParsedSupplierProduct) -> str:
     modifiers = "-".join(sorted(parsed.modifiers or []))
     parts = [
         str(parsed.normalized_brand_id or "brand-missing"),
+        parsed.collection_name or "",
         parsed.product_name_text or "name-missing",
         parsed.concentration or "",
         parsed.supplier_gender_hint or "",
@@ -38,6 +39,7 @@ def rebuild_groups(*, supplier_id: int | None = None, only_open: bool = False) -
             defaults={
                 "normalized_brand": parsed.normalized_brand,
                 "canonical_name": parsed.product_name_text or parsed.supplier_product.name[:255],
+                "collection_name": parsed.collection_name,
                 "concentration": parsed.concentration,
                 "audience_hint": parsed.supplier_gender_hint,
                 "size_ml": parsed.size_ml,

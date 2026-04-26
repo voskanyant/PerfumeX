@@ -23,6 +23,10 @@ def _tokens(value: str) -> set[str]:
     return {token for token in normalize_text(value).split() if len(token) > 1}
 
 
+def _catalog_name(perfume: Perfume) -> str:
+    return " ".join(part for part in [perfume.collection_name, perfume.name] if part)
+
+
 def _token_score(source: str, candidate: str) -> int:
     source_tokens = _tokens(source)
     candidate_tokens = _tokens(candidate)
@@ -74,7 +78,7 @@ def candidate_matches(parsed: ParsedSupplierProduct, limit: int = 8) -> list[Cat
 
     candidates: list[CatalogCandidate] = []
     for perfume in perfumes[:1000]:
-        score = _token_score(product_text, perfume.name)
+        score = _token_score(product_text, _catalog_name(perfume))
         reasons: list[str] = []
         conflicts: list[str] = []
         if score:

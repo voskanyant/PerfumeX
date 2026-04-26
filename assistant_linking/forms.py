@@ -42,7 +42,19 @@ class ProductAliasForm(forms.ModelForm):
 
     class Meta:
         model = models.ProductAlias
-        fields = ("perfume", "brand", "alias_text", "canonical_text", "supplier", "concentration", "audience", "excluded_terms", "priority", "active")
+        fields = (
+            "perfume",
+            "brand",
+            "alias_text",
+            "canonical_text",
+            "collection_name",
+            "supplier",
+            "concentration",
+            "audience",
+            "excluded_terms",
+            "priority",
+            "active",
+        )
         widgets = {"excluded_terms": forms.Textarea(attrs={"rows": 2})}
 
     def __init__(self, *args, **kwargs):
@@ -80,6 +92,8 @@ class ProductAliasForm(forms.ModelForm):
         cleaned = super().clean()
         if cleaned.get("perfume") and not cleaned.get("brand"):
             cleaned["brand"] = cleaned["perfume"].brand
+        if cleaned.get("perfume") and not cleaned.get("collection_name"):
+            cleaned["collection_name"] = cleaned["perfume"].collection_name
         return cleaned
 
 

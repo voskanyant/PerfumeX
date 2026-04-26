@@ -168,6 +168,7 @@ class KnowledgeView(StaffAssistantMixin, TemplateView):
                 queryset = queryset.filter(
                     Q(alias_text__icontains=query)
                     | Q(canonical_text__icontains=query)
+                    | Q(collection_name__icontains=query)
                     | Q(excluded_terms__icontains=query)
                     | Q(concentration__icontains=query)
                     | Q(audience__icontains=query)
@@ -319,9 +320,10 @@ class AliasesView(StaffAssistantMixin, TemplateView):
         queryset = ProductAlias.objects.select_related("brand", "perfume", "supplier").order_by("supplier__name", "priority", "alias_text")
         if query:
             queryset = queryset.filter(
-                Q(alias_text__icontains=query)
-                | Q(canonical_text__icontains=query)
-                | Q(excluded_terms__icontains=query)
+                    Q(alias_text__icontains=query)
+                    | Q(canonical_text__icontains=query)
+                    | Q(collection_name__icontains=query)
+                    | Q(excluded_terms__icontains=query)
                 | Q(concentration__icontains=query)
                 | Q(audience__icontains=query)
                 | Q(brand__name__icontains=query)

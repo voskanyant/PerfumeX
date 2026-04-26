@@ -116,6 +116,7 @@ class ParseResult:
     detected_brand_text: str = ""
     normalized_brand: Brand | None = None
     product_name_text: str = ""
+    collection_name: str = ""
     concentration: str = ""
     size_ml: Decimal | None = None
     raw_size_text: str = ""
@@ -493,6 +494,8 @@ def parse_supplier_product(product: SupplierProduct) -> ParseResult:
         excluded_terms = _split_terms(product_alias.excluded_terms)
         if alias_text and _contains_phrase(text, alias_text) and not any(_contains_phrase(text, term) for term in excluded_terms):
             result.product_name_text = product_alias.canonical_text
+            if product_alias.collection_name:
+                result.collection_name = product_alias.collection_name
             if product_alias.concentration and result.concentration and product_alias.supplier_id == product.supplier_id:
                 result.concentration = product_alias.concentration
             if product_alias.audience:
@@ -506,6 +509,7 @@ def parse_supplier_product(product: SupplierProduct) -> ParseResult:
         result.normalized_brand = perfume.brand
         result.detected_brand_text = perfume.brand.name
         result.product_name_text = perfume.name
+        result.collection_name = perfume.collection_name
         if perfume.audience:
             result.supplier_gender_hint = perfume.audience
         if product.catalog_variant_id:
@@ -575,6 +579,7 @@ def save_parse(product: SupplierProduct, *, force: bool = False) -> ParsedSuppli
             "detected_brand_text": parsed.detected_brand_text,
             "normalized_brand": parsed.normalized_brand,
             "product_name_text": parsed.product_name_text,
+            "collection_name": parsed.collection_name,
             "concentration": parsed.concentration,
             "size_ml": parsed.size_ml,
             "raw_size_text": parsed.raw_size_text,

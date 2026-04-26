@@ -71,6 +71,7 @@
                     <tr>
                         <th>Supplier text</th>
                         <th>Correct scent</th>
+                        <th>Collection</th>
                         <th>Brand</th>
                         <th>Concentration</th>
                         <th>Audience</th>
@@ -111,6 +112,7 @@
                         {% elif active_section == "products" %}
                             <td>{{ item.alias_text }}</td>
                             <td>{{ item.canonical_text }}</td>
+                            <td>{{ item.collection_name|default:"-" }}</td>
                             <td>{{ item.brand|default:"any brand" }}</td>
                             <td>{{ item.concentration|default:"-" }}</td>
                             <td>{{ item.audience|default:"-" }}</td>
