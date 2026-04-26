@@ -12,6 +12,7 @@ class Command(BaseCommand):
         parser.add_argument("--supplier-id", type=int)
         parser.add_argument("--only-unparsed", action="store_true")
         parser.add_argument("--only-stale", action="store_true")
+        parser.add_argument("--name-contains")
         parser.add_argument("--limit", type=int)
 
     def handle(self, *args, **options):
@@ -21,6 +22,8 @@ class Command(BaseCommand):
         queryset = SupplierProduct.objects.select_related("supplier").all()
         if options["supplier_id"]:
             queryset = queryset.filter(supplier_id=options["supplier_id"])
+        if options["name_contains"]:
+            queryset = queryset.filter(name__icontains=options["name_contains"])
         if options["only_unparsed"]:
             queryset = queryset.filter(assistant_parse__isnull=True)
         if options["only_stale"]:

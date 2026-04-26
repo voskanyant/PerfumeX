@@ -290,6 +290,14 @@ def _build_email_run_status(run) -> dict[str, str | int | None]:
             "progress": progress,
         }
     if run.status == models.EmailImportStatus.FINISHED:
+        if run.processed_files:
+            return {
+                "label": "current",
+                "class_name": "is-neutral",
+                "note": "",
+                "code": "successful",
+                "progress": None,
+            }
         if run.errors:
             return {
                 "label": "issues",
@@ -326,7 +334,7 @@ def _build_email_run_status(run) -> dict[str, str | int | None]:
             "label": "current",
             "class_name": "is-neutral",
             "note": "",
-            "code": "successful",
+            "code": "no-change",
             "progress": None,
         }
     if run.status == models.EmailImportStatus.FAILED:
@@ -2596,6 +2604,17 @@ def _supplier_import_tab_url(pk, source):
     return f"{reverse('prices:supplier_import', args=[pk])}?{urlencode({'source': source})}"
 
 
+def _import_board_redirect(request):
+    next_url = request.POST.get("next", "").strip()
+    if next_url and url_has_allowed_host_and_scheme(
+        next_url, allowed_hosts={request.get_host()}
+    ):
+        return redirect(next_url)
+    if request.user.is_staff:
+        return redirect("prices:supplier_overview")
+    return redirect("viewer_import_prices")
+
+
 class SupplierQuickUploadView(LoginRequiredMixin, View):
     def post(self, request, pk):
         supplier = get_object_or_404(models.Supplier, pk=pk)
@@ -2613,12 +2632,14 @@ class SupplierQuickUploadView(LoginRequiredMixin, View):
                 request,
                 "Create or confirm the supplier price mapping first.",
             )
-            return redirect(_supplier_import_tab_url(pk, "file"))
+            if request.user.is_staff:
+                return redirect(_supplier_import_tab_url(pk, "file"))
+            return _import_board_redirect(request)
 
         upload = request.FILES.get("file")
         if not upload:
             messages.info(request, "Select a file to upload.")
-            return redirect("prices:supplier_overview")
+            return _import_board_redirect(request)
 
         try:
             _process_supplier_price_upload(supplier, mapping, upload)
@@ -2626,7 +2647,7 @@ class SupplierQuickUploadView(LoginRequiredMixin, View):
             messages.error(request, f"{supplier.name}: upload failed. {exc}")
         else:
             messages.success(request, f"{supplier.name}: {upload.name} imported.")
-        return redirect("prices:supplier_overview")
+        return _import_board_redirect(request)
 
 
 class SupplierPriceSourceCreateView(LoginRequiredMixin, View):
@@ -2717,10 +2738,10 @@ class SupplierEmailImportView(LoginRequiredMixin, View):
                 request,
                 "Supplier has no sender email configured. Set From address pattern first.",
             )
-            return redirect("prices:supplier_overview")
+            return _import_board_redirect(request)
         if _has_running_email_imports():
             messages.info(request, EMAIL_IMPORT_BUSY_MESSAGE)
-            return redirect("prices:supplier_overview")
+            return _import_board_redirect(request)
         run = models.EmailImportRun.objects.create(
             supplier=supplier, status=models.EmailImportStatus.RUNNING
         )
@@ -2734,7 +2755,7 @@ class SupplierEmailImportView(LoginRequiredMixin, View):
                 last_message=f"Failed to start background import: {exc}",
             )
             messages.error(request, f"Failed to start email import: {exc}")
-        return redirect("prices:supplier_overview")
+        return _import_board_redirect(request)
 
 
 class SupplierEmailBackfillView(LoginRequiredMixin, View):
@@ -2953,19 +2974,17 @@ class SupplierRatesRecalculateView(MutatingPermissionRequiredMixin, LoginRequire
         return redirect(redirect_name)
 
 
-class SupplierEmailImportAllView(MutatingPermissionRequiredMixin, LoginRequiredMixin, View):
-    permission_required = "prices.add_emailimportrun"
-
+class SupplierEmailImportAllView(LoginRequiredMixin, View):
     def post(self, request):
         if _has_running_email_imports():
             messages.info(request, EMAIL_IMPORT_BUSY_MESSAGE)
-            return redirect("prices:supplier_overview")
+            return _import_board_redirect(request)
         try:
             _spawn_management_command("import_emails", "--force")
             messages.info(request, "Mailbox scan started.")
         except Exception as exc:
             messages.error(request, f"Failed to start mailbox scan: {exc}")
-        return redirect("prices:supplier_overview")
+        return _import_board_redirect(request)
 
 
 class SupplierPriceReimportAllView(MutatingPermissionRequiredMixin, LoginRequiredMixin, View):

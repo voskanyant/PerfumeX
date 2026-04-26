@@ -423,6 +423,45 @@ class TeachParseTests(TestCase):
         self.assertEqual(stale_parse.concentration, "Eau de Toilette")
         self.assertEqual(stale_parse.size_ml, Decimal("100.00"))
 
+    def test_reparse_supplier_products_command_can_scope_by_name(self):
+        fendi = Brand.objects.create(name="Fendi")
+        kenzo = Brand.objects.create(name="Kenzo")
+        BrandAlias.objects.create(brand=fendi, alias_text="Fendi", normalized_alias="fendi")
+        BrandAlias.objects.create(brand=kenzo, alias_text="Kenzo", normalized_alias="kenzo")
+        fendi_product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="parsed-stale-fendi-scoped",
+            name="FENDI FAN DI FENDI EDT 100ML",
+        )
+        kenzo_product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="parsed-stale-kenzo-scoped",
+            name="KENZO HOMME EDT 100ML",
+        )
+        fendi_parse = ParsedSupplierProduct.objects.create(
+            supplier_product=fendi_product,
+            raw_name=fendi_product.name,
+            normalized_text="old",
+            product_name_text="",
+            parser_version="deterministic-old",
+        )
+        kenzo_parse = ParsedSupplierProduct.objects.create(
+            supplier_product=kenzo_product,
+            raw_name=kenzo_product.name,
+            normalized_text="old",
+            product_name_text="",
+            parser_version="deterministic-old",
+        )
+
+        call_command("reparse_supplier_products", "--name-contains", "FENDI", verbosity=0)
+
+        fendi_parse.refresh_from_db()
+        kenzo_parse.refresh_from_db()
+        self.assertEqual(fendi_parse.normalized_brand, fendi)
+        self.assertEqual(fendi_parse.product_name_text, "fan di fendi")
+        self.assertIsNone(kenzo_parse.normalized_brand)
+        self.assertEqual(kenzo_parse.product_name_text, "")
+
     def test_normalization_dashboard_uses_saved_stats_snapshot(self):
         brand = Brand.objects.create(name="Cache Brand")
         product = SupplierProduct.objects.create(

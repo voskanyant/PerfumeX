@@ -1089,6 +1089,36 @@ class NormalizerTests(TestCase):
         self.assertEqual(parsed.size_ml, Decimal("90.00"))
         self.assertTrue(parsed.is_tester)
 
+    def test_kb_preprocess_normalizes_apostrophe_like_marks_between_letters(self):
+        brand = Brand.objects.create(name="State of Mind")
+        BrandAlias.objects.create(
+            brand=brand,
+            alias_text="STATE OF MIND",
+            normalized_alias="state of mind",
+        )
+        GlobalRule.objects.create(
+            title="Normalize apostrophe-like marks",
+            rule_kind="regex_preprocess",
+            scope_type="global",
+            rule_text=r"(?<=[\p{L}])\s*[`´‘’ʼʹʽ]\s*(?=[\p{L}]) => '",
+            approved=True,
+            active=True,
+            priority=15,
+        )
+        cache.clear()
+        product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="state-of-mind-l-ame",
+            name="STATE OF MIND L ` Ame Slave edp 100 ml",
+        )
+
+        parsed = parse_supplier_product(product)
+
+        self.assertEqual(parsed.normalized_brand, brand)
+        self.assertEqual(parsed.product_name_text, "l'ame slave")
+        self.assertEqual(parsed.concentration, "Eau de Parfum")
+        self.assertEqual(parsed.size_ml, Decimal("100.00"))
+
     def test_brand_alias_rejects_bad_regex(self):
         alias = BrandAlias(
             brand=self.brand,

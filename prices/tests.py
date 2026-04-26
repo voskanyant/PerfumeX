@@ -486,7 +486,6 @@ class BulkMutationPermissionTests(TestCase):
                 {"supplier_ids": [str(self.supplier.id)], "start_date": "2026-04-01"},
             ),
             ("prices:supplier_rates_recalculate", {}),
-            ("prices:supplier_import_email_all", {}),
             ("prices:supplier_reimport_all_prices", {}),
             ("prices:currency_rate_delete_bulk", {}),
         ]
@@ -542,12 +541,26 @@ class AdminPanelReadOnlyAccessTests(TestCase):
             is_staff=False,
         )
         self.client.force_login(self.user)
+        self.supplier = models.Supplier.objects.create(
+            name="Viewer Supplier",
+            from_address_pattern="supplier@example.com",
+        )
+        self.mapping = models.SupplierFileMapping.objects.create(
+            supplier=self.supplier,
+            file_kind=models.FileKind.PRICE,
+            header_row=1,
+            column_map={"sku": 1, "name": 2, "price": 3},
+        )
 
     def test_non_staff_user_can_view_import_prices_board(self):
-        response = self.client.get(reverse("prices:supplier_overview"))
+        response = self.client.get(reverse("viewer_import_prices"))
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Supplier import board")
+        self.assertContains(response, "Scan mailboxes now")
+        self.assertContains(response, 'aria-label="Quick upload"')
+        self.assertContains(response, 'aria-label="Update from email"')
+        self.assertNotContains(response, 'aria-label="Edit mapping"')
 
     def test_non_staff_user_can_poll_import_prices_board_status(self):
         response = self.client.get(reverse("prices:supplier_import_email_status_all"))
@@ -560,6 +573,41 @@ class AdminPanelReadOnlyAccessTests(TestCase):
 
         self.assertEqual(response.status_code, 302)
         self.assertEqual(response["Location"], "/")
+
+    def test_non_staff_user_can_start_mailbox_scan_from_board(self):
+        with patch("prices.views._spawn_management_command") as spawn:
+            response = self.client.post(
+                reverse("prices:supplier_import_email_all"),
+                {"next": reverse("viewer_import_prices")},
+            )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response["Location"], reverse("viewer_import_prices"))
+        spawn.assert_called_once_with("import_emails", "--force")
+
+    def test_non_staff_user_can_start_supplier_email_update_from_board(self):
+        with patch("prices.views._spawn_management_command") as spawn:
+            response = self.client.post(
+                reverse("prices:supplier_import_email", args=[self.supplier.pk]),
+                {"next": reverse("viewer_import_prices")},
+            )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response["Location"], reverse("viewer_import_prices"))
+        spawn.assert_called_once()
+        self.assertEqual(spawn.call_args.args[:2], ("process_email_runs", "--run-id"))
+
+    def test_non_staff_user_can_quick_upload_from_board(self):
+        upload = SimpleUploadedFile("viewer.csv", b"sku,name,price\n1,Item,10\n")
+        with patch("prices.views._process_supplier_price_upload") as process_upload:
+            response = self.client.post(
+                reverse("prices:supplier_quick_upload", args=[self.supplier.pk]),
+                {"next": reverse("viewer_import_prices"), "file": upload},
+            )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response["Location"], reverse("viewer_import_prices"))
+        process_upload.assert_called_once()
 
 
 class BackgroundRunSafetyTests(TransactionTestCase):
@@ -1046,6 +1094,48 @@ class SupplierImportBoundaryTests(TestCase):
 
         self.assertEqual(row["check_code"], "canceled")
         self.assertEqual(row["check_label"], "canceled")
+
+    def test_supplier_board_successful_run_with_duplicate_issues_stays_current(self):
+        now = timezone.now().replace(microsecond=0)
+        self.supplier.from_address_pattern = "supplier@example.com"
+        self.supplier.expected_import_interval_hours = 24
+        self.supplier.save(update_fields=["from_address_pattern", "expected_import_interval_hours"])
+        batch = models.ImportBatch.objects.create(
+            supplier=self.supplier,
+            mailbox=self.mailbox,
+            message_id="<mixed-success@example.com>",
+            received_at=now - timedelta(hours=1),
+            status=models.ImportStatus.PROCESSED,
+        )
+        models.ImportFile.objects.create(
+            import_batch=batch,
+            file_kind=models.FileKind.PRICE,
+            filename="mixed-success.xlsx",
+            content_hash="mixed-success-hash",
+            status=models.ImportStatus.PROCESSED,
+            processed_at=now - timedelta(hours=1),
+        )
+        run = models.EmailImportRun.objects.create(
+            supplier=self.supplier,
+            status=models.EmailImportStatus.FINISHED,
+            finished_at=now,
+            matched_files=4,
+            processed_files=1,
+            skipped_duplicates=3,
+            errors=3,
+            last_message="Imported 1 file, duplicate copies skipped.",
+        )
+
+        row = _build_supplier_board_row(
+            supplier=self.supplier,
+            successful_batch=batch,
+            latest_run=run,
+        )
+
+        self.assertEqual(row["check_code"], "successful")
+        self.assertEqual(row["check_label"], "current")
+        self.assertEqual(row["health_code"], "fresh")
+        self.assertEqual(row["problem_note"], "")
 
     def test_supplier_board_keeps_friday_import_fresh_through_weekend(self):
         self.supplier.from_address_pattern = "supplier@example.com"

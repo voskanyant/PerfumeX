@@ -40,6 +40,8 @@ OpenAI integration is gated by environment:
 
 When OpenAI is disabled or unavailable, the assistant falls back to deterministic/mock services.
 
+Assistant learning should be implemented through catalogue facts, aliases, approved rules, and review decisions rather than one-off hardcoded parser fixes. See `assistant_linking/docs/assistant_learning_design.md`.
+
 ## Main Surfaces
 
 ### Public / viewer-facing

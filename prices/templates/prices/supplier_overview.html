@@ -19,19 +19,20 @@
                 <h1 class="page-title">Import Prices</h1>
                 <div class="page-meta">Operational workspace for supplier sync, historical backfill, and rate repair.</div>
             </div>
-            {% if user.is_staff %}
             <div>
+                {% if user.is_staff %}
                 <a class="button secondary" href="{% url 'prices:import_settings' %}">Import settings</a>
                 <form action="{% url 'prices:supplier_reimport_all_prices' %}" method="post" class="layout-inline">
                     {% csrf_token %}
                     <button class="button secondary" type="submit" data-confirm="Reimport all prices for all suppliers?">Reimport all prices</button>
                 </form>
+                {% endif %}
                 <form action="{% url 'prices:supplier_import_email_all' %}" method="post" class="layout-inline" data-email-update-all-form>
                     {% csrf_token %}
+                    <input type="hidden" name="next" value="{{ request.get_full_path }}">
                     <button class="button" type="submit" data-email-update-all{% if any_running %} disabled{% endif %}>Scan mailboxes now</button>
                 </form>
             </div>
-            {% endif %}
         </div>
         <div class="email-update-banner{% if any_running %} is-visible{% endif %}" data-email-update-banner>
             Email scan is running. This board will refresh automatically.
@@ -128,9 +129,7 @@
                                 <th>Latest email check</th>
                                 <th>Health</th>
                                 <th>Problem</th>
-                                {% if user.is_staff %}
                                 <th>Actions</th>
-                                {% endif %}
                             </tr>
                         </thead>
                         <tbody>
@@ -187,12 +186,12 @@
                                             <span class="import-problem-link" data-problem-note title="{{ row.problem_note }}">{{ row.problem_note }}</span>
                                         {% endif %}
                                     </td>
-                                    {% if user.is_staff %}
                                     <td class="actions import-col-actions" data-label="Actions">
                                         <div class="import-actions-row">
                                             {% if row.has_quick_upload %}
                                                 <form action="{% url 'prices:supplier_quick_upload' row.supplier.pk %}" method="post" enctype="multipart/form-data" class="import-action-form" data-quick-upload-form>
                                                     {% csrf_token %}
+                                                    <input type="hidden" name="next" value="{{ request.get_full_path }}">
                                                     <input type="file" name="file" accept=".csv,.xls,.xlsx" class="import-quick-upload-input" data-quick-upload-input hidden>
                                                     <button class="button secondary icon import-action-button" type="button" data-quick-upload-trigger title="Quick upload" aria-label="Quick upload">
                                                         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -202,7 +201,7 @@
                                                         </svg>
                                                     </button>
                                                 </form>
-                                            {% else %}
+                                            {% elif user.is_staff %}
                                                 <a class="button secondary icon import-action-button" href="{% url 'prices:supplier_import' row.supplier.pk %}#manual-upload" title="Set mapping and upload" aria-label="Set mapping and upload">
                                                     <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                                                         <path d="M12 3v12"/>
@@ -210,9 +209,18 @@
                                                         <path d="M5 21h14"/>
                                                     </svg>
                                                 </a>
+                                            {% else %}
+                                                <button class="button secondary icon import-action-button" type="button" disabled title="Price mapping is not configured" aria-label="Price mapping is not configured">
+                                                    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                                        <path d="M12 3v12"/>
+                                                        <path d="m7 10 5 5 5-5"/>
+                                                        <path d="M5 21h14"/>
+                                                    </svg>
+                                                </button>
                                             {% endif %}
                                             <form action="{% url 'prices:supplier_import_email' row.supplier.pk %}" method="post" class="import-action-form" data-email-update-form>
                                                 {% csrf_token %}
+                                                <input type="hidden" name="next" value="{{ request.get_full_path }}">
                                                 <button class="button icon import-action-button" type="submit" data-email-update{% if row.is_running or not row.has_email_route %} disabled{% endif %} title="Update from email" aria-label="Update from email">
                                                     <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                                                         <path d="M21 12a9 9 0 1 1-2.64-6.36"/>
@@ -220,6 +228,7 @@
                                                     </svg>
                                                 </button>
                                             </form>
+                                            {% if user.is_staff %}
                                             <a class="button secondary icon import-action-button" href="{% url 'prices:supplier_import' row.supplier.pk %}#mapping-preview" title="Edit mapping" aria-label="Edit mapping">
                                                 <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                                                     <path d="M12 20h9"/>
@@ -241,13 +250,13 @@
                                                     </svg>
                                                 </button>
                                             </form>
+                                            {% endif %}
                                         </div>
                                     </td>
-                                    {% endif %}
                                 </tr>
                             {% empty %}
                                 <tr>
-                                    <td colspan="{% if user.is_staff %}6{% else %}5{% endif %}" class="empty-state">
+                                    <td colspan="6" class="empty-state">
                                         No suppliers yet.{% if user.is_staff %} <a href="{% url 'prices:supplier_create' %}">Add a supplier</a>{% endif %}
                                     </td>
                                 </tr>

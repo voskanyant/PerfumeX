@@ -1,3 +1,5 @@
+import re
+
 from django.utils import timezone
 from django.shortcuts import redirect
 from django.http import HttpResponseForbidden
@@ -24,6 +26,11 @@ class AdminPanelStaffOnlyMiddleware:
         "/admin/suppliers/overview",
         "/admin/suppliers/import-email/status",
     }
+    user_import_post_patterns = (
+        re.compile(r"^/admin/suppliers/import-email$"),
+        re.compile(r"^/admin/suppliers/\d+/import-email$"),
+        re.compile(r"^/admin/suppliers/\d+/quick-upload$"),
+    )
 
     def __init__(self, get_response):
         self.get_response = get_response
@@ -35,6 +42,11 @@ class AdminPanelStaffOnlyMiddleware:
                 return redirect(f"/login/?next={request.path}")
             if not user.is_staff:
                 normalized_path = request.path.rstrip("/")
+                if request.method == "POST" and any(
+                    pattern.match(normalized_path)
+                    for pattern in self.user_import_post_patterns
+                ):
+                    return self.get_response(request)
                 if (
                     request.method in {"GET", "HEAD", "OPTIONS", "TRACE"}
                     and normalized_path in self.readonly_user_paths
