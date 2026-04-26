@@ -23,6 +23,7 @@ from prices import views as price_views
 
 urlpatterns = [
     path("", price_views.ViewerProductListView.as_view(), name="viewer_home"),
+    path("import-prices/", price_views.SupplierOverviewView.as_view(), name="viewer_import_prices"),
     path("products/search/", price_views.ViewerProductSearchView.as_view(), name="viewer_product_search"),
     path("products/<int:pk>/", price_views.ViewerProductDetailView.as_view(), name="viewer_product_detail"),
     path("account/profile/", price_views.UserProfileUpdateView.as_view(), name="user_profile"),

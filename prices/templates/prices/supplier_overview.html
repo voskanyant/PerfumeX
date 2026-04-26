@@ -19,6 +19,7 @@
                 <h1 class="page-title">Import Prices</h1>
                 <div class="page-meta">Operational workspace for supplier sync, historical backfill, and rate repair.</div>
             </div>
+            {% if user.is_staff %}
             <div>
                 <a class="button secondary" href="{% url 'prices:import_settings' %}">Import settings</a>
                 <form action="{% url 'prices:supplier_reimport_all_prices' %}" method="post" class="layout-inline">
@@ -30,6 +31,7 @@
                     <button class="button" type="submit" data-email-update-all{% if any_running %} disabled{% endif %}>Scan mailboxes now</button>
                 </form>
             </div>
+            {% endif %}
         </div>
         <div class="email-update-banner{% if any_running %} is-visible{% endif %}" data-email-update-banner>
             Email scan is running. This board will refresh automatically.
@@ -82,54 +84,6 @@
             </div>
         </div>
 
-        <div class="import-control-grid">
-            <div class="import-control-panel">
-                <span class="card-label">History</span>
-                <h2 class="card-title">Bulk backfill</h2>
-                <p class="card-desc">Run history import for selected suppliers.</p>
-                <form id="bulk-backfill-form" method="post" action="{% url 'prices:supplier_import_email_backfill_bulk' %}">
-                    {% csrf_token %}
-                    <div class="layout-grid-12 gap-md items-end">
-                        <div class="span-12 md-span-4">
-                            <label for="bulk-backfill-start" class="form-label">Start date</label>
-                            <input id="bulk-backfill-start" name="start_date" type="date" required>
-                        </div>
-                        <div class="span-12 md-span-4">
-                            <label for="bulk-backfill-end" class="form-label">End date</label>
-                            <input id="bulk-backfill-end" name="end_date" type="date">
-                        </div>
-                        <div class="span-12 md-span-4">
-                            <button class="button is-full-width" type="submit">Run backfill</button>
-                        </div>
-                    </div>
-                    <div id="bulk-backfill-selected"></div>
-                </form>
-            </div>
-
-            <div class="import-control-panel">
-                <span class="card-label">Repair</span>
-                <h2 class="card-title">Recalculate rates</h2>
-                <p class="card-desc">Fill USD/RUB CBR rates for dates that exist in processed imports.</p>
-                <form id="bulk-rates-form" method="post" action="{% url 'prices:supplier_rates_recalculate' %}">
-                    {% csrf_token %}
-                    <div class="layout-grid-12 gap-md items-end">
-                        <div class="span-12 md-span-4">
-                            <label for="bulk-rates-start" class="form-label">Start date</label>
-                            <input id="bulk-rates-start" name="start_date" type="date">
-                        </div>
-                        <div class="span-12 md-span-4">
-                            <label for="bulk-rates-end" class="form-label">End date</label>
-                            <input id="bulk-rates-end" name="end_date" type="date">
-                        </div>
-                        <div class="span-12 md-span-4">
-                            <button class="button secondary is-full-width" type="submit">Recalculate</button>
-                        </div>
-                    </div>
-                    <div id="bulk-rates-selected"></div>
-                </form>
-            </div>
-        </div>
-
         <div class="import-board">
             <div class="page-header space-bottom-none">
                 <div>
@@ -169,19 +123,19 @@
                     <table class="data-table space-bottom-none table-mobile supplier-import-table">
                         <thead>
                             <tr>
-                                <th><input type="checkbox" id="supplier-select-all"></th>
                                 <th>Supplier</th>
                                 <th>Last success</th>
                                 <th>Latest email check</th>
                                 <th>Health</th>
                                 <th>Problem</th>
+                                {% if user.is_staff %}
                                 <th>Actions</th>
+                                {% endif %}
                             </tr>
                         </thead>
                         <tbody>
                             {% for row in rows %}
                                 <tr data-supplier-id="{{ row.supplier.pk }}" data-email-running="{% if row.is_running %}1{% else %}0{% endif %}">
-                                    <td class="import-col-select" data-label="Select"><input type="checkbox" class="supplier-select" value="{{ row.supplier.pk }}"></td>
                                     <td class="import-col-supplier" data-label="Supplier">
                                         <div class="import-supplier-stack">
                                             <div class="import-supplier-name">{{ row.supplier.name }}</div>
@@ -227,8 +181,13 @@
                                         </div>
                                     </td>
                                     <td class="import-col-problem" data-label="Problem">
-                                        <a class="import-problem-link" href="{{ row.latest_log_url }}" data-problem-note title="{{ row.problem_note }}">{{ row.problem_note }}</a>
+                                        {% if user.is_staff %}
+                                            <a class="import-problem-link" href="{{ row.latest_log_url }}" data-problem-note title="{{ row.problem_note }}">{{ row.problem_note }}</a>
+                                        {% else %}
+                                            <span class="import-problem-link" data-problem-note title="{{ row.problem_note }}">{{ row.problem_note }}</span>
+                                        {% endif %}
                                     </td>
+                                    {% if user.is_staff %}
                                     <td class="actions import-col-actions" data-label="Actions">
                                         <div class="import-actions-row">
                                             {% if row.has_quick_upload %}
@@ -284,11 +243,12 @@
                                             </form>
                                         </div>
                                     </td>
+                                    {% endif %}
                                 </tr>
                             {% empty %}
                                 <tr>
-                                    <td colspan="8" class="empty-state">
-                                        No suppliers yet. <a href="{% url 'prices:supplier_create' %}">Add a supplier</a>
+                                    <td colspan="{% if user.is_staff %}6{% else %}5{% endif %}" class="empty-state">
+                                        No suppliers yet.{% if user.is_staff %} <a href="{% url 'prices:supplier_create' %}">Add a supplier</a>{% endif %}
                                     </td>
                                 </tr>
                             {% endfor %}
@@ -296,7 +256,7 @@
                     </table>
                 </div>
             {% else %}
-                <div class="products-empty-state">No suppliers yet. <a href="{% url 'prices:supplier_create' %}">Add a supplier</a></div>
+                <div class="products-empty-state">No suppliers yet.{% if user.is_staff %} <a href="{% url 'prices:supplier_create' %}">Add a supplier</a>{% endif %}</div>
             {% endif %}
         </div>
     </div>

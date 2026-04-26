@@ -534,6 +534,34 @@ class BulkMutationPermissionTests(TestCase):
         self.assertIn("rows", ok_response.json())
 
 
+class AdminPanelReadOnlyAccessTests(TestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create_user(
+            username="readonly-user",
+            password="password",
+            is_staff=False,
+        )
+        self.client.force_login(self.user)
+
+    def test_non_staff_user_can_view_import_prices_board(self):
+        response = self.client.get(reverse("prices:supplier_overview"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Supplier import board")
+
+    def test_non_staff_user_can_poll_import_prices_board_status(self):
+        response = self.client.get(reverse("prices:supplier_import_email_status_all"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "application/json")
+
+    def test_non_staff_user_cannot_view_other_admin_pages(self):
+        response = self.client.get(reverse("prices:import_settings"))
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response["Location"], "/")
+
+
 class BackgroundRunSafetyTests(TransactionTestCase):
     def setUp(self):
         self.user = get_user_model().objects.create_user(

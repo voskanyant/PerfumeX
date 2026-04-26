@@ -1,4 +1,6 @@
 <a class="tab {% if import_section == 'overview' %}active{% endif %}" href="{{ overview_url }}">Suppliers</a>
-<a class="tab {% if import_section == 'detailed_logs' %}active{% endif %}" href="{{ detailed_logs_url }}">Detailed logs</a>
-<a class="tab {% if import_section == 'stuck_runs' %}active{% endif %}" href="{% url 'prices:stuck_email_import_runs' %}">Stuck runs</a>
-<a class="tab {% if import_section == 'settings' %}active{% endif %}" href="{{ import_settings_url|default:'' }}{% if not import_settings_url %}{% url 'prices:import_settings' %}{% endif %}">Import settings</a>
+{% if user.is_staff %}
+    <a class="tab {% if import_section == 'detailed_logs' %}active{% endif %}" href="{{ detailed_logs_url }}">Detailed logs</a>
+    <a class="tab {% if import_section == 'stuck_runs' %}active{% endif %}" href="{% url 'prices:stuck_email_import_runs' %}">Stuck runs</a>
+    <a class="tab {% if import_section == 'settings' %}active{% endif %}" href="{{ import_settings_url|default:'' }}{% if not import_settings_url %}{% url 'prices:import_settings' %}{% endif %}">Import settings</a>
+{% endif %}

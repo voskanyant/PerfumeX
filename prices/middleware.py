@@ -20,6 +20,11 @@ class ForceMoscowTimezoneMiddleware:
 class AdminPanelStaffOnlyMiddleware:
     """Allow only staff users to open the custom admin panel under /admin/."""
 
+    readonly_user_paths = {
+        "/admin/suppliers/overview",
+        "/admin/suppliers/import-email/status",
+    }
+
     def __init__(self, get_response):
         self.get_response = get_response
 
@@ -29,6 +34,12 @@ class AdminPanelStaffOnlyMiddleware:
             if not user or not user.is_authenticated:
                 return redirect(f"/login/?next={request.path}")
             if not user.is_staff:
+                normalized_path = request.path.rstrip("/")
+                if (
+                    request.method in {"GET", "HEAD", "OPTIONS", "TRACE"}
+                    and normalized_path in self.readonly_user_paths
+                ):
+                    return self.get_response(request)
                 if request.method not in {"GET", "HEAD", "OPTIONS", "TRACE"}:
                     return HttpResponseForbidden("Staff access required.")
                 return redirect("/")

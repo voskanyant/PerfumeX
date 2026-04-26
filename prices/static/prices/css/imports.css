@@ -32,6 +32,11 @@
   background: var(--white);
 }
 
+.import-control-panel select {
+  width: 100%;
+  max-width: 100%;
+}
+
 .import-scan-panel {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(260px, 360px);

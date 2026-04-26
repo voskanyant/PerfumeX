@@ -1920,7 +1920,11 @@ class SupplierOverviewView(LoginRequiredMixin, TemplateView):
         ]
         context["import_section"] = "overview"
         context["detailed_logs_url"] = reverse_lazy("prices:import_detailed_logs")
-        context["overview_url"] = reverse_lazy("prices:supplier_overview")
+        context["overview_url"] = (
+            reverse_lazy("prices:supplier_overview")
+            if self.request.user.is_staff
+            else reverse_lazy("viewer_import_prices")
+        )
         context["current_query"] = self.request.GET.urlencode()
         return context
 
@@ -2145,6 +2149,9 @@ class ImportSettingsView(LoginRequiredMixin, TemplateView):
         context["form"] = forms.ImportSettingsForm(instance=settings_obj)
         context["settings_obj"] = settings_obj
         context["mailboxes"] = models.Mailbox.objects.order_by("name")
+        context["suppliers"] = models.Supplier.objects.filter(is_active=True).order_by(
+            "name"
+        )
         if settings_obj.last_run_at:
             context["next_run_at"] = settings_obj.last_run_at + timezone.timedelta(
                 minutes=settings_obj.interval_minutes
@@ -2794,24 +2801,29 @@ class SupplierEmailBackfillBulkView(MutatingPermissionRequiredMixin, LoginRequir
     permission_required = "prices.add_emailimportrun"
 
     def post(self, request):
+        redirect_name = (
+            "prices:import_settings"
+            if request.POST.get("next") == "import_settings"
+            else "prices:supplier_overview"
+        )
         if _has_running_email_imports():
             messages.info(request, EMAIL_IMPORT_BUSY_MESSAGE)
-            return redirect("prices:supplier_overview")
+            return redirect(redirect_name)
         supplier_ids = request.POST.getlist("supplier_ids")
         start_raw = request.POST.get("start_date", "").strip()
         end_raw = request.POST.get("end_date", "").strip()
         if not supplier_ids:
             messages.info(request, "Select at least one supplier for backfill.")
-            return redirect("prices:supplier_overview")
+            return redirect(redirect_name)
         if not start_raw:
             messages.info(request, "Start date is required for bulk backfill.")
-            return redirect("prices:supplier_overview")
+            return redirect(redirect_name)
 
         try:
             start_date = datetime.fromisoformat(start_raw).date()
         except ValueError:
             messages.info(request, "Start date is invalid.")
-            return redirect("prices:supplier_overview")
+            return redirect(redirect_name)
 
         end_date = None
         if end_raw:
@@ -2819,14 +2831,14 @@ class SupplierEmailBackfillBulkView(MutatingPermissionRequiredMixin, LoginRequir
                 end_date = datetime.fromisoformat(end_raw).date()
             except ValueError:
                 messages.info(request, "End date is invalid.")
-                return redirect("prices:supplier_overview")
+                return redirect(redirect_name)
 
         suppliers = list(
             models.Supplier.objects.filter(id__in=supplier_ids, is_active=True)
         )
         if not suppliers:
             messages.info(request, "No valid suppliers selected.")
-            return redirect("prices:supplier_overview")
+            return redirect(redirect_name)
         run_ids = []
         for supplier in suppliers:
             if not supplier.from_address_pattern:
@@ -2839,7 +2851,7 @@ class SupplierEmailBackfillBulkView(MutatingPermissionRequiredMixin, LoginRequir
             run_ids.append(run.id)
         if not run_ids:
             messages.info(request, "No selected suppliers have sender email configured.")
-            return redirect("prices:supplier_overview")
+            return redirect(redirect_name)
         command_args = ["process_email_runs"]
         for run_id in run_ids:
             command_args.extend(["--run-id", str(run_id)])
@@ -2856,13 +2868,18 @@ class SupplierEmailBackfillBulkView(MutatingPermissionRequiredMixin, LoginRequir
                 last_message=f"Failed to start bulk backfill: {exc}",
             )
             messages.error(request, f"Failed to start bulk backfill: {exc}")
-        return redirect("prices:supplier_overview")
+        return redirect(redirect_name)
 
 
 class SupplierRatesRecalculateView(MutatingPermissionRequiredMixin, LoginRequiredMixin, View):
     permission_required = "prices.change_exchangerate"
 
     def post(self, request):
+        redirect_name = (
+            "prices:import_settings"
+            if request.POST.get("next") == "import_settings"
+            else "prices:supplier_overview"
+        )
         supplier_ids = request.POST.getlist("supplier_ids")
         start_raw = request.POST.get("start_date", "").strip()
         end_raw = request.POST.get("end_date", "").strip()
@@ -2873,7 +2890,7 @@ class SupplierRatesRecalculateView(MutatingPermissionRequiredMixin, LoginRequire
                 start_date = datetime.fromisoformat(start_raw).date()
             except ValueError:
                 messages.info(request, "Start date is invalid.")
-                return redirect("prices:supplier_overview")
+                return redirect(redirect_name)
 
         end_date = None
         if end_raw:
@@ -2881,11 +2898,11 @@ class SupplierRatesRecalculateView(MutatingPermissionRequiredMixin, LoginRequire
                 end_date = datetime.fromisoformat(end_raw).date()
             except ValueError:
                 messages.info(request, "End date is invalid.")
-                return redirect("prices:supplier_overview")
+                return redirect(redirect_name)
 
         if start_date and end_date and end_date < start_date:
             messages.info(request, "End date must be on or after start date.")
-            return redirect("prices:supplier_overview")
+            return redirect(redirect_name)
 
         batches = models.ImportBatch.objects.filter(
             importfile__file_kind=models.FileKind.PRICE,
@@ -2911,7 +2928,7 @@ class SupplierRatesRecalculateView(MutatingPermissionRequiredMixin, LoginRequire
 
         if not import_dates:
             messages.info(request, "No import dates found for selected filters.")
-            return redirect("prices:supplier_overview")
+            return redirect(redirect_name)
 
         settings_obj = models.ImportSettings.get_solo()
         synced = 0
@@ -2933,7 +2950,7 @@ class SupplierRatesRecalculateView(MutatingPermissionRequiredMixin, LoginRequire
                 request,
                 f"Rate recalculation finished: {synced} day(s) synced.",
             )
-        return redirect("prices:supplier_overview")
+        return redirect(redirect_name)
 
 
 class SupplierEmailImportAllView(MutatingPermissionRequiredMixin, LoginRequiredMixin, View):

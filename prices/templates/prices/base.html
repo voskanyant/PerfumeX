@@ -35,6 +35,10 @@
                     <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="1.25" y="4.25" width="13.5" height="9.5" rx="1"/><path d="M5 4.25V3a3 3 0 0 1 6 0v1.25"/></svg>
                     <span>Suppliers Products</span>
                 </a>
+                <a href="{% url 'viewer_import_prices' %}" class="sidebar-link {% if request.resolver_match.url_name == 'viewer_import_prices' or request.resolver_match.url_name == 'supplier_overview' %}active{% endif %}">
+                    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M8 2v8"/><path d="m5 7 3 3 3-3"/><path d="M3 13h10"/></svg>
+                    <span>Import Prices</span>
+                </a>
             {% endif %}
         </div>
 
@@ -222,6 +226,10 @@
                 <a href="{% url 'viewer_home' %}" class="sidebar-link {% if request.resolver_match.url_name == 'viewer_home' %}active{% endif %}">
                     <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="1.25" y="4.25" width="13.5" height="9.5" rx="1"/><path d="M5 4.25V3a3 3 0 0 1 6 0v1.25"/></svg>
                     <span>Suppliers Products</span>
+                </a>
+                <a href="{% url 'viewer_import_prices' %}" class="sidebar-link {% if request.resolver_match.url_name == 'viewer_import_prices' or request.resolver_match.url_name == 'supplier_overview' %}active{% endif %}">
+                    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M8 2v8"/><path d="m5 7 3 3 3-3"/><path d="M3 13h10"/></svg>
+                    <span>Import Prices</span>
                 </a>
             {% endif %}
             <div class="sidebar-section-label">Account</div>

@@ -205,6 +205,85 @@
         <div class="settings-section">
             <div class="settings-section-header">
                 <div>
+                    <span class="card-label">Maintenance</span>
+                    <h2 class="card-title">Import tools</h2>
+                    <p class="card-desc">Run targeted history scans and exchange-rate repairs outside the live supplier board.</p>
+                </div>
+            </div>
+            <div class="settings-body settings-body--single">
+                <div class="import-control-grid">
+                    <div class="import-control-panel">
+                        <span class="card-label">History</span>
+                        <h3 class="card-title">Bulk backfill</h3>
+                        <p class="card-desc">Run historical email import for selected suppliers.</p>
+                        <form method="post" action="{% url 'prices:supplier_import_email_backfill_bulk' %}">
+                            {% csrf_token %}
+                            <input type="hidden" name="next" value="import_settings">
+                            <div class="layout-grid-12 gap-md">
+                                <div class="span-12">
+                                    <label for="bulk-backfill-suppliers" class="form-label">Suppliers</label>
+                                    <select id="bulk-backfill-suppliers" name="supplier_ids" multiple size="8">
+                                        {% for supplier in suppliers %}
+                                            <option value="{{ supplier.pk }}">{{ supplier.name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                    <div class="form-text">Select one or more suppliers. Use Ctrl/Cmd or Shift for multiple.</div>
+                                </div>
+                                <div class="span-12 md-span-4">
+                                    <label for="bulk-backfill-start" class="form-label">Start date</label>
+                                    <input id="bulk-backfill-start" name="start_date" type="date" required>
+                                </div>
+                                <div class="span-12 md-span-4">
+                                    <label for="bulk-backfill-end" class="form-label">End date</label>
+                                    <input id="bulk-backfill-end" name="end_date" type="date">
+                                </div>
+                                <div class="span-12 md-span-4">
+                                    <label class="form-label">&nbsp;</label>
+                                    <button class="button is-full-width" type="submit">Run backfill</button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+
+                    <div class="import-control-panel">
+                        <span class="card-label">Repair</span>
+                        <h3 class="card-title">Recalculate rates</h3>
+                        <p class="card-desc">Fill USD/RUB CBR rates for dates that exist in processed imports.</p>
+                        <form method="post" action="{% url 'prices:supplier_rates_recalculate' %}">
+                            {% csrf_token %}
+                            <input type="hidden" name="next" value="import_settings">
+                            <div class="layout-grid-12 gap-md">
+                                <div class="span-12">
+                                    <label for="bulk-rates-suppliers" class="form-label">Suppliers</label>
+                                    <select id="bulk-rates-suppliers" name="supplier_ids" multiple size="8">
+                                        {% for supplier in suppliers %}
+                                            <option value="{{ supplier.pk }}">{{ supplier.name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                    <div class="form-text">Optional. Leave empty to recalculate rates for all processed imports.</div>
+                                </div>
+                                <div class="span-12 md-span-4">
+                                    <label for="bulk-rates-start" class="form-label">Start date</label>
+                                    <input id="bulk-rates-start" name="start_date" type="date">
+                                </div>
+                                <div class="span-12 md-span-4">
+                                    <label for="bulk-rates-end" class="form-label">End date</label>
+                                    <input id="bulk-rates-end" name="end_date" type="date">
+                                </div>
+                                <div class="span-12 md-span-4">
+                                    <label class="form-label">&nbsp;</label>
+                                    <button class="button secondary is-full-width" type="submit">Recalculate</button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="settings-section">
+            <div class="settings-section-header">
+                <div>
                     <span class="card-label">Mailboxes</span>
                     <h2 class="card-title">Mailbox directory</h2>
                 </div>
