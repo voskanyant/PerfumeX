@@ -366,6 +366,35 @@ class TeachParseTests(TestCase):
         self.assertEqual(len(parses), 1)
         self.assertEqual(parses[0].supplier_product_id, matching.id)
 
+    def test_parsed_products_page_refreshes_stale_rows_before_filtering(self):
+        brand = Brand.objects.create(name="Fendi")
+        BrandAlias.objects.create(brand=brand, alias_text="Fendi", normalized_alias="fendi")
+        product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="parsed-stale-fendi",
+            name="FENDI FAN DI FENDI POUR HOMME ASSOLUTO 100ML EDT TESTER",
+        )
+        stale_parse = ParsedSupplierProduct.objects.create(
+            supplier_product=product,
+            raw_name=product.name,
+            normalized_text="fendi fan di fendi",
+            detected_brand_text="",
+            product_name_text="",
+            concentration="",
+            parser_version="deterministic-old",
+        )
+
+        response = self.client.get(reverse("assistant_linking:normalization_parsed"))
+
+        self.assertEqual(response.status_code, 200)
+        parse_product_ids = {item.supplier_product_id for item in response.context["parses"]}
+        self.assertIn(product.id, parse_product_ids)
+        stale_parse.refresh_from_db()
+        self.assertEqual(stale_parse.normalized_brand, brand)
+        self.assertEqual(stale_parse.product_name_text, "fan di fendi pour homme assoluto")
+        self.assertEqual(stale_parse.concentration, "Eau de Toilette")
+        self.assertEqual(stale_parse.size_ml, Decimal("100.00"))
+
     def test_parsed_products_page_shows_tester_in_identity(self):
         brand = Brand.objects.create(name="100 Bon")
         BrandAlias.objects.create(

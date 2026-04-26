@@ -834,6 +834,24 @@ class NormalizerTests(TestCase):
         self.assertEqual(parsed.size_ml, Decimal("2.00"))
         self.assertTrue(parsed.is_sample)
 
+    def test_repeated_brand_can_be_part_of_scent_name(self):
+        brand = Brand.objects.create(name="Fendi")
+        BrandAlias.objects.create(brand=brand, alias_text="Fendi", normalized_alias="fendi")
+        product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="fendi-fan-di-fendi",
+            name="FENDI FAN DI FENDI POUR HOMME ASSOLUTO 100ML EDT TESTER",
+        )
+
+        parsed = parse_supplier_product(product)
+
+        self.assertEqual(parsed.normalized_brand, brand)
+        self.assertEqual(parsed.product_name_text, "fan di fendi pour homme assoluto")
+        self.assertEqual(parsed.concentration, "Eau de Toilette")
+        self.assertEqual(parsed.size_ml, Decimal("100.00"))
+        self.assertEqual(parsed.supplier_gender_hint, "Pour Homme")
+        self.assertTrue(parsed.is_tester)
+
     def test_brand_alias_rejects_bad_regex(self):
         alias = BrandAlias(
             brand=self.brand,

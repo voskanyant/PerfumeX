@@ -27,7 +27,7 @@ from prices.models import SupplierProduct
 
 
 logger = logging.getLogger(__name__)
-PARSER_VERSION = "deterministic-v3"
+PARSER_VERSION = "deterministic-v4"
 REGEX_ALIAS_TIMEOUT_SECONDS = 1.0
 
 DEFAULT_CONCENTRATION_ALIASES = (
@@ -305,6 +305,13 @@ def _strip_known_terms(text: str, terms: list[str]) -> str:
     return re.sub(r"\s+", " ", remaining).strip()
 
 
+def _strip_first_phrase(text: str, phrase: str) -> str:
+    normalized_phrase = normalize_text(phrase)
+    if not normalized_phrase:
+        return text
+    return re.sub(rf"(^|\s){re.escape(normalized_phrase)}($|\s)", " ", text, count=1).strip()
+
+
 def _strip_concentration_aliases(text: str, rows: list[tuple]) -> str:
     remaining = text
     for row in rows:
@@ -497,8 +504,7 @@ def parse_supplier_product(product: SupplierProduct) -> ParseResult:
     if brand:
         result.normalized_brand = brand
         result.detected_brand_text = alias.alias_text if alias else brand.name
-        brand_text = normalize_text(result.detected_brand_text)
-        text = re.sub(rf"(^|\s){re.escape(brand_text)}($|\s)", " ", text).strip()
+        text = _strip_first_phrase(text, result.detected_brand_text)
         if alias and alias.supplier_id:
             result.warnings.append("supplier-specific alias overrode global alias")
 

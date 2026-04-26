@@ -6,7 +6,7 @@ from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.http import Http404, HttpResponse, JsonResponse
 from django.db import transaction
-from django.db.models import Count, Q
+from django.db.models import Count, F, Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse_lazy
 from django.utils import timezone
@@ -63,6 +63,29 @@ def _exclude_garbage_parses(queryset):
 
 def _exclude_set_parses(queryset):
     return queryset.exclude(is_set=True)
+
+
+def _stale_parse_filter():
+    return (
+        Q(parser_version__isnull=True)
+        | ~Q(parser_version=PARSER_VERSION)
+        | Q(last_parsed_at__isnull=True)
+        | Q(supplier_product__updated_at__gt=F("last_parsed_at"))
+    )
+
+
+def _refresh_stale_parses(queryset, *, limit: int = 500) -> int:
+    stale_parses = (
+        queryset.filter(locked_by_human=False)
+        .filter(_stale_parse_filter())
+        .select_related("supplier_product")
+        .order_by("supplier_product_id")[:limit]
+    )
+    refreshed = 0
+    for parsed in stale_parses:
+        save_parse(parsed.supplier_product)
+        refreshed += 1
+    return refreshed
 
 
 def _complete_parse_query():
@@ -506,13 +529,21 @@ class ParsedListView(NormalizationIssueListView):
     issue_title = "Complete parsed products"
 
     def get_queryset(self):
+        base_queryset = models.ParsedSupplierProduct.objects.select_related(
+            "supplier_product",
+            "supplier_product__supplier",
+            "normalized_brand",
+        )
+        base_queryset = _hide_parsed_products(base_queryset, self.request)
+        _refresh_stale_parses(_apply_parsed_search(base_queryset, self.get_search_query()))
+
         queryset = models.ParsedSupplierProduct.objects.select_related(
             "supplier_product",
             "supplier_product__supplier",
             "normalized_brand",
         )
-        queryset = _apply_parsed_search(queryset, self.get_search_query())
         queryset = _hide_parsed_products(queryset, self.request)
+        queryset = _apply_parsed_search(queryset, self.get_search_query())
         queryset = _complete_parses(_exclude_garbage_parses(queryset))
         return queryset.order_by("-updated_at", "supplier_product__supplier__name", "supplier_product__name")
 
