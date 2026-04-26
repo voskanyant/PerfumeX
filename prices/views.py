@@ -57,7 +57,11 @@ from catalog.models import Brand as CatalogBrand, PerfumeVariant as CatalogPerfu
 from . import forms, models
 from django.shortcuts import get_object_or_404, redirect
 
-from .services.importer import delete_import_batch, process_import_file
+from .services.importer import (
+    delete_import_batch,
+    mark_import_batch_products_seen,
+    process_import_file,
+)
 from django.contrib import messages
 
 from .services.importer import preview_mapping_file
@@ -299,15 +303,15 @@ def _build_email_run_status(run) -> dict[str, str | int | None]:
             }
         if not run.processed_files and run.skipped_duplicates:
             return {
-                "label": "no change",
+                "label": "current",
                 "class_name": "is-neutral",
-                "note": f"{run.skipped_duplicates} duplicate file(s) skipped",
+                "note": f"{run.skipped_duplicates} same file(s) already imported",
                 "code": "no-change",
                 "progress": None,
             }
         if not run.processed_files:
             return {
-                "label": "no change",
+                "label": "checked",
                 "class_name": "is-neutral",
                 "note": "Matching files found, but nothing new was imported",
                 "code": "no-change",
@@ -317,7 +321,7 @@ def _build_email_run_status(run) -> dict[str, str | int | None]:
         if run.skipped_duplicates:
             note = f"{note}, {run.skipped_duplicates} duplicate(s) skipped"
         return {
-            "label": "successful",
+            "label": "updated",
             "class_name": "is-success",
             "note": note,
             "code": "successful",
@@ -572,7 +576,7 @@ def _build_latest_check_info(
 
 def _build_supplier_email_fallback_check(supplier, fallback_dt) -> dict[str, str | int | None | bool]:
     if supplier.last_email_processed:
-        label = "imported"
+        label = "updated"
         class_name = "is-success"
         code = "successful"
         note = f"{supplier.last_email_processed} file(s) imported"
@@ -582,10 +586,10 @@ def _build_supplier_email_fallback_check(supplier, fallback_dt) -> dict[str, str
         code = "failed"
         note = f"{supplier.last_email_errors} import issue(s)"
     elif supplier.last_email_matched:
-        label = "no change"
+        label = "current"
         class_name = "is-neutral"
         code = "no-change"
-        note = "Price email found, nothing new"
+        note = "Price email found, no new file"
     else:
         label = "manual: no email"
         class_name = "is-warning"
@@ -625,15 +629,15 @@ def _build_diagnostic_event_check(diagnostic) -> dict[str, str | int | None | bo
     filename = _format_event_filename(diagnostic.filename)
     reason = _attachment_reason_label(diagnostic.reason_code, decision)
     if decision == models.AttachmentDecision.IMPORTED:
-        label = "imported"
+        label = "updated"
         class_name = "is-success"
         code = "successful"
         note = f"{filename}: imported" if filename else "Price file imported"
     elif decision == models.AttachmentDecision.DUPLICATE:
-        label = "no change"
+        label = "current"
         class_name = "is-neutral"
         code = "no-change"
-        note = f"{filename}: duplicate" if filename else "Duplicate price file"
+        note = f"{filename}: same file already imported" if filename else "Same price file already imported"
     elif decision in {
         models.AttachmentDecision.FAILED,
         models.AttachmentDecision.QUARANTINED,
@@ -1005,7 +1009,7 @@ def _summarize_latest_files(supplier, latest_run, latest_diagnostic=None) -> str
         if latest_run.errors:
             return "Import issue"
         if latest_run.skipped_duplicates:
-            return "No change - duplicate price file"
+            return "Current - same price file"
         if latest_run.matched_files:
             return "Price email found, no new file"
         return "No price email found"
@@ -1013,7 +1017,7 @@ def _summarize_latest_files(supplier, latest_run, latest_diagnostic=None) -> str
         if latest_diagnostic.decision == models.AttachmentDecision.IMPORTED:
             return "Imported 1 file"
         if latest_diagnostic.decision == models.AttachmentDecision.DUPLICATE:
-            return "No change - duplicate price file"
+            return "Current - same price file"
         if latest_diagnostic.decision in {
             models.AttachmentDecision.FAILED,
             models.AttachmentDecision.QUARANTINED,
@@ -3421,6 +3425,7 @@ def _process_supplier_price_payload(
     received_at=None,
 ):
     filename = filename or "downloaded_price.xlsx"
+    imported_at = timezone.now()
     content_hash = hashlib.sha256(payload or b"").hexdigest()
     readable, readable_error = _validate_spreadsheet_payload(filename, payload or b"")
     if not readable:
@@ -3432,6 +3437,7 @@ def _process_supplier_price_payload(
         import_batch__supplier=supplier,
     ).first()
     if existing:
+        seen_count = mark_import_batch_products_seen(existing.import_batch, seen_at=imported_at)
         models.EmailAttachmentDiagnostic.objects.create(
             supplier=supplier,
             import_file=existing,
@@ -3446,7 +3452,7 @@ def _process_supplier_price_payload(
             content_hash=content_hash,
             decision=models.AttachmentDecision.DUPLICATE,
             reason_code=models.AttachmentReason.DUPLICATE_HASH,
-            message="Duplicate price source link file.",
+            message=f"Duplicate price source link file. Refreshed {seen_count} product(s).",
         )
         return {
             "status": "duplicate",
@@ -3458,7 +3464,7 @@ def _process_supplier_price_payload(
     import_batch = models.ImportBatch.objects.create(
         supplier=supplier,
         status=models.ImportStatus.PENDING,
-        received_at=received_at or timezone.now(),
+        received_at=imported_at,
         message_id=source_url[:255],
     )
     import_file = models.ImportFile.objects.create(
@@ -3481,7 +3487,7 @@ def _process_supplier_price_payload(
             import_batch=import_batch,
             import_file=import_file,
             message_id=source_url[:255],
-            message_date=received_at or timezone.now(),
+            message_date=received_at or imported_at,
             sender=source_label[:300],
             subject="Price source link",
             filename=filename,
@@ -3524,7 +3530,7 @@ def _process_supplier_price_payload(
             import_batch=import_batch,
             import_file=import_file,
             message_id=source_url[:255],
-            message_date=received_at or timezone.now(),
+            message_date=received_at or imported_at,
             sender=source_label[:300],
             subject="Price source link",
             filename=filename,

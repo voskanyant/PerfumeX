@@ -20,7 +20,7 @@ from django.db.models import F
 
 from prices import models
 from prices.services import link_importer
-from prices.services.importer import process_import_file
+from prices.services.importer import mark_import_batch_products_seen, process_import_file
 
 
 logger = logging.getLogger(__name__)
@@ -1603,12 +1603,24 @@ def run_import(
                                         import_batch__supplier=matched_supplier,
                                     ).exists()
                                     if exists:
+                                        existing_file = models.ImportFile.objects.filter(
+                                            content_hash=content_hash,
+                                            status=models.ImportStatus.PROCESSED,
+                                            import_batch__supplier=matched_supplier,
+                                        ).first()
+                                        seen_count = 0
+                                        if existing_file:
+                                            seen_count = mark_import_batch_products_seen(
+                                                existing_file.import_batch
+                                            )
                                         summary["skipped_duplicates"] += 1
                                         summary["skipped_files"] += 1
                                         stats["duplicates"] = stats.get("duplicates", 0) + 1
                                         source.last_checked_at = timezone.now()
                                         source.last_status = "duplicate"
-                                        source.last_message = "Duplicate price file hash."
+                                        source.last_message = (
+                                            f"Duplicate price file hash. Refreshed {seen_count} product(s)."
+                                        )
                                         source.last_filename = filename
                                         source.save(
                                             update_fields=[
@@ -1621,7 +1633,10 @@ def run_import(
                                         record_diagnostic(
                                             decision=models.AttachmentDecision.DUPLICATE,
                                             reason_code=models.AttachmentReason.DUPLICATE_HASH,
-                                            message="Duplicate price source link file.",
+                                            message=(
+                                                "Duplicate price source link file. "
+                                                f"Refreshed {seen_count} product(s)."
+                                            ),
                                             mailbox=mailbox,
                                             folder=item_folder,
                                             msg_id=msg_id,
@@ -1640,12 +1655,13 @@ def run_import(
                                     batch_message_id = (message_id or "")[:200]
                                     if source_link:
                                         batch_message_id = f"{batch_message_id}|link:{hashlib.sha256(source_link.encode('utf-8')).hexdigest()[:16]}"
+                                    imported_at = timezone.now()
                                     batch = models.ImportBatch.objects.create(
                                         supplier=matched_supplier,
                                         mailbox=mailbox,
                                         message_folder=item_folder,
                                         message_id=batch_message_id[:255],
-                                        received_at=received_at,
+                                        received_at=imported_at,
                                         status=models.ImportStatus.PENDING,
                                     )
                                     mapping = models.SupplierFileMapping.objects.filter(

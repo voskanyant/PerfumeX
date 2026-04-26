@@ -1,4 +1,5 @@
 import io
+import hashlib
 import shutil
 import tempfile
 from datetime import datetime, timedelta
@@ -44,6 +45,7 @@ from prices.views import (
     _build_supplier_board_row,
     _collect_latest_successful_imports,
     _get_cron_status,
+    _process_supplier_price_payload,
     _render_runner_script,
     _summarize_latest_files,
 )
@@ -763,6 +765,136 @@ class SupplierImportBoundaryTests(TestCase):
 
         self.assertEqual(_batch_activity_datetime(latest_batch), now)
 
+    def test_link_payload_uses_download_time_for_product_freshness(self):
+        temp_media = tempfile.mkdtemp()
+        self.addCleanup(lambda: shutil.rmtree(temp_media, ignore_errors=True))
+        settings_obj = models.ImportSettings.get_solo()
+        settings_obj.minimum_price_rows = 1
+        settings_obj.save(update_fields=["minimum_price_rows"])
+
+        now = timezone.now().replace(microsecond=0)
+        old_link_email_time = now - timedelta(days=3)
+        previous_batch_time = now - timedelta(days=1)
+        previous_batch = models.ImportBatch.objects.create(
+            supplier=self.supplier,
+            mailbox=self.mailbox,
+            message_id="<previous@example.com>",
+            received_at=previous_batch_time,
+            status=models.ImportStatus.PROCESSED,
+        )
+        models.ImportFile.objects.create(
+            import_batch=previous_batch,
+            file_kind=models.FileKind.PRICE,
+            filename="previous.csv",
+            content_hash="previous-hash",
+            status=models.ImportStatus.PROCESSED,
+            processed_at=previous_batch_time,
+        )
+        product = models.SupplierProduct.objects.create(
+            supplier=self.supplier,
+            supplier_sku="SKU-1",
+            identity_key="sku-1",
+            name="Static Product",
+            currency=models.Currency.RUB,
+            current_price="10.00",
+            last_imported_at=previous_batch_time,
+            last_import_batch=previous_batch,
+            is_active=True,
+        )
+        mapping = models.SupplierFileMapping.objects.create(
+            supplier=self.supplier,
+            file_kind=models.FileKind.PRICE,
+            header_row=1,
+            column_map={"sku": 1, "name": 2, "price": 3},
+        )
+        payload = b"SKU-1,Static Product,10\n"
+
+        with override_settings(MEDIA_ROOT=temp_media):
+            result = _process_supplier_price_payload(
+                supplier=self.supplier,
+                mapping=mapping,
+                filename="link-price.csv",
+                payload=payload,
+                content_type="text/csv",
+                source_label="Yandex Disk",
+                source_url="https://disk.yandex.ru/d/example",
+                received_at=old_link_email_time,
+            )
+
+        product.refresh_from_db()
+        self.assertEqual(result["status"], "imported")
+        self.assertEqual(product.last_import_batch_id, result["batch"].id)
+        self.assertGreater(product.last_imported_at, previous_batch_time)
+        self.assertGreater(result["batch"].received_at, previous_batch_time)
+
+    def test_duplicate_link_payload_refreshes_seen_products(self):
+        temp_media = tempfile.mkdtemp()
+        self.addCleanup(lambda: shutil.rmtree(temp_media, ignore_errors=True))
+        settings_obj = models.ImportSettings.get_solo()
+        settings_obj.minimum_price_rows = 1
+        settings_obj.save(update_fields=["minimum_price_rows"])
+
+        now = timezone.now().replace(microsecond=0)
+        old_seen_at = now - timedelta(days=3)
+        payload = b"SKU-1,Static Product,10\n"
+        content_hash = hashlib.sha256(payload).hexdigest()
+        previous_batch = models.ImportBatch.objects.create(
+            supplier=self.supplier,
+            mailbox=self.mailbox,
+            message_id="<previous-link@example.com>",
+            received_at=old_seen_at,
+            status=models.ImportStatus.PROCESSED,
+        )
+        product = models.SupplierProduct.objects.create(
+            supplier=self.supplier,
+            supplier_sku="SKU-1",
+            identity_key="sku-1",
+            name="Static Product",
+            currency=models.Currency.RUB,
+            current_price="10.00",
+            last_imported_at=old_seen_at,
+            last_import_batch=previous_batch,
+            is_active=True,
+        )
+        models.ImportFile.objects.create(
+            import_batch=previous_batch,
+            file_kind=models.FileKind.PRICE,
+            filename="previous-link.csv",
+            content_hash=content_hash,
+            status=models.ImportStatus.PROCESSED,
+            processed_at=old_seen_at,
+        )
+        models.PriceSnapshot.objects.create(
+            supplier_product=product,
+            import_batch=previous_batch,
+            price="10.00",
+            currency=models.Currency.RUB,
+            recorded_at=old_seen_at,
+        )
+        mapping = models.SupplierFileMapping.objects.create(
+            supplier=self.supplier,
+            file_kind=models.FileKind.PRICE,
+            header_row=1,
+            column_map={"sku": 1, "name": 2, "price": 3},
+        )
+
+        with override_settings(MEDIA_ROOT=temp_media):
+            result = _process_supplier_price_payload(
+                supplier=self.supplier,
+                mapping=mapping,
+                filename="link-price.csv",
+                payload=payload,
+                content_type="text/csv",
+                source_label="Yandex Disk",
+                source_url="https://disk.yandex.ru/d/example",
+                received_at=old_seen_at,
+            )
+
+        product.refresh_from_db()
+        self.assertEqual(result["status"], "duplicate")
+        self.assertEqual(product.last_import_batch_id, previous_batch.id)
+        self.assertGreater(product.last_imported_at, old_seen_at)
+
     def test_supplier_board_prefers_newer_autorun_check_over_canceled_run(self):
         now = timezone.now().replace(microsecond=0)
         self.supplier.last_email_check_at = now
@@ -795,7 +927,7 @@ class SupplierImportBoundaryTests(TestCase):
         )
 
         self.assertEqual(row["check_code"], "no-change")
-        self.assertEqual(row["check_label"], "no change")
+        self.assertEqual(row["check_label"], "current")
 
     def test_supplier_board_keeps_canceled_run_when_newer_than_autorun_check(self):
         now = timezone.now().replace(microsecond=0)
@@ -1174,7 +1306,7 @@ class SupplierImportBoundaryTests(TestCase):
 
         summary = _summarize_latest_files(self.supplier, run)
 
-        self.assertEqual(summary, "No change - duplicate price file")
+        self.assertEqual(summary, "Current - same price file")
         self.assertNotIn("1597", summary)
 
     def test_running_email_status_shows_live_activity(self):

@@ -849,6 +849,26 @@ def process_import_file(import_file: models.ImportFile) -> None:
     import_file.save(update_fields=["status", "processed_at"])
 
 
+def mark_import_batch_products_seen(
+    import_batch: models.ImportBatch,
+    *,
+    seen_at=None,
+) -> int:
+    seen_at = seen_at or timezone.now()
+    product_ids = list(
+        models.PriceSnapshot.objects.filter(import_batch=import_batch)
+        .values_list("supplier_product_id", flat=True)
+        .distinct()
+    )
+    if not product_ids:
+        return 0
+    return models.SupplierProduct.objects.filter(id__in=product_ids).update(
+        last_imported_at=seen_at,
+        last_import_batch=import_batch,
+        is_active=True,
+    )
+
+
 def delete_import_batch(import_batch: models.ImportBatch) -> None:
     products = models.SupplierProduct.objects.filter(
         created_import_batch=import_batch
