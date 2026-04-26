@@ -29,6 +29,7 @@ from prices.models import SupplierProduct
 logger = logging.getLogger(__name__)
 PARSER_VERSION = "deterministic-v8"
 REGEX_ALIAS_TIMEOUT_SECONDS = 1.0
+NORMALIZATION_DASHBOARD_STATS_VERSION_KEY = "assistant_linking:normalization_dashboard_stats_version"
 
 DEFAULT_CONCENTRATION_ALIASES = (
     ("extrait de parfum", "Extrait de Parfum"),
@@ -659,4 +660,8 @@ def save_parse(product: SupplierProduct, *, force: bool = False) -> ParsedSuppli
             "last_parsed_at": timezone.now(),
         },
     )
+    try:
+        cache.incr(NORMALIZATION_DASHBOARD_STATS_VERSION_KEY)
+    except ValueError:
+        cache.set(NORMALIZATION_DASHBOARD_STATS_VERSION_KEY, 1, None)
     return obj

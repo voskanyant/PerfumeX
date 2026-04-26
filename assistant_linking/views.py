@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import hashlib
+
 from datetime import timedelta
 
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
+from django.core.cache import cache
 from django.http import Http404, HttpResponse, JsonResponse
 from django.db import transaction
 from django.db.models import Count, F, Q
@@ -17,7 +20,11 @@ from assistant_linking.services.catalog_matcher import candidate_matches, rule_i
 from assistant_linking.services.garbage import GARBAGE_MODIFIER, normalize_garbage_keyword
 from assistant_linking.services.grouping import rebuild_groups
 from assistant_linking.services.mock_suggester import generate_link_suggestions
-from assistant_linking.services.normalizer import PARSER_VERSION, save_parse
+from assistant_linking.services.normalizer import (
+    NORMALIZATION_DASHBOARD_STATS_VERSION_KEY,
+    PARSER_VERSION,
+    save_parse,
+)
 from assistant_linking.services.smart_search import normalize_query
 from catalog.models import Brand, Perfume, PerfumeVariant, compact_decimal_text
 from prices.models import SupplierProduct
@@ -35,6 +42,7 @@ PARSED_PRODUCT_HIDDEN_FIELDS = (
     "supplier_product__brand",
     "supplier_product__supplier_sku",
 )
+NORMALIZATION_DASHBOARD_CACHE_SECONDS = 300
 
 
 def _hidden_product_keywords(request) -> list[str]:
@@ -100,6 +108,65 @@ def _complete_parse_query():
 
 def _complete_parses(queryset):
     return queryset.filter(_complete_parse_query())
+
+
+def _dashboard_stats_cache_version() -> int:
+    version = cache.get(NORMALIZATION_DASHBOARD_STATS_VERSION_KEY)
+    if version is None:
+        cache.set(NORMALIZATION_DASHBOARD_STATS_VERSION_KEY, 1, None)
+        return 1
+    return int(version)
+
+
+def _dashboard_stats_cache_key(hidden_keywords: list[str]) -> str:
+    hidden_digest = hashlib.sha256("\n".join(sorted(hidden_keywords)).encode("utf-8")).hexdigest()[:16]
+    version = _dashboard_stats_cache_version()
+    return f"assistant_linking:normalization_dashboard:{PARSER_VERSION}:{version}:{hidden_digest}"
+
+
+def _normalization_dashboard_stats(request, hidden_keywords: list[str]) -> dict[str, object]:
+    cache_key = _dashboard_stats_cache_key(hidden_keywords)
+    if request.GET.get("refresh") == "1":
+        cache.delete(cache_key)
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return {**cached, "stats_cached": True}
+
+    parsed_queryset = _hide_parsed_products(
+        models.ParsedSupplierProduct.objects.all(),
+        request,
+    )
+    non_garbage_queryset = _exclude_garbage_parses(parsed_queryset)
+    normal_product_queryset = _exclude_set_parses(non_garbage_queryset)
+    unparsed_queryset = _hide_supplier_products(
+        SupplierProduct.objects.all(),
+        request,
+    )
+
+    counts = normal_product_queryset.aggregate(
+        parsed_count=Count("id", filter=_complete_parse_query()),
+        low_confidence_count=Count("id", filter=Q(confidence__lt=75)),
+        missing_brand_count=Count("id", filter=Q(normalized_brand__isnull=True)),
+        missing_name_count=Count("id", filter=Q(product_name_text="")),
+        missing_concentration_count=Count("id", filter=Q(concentration="")),
+        missing_size_count=Count("id", filter=Q(size_ml__isnull=True)),
+        modifier_count=Count("id", filter=~Q(modifiers=[])),
+        tester_sample_count=Count(
+            "id",
+            filter=Q(is_tester=True) | Q(is_sample=True) | Q(is_travel=True),
+        ),
+    )
+    counts["garbage_count"] = parsed_queryset.filter(modifiers__contains=[GARBAGE_MODIFIER]).count()
+    counts["set_count"] = non_garbage_queryset.filter(is_set=True).count()
+    counts["unparsed_count"] = unparsed_queryset.filter(assistant_parse__isnull=True).count()
+    counts["recent_ids"] = list(
+        _complete_parses(normal_product_queryset)
+        .order_by("-updated_at")
+        .values_list("id", flat=True)[:20]
+    )
+    counts["stats_cached"] = False
+    cache.set(cache_key, counts, NORMALIZATION_DASHBOARD_CACHE_SECONDS)
+    return counts
 
 
 def _apply_parsed_search(queryset, query):
@@ -275,34 +342,17 @@ class NormalizationDashboardView(StaffAssistantMixin, TemplateView):
 
     def get_context_data(self, **kwargs):
         hidden_keywords = _hidden_product_keywords(self.request)
-        parsed_queryset = _hide_parsed_products(
-            models.ParsedSupplierProduct.objects.all(),
-            self.request,
-        )
-        non_garbage_queryset = _exclude_garbage_parses(parsed_queryset)
-        normal_product_queryset = _exclude_set_parses(non_garbage_queryset)
-        unparsed_queryset = _hide_supplier_products(
-            SupplierProduct.objects.all(),
-            self.request,
+        stats = _normalization_dashboard_stats(self.request, hidden_keywords)
+        recent_ids = stats.get("recent_ids") or []
+        recent = (
+            models.ParsedSupplierProduct.objects.select_related("supplier_product", "normalized_brand")
+            .filter(id__in=recent_ids)
+            .order_by("-updated_at")[:20]
         )
         return {
             **super().get_context_data(**kwargs),
-            "parsed_count": _complete_parses(normal_product_queryset).count(),
-            "unparsed_count": unparsed_queryset.filter(assistant_parse__isnull=True).count(),
-            "low_confidence_count": normal_product_queryset.filter(confidence__lt=75).count(),
-            "missing_brand_count": normal_product_queryset.filter(normalized_brand__isnull=True).count(),
-            "missing_name_count": normal_product_queryset.filter(product_name_text="").count(),
-            "missing_concentration_count": normal_product_queryset.filter(concentration="").count(),
-            "missing_size_count": normal_product_queryset.filter(size_ml__isnull=True).count(),
-            "modifier_count": normal_product_queryset.exclude(modifiers=[]).count(),
-            "garbage_count": parsed_queryset.filter(modifiers__contains=[GARBAGE_MODIFIER]).count(),
-            "tester_sample_count": normal_product_queryset.filter(
-                Q(is_tester=True) | Q(is_sample=True) | Q(is_travel=True)
-            ).count(),
-            "set_count": non_garbage_queryset.filter(is_set=True).count(),
-            "recent": _complete_parses(normal_product_queryset)
-            .select_related("supplier_product", "normalized_brand")
-            .order_by("-updated_at")[:20],
+            **{key: value for key, value in stats.items() if key != "recent_ids"},
+            "recent": recent,
             "hidden_keywords_active": bool(hidden_keywords),
         }
 

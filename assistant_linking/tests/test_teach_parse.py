@@ -395,6 +395,32 @@ class TeachParseTests(TestCase):
         self.assertEqual(stale_parse.concentration, "Eau de Toilette")
         self.assertEqual(stale_parse.size_ml, Decimal("100.00"))
 
+    def test_normalization_dashboard_reuses_cached_counts(self):
+        brand = Brand.objects.create(name="Cache Brand")
+        product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="dashboard-cache",
+            name="Cache Brand Scent edp 50ml",
+        )
+        ParsedSupplierProduct.objects.create(
+            supplier_product=product,
+            raw_name=product.name,
+            normalized_text="cache brand scent",
+            normalized_brand=brand,
+            product_name_text="scent",
+            concentration="Eau de Parfum",
+            size_ml=Decimal("50.00"),
+            confidence=95,
+        )
+
+        first = self.client.get(reverse("assistant_linking:normalization_dashboard"))
+        second = self.client.get(reverse("assistant_linking:normalization_dashboard"))
+
+        self.assertEqual(first.status_code, 200)
+        self.assertFalse(first.context["stats_cached"])
+        self.assertEqual(second.status_code, 200)
+        self.assertTrue(second.context["stats_cached"])
+
     def test_parsed_products_page_shows_tester_in_identity(self):
         brand = Brand.objects.create(name="100 Bon")
         BrandAlias.objects.create(
