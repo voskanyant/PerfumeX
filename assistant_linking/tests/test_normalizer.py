@@ -116,7 +116,7 @@ class NormalizerTests(TestCase):
             catalog_variant=variant,
         )
 
-        parsed = parse_supplier_product(product)
+        parsed = save_parse(product, force=True)
 
         self.assertEqual(parsed.product_name_text, "Cabiria")
         self.assertEqual(parsed.concentration, "Eau de Parfum")
@@ -139,7 +139,7 @@ class NormalizerTests(TestCase):
             name="Nina Ricci NINA 50ml edt tester",
         )
 
-        parsed = parse_supplier_product(product)
+        parsed = save_parse(product, force=True)
 
         self.assertEqual(parsed.product_name_text, "Nina")
         self.assertEqual(parsed.concentration, "Eau de Toilette")
@@ -964,6 +964,39 @@ class NormalizerTests(TestCase):
         self.assertEqual(parsed.concentration, "Eau de Parfum")
         self.assertEqual(parsed.size_ml, Decimal("150.00"))
         self.assertTrue(parsed.is_tester)
+
+    def test_van_cleef_collection_extraordinaire_alias_keeps_scent_name(self):
+        brand = Brand.objects.create(name="Van Cleef & Arpels")
+        BrandAlias.objects.create(
+            brand=brand,
+            alias_text="VAN CLEEF & ARPELS",
+            normalized_alias="van cleef & arpels",
+        )
+        ProductAlias.objects.create(
+            brand=brand,
+            alias_text="collection extraordinaire",
+            canonical_text="",
+            collection_name="Collection Extraordinaire",
+            priority=30,
+        )
+        product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="vca-collection-extraordinaire-neroli-amara",
+            name="VAN CLEEF & ARPELS Collection Extraordinaire Neroli Amara edp 15 ml tester",
+        )
+
+        parsed = save_parse(product, force=True)
+
+        self.assertEqual(parsed.normalized_brand, brand)
+        self.assertEqual(parsed.collection_name, "Collection Extraordinaire")
+        self.assertEqual(parsed.product_name_text, "neroli amara")
+        self.assertEqual(parsed.concentration, "Eau de Parfum")
+        self.assertEqual(parsed.size_ml, Decimal("15.00"))
+        self.assertTrue(parsed.is_tester)
+        self.assertEqual(
+            parsed.display_identity,
+            "Van Cleef & Arpels / Collection Extraordinaire / Neroli Amara / Eau de Parfum / 15ml / Tester",
+        )
 
     def test_product_alias_prefix_keeps_remaining_scent_words(self):
         brand = Brand.objects.create(name="4711")
