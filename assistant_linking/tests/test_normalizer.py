@@ -326,6 +326,31 @@ class NormalizerTests(TestCase):
         self.assertEqual(parsed.supplier_gender_hint, "Pour Femme")
         self.assertEqual(parsed.product_name_text, "light blue pour femme")
 
+    def test_name_bearing_audience_alias_preserves_preceding_scent_words(self):
+        brand = Brand.objects.create(name="Versace")
+        BrandAlias.objects.create(brand=brand, alias_text="VERSACE", normalized_alias="versace")
+        ProductAlias.objects.create(
+            brand=brand,
+            alias_text="pour femme",
+            canonical_text="Pour Femme",
+            audience="Pour Femme",
+            priority=20,
+            active=True,
+        )
+        product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="versace-eros-pour-femme",
+            name="VERSACE EROS pour femme edt 100 ml 2015",
+        )
+
+        parsed = parse_supplier_product(product)
+
+        self.assertEqual(parsed.normalized_brand, brand)
+        self.assertEqual(parsed.product_name_text, "eros Pour Femme")
+        self.assertEqual(parsed.concentration, "Eau de Toilette")
+        self.assertEqual(parsed.size_ml, Decimal("100.00"))
+        self.assertEqual(parsed.supplier_gender_hint, "Pour Femme")
+
     def test_pour_homme_stays_in_product_name_while_setting_audience(self):
         brand = Brand.objects.create(name="Issey Miyake")
         BrandAlias.objects.create(brand=brand, alias_text="Issey Miyake", normalized_alias="issey miyake")

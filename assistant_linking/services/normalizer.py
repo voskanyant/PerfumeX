@@ -27,7 +27,7 @@ from prices.models import SupplierProduct
 
 
 logger = logging.getLogger(__name__)
-PARSER_VERSION = "deterministic-v9"
+PARSER_VERSION = "deterministic-v10"
 REGEX_ALIAS_TIMEOUT_SECONDS = 1.0
 
 DEFAULT_CONCENTRATION_ALIASES = (
@@ -337,6 +337,28 @@ def _remaining_after_alias_prefix(text: str, alias_text: str) -> str:
     return re.sub(r"\s+", " ", match.group("remaining")).strip()
 
 
+def _product_name_from_alias_match_context(text: str, alias_text: str, canonical_text: str) -> str:
+    normalized_alias = normalize_text(alias_text)
+    if normalize_text(canonical_text) not in {normalize_text(term) for term in NAME_AUDIENCE_TERMS}:
+        return canonical_text
+    match = re.search(rf"^(?P<prefix>.*?)\b{re.escape(normalized_alias)}\b(?P<suffix>.*)$", text)
+    if not match:
+        return canonical_text
+    prefix = re.sub(r"\s+", " ", match.group("prefix")).strip()
+    suffix = re.sub(r"\s+", " ", match.group("suffix")).strip()
+    if re.fullmatch(r"(?:19|20)\d{2}", suffix):
+        suffix = ""
+    parts = [prefix, canonical_text, suffix]
+    return re.sub(r"\s+", " ", " ".join(part for part in parts if part)).strip() or canonical_text
+
+
+def _clean_product_name_text(value: str) -> str:
+    name = re.sub(r"\s+", " ", value or "").strip()
+    if any(_contains_phrase(name, term) for term in NAME_AUDIENCE_TERMS):
+        name = re.sub(r"\s+(?:19|20)\d{2}$", "", name).strip()
+    return name[:255]
+
+
 def _name_bearing_modifiers(product_alias: ProductAlias) -> set[str]:
     alias_identity = normalize_text(" ".join([product_alias.alias_text, product_alias.canonical_text]))
     return {modifier for modifier in MODIFIER_TERMS if _contains_phrase(alias_identity, normalize_text(modifier))}
@@ -551,10 +573,16 @@ def parse_supplier_product(product: SupplierProduct) -> ParseResult:
                 text = _strip_known_terms(text, [alias_text])
                 product_alias_match_text = _strip_known_terms(product_alias_match_text, [alias_text])
                 continue
-            result.product_name_text = product_alias.canonical_text
+            result.product_name_text = _product_name_from_alias_match_context(
+                product_alias_match_text,
+                alias_text,
+                product_alias.canonical_text,
+            )
             remaining_name = _remaining_after_alias_prefix(product_alias_match_text, alias_text)
             if remaining_name and result.concentration and result.size_ml:
-                result.product_name_text = f"{result.product_name_text} {remaining_name}".strip()[:255]
+                result.product_name_text = _clean_product_name_text(
+                    f"{result.product_name_text} {remaining_name}".strip()
+                )
             name_modifiers = _name_bearing_modifiers(product_alias)
             if name_modifiers:
                 result.modifiers = [modifier for modifier in result.modifiers if modifier not in name_modifiers]
@@ -602,7 +630,9 @@ def parse_supplier_product(product: SupplierProduct) -> ParseResult:
                 *NO_BOX_TERMS,
             ],
         )
-        result.product_name_text = re.sub(r"\s+", " ", remaining).strip()[:255]
+        result.product_name_text = _clean_product_name_text(remaining)
+
+    result.product_name_text = _clean_product_name_text(result.product_name_text)
 
     if not result.normalized_brand:
         result.warnings.append("brand missing")
