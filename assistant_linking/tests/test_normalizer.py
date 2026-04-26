@@ -902,6 +902,29 @@ class NormalizerTests(TestCase):
         self.assertEqual(parsed.size_ml, Decimal("150.00"))
         self.assertTrue(parsed.is_tester)
 
+    def test_product_alias_prefix_keeps_remaining_scent_words(self):
+        brand = Brand.objects.create(name="4711")
+        BrandAlias.objects.create(brand=brand, alias_text="4711", normalized_alias="4711")
+        ProductAlias.objects.create(
+            brand=brand,
+            alias_text="acqua colonia",
+            canonical_text="Acqua Colonia",
+            priority=40,
+        )
+        product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="4711-acqua-colonia-pink-pepper-grapefruit",
+            name="4711 Acqua Colonia Pink Pepper & Grapefruit tester edc170ml",
+        )
+
+        parsed = parse_supplier_product(product)
+
+        self.assertEqual(parsed.normalized_brand, brand)
+        self.assertEqual(parsed.product_name_text, "Acqua Colonia pink pepper & grapefruit")
+        self.assertEqual(parsed.concentration, "Eau de Cologne")
+        self.assertEqual(parsed.size_ml, Decimal("170.00"))
+        self.assertTrue(parsed.is_tester)
+
     def test_xerjoff_casamorati_combination_maps_to_casamorati_brand(self):
         xerjoff = Brand.objects.create(name="Xerjoff")
         casamorati = Brand.objects.create(name="Casamorati")

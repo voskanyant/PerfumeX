@@ -27,7 +27,7 @@ from prices.models import SupplierProduct
 
 
 logger = logging.getLogger(__name__)
-PARSER_VERSION = "deterministic-v7"
+PARSER_VERSION = "deterministic-v8"
 REGEX_ALIAS_TIMEOUT_SECONDS = 1.0
 
 DEFAULT_CONCENTRATION_ALIASES = (
@@ -327,6 +327,16 @@ def _strip_concentration_aliases(text: str, rows: list[tuple]) -> str:
     return re.sub(r"\s+", " ", remaining).strip()
 
 
+def _remaining_after_alias_prefix(text: str, alias_text: str) -> str:
+    normalized_alias = normalize_text(alias_text)
+    if not normalized_alias:
+        return ""
+    match = re.search(rf"^\s*{re.escape(normalized_alias)}(?:\s+|$)(?P<remaining>.*)$", text)
+    if not match:
+        return ""
+    return re.sub(r"\s+", " ", match.group("remaining")).strip()
+
+
 def _name_bearing_modifiers(product_alias: ProductAlias) -> set[str]:
     alias_identity = normalize_text(" ".join([product_alias.alias_text, product_alias.canonical_text]))
     return {modifier for modifier in MODIFIER_TERMS if _contains_phrase(alias_identity, normalize_text(modifier))}
@@ -542,6 +552,9 @@ def parse_supplier_product(product: SupplierProduct) -> ParseResult:
                 product_alias_match_text = _strip_known_terms(product_alias_match_text, [alias_text])
                 continue
             result.product_name_text = product_alias.canonical_text
+            remaining_name = _remaining_after_alias_prefix(product_alias_match_text, alias_text)
+            if remaining_name and result.concentration and result.size_ml:
+                result.product_name_text = f"{result.product_name_text} {remaining_name}".strip()[:255]
             name_modifiers = _name_bearing_modifiers(product_alias)
             if name_modifiers:
                 result.modifiers = [modifier for modifier in result.modifiers if modifier not in name_modifiers]
