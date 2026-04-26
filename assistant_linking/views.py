@@ -43,6 +43,19 @@ PARSED_PRODUCT_HIDDEN_FIELDS = (
     "supplier_product__supplier_sku",
 )
 NORMALIZATION_DASHBOARD_CACHE_SECONDS = 300
+NORMALIZATION_DASHBOARD_COUNT_KEYS = (
+    "parsed_count",
+    "unparsed_count",
+    "low_confidence_count",
+    "missing_brand_count",
+    "missing_name_count",
+    "missing_concentration_count",
+    "missing_size_count",
+    "modifier_count",
+    "garbage_count",
+    "tester_sample_count",
+    "set_count",
+)
 
 
 def _hidden_product_keywords(request) -> list[str]:
@@ -124,13 +137,25 @@ def _dashboard_stats_cache_key(hidden_keywords: list[str]) -> str:
     return f"assistant_linking:normalization_dashboard:{PARSER_VERSION}:{version}:{hidden_digest}"
 
 
+def _empty_dashboard_stats() -> dict[str, object]:
+    return {
+        **{key: "..." for key in NORMALIZATION_DASHBOARD_COUNT_KEYS},
+        "recent_ids": [],
+        "stats_cached": False,
+        "stats_pending": True,
+    }
+
+
 def _normalization_dashboard_stats(request, hidden_keywords: list[str]) -> dict[str, object]:
     cache_key = _dashboard_stats_cache_key(hidden_keywords)
-    if request.GET.get("refresh") == "1":
+    force_refresh = request.GET.get("refresh") == "1"
+    if force_refresh:
         cache.delete(cache_key)
     cached = cache.get(cache_key)
     if cached is not None:
-        return {**cached, "stats_cached": True}
+        return {**cached, "stats_cached": True, "stats_pending": False}
+    if not force_refresh:
+        return _empty_dashboard_stats()
 
     parsed_queryset = _hide_parsed_products(
         models.ParsedSupplierProduct.objects.all(),
@@ -165,6 +190,7 @@ def _normalization_dashboard_stats(request, hidden_keywords: list[str]) -> dict[
         .values_list("id", flat=True)[:20]
     )
     counts["stats_cached"] = False
+    counts["stats_pending"] = False
     cache.set(cache_key, counts, NORMALIZATION_DASHBOARD_CACHE_SECONDS)
     return counts
 

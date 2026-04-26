@@ -414,12 +414,17 @@ class TeachParseTests(TestCase):
         )
 
         first = self.client.get(reverse("assistant_linking:normalization_dashboard"))
-        second = self.client.get(reverse("assistant_linking:normalization_dashboard"))
+        refresh = self.client.get(reverse("assistant_linking:normalization_dashboard"), {"refresh": "1"})
+        cached = self.client.get(reverse("assistant_linking:normalization_dashboard"))
 
         self.assertEqual(first.status_code, 200)
-        self.assertFalse(first.context["stats_cached"])
-        self.assertEqual(second.status_code, 200)
-        self.assertTrue(second.context["stats_cached"])
+        self.assertTrue(first.context["stats_pending"])
+        self.assertEqual(first.context["parsed_count"], "...")
+        self.assertEqual(refresh.status_code, 200)
+        self.assertFalse(refresh.context["stats_pending"])
+        self.assertFalse(refresh.context["stats_cached"])
+        self.assertEqual(cached.status_code, 200)
+        self.assertTrue(cached.context["stats_cached"])
 
     def test_parsed_products_page_shows_tester_in_identity(self):
         brand = Brand.objects.create(name="100 Bon")
@@ -569,9 +574,10 @@ class TeachParseTests(TestCase):
         for product in [complete, missing_size, missing_concentration, missing_name, set_product]:
             save_parse(product)
 
-        response = self.client.get(reverse("assistant_linking:normalization_dashboard"))
+        response = self.client.get(reverse("assistant_linking:normalization_dashboard"), {"refresh": "1"})
 
         self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.context["stats_pending"])
         self.assertEqual(response.context["parsed_count"], 1)
         self.assertEqual(response.context["set_count"], 1)
         self.assertEqual(response.context["missing_size_count"], 1)

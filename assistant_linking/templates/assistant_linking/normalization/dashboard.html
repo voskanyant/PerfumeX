@@ -9,6 +9,9 @@
         {% if hidden_keywords_active %}
             <p class="page-subtitle space-bottom-none">Global hidden product keywords are active, so ignored rows are excluded from these counts and queues.</p>
         {% endif %}
+        {% if stats_pending %}
+            <p class="page-subtitle space-bottom-none">Stats are not warmed yet. The queues still open; refresh stats when you need current totals.</p>
+        {% endif %}
     </div>
     <div class="page-actions">
         <a class="button ghost" href="{% url 'assistant_linking:normalization_dashboard' %}?refresh=1">Refresh stats</a>
