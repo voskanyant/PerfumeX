@@ -9,8 +9,12 @@
         {% if hidden_keywords_active %}
             <p class="page-subtitle space-bottom-none">Global hidden product keywords are active, so ignored rows are excluded from these counts and queues.</p>
         {% endif %}
-        {% if stats_pending %}
-            <p class="page-subtitle space-bottom-none">Stats are not warmed yet. The queues still open; refresh stats when you need current totals.</p>
+        {% if not stats_available %}
+            <p class="page-subtitle space-bottom-none">Stats snapshot is not generated yet. The queues still open; refresh stats to create saved totals.</p>
+        {% elif stats_stale %}
+            <p class="page-subtitle space-bottom-none">Stats snapshot is stale because parses changed. Refresh stats to update saved totals.</p>
+        {% elif stats_generated_at %}
+            <p class="page-subtitle space-bottom-none">Stats generated {{ stats_generated_at|date:"Y-m-d H:i" }}.</p>
         {% endif %}
     </div>
     <div class="page-actions">

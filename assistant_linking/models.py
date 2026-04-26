@@ -301,6 +301,39 @@ class ParsedSupplierProduct(TimeStampedModel):
         return " / ".join(part for part in parts if part)
 
 
+class NormalizationStatsSnapshot(TimeStampedModel):
+    parser_version = models.CharField(max_length=40, db_index=True)
+    scope_key = models.CharField(max_length=80, db_index=True)
+    hidden_keywords_hash = models.CharField(max_length=64, blank=True, db_index=True)
+    hidden_keywords = models.JSONField(default=list, blank=True)
+    parsed_count = models.PositiveIntegerField(default=0)
+    unparsed_count = models.PositiveIntegerField(default=0)
+    low_confidence_count = models.PositiveIntegerField(default=0)
+    missing_brand_count = models.PositiveIntegerField(default=0)
+    missing_name_count = models.PositiveIntegerField(default=0)
+    missing_concentration_count = models.PositiveIntegerField(default=0)
+    missing_size_count = models.PositiveIntegerField(default=0)
+    modifier_count = models.PositiveIntegerField(default=0)
+    garbage_count = models.PositiveIntegerField(default=0)
+    tester_sample_count = models.PositiveIntegerField(default=0)
+    set_count = models.PositiveIntegerField(default=0)
+    recent_parse_ids = models.JSONField(default=list, blank=True)
+    generated_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    is_stale = models.BooleanField(default=False, db_index=True)
+
+    class Meta:
+        ordering = ("-generated_at", "-updated_at")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["parser_version", "scope_key"],
+                name="uniq_normalization_stats_snapshot_scope",
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"Normalization stats {self.parser_version} {self.scope_key}"
+
+
 class MatchGroup(TimeStampedModel):
     STATUS_OPEN = "open"
     STATUS_REVIEWED = "reviewed"

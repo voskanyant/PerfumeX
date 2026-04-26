@@ -395,7 +395,7 @@ class TeachParseTests(TestCase):
         self.assertEqual(stale_parse.concentration, "Eau de Toilette")
         self.assertEqual(stale_parse.size_ml, Decimal("100.00"))
 
-    def test_normalization_dashboard_reuses_cached_counts(self):
+    def test_normalization_dashboard_uses_saved_stats_snapshot(self):
         brand = Brand.objects.create(name="Cache Brand")
         product = SupplierProduct.objects.create(
             supplier=self.supplier,
@@ -418,13 +418,15 @@ class TeachParseTests(TestCase):
         cached = self.client.get(reverse("assistant_linking:normalization_dashboard"))
 
         self.assertEqual(first.status_code, 200)
-        self.assertTrue(first.context["stats_pending"])
+        self.assertFalse(first.context["stats_available"])
         self.assertEqual(first.context["parsed_count"], "...")
         self.assertEqual(refresh.status_code, 200)
-        self.assertFalse(refresh.context["stats_pending"])
-        self.assertFalse(refresh.context["stats_cached"])
+        self.assertTrue(refresh.context["stats_available"])
+        self.assertFalse(refresh.context["stats_stale"])
+        self.assertEqual(refresh.context["parsed_count"], 1)
         self.assertEqual(cached.status_code, 200)
-        self.assertTrue(cached.context["stats_cached"])
+        self.assertTrue(cached.context["stats_available"])
+        self.assertEqual(cached.context["parsed_count"], 1)
 
     def test_parsed_products_page_shows_tester_in_identity(self):
         brand = Brand.objects.create(name="100 Bon")
@@ -577,7 +579,8 @@ class TeachParseTests(TestCase):
         response = self.client.get(reverse("assistant_linking:normalization_dashboard"), {"refresh": "1"})
 
         self.assertEqual(response.status_code, 200)
-        self.assertFalse(response.context["stats_pending"])
+        self.assertTrue(response.context["stats_available"])
+        self.assertFalse(response.context["stats_stale"])
         self.assertEqual(response.context["parsed_count"], 1)
         self.assertEqual(response.context["set_count"], 1)
         self.assertEqual(response.context["missing_size_count"], 1)
