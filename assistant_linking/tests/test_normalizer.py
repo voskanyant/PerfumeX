@@ -967,6 +967,32 @@ class NormalizerTests(TestCase):
         self.assertEqual(standalone.normalized_brand, xerjoff)
         self.assertEqual(standalone.product_name_text, "naxos")
 
+    def test_kb_preprocess_removes_supplier_cap_notes_from_name(self):
+        brand = Brand.objects.create(name="Versace")
+        BrandAlias.objects.create(brand=brand, alias_text="VERSACE", normalized_alias="versace")
+        GlobalRule.objects.create(
+            title="Remove supplier cap notes",
+            rule_kind="regex_preprocess",
+            scope_type="global",
+            rule_text=r"\b(?:с|без)\s+крышк(?:ой|и|а|у)?\b|\b(?:with|without)\s+(?:cap|lid)\b => ",
+            approved=True,
+            active=True,
+        )
+        cache.clear()
+        product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="versace-yellow-diamond-cap",
+            name="VERSACE Yellow Diamond edt 90 ml Tester с крышкой",
+        )
+
+        parsed = parse_supplier_product(product)
+
+        self.assertEqual(parsed.normalized_brand, brand)
+        self.assertEqual(parsed.product_name_text, "yellow diamond")
+        self.assertEqual(parsed.concentration, "Eau de Toilette")
+        self.assertEqual(parsed.size_ml, Decimal("90.00"))
+        self.assertTrue(parsed.is_tester)
+
     def test_brand_alias_rejects_bad_regex(self):
         alias = BrandAlias(
             brand=self.brand,
