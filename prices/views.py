@@ -626,31 +626,11 @@ def _build_latest_check_info(
 
 
 def _build_supplier_email_fallback_check(supplier, fallback_dt) -> dict[str, str | int | None | bool]:
-    if supplier.last_email_processed:
-        label = "current"
-        class_name = "is-neutral"
-        code = "successful"
-        note = ""
-    elif supplier.last_email_errors:
-        label = "failed"
-        class_name = "is-warning"
-        code = "failed"
-        note = f"{supplier.last_email_errors} import issue(s)"
-    elif supplier.last_email_matched:
-        label = "current"
-        class_name = "is-neutral"
-        code = "no-change"
-        note = ""
-    else:
-        label = "current"
-        class_name = "is-neutral"
-        code = "no-change"
-        note = ""
     return {
-        "label": label,
-        "class_name": class_name,
-        "code": code,
-        "note": note,
+        "label": "current",
+        "class_name": "is-neutral",
+        "code": "successful" if supplier.last_email_processed else "no-change",
+        "note": "",
         "relative": _short_relative_datetime(fallback_dt),
         "full": _format_local_datetime(fallback_dt),
         "progress": None,
@@ -1080,8 +1060,6 @@ def _summarize_latest_files(supplier, latest_run, latest_diagnostic=None) -> str
     if supplier.last_email_check_at:
         if supplier.last_email_processed:
             return "Current"
-        if supplier.last_email_errors:
-            return "Import issue"
         if supplier.last_email_matched:
             return "Current"
         return "Current"
@@ -1829,89 +1807,6 @@ class SupplierOverviewView(LoginRequiredMixin, TemplateView):
         _expire_stale_email_import_runs()
         latest_runs, run_streaks = _collect_latest_runs_and_streaks()
         rows = []
-        import_batches = models.ImportBatch.objects.select_related(
-            "supplier", "mailbox"
-        ).prefetch_related("importfile_set").annotate(
-            updated_at=Coalesce(Max("importfile__processed_at"), "created_at"),
-            date_at=Coalesce("received_at", "created_at"),
-        )
-        supplier_filter_ids = _supplier_filter_ids_from_request(self.request)
-        supplier_filter = _serialize_supplier_filter_ids(supplier_filter_ids)
-        status_filter = self.request.GET.get("status", "").strip().lower()
-        log_sort = self.request.GET.get("log_sort", "date").strip()
-        log_dir = self.request.GET.get("log_dir", "desc").strip().lower()
-        if log_dir not in {"asc", "desc"}:
-            log_dir = "desc"
-        if supplier_filter_ids:
-            import_batches = import_batches.filter(supplier_id__in=supplier_filter_ids)
-        if status_filter == "successful":
-            import_batches = import_batches.filter(status=models.ImportStatus.PROCESSED).exclude(
-                message_id__startswith=PRODUCT_REMOVED_EVENT_PREFIX
-            )
-        elif status_filter == "product_removed":
-            import_batches = import_batches.filter(
-                message_id__startswith=PRODUCT_REMOVED_EVENT_PREFIX
-            )
-        elif status_filter == "failed":
-            import_batches = import_batches.filter(status=models.ImportStatus.FAILED)
-        elif status_filter == "pending":
-            import_batches = import_batches.filter(status=models.ImportStatus.PENDING)
-        if log_sort == "supplier":
-            ordering = "supplier__name"
-        elif log_sort == "status":
-            ordering = "status"
-        elif log_sort == "mailbox":
-            ordering = "mailbox__name"
-        elif log_sort == "updated":
-            ordering = "updated_at"
-        else:
-            log_sort = "date"
-            ordering = "received_at"
-
-        if log_sort == "date":
-            if log_dir == "asc":
-                import_batches = import_batches.order_by(
-                    "date_at", "updated_at", "created_at", "id"
-                )
-            else:
-                import_batches = import_batches.order_by(
-                    "-date_at", "-updated_at", "-created_at", "-id"
-                )
-        elif log_sort == "updated":
-            if log_dir == "asc":
-                import_batches = import_batches.order_by(
-                    "updated_at", "date_at", "created_at", "id"
-                )
-            else:
-                import_batches = import_batches.order_by(
-                    "-updated_at", "-date_at", "-created_at", "-id"
-                )
-        else:
-            if log_dir == "asc":
-                import_batches = import_batches.order_by(ordering, "-created_at")
-            else:
-                import_batches = import_batches.order_by(f"-{ordering}", "-created_at")
-        log_paginator = Paginator(import_batches, 25)
-        log_page_number = self.request.GET.get("log_page", "1")
-        log_page = log_paginator.get_page(log_page_number)
-        for batch in log_page.object_list:
-            is_removed = (batch.message_id or "").startswith(PRODUCT_REMOVED_EVENT_PREFIX)
-            batch.is_product_removed_event = is_removed
-            if is_removed:
-                batch.display_status = "product removed"
-                batch.row_class = "import-row-removed"
-            elif batch.status == models.ImportStatus.PROCESSED:
-                batch.display_status = "successful"
-                batch.row_class = "import-row-success"
-            elif batch.status == models.ImportStatus.FAILED:
-                batch.display_status = "failed"
-                batch.row_class = "import-row-failed"
-            elif batch.status == models.ImportStatus.PENDING:
-                batch.display_status = "pending"
-                batch.row_class = "import-row-pending"
-            else:
-                batch.display_status = batch.status
-                batch.row_class = ""
         for supplier in suppliers:
             rows.append(
                 _build_supplier_board_row(
@@ -1928,25 +1823,12 @@ class SupplierOverviewView(LoginRequiredMixin, TemplateView):
         context["rows"] = rows
         context["supplier_summary"] = _build_supplier_board_summary(rows)
         context["autoimport_scan_status"] = _build_autoimport_scan_status()
-        context["import_batches"] = log_page
-        context["import_log_page"] = log_page
         context["any_running"] = (
             models.EmailImportRun.objects.filter(
                 status=models.EmailImportStatus.RUNNING
             ).exists()
             or email_import_worker_is_busy()
         )
-        context["supplier_filter"] = supplier_filter
-        context["status_filter"] = status_filter
-        context["log_sort"] = log_sort
-        context["log_dir"] = log_dir
-        context["supplier_options"] = suppliers
-        context["status_options"] = [
-            ("successful", "Successful"),
-            ("product_removed", "Product removed"),
-            ("failed", "Failed"),
-            ("pending", "Pending"),
-        ]
         context["import_section"] = "overview"
         context["detailed_logs_url"] = reverse_lazy("prices:import_detailed_logs")
         context["overview_url"] = (
@@ -1954,7 +1836,6 @@ class SupplierOverviewView(LoginRequiredMixin, TemplateView):
             if self.request.user.is_staff
             else reverse_lazy("viewer_import_prices")
         )
-        context["current_query"] = self.request.GET.urlencode()
         return context
 
 
