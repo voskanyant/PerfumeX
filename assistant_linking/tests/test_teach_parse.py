@@ -1,6 +1,7 @@
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
+from django.core.management import call_command
 from django.test import TestCase
 from django.urls import reverse
 
@@ -312,7 +313,7 @@ class TeachParseTests(TestCase):
         self.assertEqual(form["concentration"].value(), "Extrait de Parfum")
         self.assertContains(response, "Catalogue match suggests Extrait de Parfum")
 
-    def test_missing_brand_list_refreshes_stale_parse_before_render(self):
+    def test_missing_brand_list_uses_saved_parse_rows(self):
         product = SupplierProduct.objects.create(
             supplier=self.supplier,
             identity_key="100bon-1",
@@ -332,9 +333,9 @@ class TeachParseTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         parse_product_ids = [item.supplier_product_id for item in response.context["parses"]]
-        self.assertNotIn(product.id, parse_product_ids)
+        self.assertIn(product.id, parse_product_ids)
         stale_parse.refresh_from_db()
-        self.assertEqual(stale_parse.normalized_brand, brand)
+        self.assertIsNone(stale_parse.normalized_brand)
 
     def test_parsed_products_page_supports_search(self):
         brand = Brand.objects.create(name="Montale")
@@ -366,7 +367,7 @@ class TeachParseTests(TestCase):
         self.assertEqual(len(parses), 1)
         self.assertEqual(parses[0].supplier_product_id, matching.id)
 
-    def test_parsed_products_page_refreshes_stale_rows_before_filtering(self):
+    def test_parsed_products_page_does_not_reparse_stale_rows(self):
         brand = Brand.objects.create(name="Fendi")
         BrandAlias.objects.create(brand=brand, alias_text="Fendi", normalized_alias="fendi")
         product = SupplierProduct.objects.create(
@@ -388,7 +389,34 @@ class TeachParseTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         parse_product_ids = {item.supplier_product_id for item in response.context["parses"]}
-        self.assertIn(product.id, parse_product_ids)
+        self.assertNotIn(product.id, parse_product_ids)
+        stale_parse.refresh_from_db()
+        self.assertIsNone(stale_parse.normalized_brand)
+        self.assertEqual(stale_parse.product_name_text, "")
+        self.assertEqual(stale_parse.concentration, "")
+        self.assertIsNone(stale_parse.size_ml)
+        self.assertEqual(stale_parse.parser_version, "deterministic-old")
+
+    def test_reparse_supplier_products_command_refreshes_stale_rows(self):
+        brand = Brand.objects.create(name="Fendi")
+        BrandAlias.objects.create(brand=brand, alias_text="Fendi", normalized_alias="fendi")
+        product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="parsed-stale-fendi-command",
+            name="FENDI FAN DI FENDI POUR HOMME ASSOLUTO 100ML EDT TESTER",
+        )
+        stale_parse = ParsedSupplierProduct.objects.create(
+            supplier_product=product,
+            raw_name=product.name,
+            normalized_text="fendi fan di fendi",
+            detected_brand_text="",
+            product_name_text="",
+            concentration="",
+            parser_version="deterministic-old",
+        )
+
+        call_command("reparse_supplier_products", "--only-stale", verbosity=0)
+
         stale_parse.refresh_from_db()
         self.assertEqual(stale_parse.normalized_brand, brand)
         self.assertEqual(stale_parse.product_name_text, "fan di fendi pour homme assoluto")

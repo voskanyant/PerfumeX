@@ -6,7 +6,7 @@ from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.http import Http404, HttpResponse, JsonResponse
 from django.db import transaction
-from django.db.models import Count, F, Q
+from django.db.models import Count, Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse_lazy
 from django.utils import timezone
@@ -24,7 +24,7 @@ from assistant_linking.services.normalization_stats import (
     refresh_stats_snapshot,
     snapshot_to_stats,
 )
-from assistant_linking.services.normalizer import PARSER_VERSION, save_parse
+from assistant_linking.services.normalizer import save_parse
 from assistant_linking.services.smart_search import normalize_query
 from catalog.models import Brand, Perfume, PerfumeVariant, compact_decimal_text
 from prices.models import SupplierProduct
@@ -69,29 +69,6 @@ def _exclude_garbage_parses(queryset):
 
 def _exclude_set_parses(queryset):
     return queryset.exclude(is_set=True)
-
-
-def _stale_parse_filter():
-    return (
-        Q(parser_version__isnull=True)
-        | ~Q(parser_version=PARSER_VERSION)
-        | Q(last_parsed_at__isnull=True)
-        | Q(supplier_product__updated_at__gt=F("last_parsed_at"))
-    )
-
-
-def _refresh_stale_parses(queryset, *, limit: int = 500) -> int:
-    stale_parses = (
-        queryset.filter(locked_by_human=False)
-        .filter(_stale_parse_filter())
-        .select_related("supplier_product")
-        .order_by("supplier_product_id")[:limit]
-    )
-    refreshed = 0
-    for parsed in stale_parses:
-        save_parse(parsed.supplier_product)
-        refreshed += 1
-    return refreshed
 
 
 def _complete_parse_query():
@@ -348,42 +325,6 @@ class LowConfidenceListView(NormalizationSearchMixin, StaffAssistantMixin, ListV
         queryset = _exclude_set_parses(_exclude_garbage_parses(_hide_parsed_products(queryset, self.request)))
         return queryset.order_by("confidence", "supplier_product__supplier__name", "supplier_product__name")
 
-    def parse_matches_view(self, parsed):
-        return parsed.confidence < 75 and not parsed.is_set
-
-    def should_refresh_parse(self, parsed) -> bool:
-        if parsed.locked_by_human:
-            return False
-        if parsed.parser_version != PARSER_VERSION:
-            return True
-        if not parsed.last_parsed_at:
-            return True
-        product_updated_at = getattr(parsed.supplier_product, "updated_at", None)
-        if product_updated_at and product_updated_at > parsed.last_parsed_at:
-            return True
-        return False
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        page_obj = context.get("page_obj")
-        if not page_obj:
-            return context
-
-        refreshed = []
-        for stored_parse in list(page_obj.object_list):
-            refreshed_parse = (
-                save_parse(stored_parse.supplier_product)
-                if self.should_refresh_parse(stored_parse)
-                else stored_parse
-            )
-            if self.parse_matches_view(refreshed_parse):
-                refreshed.append(refreshed_parse)
-
-        page_obj.object_list = refreshed
-        context["object_list"] = refreshed
-        context[self.context_object_name] = refreshed
-        return context
-
 
 class NormalizationIssueListView(LowConfidenceListView):
     template_name = "assistant_linking/normalization/issue_list.html"
@@ -406,12 +347,6 @@ class MissingBrandListView(NormalizationIssueListView):
         queryset = _exclude_set_parses(_exclude_garbage_parses(_hide_parsed_products(queryset, self.request)))
         return queryset.order_by("supplier_product__name")
 
-    def parse_matches_view(self, parsed):
-        return parsed.normalized_brand_id is None and not parsed.is_set
-
-    def should_refresh_parse(self, parsed) -> bool:
-        return not parsed.locked_by_human
-
 
 class MissingNameListView(NormalizationIssueListView):
     issue_title = "Missing product name"
@@ -425,9 +360,6 @@ class MissingNameListView(NormalizationIssueListView):
         queryset = _apply_parsed_search(queryset, self.get_search_query())
         queryset = _exclude_set_parses(_exclude_garbage_parses(_hide_parsed_products(queryset, self.request)))
         return queryset.order_by("supplier_product__name")
-
-    def parse_matches_view(self, parsed):
-        return not parsed.product_name_text and not parsed.is_set
 
 
 class MissingConcentrationListView(NormalizationIssueListView):
@@ -443,9 +375,6 @@ class MissingConcentrationListView(NormalizationIssueListView):
         queryset = _exclude_set_parses(_exclude_garbage_parses(_hide_parsed_products(queryset, self.request)))
         return queryset.order_by("supplier_product__name")
 
-    def parse_matches_view(self, parsed):
-        return not parsed.concentration and not parsed.is_set
-
 
 class MissingSizeListView(NormalizationIssueListView):
     issue_title = "Missing or ambiguous size"
@@ -459,9 +388,6 @@ class MissingSizeListView(NormalizationIssueListView):
         queryset = _apply_parsed_search(queryset, self.get_search_query())
         queryset = _exclude_set_parses(_exclude_garbage_parses(_hide_parsed_products(queryset, self.request)))
         return queryset.order_by("supplier_product__name")
-
-    def parse_matches_view(self, parsed):
-        return parsed.size_ml is None and not parsed.is_set
 
 
 class TesterSampleListView(NormalizationIssueListView):
@@ -477,9 +403,6 @@ class TesterSampleListView(NormalizationIssueListView):
         queryset = _exclude_garbage_parses(_hide_parsed_products(queryset, self.request))
         return queryset.order_by("supplier_product__name")
 
-    def parse_matches_view(self, parsed):
-        return bool((parsed.is_tester or parsed.is_sample or parsed.is_travel) and not parsed.is_set)
-
 
 class SetListView(NormalizationIssueListView):
     issue_title = "Set rows"
@@ -493,9 +416,6 @@ class SetListView(NormalizationIssueListView):
         queryset = _apply_parsed_search(queryset, self.get_search_query())
         queryset = _exclude_garbage_parses(_hide_parsed_products(queryset, self.request))
         return queryset.order_by("supplier_product__supplier__name", "supplier_product__name")
-
-    def parse_matches_view(self, parsed):
-        return bool(parsed.is_set)
 
 
 class ModifierConflictListView(NormalizationIssueListView):
@@ -511,22 +431,11 @@ class ModifierConflictListView(NormalizationIssueListView):
         queryset = _exclude_set_parses(_exclude_garbage_parses(_hide_parsed_products(queryset, self.request)))
         return queryset.order_by("supplier_product__name")
 
-    def parse_matches_view(self, parsed):
-        return bool(parsed.modifiers and not parsed.is_set)
-
 
 class ParsedListView(NormalizationIssueListView):
     issue_title = "Complete parsed products"
 
     def get_queryset(self):
-        base_queryset = models.ParsedSupplierProduct.objects.select_related(
-            "supplier_product",
-            "supplier_product__supplier",
-            "normalized_brand",
-        )
-        base_queryset = _hide_parsed_products(base_queryset, self.request)
-        _refresh_stale_parses(_apply_parsed_search(base_queryset, self.get_search_query()))
-
         queryset = models.ParsedSupplierProduct.objects.select_related(
             "supplier_product",
             "supplier_product__supplier",
@@ -536,16 +445,6 @@ class ParsedListView(NormalizationIssueListView):
         queryset = _apply_parsed_search(queryset, self.get_search_query())
         queryset = _complete_parses(_exclude_garbage_parses(queryset))
         return queryset.order_by("-updated_at", "supplier_product__supplier__name", "supplier_product__name")
-
-    def parse_matches_view(self, parsed):
-        return (
-            parsed.normalized_brand_id is not None
-            and bool(parsed.product_name_text)
-            and bool(parsed.concentration)
-            and parsed.size_ml is not None
-            and not parsed.is_set
-            and GARBAGE_MODIFIER not in (parsed.modifiers or [])
-        )
 
 
 class GarbageListView(NormalizationIssueListView):
@@ -560,9 +459,6 @@ class GarbageListView(NormalizationIssueListView):
         queryset = _apply_parsed_search(queryset, self.get_search_query())
         queryset = _hide_parsed_products(queryset, self.request)
         return queryset.order_by("supplier_product__supplier__name", "supplier_product__name")
-
-    def parse_matches_view(self, parsed):
-        return GARBAGE_MODIFIER in (parsed.modifiers or [])
 
 
 class ParsedProductDetailView(StaffAssistantMixin, DetailView):
