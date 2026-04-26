@@ -1119,8 +1119,9 @@ class SupplierImportBoundaryTests(TestCase):
             latest_run=None,
         )
 
-        self.assertEqual(row["check_code"], "idle")
-        self.assertEqual(row["check_relative"], "Not checked")
+        self.assertEqual(row["check_code"], "no-change")
+        self.assertEqual(row["check_full"], _format_local_datetime(now))
+        self.assertEqual(row["check_note"], "")
 
     def test_fresh_duplicate_event_is_neutral_not_problem(self):
         now = timezone.now().replace(microsecond=0)
@@ -1397,6 +1398,37 @@ class SupplierImportBoundaryTests(TestCase):
         )
 
         self.assertEqual(row["check_full"], _format_local_datetime(now))
+
+    def test_supplier_board_check_time_uses_latest_mailbox_scan(self):
+        now = timezone.now().replace(microsecond=0)
+        old_event_time = now - timedelta(days=1)
+        self.supplier.from_address_pattern = "supplier@example.com"
+        self.supplier.save(update_fields=["from_address_pattern"])
+        self.mailbox.last_checked_at = now
+        self.mailbox.save(update_fields=["last_checked_at"])
+        diagnostic = models.EmailAttachmentDiagnostic.objects.create(
+            supplier=self.supplier,
+            mailbox=self.mailbox,
+            sender="supplier@example.com",
+            subject="Price",
+            filename="price.xlsx",
+            decision=models.AttachmentDecision.DUPLICATE,
+            reason_code=models.AttachmentReason.DUPLICATE_HASH,
+        )
+        models.EmailAttachmentDiagnostic.objects.filter(pk=diagnostic.pk).update(
+            created_at=old_event_time
+        )
+        diagnostic.refresh_from_db()
+
+        row = _build_supplier_board_row(
+            supplier=self.supplier,
+            successful_batch=None,
+            latest_run=None,
+            latest_diagnostic=diagnostic,
+        )
+
+        self.assertEqual(row["check_full"], _format_local_datetime(now))
+        self.assertEqual(row["check_code"], "no-change")
 
     def test_running_email_status_shows_live_activity(self):
         run = models.EmailImportRun.objects.create(

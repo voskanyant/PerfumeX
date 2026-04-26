@@ -488,6 +488,19 @@ def _diagnostic_check_datetime(diagnostic):
     return diagnostic.created_at
 
 
+def _latest_active_mailbox_check_datetime():
+    return models.Mailbox.objects.filter(is_active=True).aggregate(
+        latest=Max("last_checked_at")
+    )["latest"]
+
+
+def _supplier_email_check_datetime(supplier, event_dt=None):
+    candidates = [supplier.last_email_check_at, event_dt]
+    if supplier.from_address_pattern:
+        candidates.append(_latest_active_mailbox_check_datetime())
+    return max([dt for dt in candidates if dt], default=None)
+
+
 def _failed_file_activity_datetime(import_file):
     if not import_file:
         return None
@@ -514,8 +527,8 @@ def _build_latest_check_info(
     streak_count: int = 1,
     latest_diagnostic=None,
 ) -> dict[str, str | int | None | bool]:
-    fallback_dt = supplier.last_email_check_at
     diagnostic_dt = _diagnostic_check_datetime(latest_diagnostic)
+    fallback_dt = _supplier_email_check_datetime(supplier, diagnostic_dt)
     if run:
         run_dt = _run_activity_datetime(run)
         newest_side_event_dt = max(
@@ -631,6 +644,7 @@ def _is_benign_attachment_diagnostic(diagnostic) -> bool:
 
 
 def _build_diagnostic_event_check(diagnostic) -> dict[str, str | int | None | bool]:
+    supplier = diagnostic.supplier
     decision = diagnostic.decision
     filename = _format_event_filename(diagnostic.filename)
     reason = _attachment_reason_label(diagnostic.reason_code, decision)
@@ -663,15 +677,16 @@ def _build_diagnostic_event_check(diagnostic) -> dict[str, str | int | None | bo
         code = "no-valid-file"
         note = f"{filename}: {reason}" if filename else reason
     event_dt = _diagnostic_check_datetime(diagnostic)
+    check_dt = _supplier_email_check_datetime(supplier, event_dt) if supplier else event_dt
     return {
         "label": label,
         "class_name": class_name,
         "code": code,
         "note": note,
-        "relative": _short_relative_datetime(event_dt) if event_dt else "Checked",
-        "full": _format_local_datetime(event_dt),
+        "relative": _short_relative_datetime(check_dt) if check_dt else "Checked",
+        "full": _format_local_datetime(check_dt),
         "progress": None,
-        "show_time": bool(event_dt),
+        "show_time": bool(check_dt),
     }
 
 
