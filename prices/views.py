@@ -41,6 +41,7 @@ import unicodedata
 
 from django.db.models import (
     Case,
+    Count,
     DecimalField,
     ExpressionWrapper,
     F,
@@ -52,7 +53,11 @@ from django.db.models import (
 )
 from django.db.models.functions import Coalesce, RowNumber, TruncDate
 
-from catalog.models import Brand as CatalogBrand, PerfumeVariant as CatalogPerfumeVariant
+from catalog.models import (
+    Brand as CatalogBrand,
+    Perfume as CatalogPerfume,
+    PerfumeVariant as CatalogPerfumeVariant,
+)
 
 from . import forms, models
 from django.shortcuts import get_object_or_404, redirect
@@ -4104,9 +4109,92 @@ class OurProductListView(LoginRequiredMixin, ListView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        active_tab = self.request.GET.get("tab", "products").strip()
+        if active_tab not in {"products", "brands", "collections", "concentrations"}:
+            active_tab = "products"
         context["total_count"] = context["paginator"].count if context.get("paginator") else len(context["variants"])
         context["search_query"] = self.request.GET.get("q", "").strip()
+        context["active_tab"] = active_tab
+        context["brand_rows"] = CatalogBrand.objects.annotate(
+            perfume_count=Count("perfumes")
+        ).order_by("name")
+        context["collection_rows"] = (
+            CatalogPerfume.objects.exclude(collection_name="")
+            .values("collection_name")
+            .annotate(perfume_count=Count("id"))
+            .order_by("collection_name")
+        )
+        context["concentration_rows"] = (
+            CatalogPerfume.objects.exclude(concentration="")
+            .values("concentration")
+            .annotate(perfume_count=Count("id"))
+            .order_by("concentration")
+        )
         return context
+
+    def post(self, request, *args, **kwargs):
+        action = request.POST.get("action", "").strip()
+        tab = request.POST.get("tab", "products").strip() or "products"
+        redirect_url = f"{reverse('prices:our_product_list')}?{urlencode({'tab': tab})}"
+
+        if action == "add_brand":
+            name = request.POST.get("name", "").strip()
+            if not name:
+                messages.error(request, "Brand name is required.")
+            else:
+                brand, created = CatalogBrand.objects.get_or_create(name=name)
+                messages.success(
+                    request,
+                    f"Brand {'created' if created else 'already exists'}: {brand.name}.",
+                )
+            return redirect(redirect_url)
+
+        if action == "delete_brand":
+            brand = get_object_or_404(CatalogBrand, pk=request.POST.get("brand_id"))
+            if CatalogPerfume.objects.filter(brand=brand).exists():
+                messages.error(request, f"{brand.name} has products. Move or delete those products first.")
+            else:
+                brand_name = brand.name
+                brand.delete()
+                messages.success(request, f"Brand deleted: {brand_name}.")
+            return redirect(redirect_url)
+
+        if action in {"rename_collection", "clear_collection"}:
+            old_value = request.POST.get("old_value", "").strip()
+            new_value = request.POST.get("new_value", "").strip()
+            if not old_value:
+                messages.error(request, "Select a collection.")
+                return redirect(redirect_url)
+            if action == "rename_collection":
+                if not new_value:
+                    messages.error(request, "New collection name is required.")
+                else:
+                    updated = CatalogPerfume.objects.filter(collection_name=old_value).update(collection_name=new_value)
+                    messages.success(request, f"Collection renamed on {updated} products.")
+            else:
+                updated = CatalogPerfume.objects.filter(collection_name=old_value).update(collection_name="")
+                messages.success(request, f"Collection cleared on {updated} products.")
+            return redirect(redirect_url)
+
+        if action in {"rename_concentration", "clear_concentration"}:
+            old_value = request.POST.get("old_value", "").strip()
+            new_value = request.POST.get("new_value", "").strip()
+            if not old_value:
+                messages.error(request, "Select a concentration.")
+                return redirect(redirect_url)
+            if action == "rename_concentration":
+                if not new_value:
+                    messages.error(request, "New concentration name is required.")
+                else:
+                    updated = CatalogPerfume.objects.filter(concentration=old_value).update(concentration=new_value)
+                    messages.success(request, f"Concentration renamed on {updated} products.")
+            else:
+                updated = CatalogPerfume.objects.filter(concentration=old_value).update(concentration="")
+                messages.success(request, f"Concentration cleared on {updated} products.")
+            return redirect(redirect_url)
+
+        messages.error(request, "Unknown catalogue action.")
+        return redirect(redirect_url)
 
 
 class OurProductVariantInlineUpdateView(LoginRequiredMixin, View):

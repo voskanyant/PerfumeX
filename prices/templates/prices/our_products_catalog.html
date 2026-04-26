@@ -15,7 +15,16 @@
 </div>
 
 <div class="workspace-block">
+    <nav class="tabs catalogue-tabs" aria-label="Catalogue management tabs">
+        <a class="tab {% if active_tab == 'products' %}active{% endif %}" href="{% url 'prices:our_product_list' %}">Products</a>
+        <a class="tab {% if active_tab == 'brands' %}active{% endif %}" href="{% url 'prices:our_product_list' %}?tab=brands">Brands</a>
+        <a class="tab {% if active_tab == 'collections' %}active{% endif %}" href="{% url 'prices:our_product_list' %}?tab=collections">Collections</a>
+        <a class="tab {% if active_tab == 'concentrations' %}active{% endif %}" href="{% url 'prices:our_product_list' %}?tab=concentrations">Concentrations</a>
+    </nav>
+
+    {% if active_tab == 'products' %}
     <form method="get" class="search-wrap">
+        <input type="hidden" name="tab" value="products">
         <input type="text" name="q" value="{{ search_query }}" placeholder="Search brand, scent, size, packaging...">
         <button class="button ghost" type="submit">Search</button>
     </form>
@@ -76,13 +85,130 @@
     {% if is_paginated %}
         <div class="pagination">
             {% if page_obj.has_previous %}
-                <a class="button ghost" href="?q={{ search_query|urlencode }}&page={{ page_obj.previous_page_number }}">Previous</a>
+                <a class="button ghost" href="?tab=products&q={{ search_query|urlencode }}&page={{ page_obj.previous_page_number }}">Previous</a>
             {% endif %}
             <span>Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
             {% if page_obj.has_next %}
-                <a class="button ghost" href="?q={{ search_query|urlencode }}&page={{ page_obj.next_page_number }}">Next</a>
+                <a class="button ghost" href="?tab=products&q={{ search_query|urlencode }}&page={{ page_obj.next_page_number }}">Next</a>
             {% endif %}
         </div>
+    {% endif %}
+    {% elif active_tab == 'brands' %}
+        <form method="post" class="catalogue-add-row">
+            {% csrf_token %}
+            <input type="hidden" name="tab" value="brands">
+            <input type="hidden" name="action" value="add_brand">
+            <input type="text" name="name" placeholder="New brand name">
+            <button class="button primary" type="submit">Add brand</button>
+        </form>
+        <table class="data-table catalogue-admin-table">
+            <thead>
+                <tr>
+                    <th>Brand</th>
+                    <th>Products</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for brand in brand_rows %}
+                <tr>
+                    <td>{{ brand.name }}</td>
+                    <td>{{ brand.perfume_count }}</td>
+                    <td>
+                        <form method="post" class="catalogue-inline-form">
+                            {% csrf_token %}
+                            <input type="hidden" name="tab" value="brands">
+                            <input type="hidden" name="action" value="delete_brand">
+                            <input type="hidden" name="brand_id" value="{{ brand.id }}">
+                            <button class="button danger" type="submit">Delete</button>
+                        </form>
+                    </td>
+                </tr>
+            {% empty %}
+                <tr><td colspan="3" class="empty-state">No brands yet.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    {% elif active_tab == 'collections' %}
+        <table class="data-table catalogue-admin-table">
+            <thead>
+                <tr>
+                    <th>Collection</th>
+                    <th>Products</th>
+                    <th>Rename</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for row in collection_rows %}
+                <tr>
+                    <td>{{ row.collection_name }}</td>
+                    <td>{{ row.perfume_count }}</td>
+                    <td>
+                        <form method="post" class="catalogue-inline-form">
+                            {% csrf_token %}
+                            <input type="hidden" name="tab" value="collections">
+                            <input type="hidden" name="action" value="rename_collection">
+                            <input type="hidden" name="old_value" value="{{ row.collection_name }}">
+                            <input type="text" name="new_value" value="{{ row.collection_name }}">
+                            <button class="button ghost" type="submit">Save</button>
+                        </form>
+                    </td>
+                    <td>
+                        <form method="post" class="catalogue-inline-form">
+                            {% csrf_token %}
+                            <input type="hidden" name="tab" value="collections">
+                            <input type="hidden" name="action" value="clear_collection">
+                            <input type="hidden" name="old_value" value="{{ row.collection_name }}">
+                            <button class="button danger" type="submit">Clear</button>
+                        </form>
+                    </td>
+                </tr>
+            {% empty %}
+                <tr><td colspan="4" class="empty-state">No collections yet.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    {% elif active_tab == 'concentrations' %}
+        <table class="data-table catalogue-admin-table">
+            <thead>
+                <tr>
+                    <th>Concentration</th>
+                    <th>Products</th>
+                    <th>Rename</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for row in concentration_rows %}
+                <tr>
+                    <td>{{ row.concentration }}</td>
+                    <td>{{ row.perfume_count }}</td>
+                    <td>
+                        <form method="post" class="catalogue-inline-form">
+                            {% csrf_token %}
+                            <input type="hidden" name="tab" value="concentrations">
+                            <input type="hidden" name="action" value="rename_concentration">
+                            <input type="hidden" name="old_value" value="{{ row.concentration }}">
+                            <input type="text" name="new_value" value="{{ row.concentration }}">
+                            <button class="button ghost" type="submit">Save</button>
+                        </form>
+                    </td>
+                    <td>
+                        <form method="post" class="catalogue-inline-form">
+                            {% csrf_token %}
+                            <input type="hidden" name="tab" value="concentrations">
+                            <input type="hidden" name="action" value="clear_concentration">
+                            <input type="hidden" name="old_value" value="{{ row.concentration }}">
+                            <button class="button danger" type="submit">Clear</button>
+                        </form>
+                    </td>
+                </tr>
+            {% empty %}
+                <tr><td colspan="4" class="empty-state">No concentrations yet.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
     {% endif %}
 </div>
 {% endblock %}

@@ -945,6 +945,26 @@ select:focus {
 .toggle input:checked ~ .toggle-thumb { transform: translateX(16px); }
 
 .search-wrap { margin-bottom: 20px; }
+.catalogue-tabs {
+  margin-bottom: 22px;
+}
+.catalogue-add-row,
+.catalogue-inline-form {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.catalogue-add-row {
+  margin-bottom: 18px;
+}
+.catalogue-add-row input,
+.catalogue-inline-form input {
+  min-width: 220px;
+}
+.catalogue-admin-table td {
+  vertical-align: middle;
+}
 .search-wrap-inner {
   position: relative;
   display: inline-block;

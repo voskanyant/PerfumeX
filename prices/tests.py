@@ -690,6 +690,67 @@ class OurProductCatalogueListTests(TestCase):
         self.assertFalse(self.variant.is_tester)
         self.assertEqual(self.variant.packaging, "no box")
 
+    def test_our_products_brands_tab_can_add_brand(self):
+        response = self.client.post(
+            reverse("prices:our_product_list"),
+            {"tab": "brands", "action": "add_brand", "name": "New House"},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(Brand.objects.filter(name="New House").exists())
+
+    def test_our_products_brands_tab_does_not_delete_used_brand(self):
+        brand = self.perfume.brand
+
+        response = self.client.post(
+            reverse("prices:our_product_list"),
+            {"tab": "brands", "action": "delete_brand", "brand_id": brand.id},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(Brand.objects.filter(id=brand.id).exists())
+
+    def test_our_products_brands_tab_deletes_unused_brand(self):
+        brand = Brand.objects.create(name="Unused House")
+
+        response = self.client.post(
+            reverse("prices:our_product_list"),
+            {"tab": "brands", "action": "delete_brand", "brand_id": brand.id},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(Brand.objects.filter(id=brand.id).exists())
+
+    def test_our_products_collection_tab_renames_collection(self):
+        response = self.client.post(
+            reverse("prices:our_product_list"),
+            {
+                "tab": "collections",
+                "action": "rename_collection",
+                "old_value": "Classic",
+                "new_value": "Les Classiques",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.perfume.refresh_from_db()
+        self.assertEqual(self.perfume.collection_name, "Les Classiques")
+
+    def test_our_products_concentration_tab_renames_concentration(self):
+        response = self.client.post(
+            reverse("prices:our_product_list"),
+            {
+                "tab": "concentrations",
+                "action": "rename_concentration",
+                "old_value": "Eau de Parfum",
+                "new_value": "Extrait de Parfum",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.perfume.refresh_from_db()
+        self.assertEqual(self.perfume.concentration, "Extrait de Parfum")
+
 
 class SupplierImportBoundaryTests(TestCase):
     def setUp(self):
