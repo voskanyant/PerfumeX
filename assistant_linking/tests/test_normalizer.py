@@ -852,6 +852,31 @@ class NormalizerTests(TestCase):
         self.assertEqual(parsed.supplier_gender_hint, "Pour Homme")
         self.assertTrue(parsed.is_tester)
 
+    def test_chloe_atelier_alias_sets_collection_and_scent(self):
+        brand = Brand.objects.create(name="Chloe")
+        BrandAlias.objects.create(brand=brand, alias_text="Chloe", normalized_alias="chloe")
+        ProductAlias.objects.create(
+            brand=brand,
+            alias_text="atelier jasminum sambac",
+            canonical_text="Jasminum Sambac",
+            collection_name="Atelier des Fleurs",
+            priority=20,
+        )
+        product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="chloe-atelier-jasminum-sambac",
+            name="Chloe ATELIER Jasminum Sambac 150ml edp TEST",
+        )
+
+        parsed = parse_supplier_product(product)
+
+        self.assertEqual(parsed.normalized_brand, brand)
+        self.assertEqual(parsed.collection_name, "Atelier des Fleurs")
+        self.assertEqual(parsed.product_name_text, "Jasminum Sambac")
+        self.assertEqual(parsed.concentration, "Eau de Parfum")
+        self.assertEqual(parsed.size_ml, Decimal("150.00"))
+        self.assertTrue(parsed.is_tester)
+
     def test_brand_alias_rejects_bad_regex(self):
         alias = BrandAlias(
             brand=self.brand,

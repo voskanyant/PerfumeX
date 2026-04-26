@@ -27,7 +27,7 @@ from prices.models import SupplierProduct
 
 
 logger = logging.getLogger(__name__)
-PARSER_VERSION = "deterministic-v4"
+PARSER_VERSION = "deterministic-v5"
 REGEX_ALIAS_TIMEOUT_SECONDS = 1.0
 
 DEFAULT_CONCENTRATION_ALIASES = (
