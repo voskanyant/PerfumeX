@@ -1041,7 +1041,7 @@ class SupplierImportBoundaryTests(TestCase):
             latest_run=None,
         )
 
-        self.assertEqual(row["check_code"], "no-files")
+        self.assertEqual(row["check_code"], "no-change")
         self.assertIn("Manual check", row["check_note"])
 
     def test_global_scan_without_supplier_event_does_not_touch_row_status(self):
