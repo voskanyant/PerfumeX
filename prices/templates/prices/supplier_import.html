@@ -22,14 +22,14 @@
             </div>
         </div>
 
-        <nav class="supplier-source-tabs" aria-label="Import source sections">
-            <a href="#email-rules">Email rules</a>
-            <a href="#link-sources">Link sources</a>
-            <a href="#manual-upload">Manual file</a>
-            <a href="#email-backfill">History</a>
+        <nav class="tabs supplier-source-tabs" aria-label="Supplier import sources">
+            <a class="tab active" href="#email-rules" data-supplier-import-tab="email-rules">Update from email</a>
+            <a class="tab" href="#link-sources" data-supplier-import-tab="link-sources">Update from link</a>
+            <a class="tab" href="#price-file" data-supplier-import-tab="price-file">Price file</a>
         </nav>
 
-        <section class="supplier-import-utility supplier-import-utility--stack" id="email-rules">
+        <section class="supplier-import-tab-panel is-active" id="email-rules" data-supplier-import-panel="email-rules">
+        <div class="supplier-import-utility supplier-import-utility--stack">
             <div>
                 <span class="card-label">Email rules</span>
                 <h2 class="card-title">Update from email</h2>
@@ -49,9 +49,11 @@
                     <strong>{{ supplier.price_filename_pattern|default:"Any spreadsheet" }}</strong>
                 </div>
             </div>
+        </div>
         </section>
 
-        <section class="supplier-import-utility supplier-import-utility--stack" id="link-sources">
+        <section class="supplier-import-tab-panel" id="link-sources" data-supplier-import-panel="link-sources">
+        <div class="supplier-import-utility supplier-import-utility--stack">
             <div>
                 <span class="card-label">Link sources</span>
                 <h2 class="card-title">Update from link</h2>
@@ -125,8 +127,10 @@
                     </div>
                 {% endfor %}
             </div>
+        </div>
         </section>
 
+        <section class="supplier-import-tab-panel" id="price-file" data-supplier-import-panel="price-file">
         <div class="supplier-import-workbench" id="manual-upload">
             <form method="post" enctype="multipart/form-data" class="supplier-import-form">
                 {% csrf_token %}
@@ -258,6 +262,7 @@
                 <button class="button secondary" type="submit">Run backfill</button>
             </form>
         </div>
+        </section>
     </div>
     <div id="supplier-import-config" data-supplier-id="{{ supplier.pk }}"></div>
     <script src="{% static 'prices/js/supplier-import.js' %}"></script>

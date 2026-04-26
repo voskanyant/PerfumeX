@@ -196,32 +196,15 @@
 }
 
 .supplier-source-tabs {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-  padding: 6px;
-  border: 1px solid var(--grey-200);
-  border-radius: var(--radius-md);
-  background: var(--white);
-  box-shadow: var(--shadow-sm);
+  margin-bottom: 0;
 }
 
-.supplier-source-tabs a {
-  min-height: 34px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 7px 12px;
-  border-radius: var(--radius-sm);
-  color: var(--grey-600);
-  font-size: 12px;
-  text-decoration: none;
+.supplier-import-tab-panel {
+  display: none;
 }
 
-.supplier-source-tabs a:hover {
-  background: var(--grey-50);
-  color: var(--black);
+.supplier-import-tab-panel.is-active {
+  display: block;
 }
 
 .supplier-import-form {

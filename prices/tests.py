@@ -127,6 +127,10 @@ class FrontendHardeningTests(TestCase):
         response = self.client.get(reverse("prices:supplier_import", args=[supplier.pk]), secure=True)
 
         self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'class="tabs supplier-source-tabs"')
+        self.assertContains(response, "Update from email")
+        self.assertContains(response, "Update from link")
+        self.assertContains(response, "Price file")
         self.assertContains(response, "supplier-import-workbench")
         self.assertContains(response, "supplier-upload-box")
         self.assertContains(response, "Mapping preview")
