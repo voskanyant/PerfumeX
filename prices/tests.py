@@ -135,8 +135,9 @@ class FrontendHardeningTests(TestCase):
         self.assertContains(response, "Update from link")
         self.assertContains(response, "Price file")
         self.assertContains(response, "Automatic mailbox scans use these rules")
-        self.assertNotContains(response, "supplier-import-workbench")
-        self.assertNotContains(response, "Mapping preview")
+        self.assertContains(response, "supplier-import-workbench")
+        self.assertContains(response, "Mapping preview")
+        self.assertContains(response, "These settings are used by email attachments")
 
     def test_supplier_import_file_tab_uses_workbench_layout(self):
         supplier = models.Supplier.objects.create(
@@ -180,7 +181,8 @@ class FrontendHardeningTests(TestCase):
         self.assertContains(response, "Update from link")
         self.assertContains(response, "https://disk.yandex.ru/d/example")
         self.assertContains(response, "Import now")
-        self.assertNotContains(response, "supplier-import-workbench")
+        self.assertContains(response, "supplier-import-workbench")
+        self.assertContains(response, "These settings are used by email attachments")
 
 
 class MailboxPasswordSecurityTests(TestCase):

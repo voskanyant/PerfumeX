@@ -145,7 +145,27 @@
                     {% endfor %}
                 </div>
             </section>
-        {% else %}
+        {% elif active_import_source == "file" %}
+            <section class="supplier-tab-card supplier-file-summary">
+                <div class="supplier-tab-card__head">
+                    <div>
+                        <span class="card-label">Manual file</span>
+                        <h2 class="card-title">Price file</h2>
+                        <p class="card-desc">Use the shared mapping tools below to upload a spreadsheet, verify columns, and import this supplier manually.</p>
+                    </div>
+                </div>
+            </section>
+        {% endif %}
+
+        <section class="supplier-common-tools">
+            <div class="supplier-common-tools__head">
+                <div>
+                    <span class="card-label">Mapping and tools</span>
+                    <h2 class="card-title">Price file mapping</h2>
+                </div>
+                <p class="card-desc">These settings are used by email attachments, link downloads, and manual uploads.</p>
+            </div>
+
             <div class="supplier-import-workbench" id="manual-upload">
                 <form method="post" enctype="multipart/form-data" class="supplier-import-form">
                     {% csrf_token %}
@@ -276,7 +296,7 @@
                     <button class="button secondary" type="submit">Run backfill</button>
                 </form>
             </div>
-        {% endif %}
+        </section>
     </div>
     <div id="supplier-import-config" data-supplier-id="{{ supplier.pk }}"></div>
     <script src="{% static 'prices/js/supplier-import.js' %}"></script>
