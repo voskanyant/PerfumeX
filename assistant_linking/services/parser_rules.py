@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 import logging
+import regex
 
 from django.core.cache import cache
 from django.db import OperationalError, ProgrammingError
@@ -11,16 +12,58 @@ from assistant_linking.utils.text import normalize_alias_value
 
 logger = logging.getLogger(__name__)
 PARSER_RULE_CACHE_KEY = "assistant_linking:parser_rules:v1"
-PARSER_RULE_KINDS = (
-    "parser_tester_term",
-    "parser_sample_term",
-    "parser_mini_term",
-    "parser_travel_term",
-    "parser_set_term",
-    "parser_refill_term",
-    "parser_audience_term",
-    "regex_preprocess",
+PARSER_RULE_KIND_OPTIONS = (
+    {
+        "key": "parser_tester_term",
+        "label": "Tester term",
+        "description": "Marks rows as Tester and removes the marker from the scent name.",
+        "example": "tester",
+    },
+    {
+        "key": "parser_sample_term",
+        "label": "Sample term",
+        "description": "Marks samples and vial rows without treating them as full bottles.",
+        "example": "sample",
+    },
+    {
+        "key": "parser_mini_term",
+        "label": "Mini term",
+        "description": "Marks miniature rows as mini variants.",
+        "example": "miniature",
+    },
+    {
+        "key": "parser_travel_term",
+        "label": "Travel term",
+        "description": "Marks travel-size rows as travel variants.",
+        "example": "travel",
+    },
+    {
+        "key": "parser_set_term",
+        "label": "Set term",
+        "description": "Routes sets and coffrets away from complete single perfumes.",
+        "example": "coffret",
+    },
+    {
+        "key": "parser_refill_term",
+        "label": "Refill term",
+        "description": "Adds the refill modifier to matching rows.",
+        "example": "refill",
+    },
+    {
+        "key": "parser_audience_term",
+        "label": "Audience alias",
+        "description": "Sets audience from supplier text. Format: alias => Display | men/women/unisex.",
+        "example": "fem => Woman | women",
+    },
+    {
+        "key": "regex_preprocess",
+        "label": "Regex preprocess",
+        "description": "Rewrites supplier text before parsing. Format: regex pattern => replacement.",
+        "example": r"\beau de perfume\b => eau de parfum",
+    },
 )
+PARSER_RULE_KINDS = tuple(option["key"] for option in PARSER_RULE_KIND_OPTIONS)
+PARSER_RULE_KIND_LABELS = {option["key"]: option["label"] for option in PARSER_RULE_KIND_OPTIONS}
 TERM_RULE_KINDS = tuple(kind for kind in PARSER_RULE_KINDS if kind != "regex_preprocess")
 
 
@@ -66,6 +109,25 @@ def _parse_audience_rule(rule_text: str) -> tuple[str, str, str] | None:
     if not alias or not display or group not in {"men", "women", "unisex"}:
         return None
     return alias, display, group
+
+
+def validate_parser_rule_text(rule_kind: str, rule_text: str) -> str:
+    if rule_kind not in PARSER_RULE_KINDS:
+        return "Choose a valid parser rule kind."
+    if not (rule_text or "").strip():
+        return "Add at least one parser term."
+    if rule_kind == "parser_audience_term" and not _parse_audience_rule(rule_text):
+        return "Audience aliases must use: alias => Display | men/women/unisex."
+    if rule_kind == "regex_preprocess":
+        parsed = _parse_preprocess_rule(rule_text)
+        if not parsed:
+            return "Regex preprocess rules must use: pattern => replacement."
+        pattern, _replacement = parsed
+        try:
+            regex.compile(pattern)
+        except regex.error as exc:
+            return f"Regex preprocess pattern is invalid: {exc}"
+    return ""
 
 
 def get_parser_rules() -> dict[str, list]:

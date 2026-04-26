@@ -15,6 +15,7 @@ from assistant_linking.models import (
     ManualLinkDecisionAudit,
     MatchGroup,
     MatchGroupItem,
+    ProductAlias,
 )
 from assistant_linking.services.grouping import rebuild_groups
 from assistant_linking.services.normalizer import save_parse
@@ -221,6 +222,7 @@ class ConcurrentSuggestionAcceptanceTests(TransactionTestCase):
     reset_sequences = True
 
     def setUp(self):
+        ProductAlias.objects.all().delete()
         self.staff1 = User.objects.create_user(username="staff1", password="pass", is_staff=True)
         self.staff2 = User.objects.create_user(username="staff2", password="pass", is_staff=True)
         self.brand = Brand.objects.create(name="Race Brand")

@@ -18,6 +18,7 @@ from assistant_core.services.catalog_importer import import_catalog_file
 from assistant_core.services.mock_brand_research import run_mock_brand_watch
 from assistant_core.services.mock_description_generator import create_mock_draft
 from assistant_linking import forms as linking_forms
+from assistant_linking.services.parser_rules import PARSER_RULE_KIND_OPTIONS, PARSER_RULE_KINDS
 from catalog.models import AIDraft, Brand, FactClaim, Perfume, PerfumeVariant
 
 
@@ -121,18 +122,7 @@ class KnowledgeView(StaffAssistantMixin, TemplateView):
             if section == self.SECTION_GARBAGE_KEYWORDS:
                 queryset = queryset.filter(rule_kind__in=("garbage_keyword", "exclude_keyword"))
             elif section == self.SECTION_PARSER_TERMS:
-                queryset = queryset.filter(
-                    rule_kind__in=(
-                        "parser_tester_term",
-                        "parser_sample_term",
-                        "parser_mini_term",
-                        "parser_travel_term",
-                        "parser_set_term",
-                        "parser_refill_term",
-                        "parser_audience_term",
-                        "regex_preprocess",
-                    )
-                )
+                queryset = queryset.filter(rule_kind__in=PARSER_RULE_KINDS)
             if query:
                 queryset = queryset.filter(
                     Q(title__icontains=query)
@@ -250,16 +240,7 @@ class KnowledgeView(StaffAssistantMixin, TemplateView):
                 "key": self.SECTION_PARSER_TERMS,
                 "label": "Parser terms",
                 "count": models.GlobalRule.objects.filter(
-                    rule_kind__in=(
-                        "parser_tester_term",
-                        "parser_sample_term",
-                        "parser_mini_term",
-                        "parser_travel_term",
-                        "parser_set_term",
-                        "parser_refill_term",
-                        "parser_audience_term",
-                        "regex_preprocess",
-                    )
+                    rule_kind__in=PARSER_RULE_KINDS
                 ).count(),
             },
             {"key": self.SECTION_GLOBAL_RULES, "label": "Global rules", "count": models.GlobalRule.objects.count()},
@@ -278,6 +259,7 @@ class KnowledgeView(StaffAssistantMixin, TemplateView):
                 "page_obj": page_obj,
                 "items": page_obj.object_list,
                 "concentration_alias_count": ConcentrationAlias.objects.count(),
+                "parser_rule_kind_options": PARSER_RULE_KIND_OPTIONS,
             }
         )
         return context
@@ -602,19 +584,10 @@ class GarbageKeywordCreateView(StaffAssistantMixin, View):
 
 
 class ParserTermCreateView(StaffAssistantMixin, View):
-    allowed_kinds = {
-        "parser_tester_term",
-        "parser_sample_term",
-        "parser_mini_term",
-        "parser_travel_term",
-        "parser_set_term",
-        "parser_refill_term",
-        "parser_audience_term",
-        "regex_preprocess",
-    }
+    allowed_kinds = set(PARSER_RULE_KINDS)
 
     def post(self, request):
-        from assistant_linking.services.parser_rules import clear_parser_rule_cache, normalize_parser_terms
+        from assistant_linking.services.parser_rules import clear_parser_rule_cache, normalize_parser_terms, validate_parser_rule_text
 
         rule_kind = request.POST.get("rule_kind", "").strip()
         raw_terms = request.POST.get("terms", "")
@@ -628,6 +601,11 @@ class ParserTermCreateView(StaffAssistantMixin, View):
             terms = normalize_parser_terms(raw_terms)
         if not terms:
             messages.error(request, "Add at least one parser term.")
+            return redirect(f"{reverse_lazy('assistant_core:knowledge')}?section=parser_terms")
+
+        errors = [error for term in terms if (error := validate_parser_rule_text(rule_kind, term))]
+        if errors:
+            messages.error(request, errors[0])
             return redirect(f"{reverse_lazy('assistant_core:knowledge')}?section=parser_terms")
 
         for term in terms:

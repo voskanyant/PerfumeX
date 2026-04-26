@@ -73,14 +73,9 @@
                 <div class="span-12 md-span-3">
                     <label class="form-label" for="parser-rule-kind">Rule kind</label>
                     <select id="parser-rule-kind" name="rule_kind">
-                        <option value="parser_tester_term">Tester term</option>
-                        <option value="parser_sample_term">Sample term</option>
-                        <option value="parser_mini_term">Mini term</option>
-                        <option value="parser_travel_term">Travel term</option>
-                        <option value="parser_set_term">Set term</option>
-                        <option value="parser_refill_term">Refill term</option>
-                        <option value="parser_audience_term">Audience alias</option>
-                        <option value="regex_preprocess">Regex preprocess</option>
+                        {% for option in parser_rule_kind_options %}
+                            <option value="{{ option.key }}">{{ option.label }}</option>
+                        {% endfor %}
                     </select>
                 </div>
                 <div class="span-12 md-span-6">
@@ -91,6 +86,13 @@
                     <button class="button primary" type="submit">Add parser rule</button>
                     <p class="page-meta space-top-sm">Approved parser terms affect new parses after reparse.</p>
                 </div>
+            </div>
+            <div class="layout-grid-12 gap-sm space-top-sm">
+                {% for option in parser_rule_kind_options %}
+                    <div class="span-12 md-span-6 page-meta">
+                        <strong>{{ option.label }}:</strong> {{ option.description }} Example: <code>{{ option.example }}</code>
+                    </div>
+                {% endfor %}
             </div>
         </form>
     {% endif %}

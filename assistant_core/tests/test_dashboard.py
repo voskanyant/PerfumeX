@@ -61,6 +61,8 @@ class AssistantDashboardTests(TestCase):
         self.assertContains(response, "Parser terms")
         self.assertContains(response, "parser_mini_term")
         self.assertContains(response, "miniature")
+        self.assertContains(response, "Audience alias")
+        self.assertContains(response, "fem =&gt; Woman | women")
 
     def test_parser_term_create_updates_parser_behavior(self):
         user = User.objects.create_user(username="staff", password="pass", is_staff=True)
@@ -80,6 +82,38 @@ class AssistantDashboardTests(TestCase):
         )
         parsed = parse_supplier_product(product)
         self.assertIn("refill", parsed.modifiers)
+
+    def test_invalid_parser_audience_term_is_not_saved(self):
+        user = User.objects.create_user(username="staff", password="pass", is_staff=True)
+        self.client.force_login(user)
+
+        response = self.client.post(
+            reverse("assistant_core:parser_term_create"),
+            {"rule_kind": "parser_audience_term", "terms": "bad audience row"},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(GlobalRule.objects.filter(rule_kind="parser_audience_term", rule_text="bad audience row").exists())
+
+    def test_parser_audience_term_create_updates_parser_behavior(self):
+        user = User.objects.create_user(username="staff", password="pass", is_staff=True)
+        self.client.force_login(user)
+        supplier = Supplier.objects.create(name="Supplier", code="sup")
+
+        response = self.client.post(
+            reverse("assistant_core:parser_term_create"),
+            {"rule_kind": "parser_audience_term", "terms": "ladies => Woman | women"},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        product = SupplierProduct.objects.create(
+            supplier=supplier,
+            identity_key="kb-audience",
+            name="Some Brand Scent ladies 100ml",
+        )
+        parsed = parse_supplier_product(product)
+        self.assertEqual(parsed.supplier_gender_hint, "Woman")
+        self.assertEqual(parsed.product_name_text, "some brand scent")
 
     def test_garbage_keyword_create_clears_garbage_cache(self):
         cache.clear()

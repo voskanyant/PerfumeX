@@ -343,6 +343,45 @@ class NormalizerTests(TestCase):
         self.assertEqual(parsed.size_ml, Decimal("125.00"))
         self.assertTrue(parsed.is_tester)
 
+    def test_specific_product_alias_beats_blocked_generic_alias(self):
+        brand = Brand.objects.create(name="Thierry Mugler")
+        BrandAlias.objects.create(brand=brand, alias_text="Thierry Mugler", normalized_alias="thierry mugler")
+        ProductAlias.objects.create(
+            brand=brand,
+            alias_text="angel",
+            canonical_text="Angel",
+            excluded_terms="etoile des reves",
+            priority=10,
+            active=True,
+        )
+        ProductAlias.objects.create(
+            brand=brand,
+            alias_text="angel etoile des reves eau de nuit",
+            canonical_text="Angel Etoile des Reves Eau de Nuit",
+            audience="Woman",
+            priority=20,
+            active=True,
+        )
+        etoile_product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="mugler-etoile",
+            name="THIERRY MUGLER ANGEL ETOILE DES REVES EAU DE NUIT edp WOMAN 100ml",
+        )
+        angel_product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="mugler-angel",
+            name="THIERRY MUGLER ANGEL edp WOMAN 100ml",
+        )
+
+        etoile_parse = parse_supplier_product(etoile_product)
+        angel_parse = parse_supplier_product(angel_product)
+
+        self.assertEqual(etoile_parse.product_name_text, "Angel Etoile des Reves Eau de Nuit")
+        self.assertEqual(etoile_parse.concentration, "Eau de Parfum")
+        self.assertEqual(etoile_parse.size_ml, Decimal("100.00"))
+        self.assertEqual(etoile_parse.supplier_gender_hint, "Woman")
+        self.assertEqual(angel_parse.product_name_text, "Angel")
+
     def test_explicit_edp_wins_over_catalogue_link_concentration(self):
         brand = Brand.objects.create(name="Trussardi")
         BrandAlias.objects.create(brand=brand, alias_text="Trussardi", normalized_alias="trussardi")
@@ -513,6 +552,21 @@ class NormalizerTests(TestCase):
             parsed = parse_supplier_product(product)
 
             self.assertFalse(parsed.is_sample)
+
+    def test_kb_sample_terms_mark_probe_tubes_as_sample(self):
+        brand = Brand.objects.create(name="Byredo")
+        BrandAlias.objects.create(brand=brand, alias_text="Byredo", normalized_alias="byredo")
+        product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="sample-probe-tube",
+            name="Byredo Blanche \u043f\u0440\u043e\u0431\u0438\u0440\u043a\u0430 2ml",
+        )
+
+        parsed = parse_supplier_product(product)
+
+        self.assertTrue(parsed.is_sample)
+        self.assertEqual(parsed.variant_type, "sample")
+        self.assertEqual(parsed.product_name_text, "blanche")
 
     def test_refill_terms_add_refill_modifier(self):
         product = SupplierProduct.objects.create(
