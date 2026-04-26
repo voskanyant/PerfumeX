@@ -446,6 +446,18 @@ class ParsedListView(NormalizationIssueListView):
         queryset = _complete_parses(_exclude_garbage_parses(queryset))
         return queryset.order_by("-updated_at", "supplier_product__supplier__name", "supplier_product__name")
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        refreshed_parses = [
+            save_parse(parsed.supplier_product)
+            for parsed in context.get("parses", [])
+        ]
+        context["parses"] = refreshed_parses
+        context["object_list"] = refreshed_parses
+        if context.get("page_obj"):
+            context["page_obj"].object_list = refreshed_parses
+        return context
+
 
 class GarbageListView(NormalizationIssueListView):
     issue_title = "Garbage / excluded rows"

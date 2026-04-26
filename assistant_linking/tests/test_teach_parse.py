@@ -397,6 +397,50 @@ class TeachParseTests(TestCase):
         self.assertIsNone(stale_parse.size_ml)
         self.assertEqual(stale_parse.parser_version, "deterministic-old")
 
+    def test_parsed_products_page_refreshes_visible_saved_parse_rows(self):
+        brand = Brand.objects.create(name="Van Cleef & Arpels")
+        BrandAlias.objects.create(
+            brand=brand,
+            alias_text="VAN CLEEF & ARPELS",
+            normalized_alias="van cleef & arpels",
+        )
+        ProductAlias.objects.create(
+            brand=brand,
+            alias_text="collection extraordinaire",
+            canonical_text="",
+            collection_name="Collection Extraordinaire",
+            priority=30,
+        )
+        product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="vca-visible-stale",
+            name="VAN CLEEF & ARPELS Collection Extraordinaire Neroli Amara edp 15 ml tester",
+        )
+        stale_parse = ParsedSupplierProduct.objects.create(
+            supplier_product=product,
+            raw_name=product.name,
+            normalized_text="van cleef neroli amara",
+            normalized_brand=brand,
+            product_name_text="Neroli Amara",
+            collection_name="",
+            concentration="Eau de Parfum",
+            size_ml=Decimal("15.00"),
+            variant_type="tester",
+            is_tester=True,
+            confidence=95,
+            parser_version="deterministic-old",
+        )
+
+        response = self.client.get(reverse("assistant_linking:normalization_parsed"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            "Van Cleef &amp; Arpels / Collection Extraordinaire / Neroli Amara / Eau de Parfum / 15ml / Tester",
+        )
+        stale_parse.refresh_from_db()
+        self.assertEqual(stale_parse.collection_name, "Collection Extraordinaire")
+
     def test_reparse_supplier_products_command_refreshes_stale_rows(self):
         brand = Brand.objects.create(name="Fendi")
         BrandAlias.objects.create(brand=brand, alias_text="Fendi", normalized_alias="fendi")

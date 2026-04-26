@@ -345,6 +345,16 @@ class ImportBatch(models.Model):
                 name="uniq_batch_mailbox_message_id",
             ),
         ]
+        indexes = [
+            models.Index(
+                fields=["supplier", "status", "-created_at"],
+                name="prices_ib_supplier_status_idx",
+            ),
+            models.Index(
+                fields=["status", "-received_at"],
+                name="prices_ib_status_received_idx",
+            ),
+        ]
 
     def __str__(self) -> str:
         return f"{self.supplier} / {self.created_at:%Y-%m-%d %H:%M}"
@@ -465,6 +475,18 @@ class ImportFile(models.Model):
     def __str__(self) -> str:
         return f"{self.import_batch} / {self.filename}"
 
+    class Meta:
+        indexes = [
+            models.Index(
+                fields=["status", "file_kind"],
+                name="prices_if_status_kind_idx",
+            ),
+            models.Index(
+                fields=["import_batch", "file_kind", "status"],
+                name="prices_if_batch_kind_stat_idx",
+            ),
+        ]
+
 
 class PriceSnapshot(models.Model):
     supplier_product = models.ForeignKey(SupplierProduct, on_delete=models.CASCADE)
@@ -547,6 +569,18 @@ class EmailImportRun(models.Model):
 
     def __str__(self) -> str:
         return f"{self.supplier} {self.started_at:%Y-%m-%d %H:%M}"
+
+    class Meta:
+        indexes = [
+            models.Index(
+                fields=["supplier", "-started_at"],
+                name="prices_eir_sup_start_idx",
+            ),
+            models.Index(
+                fields=["status", "-updated_at"],
+                name="prices_eir_status_updated_idx",
+            ),
+        ]
 
 
 class EmailAttachmentDiagnostic(models.Model):
