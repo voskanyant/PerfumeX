@@ -101,7 +101,7 @@ class KnowledgeResearchTests(TestCase):
     def test_context_builder_includes_only_approved_active_rules(self):
         supplier = Supplier.objects.create(name="Supplier", code="sup")
         product = SupplierProduct.objects.create(supplier=supplier, identity_key="1", name="Name")
-        GlobalRule.objects.create(title="yes", rule_kind="linking", scope_type="global", rule_text="use", approved=True, active=True)
+        GlobalRule.objects.create(title="yes", rule_kind="linking", scope_type="global", rule_text="use", priority=0, approved=True, active=True)
         GlobalRule.objects.create(title="no", rule_kind="linking", scope_type="global", rule_text="ignore", approved=False, active=True)
         SupplierRule.objects.create(supplier=supplier, title="supplier", rule_kind="linking", rule_text="use", approved=True, active=True)
         KnowledgeNote.objects.create(category="brand", title="note", content="visible", supplier=supplier, active=True)

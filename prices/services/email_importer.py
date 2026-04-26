@@ -1632,7 +1632,7 @@ def run_import(
 
                                     batch_message_id = (message_id or "")[:200]
                                     if source_link:
-                                        batch_message_id = f"{batch_message_id}|link:{hashlib.sha1(source_link.encode('utf-8')).hexdigest()[:16]}"
+                                        batch_message_id = f"{batch_message_id}|link:{hashlib.sha256(source_link.encode('utf-8')).hexdigest()[:16]}"
                                     batch = models.ImportBatch.objects.create(
                                         supplier=matched_supplier,
                                         mailbox=mailbox,
