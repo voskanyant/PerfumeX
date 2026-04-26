@@ -248,6 +248,8 @@ class NormalizerTests(TestCase):
     def test_standalone_w_and_m_are_audience_aliases_not_product_name(self):
         brand = Brand.objects.create(name="Abercrombie & Fitch")
         BrandAlias.objects.create(brand=brand, alias_text="Abercrombie Fitch", normalized_alias="abercrombie fitch")
+        chanel = Brand.objects.create(name="Chanel")
+        BrandAlias.objects.create(brand=chanel, alias_text="Chanel", normalized_alias="chanel")
         woman_product = SupplierProduct.objects.create(
             supplier=self.supplier,
             identity_key="audience-w",
@@ -258,15 +260,23 @@ class NormalizerTests(TestCase):
             identity_key="audience-m",
             name="Abercrombie Fitch Authentic m tester edt100ml",
         )
+        fem_product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="audience-fem",
+            name="CHANEL COCO fem edp 50ml",
+        )
 
         woman_parse = parse_supplier_product(woman_product)
         men_parse = parse_supplier_product(men_product)
+        fem_parse = parse_supplier_product(fem_product)
 
         self.assertEqual(woman_parse.supplier_gender_hint, "Woman")
         self.assertEqual(woman_parse.product_name_text, "authentic moment")
         self.assertTrue(woman_parse.is_tester)
         self.assertEqual(men_parse.supplier_gender_hint, "Men")
         self.assertEqual(men_parse.product_name_text, "authentic")
+        self.assertEqual(fem_parse.supplier_gender_hint, "Woman")
+        self.assertEqual(fem_parse.product_name_text, "coco")
 
     def test_parenthetical_l_is_exact_woman_marker_not_product_name(self):
         brand = Brand.objects.create(name="Kenzo")
