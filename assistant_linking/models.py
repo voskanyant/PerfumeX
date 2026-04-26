@@ -207,6 +207,7 @@ class ParsedSupplierProduct(TimeStampedModel):
     concentration = models.CharField(max_length=80, blank=True, db_index=True)
     size_ml = models.DecimalField(max_digits=7, decimal_places=2, null=True, blank=True, db_index=True)
     raw_size_text = models.CharField(max_length=80, blank=True)
+    release_year = models.PositiveSmallIntegerField(null=True, blank=True, db_index=True)
     supplier_gender_hint = models.CharField(max_length=80, blank=True, db_index=True)
     packaging = models.CharField(max_length=80, blank=True, db_index=True)
     variant_type = models.CharField(max_length=80, blank=True, db_index=True)

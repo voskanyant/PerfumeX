@@ -349,7 +349,26 @@ class NormalizerTests(TestCase):
         self.assertEqual(parsed.product_name_text, "eros Pour Femme")
         self.assertEqual(parsed.concentration, "Eau de Toilette")
         self.assertEqual(parsed.size_ml, Decimal("100.00"))
+        self.assertEqual(parsed.release_year, 2015)
         self.assertEqual(parsed.supplier_gender_hint, "Pour Femme")
+
+    def test_release_year_is_stored_separately_not_displayed_in_name(self):
+        brand = Brand.objects.create(name="Versace")
+        BrandAlias.objects.create(brand=brand, alias_text="VERSACE", normalized_alias="versace")
+        product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="versace-eros-flame-year",
+            name="VERSACE EROS Flame Man edp 100 ml 2019 Tester",
+        )
+
+        parsed = save_parse(product, force=True)
+
+        self.assertEqual(parsed.normalized_brand, brand)
+        self.assertEqual(parsed.product_name_text, "eros flame man")
+        self.assertEqual(parsed.release_year, 2019)
+        self.assertEqual(parsed.concentration, "Eau de Parfum")
+        self.assertEqual(parsed.size_ml, Decimal("100.00"))
+        self.assertEqual(parsed.display_identity, "Versace / Eros Flame Man / Eau de Parfum / 100ml / Tester")
 
     def test_man_eau_fraiche_is_name_bearing_not_modifier_warning(self):
         brand = Brand.objects.create(name="Versace")

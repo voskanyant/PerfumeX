@@ -40,6 +40,7 @@
         <p>Category: {{ parsed.product_category_label }}</p>
         <p>Brand: {{ parsed.display_brand }}</p>
         <p>Name: {{ parsed.display_product_name }}</p>
+        {% if parsed.release_year %}<p>Year: {{ parsed.release_year }}</p>{% endif %}
         <p>{{ parsed.concentration }} &middot; {{ parsed.display_size }} &middot; {{ parsed.supplier_gender_hint }}</p>
         <p>Type: {{ parsed.display_variant_type }} &middot; Packaging: {{ parsed.display_packaging }}</p>
         <p>Confidence {{ parsed.confidence }}</p>

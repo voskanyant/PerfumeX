@@ -27,7 +27,7 @@ from prices.models import SupplierProduct
 
 
 logger = logging.getLogger(__name__)
-PARSER_VERSION = "deterministic-v11"
+PARSER_VERSION = "deterministic-v12"
 REGEX_ALIAS_TIMEOUT_SECONDS = 1.0
 
 DEFAULT_CONCENTRATION_ALIASES = (
@@ -121,6 +121,7 @@ class ParseResult:
     concentration: str = ""
     size_ml: Decimal | None = None
     raw_size_text: str = ""
+    release_year: int | None = None
     supplier_gender_hint: str = ""
     packaging: str = ""
     variant_type: str = ""
@@ -355,9 +356,17 @@ def _product_name_from_alias_match_context(text: str, alias_text: str, canonical
 
 def _clean_product_name_text(value: str) -> str:
     name = re.sub(r"\s+", " ", value or "").strip()
-    if any(_contains_phrase(name, term) for term in NAME_AUDIENCE_TERMS):
-        name = re.sub(r"\s+(?:19|20)\d{2}$", "", name).strip()
+    name = re.sub(r"\s+(?:19|20)\d{2}$", "", name).strip()
     return name[:255]
+
+
+def _extract_release_year(text: str) -> tuple[int | None, str]:
+    matches = list(re.finditer(r"(?<!\d)(?P<year>(?:19|20)\d{2})(?!\d)", text))
+    if not matches:
+        return None, text
+    match = matches[-1]
+    year = int(match.group("year"))
+    return year, re.sub(r"\s+", " ", f"{text[:match.start()]} {text[match.end():]}").strip()
 
 
 def _name_bearing_modifiers(product_alias: ProductAlias) -> set[str]:
@@ -495,6 +504,7 @@ def parse_supplier_product(product: SupplierProduct) -> ParseResult:
     size, raw_size, text = _extract_size(text)
     result.size_ml = size
     result.raw_size_text = raw_size
+    result.release_year, text = _extract_release_year(text)
 
     concentration_alias_rows = get_concentration_alias_rows()
     supplier_aliases = [row for row in concentration_alias_rows if row[0] == product.supplier_id]
@@ -692,6 +702,7 @@ def save_parse(product: SupplierProduct, *, force: bool = False) -> ParsedSuppli
             "concentration": parsed.concentration,
             "size_ml": parsed.size_ml,
             "raw_size_text": parsed.raw_size_text,
+            "release_year": parsed.release_year,
             "supplier_gender_hint": parsed.supplier_gender_hint,
             "packaging": parsed.packaging,
             "variant_type": parsed.variant_type,
