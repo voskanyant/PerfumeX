@@ -456,6 +456,41 @@ class TeachParseTests(TestCase):
         self.assertTrue(cached.context["stats_available"])
         self.assertEqual(cached.context["parsed_count"], 1)
 
+    def test_refresh_normalization_stats_command_warms_user_hidden_scopes(self):
+        brand = Brand.objects.create(name="Cache Brand")
+        visible = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="dashboard-cache-visible",
+            name="Cache Brand Visible edp 50ml",
+        )
+        hidden = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="dashboard-cache-hidden",
+            name="Cache Brand Hidden edp 50ml",
+        )
+        for product in [visible, hidden]:
+            ParsedSupplierProduct.objects.create(
+                supplier_product=product,
+                raw_name=product.name,
+                normalized_text=product.name.lower(),
+                normalized_brand=brand,
+                product_name_text=product.name,
+                concentration="Eau de Parfum",
+                size_ml=Decimal("50.00"),
+                confidence=95,
+            )
+        UserPreference.objects.update_or_create(
+            user=self.user,
+            defaults={"supplier_exclude_terms": "hidden"},
+        )
+
+        call_command("refresh_normalization_stats", "--all-user-scopes", verbosity=0)
+        response = self.client.get(reverse("assistant_linking:normalization_dashboard"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.context["stats_available"])
+        self.assertEqual(response.context["parsed_count"], 1)
+
     def test_parsed_products_page_shows_tester_in_identity(self):
         brand = Brand.objects.create(name="100 Bon")
         BrandAlias.objects.create(
