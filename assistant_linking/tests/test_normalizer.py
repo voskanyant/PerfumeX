@@ -877,6 +877,48 @@ class NormalizerTests(TestCase):
         self.assertEqual(parsed.size_ml, Decimal("150.00"))
         self.assertTrue(parsed.is_tester)
 
+    def test_xerjoff_casamorati_combination_maps_to_casamorati_brand(self):
+        xerjoff = Brand.objects.create(name="Xerjoff")
+        casamorati = Brand.objects.create(name="Casamorati")
+        BrandAlias.objects.create(
+            brand=xerjoff,
+            alias_text="xerjoff",
+            normalized_alias="xerjoff",
+            priority=100,
+        )
+        BrandAlias.objects.create(
+            brand=casamorati,
+            alias_text="xerjoff casamorati",
+            normalized_alias="xerjoff casamorati",
+            priority=10,
+        )
+        BrandAlias.objects.create(
+            brand=casamorati,
+            alias_text="casamorati",
+            normalized_alias="casamorati",
+            priority=10,
+        )
+        combined_product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="xerjoff-casamorati-italica",
+            name="Xerjoff Casamorati Italica 100ml edp",
+        )
+        standalone_product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="xerjoff-naxos",
+            name="Xerjoff Naxos 100ml edp",
+        )
+
+        combined = parse_supplier_product(combined_product)
+        standalone = parse_supplier_product(standalone_product)
+
+        self.assertEqual(combined.normalized_brand, casamorati)
+        self.assertEqual(combined.product_name_text, "italica")
+        self.assertEqual(combined.concentration, "Eau de Parfum")
+        self.assertEqual(combined.size_ml, Decimal("100.00"))
+        self.assertEqual(standalone.normalized_brand, xerjoff)
+        self.assertEqual(standalone.product_name_text, "naxos")
+
     def test_brand_alias_rejects_bad_regex(self):
         alias = BrandAlias(
             brand=self.brand,
