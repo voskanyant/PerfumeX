@@ -793,7 +793,7 @@ class SupplierImportBoundaryTests(TestCase):
         product = models.SupplierProduct.objects.create(
             supplier=self.supplier,
             supplier_sku="SKU-1",
-            identity_key="sku-1",
+            identity_key="SKU-1",
             name="Static Product",
             currency=models.Currency.RUB,
             current_price="10.00",
@@ -848,7 +848,7 @@ class SupplierImportBoundaryTests(TestCase):
         product = models.SupplierProduct.objects.create(
             supplier=self.supplier,
             supplier_sku="SKU-1",
-            identity_key="sku-1",
+            identity_key="SKU-1",
             name="Static Product",
             currency=models.Currency.RUB,
             current_price="10.00",
