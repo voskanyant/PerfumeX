@@ -371,42 +371,53 @@ def _collect_latest_successful_imports() -> dict[int, models.ImportBatch]:
         )
         .exclude(message_id__startswith=PRODUCT_REMOVED_EVENT_PREFIX)
         .annotate(updated_at=Coalesce(Max("importfile__processed_at"), "created_at"))
-        .order_by("-updated_at", "-received_at", "-created_at", "-id")
-        .distinct()
+        .annotate(
+            supplier_rank=Window(
+                expression=RowNumber(),
+                partition_by=[F("supplier_id")],
+                order_by=[
+                    F("updated_at").desc(nulls_last=True),
+                    F("received_at").desc(nulls_last=True),
+                    F("created_at").desc(nulls_last=True),
+                    F("id").desc(),
+                ],
+            )
+        )
+        .filter(supplier_rank=1)
     )
-    latest: dict[int, models.ImportBatch] = {}
-    for batch in batches:
-        if batch.supplier_id not in latest:
-            latest[batch.supplier_id] = batch
-    return latest
+    return {batch.supplier_id: batch for batch in batches}
 
 
 def _collect_latest_failed_import_files() -> dict[int, models.ImportFile]:
     files = (
         models.ImportFile.objects.select_related("import_batch", "import_batch__supplier")
         .filter(status=models.ImportStatus.FAILED)
-        .order_by("-import_batch__created_at", "-id")
+        .annotate(
+            supplier_rank=Window(
+                expression=RowNumber(),
+                partition_by=[F("import_batch__supplier_id")],
+                order_by=[F("import_batch__created_at").desc(nulls_last=True), F("id").desc()],
+            )
+        )
+        .filter(supplier_rank=1)
     )
-    latest: dict[int, models.ImportFile] = {}
-    for import_file in files:
-        supplier_id = import_file.import_batch.supplier_id
-        if supplier_id not in latest:
-            latest[supplier_id] = import_file
-    return latest
+    return {import_file.import_batch.supplier_id: import_file for import_file in files}
 
 
 def _collect_latest_attachment_diagnostics() -> dict[int, models.EmailAttachmentDiagnostic]:
     diagnostics = (
         models.EmailAttachmentDiagnostic.objects.select_related("supplier")
         .filter(supplier__isnull=False)
-        .order_by("-created_at", "-id")
+        .annotate(
+            supplier_rank=Window(
+                expression=RowNumber(),
+                partition_by=[F("supplier_id")],
+                order_by=[F("created_at").desc(nulls_last=True), F("id").desc()],
+            )
+        )
+        .filter(supplier_rank=1)
     )
-    latest: dict[int, models.EmailAttachmentDiagnostic] = {}
-    for diagnostic in diagnostics:
-        supplier_id = diagnostic.supplier_id
-        if supplier_id not in latest:
-            latest[supplier_id] = diagnostic
-    return latest
+    return {diagnostic.supplier_id: diagnostic for diagnostic in diagnostics}
 
 
 def _collect_active_price_mappings() -> dict[int, models.SupplierFileMapping]:
@@ -426,23 +437,33 @@ def _collect_active_price_mappings() -> dict[int, models.SupplierFileMapping]:
 
 
 def _collect_latest_runs_and_streaks() -> tuple[dict[int, models.EmailImportRun], dict[int, int]]:
-    runs = (
-        models.EmailImportRun.objects.select_related("supplier")
-        .order_by("-started_at", "-id")
-    )
-    latest_runs: dict[int, models.EmailImportRun] = {}
-    streaks: dict[int, int] = {}
-    target_codes: dict[int, str] = {}
+    base_runs = models.EmailImportRun.objects.select_related("supplier")
+    latest_runs = {
+        run.supplier_id: run
+        for run in base_runs.annotate(
+            supplier_rank=Window(
+                expression=RowNumber(),
+                partition_by=[F("supplier_id")],
+                order_by=[F("started_at").desc(nulls_last=True), F("id").desc()],
+            )
+        ).filter(supplier_rank=1)
+    }
+    streaks: dict[int, int] = {supplier_id: 1 for supplier_id in latest_runs}
+    target_codes: dict[int, str] = {
+        supplier_id: str(_build_email_run_status(run).get("code") or "unknown")
+        for supplier_id, run in latest_runs.items()
+    }
+    recent_runs = list(base_runs.order_by("-started_at", "-id")[:1000])
+    seen_latest: set[int] = set()
     closed: set[int] = set()
-    for run in runs:
+    for run in recent_runs:
         supplier_id = run.supplier_id
-        code = str(_build_email_run_status(run).get("code") or "unknown")
-        if supplier_id not in latest_runs:
-            latest_runs[supplier_id] = run
-            streaks[supplier_id] = 1
-            target_codes[supplier_id] = code
+        if supplier_id not in latest_runs or supplier_id in closed:
             continue
-        if supplier_id in closed:
+        code = str(_build_email_run_status(run).get("code") or "unknown")
+        if supplier_id not in seen_latest:
+            if run.id == latest_runs[supplier_id].id:
+                seen_latest.add(supplier_id)
             continue
         if target_codes.get(supplier_id) == code:
             streaks[supplier_id] += 1
