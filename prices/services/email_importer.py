@@ -246,6 +246,13 @@ def _find_supplier_fallback(suppliers, from_addr, subject, filename):
 
 
 def _connect_imap(mailbox, logger, select_folder="INBOX"):
+    if mailbox.password_requires_reset():
+        _log(
+            logger,
+            f"Mailbox password cannot be decrypted for {mailbox.name}. "
+            "Re-enter its application password in Import Settings.",
+        )
+        return None
     host_candidates = _mailbox_host_candidates(mailbox)
     for attempt in range(2):
         for host in host_candidates:

@@ -54,6 +54,10 @@ class MailboxForm(forms.ModelForm):
         if password:
             return password
         if self.instance and self.instance.pk:
+            if self.instance.password_requires_reset():
+                raise forms.ValidationError(
+                    "Saved password cannot be decrypted. Enter the mailbox application password again."
+                )
             return self.instance.password
         raise forms.ValidationError("Password is required.")
 

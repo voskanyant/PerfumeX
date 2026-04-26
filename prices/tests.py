@@ -21,7 +21,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from catalog.models import Brand, Perfume, PerfumeVariant
-from prices import models
+from prices import forms, models
 from prices.management.commands.import_emails import (
     _get_supplier_latest_batch_time,
     _should_skip_recent_run,
@@ -201,6 +201,59 @@ class MailboxPasswordSecurityTests(TestCase):
             cursor.execute("SELECT password FROM prices_mailbox WHERE id = %s", [mailbox.pk])
             stored_password = cursor.fetchone()[0]
         self.assertNotEqual(stored_password, "plain-secret-value")
+
+    def test_mailbox_flags_unreadable_encrypted_token(self):
+        mailbox = models.Mailbox.objects.create(
+            name="broken-mailbox",
+            host="imap.example.com",
+            username="broken@example.com",
+            password="plain-secret-value",
+        )
+        encrypted_looking_value = "gAAAA" + ("x" * 115)
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "UPDATE prices_mailbox SET password = %s WHERE id = %s",
+                [encrypted_looking_value, mailbox.pk],
+            )
+
+        mailbox.refresh_from_db()
+
+        self.assertTrue(mailbox.password_requires_reset())
+
+    def test_mailbox_form_requires_password_when_saved_value_is_unreadable(self):
+        mailbox = models.Mailbox.objects.create(
+            name="broken-form-mailbox",
+            host="imap.example.com",
+            username="broken-form@example.com",
+            password="plain-secret-value",
+        )
+        encrypted_looking_value = "gAAAA" + ("x" * 115)
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "UPDATE prices_mailbox SET password = %s WHERE id = %s",
+                [encrypted_looking_value, mailbox.pk],
+            )
+        mailbox.refresh_from_db()
+
+        form = forms.MailboxForm(
+            data={
+                "protocol": models.Mailbox.IMAP,
+                "name": mailbox.name,
+                "host": mailbox.host,
+                "port": mailbox.port,
+                "username": mailbox.username,
+                "password": "",
+                "use_ssl": "on",
+                "is_active": "on",
+                "priority": mailbox.priority,
+                "last_inbox_uid": mailbox.last_inbox_uid,
+                "last_all_mail_uid": mailbox.last_all_mail_uid,
+            },
+            instance=mailbox,
+        )
+
+        self.assertFalse(form.is_valid())
+        self.assertIn("password", form.errors)
 
     def test_mailbox_password_not_in_admin_html(self):
         user = get_user_model().objects.create_superuser(

@@ -9,6 +9,10 @@ from django.utils.text import slugify
 from encrypted_fields import EncryptedCharField
 
 
+def looks_like_encrypted_token(value) -> bool:
+    return isinstance(value, str) and value.startswith("gAAAA") and len(value) >= 80
+
+
 class Currency(models.TextChoices):
     RUB = "RUB", "RUB"
     USD = "USD", "USD"
@@ -118,6 +122,9 @@ class Mailbox(models.Model):
                 self.last_all_mail_uid = 0
                 self.last_checked_at = None
         return super().save(*args, **kwargs)
+
+    def password_requires_reset(self) -> bool:
+        return looks_like_encrypted_token(self.password)
 
     def __str__(self) -> str:
         return self.name
