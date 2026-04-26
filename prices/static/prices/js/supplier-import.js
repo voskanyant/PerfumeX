@@ -8,33 +8,6 @@
     var supplierId = config ? String(config.getAttribute("data-supplier-id") || "") : "";
     var modeStatus = document.getElementById("mode-status");
 
-    function activateImportTab(targetId, updateHash) {
-        if (!targetId) return;
-        var targetPanel = document.querySelector("[data-supplier-import-panel='" + targetId + "']");
-        if (!targetPanel) return;
-        document.querySelectorAll("[data-supplier-import-tab]").forEach(function (tab) {
-            tab.classList.toggle("active", tab.getAttribute("data-supplier-import-tab") === targetId);
-        });
-        document.querySelectorAll("[data-supplier-import-panel]").forEach(function (panel) {
-            panel.classList.toggle("is-active", panel.getAttribute("data-supplier-import-panel") === targetId);
-        });
-        if (updateHash && window.history && window.history.replaceState) {
-            window.history.replaceState(null, "", "#" + targetId);
-        }
-    }
-
-    document.querySelectorAll("[data-supplier-import-tab]").forEach(function (tab) {
-        tab.addEventListener("click", function (event) {
-            event.preventDefault();
-            activateImportTab(tab.getAttribute("data-supplier-import-tab"), true);
-        });
-    });
-
-    var initialTab = (window.location.hash || "").replace("#", "");
-    if (initialTab) {
-        activateImportTab(initialTab, false);
-    }
-
     if (!fileInput || !supplierId) return;
 
     function escapeHtml(value) {

@@ -118,7 +118,7 @@ class FrontendHardeningTests(TestCase):
         self.assertIn("&lt;img src=x onerror=alert(1)&gt;", html)
         self.assertNotIn(payload, html)
 
-    def test_supplier_import_page_uses_workbench_layout(self):
+    def test_supplier_import_page_renders_server_side_tabs(self):
         supplier = models.Supplier.objects.create(
             name="Workbench Supplier",
             from_address_pattern="supplier@example.com",
@@ -128,12 +128,33 @@ class FrontendHardeningTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'class="tabs supplier-source-tabs"')
+        self.assertContains(response, "?source=email")
+        self.assertContains(response, "?source=link")
+        self.assertContains(response, "?source=file")
         self.assertContains(response, "Update from email")
         self.assertContains(response, "Update from link")
         self.assertContains(response, "Price file")
+        self.assertContains(response, "Automatic mailbox scans use these rules")
+        self.assertNotContains(response, "supplier-import-workbench")
+        self.assertNotContains(response, "Mapping preview")
+
+    def test_supplier_import_file_tab_uses_workbench_layout(self):
+        supplier = models.Supplier.objects.create(
+            name="Workbench Supplier",
+            from_address_pattern="supplier@example.com",
+        )
+
+        response = self.client.get(
+            reverse("prices:supplier_import", args=[supplier.pk]),
+            {"source": "file"},
+            secure=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
         self.assertContains(response, "supplier-import-workbench")
         self.assertContains(response, "supplier-upload-box")
         self.assertContains(response, "Mapping preview")
+        self.assertNotContains(response, "Automatic mailbox scans use these rules")
         self.assertNotContains(response, "<p><label")
 
     def test_supplier_import_page_exposes_link_sources(self):
@@ -149,12 +170,17 @@ class FrontendHardeningTests(TestCase):
             file_pattern="price",
         )
 
-        response = self.client.get(reverse("prices:supplier_import", args=[supplier.pk]), secure=True)
+        response = self.client.get(
+            reverse("prices:supplier_import", args=[supplier.pk]),
+            {"source": "link"},
+            secure=True,
+        )
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Update from link")
         self.assertContains(response, "https://disk.yandex.ru/d/example")
         self.assertContains(response, "Import now")
+        self.assertNotContains(response, "supplier-import-workbench")
 
 
 class MailboxPasswordSecurityTests(TestCase):

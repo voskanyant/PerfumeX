@@ -1,7 +1,7 @@
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin, UserPassesTestMixin
 from django.contrib.auth import get_user_model, update_session_auth_hash
 from django.contrib.auth.models import Group
-from django.urls import reverse_lazy
+from django.urls import reverse, reverse_lazy
 from collections import defaultdict
 import hashlib
 import os
@@ -2479,6 +2479,7 @@ class SupplierProductSearchView(LoginRequiredMixin, View):
 class SupplierImportView(LoginRequiredMixin, FormView):
     template_name = "prices/supplier_import.html"
     form_class = forms.SupplierImportForm
+    valid_sources = {"email", "link", "file"}
 
     def get_success_url(self):
         return reverse_lazy("prices:supplier_overview")
@@ -2486,7 +2487,11 @@ class SupplierImportView(LoginRequiredMixin, FormView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         supplier = get_object_or_404(models.Supplier, pk=self.kwargs["pk"])
+        active_source = self.request.GET.get("source", "email")
+        if active_source not in self.valid_sources:
+            active_source = "email"
         context["supplier"] = supplier
+        context["active_import_source"] = active_source
         context["source_form"] = forms.SupplierPriceSourceForm(
             initial={"source_type": models.PriceSourceType.FIXED_LINK}
         )
@@ -2544,6 +2549,10 @@ class SupplierImportView(LoginRequiredMixin, FormView):
         return super().form_valid(form)
 
 
+def _supplier_import_tab_url(pk, source):
+    return f"{reverse('prices:supplier_import', args=[pk])}?{urlencode({'source': source})}"
+
+
 class SupplierQuickUploadView(LoginRequiredMixin, View):
     def post(self, request, pk):
         supplier = get_object_or_404(models.Supplier, pk=pk)
@@ -2561,7 +2570,7 @@ class SupplierQuickUploadView(LoginRequiredMixin, View):
                 request,
                 "Create or confirm the supplier price mapping first.",
             )
-            return redirect("prices:supplier_import", pk=pk)
+            return redirect(_supplier_import_tab_url(pk, "file"))
 
         upload = request.FILES.get("file")
         if not upload:
@@ -2583,12 +2592,12 @@ class SupplierPriceSourceCreateView(LoginRequiredMixin, View):
         form = forms.SupplierPriceSourceForm(request.POST)
         if not form.is_valid():
             messages.error(request, "Link source was not saved. Check the highlighted fields.")
-            return redirect("prices:supplier_import", pk=pk)
+            return redirect(_supplier_import_tab_url(pk, "link"))
         source = form.save(commit=False)
         source.supplier = supplier
         source.save()
         messages.success(request, "Price link source saved.")
-        return redirect("prices:supplier_import", pk=pk)
+        return redirect(_supplier_import_tab_url(pk, "link"))
 
 
 class SupplierPriceSourceImportView(LoginRequiredMixin, View):
@@ -2608,7 +2617,7 @@ class SupplierPriceSourceImportView(LoginRequiredMixin, View):
         )
         if not mapping:
             messages.info(request, "Create or confirm the supplier price mapping first.")
-            return redirect("prices:supplier_import", pk=pk)
+            return redirect(_supplier_import_tab_url(pk, "file"))
         try:
             downloaded = link_importer.download_price_source(source)
             result = _process_supplier_price_payload(
@@ -2626,7 +2635,7 @@ class SupplierPriceSourceImportView(LoginRequiredMixin, View):
             source.last_message = str(exc)
             source.save(update_fields=["last_checked_at", "last_status", "last_message"])
             messages.error(request, f"{supplier.name}: link import failed. {exc}")
-            return redirect("prices:supplier_import", pk=pk)
+            return redirect(_supplier_import_tab_url(pk, "link"))
 
         source.last_checked_at = timezone.now()
         source.last_status = result["status"]
@@ -2644,7 +2653,7 @@ class SupplierPriceSourceImportView(LoginRequiredMixin, View):
             messages.info(request, f"{supplier.name}: no change, duplicate file {result['filename']}.")
         else:
             messages.success(request, f"{supplier.name}: imported {result['filename']} from link.")
-        return redirect("prices:supplier_import", pk=pk)
+        return redirect(_supplier_import_tab_url(pk, "link"))
 
 
 class SupplierPriceSourceDeleteView(LoginRequiredMixin, View):
@@ -2654,7 +2663,7 @@ class SupplierPriceSourceDeleteView(LoginRequiredMixin, View):
         )
         source.delete()
         messages.success(request, "Price link source deleted.")
-        return redirect("prices:supplier_import", pk=pk)
+        return redirect(_supplier_import_tab_url(pk, "link"))
 
 
 class SupplierEmailImportView(LoginRequiredMixin, View):

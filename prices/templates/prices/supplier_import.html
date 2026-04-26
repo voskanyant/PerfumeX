@@ -14,7 +14,7 @@
             <div>
                 <span class="page-kicker">Supplier import</span>
                 <h1 class="page-title">{{ supplier.name }}</h1>
-                <p class="page-subtitle space-bottom-none">Upload a price file, verify columns, and run a controlled import for this supplier.</p>
+                <p class="page-subtitle space-bottom-none">Manage how this supplier price list is found, downloaded, mapped, and imported.</p>
             </div>
             <div class="supplier-import-hero__meta">
                 <span>{{ supplier.from_address_pattern|default:"No email route" }}</span>
@@ -23,246 +23,260 @@
         </div>
 
         <nav class="tabs supplier-source-tabs" aria-label="Supplier import sources">
-            <a class="tab active" href="#email-rules" data-supplier-import-tab="email-rules">Update from email</a>
-            <a class="tab" href="#link-sources" data-supplier-import-tab="link-sources">Update from link</a>
-            <a class="tab" href="#price-file" data-supplier-import-tab="price-file">Price file</a>
+            <a class="tab {% if active_import_source == 'email' %}active{% endif %}" href="{% url 'prices:supplier_import' supplier.pk %}?source=email">Update from email</a>
+            <a class="tab {% if active_import_source == 'link' %}active{% endif %}" href="{% url 'prices:supplier_import' supplier.pk %}?source=link">Update from link</a>
+            <a class="tab {% if active_import_source == 'file' %}active{% endif %}" href="{% url 'prices:supplier_import' supplier.pk %}?source=file">Price file</a>
         </nav>
 
-        <section class="supplier-import-tab-panel is-active" id="email-rules" data-supplier-import-panel="email-rules">
-        <div class="supplier-import-utility supplier-import-utility--stack">
-            <div>
-                <span class="card-label">Email rules</span>
-                <h2 class="card-title">Update from email</h2>
-                <p class="card-desc">Automatic scans match supplier emails by sender, subject, attachment filename, and configured email-link sources.</p>
-            </div>
-            <div class="supplier-rule-summary">
-                <div>
-                    <span class="card-label">Sender</span>
-                    <strong>{{ supplier.from_address_pattern|default:"Not configured" }}</strong>
-                </div>
-                <div>
-                    <span class="card-label">Subject</span>
-                    <strong>{{ supplier.price_subject_pattern|default:"Any subject" }}</strong>
-                </div>
-                <div>
-                    <span class="card-label">Filename</span>
-                    <strong>{{ supplier.price_filename_pattern|default:"Any spreadsheet" }}</strong>
-                </div>
-            </div>
-        </div>
-        </section>
-
-        <section class="supplier-import-tab-panel" id="link-sources" data-supplier-import-panel="link-sources">
-        <div class="supplier-import-utility supplier-import-utility--stack">
-            <div>
-                <span class="card-label">Link sources</span>
-                <h2 class="card-title">Update from link</h2>
-                <p class="card-desc">Use this for suppliers who email a Yandex Disk, Google Drive, or direct spreadsheet link instead of attaching the file.</p>
-            </div>
-
-            <form method="post" action="{% url 'prices:supplier_price_source_create' supplier.pk %}" class="supplier-link-source-form">
-                {% csrf_token %}
-                <div class="supplier-import-field">
-                    <label for="{{ source_form.source_type.id_for_label }}" class="form-label">Source</label>
-                    {{ source_form.source_type }}
-                </div>
-                <div class="supplier-import-field">
-                    <label for="{{ source_form.provider.id_for_label }}" class="form-label">Provider</label>
-                    {{ source_form.provider }}
-                </div>
-                <div class="supplier-import-field supplier-link-source-form__url">
-                    <label for="{{ source_form.url.id_for_label }}" class="form-label">Fixed link</label>
-                    {{ source_form.url }}
-                    <div class="field-help">For email-link sources this can stay empty; the importer extracts the link from the email body.</div>
-                </div>
-                <div class="supplier-import-field">
-                    <label for="{{ source_form.url_pattern.id_for_label }}" class="form-label">Email link filter</label>
-                    {{ source_form.url_pattern }}
-                </div>
-                <div class="supplier-import-field">
-                    <label for="{{ source_form.file_pattern.id_for_label }}" class="form-label">Filename filter</label>
-                    {{ source_form.file_pattern }}
-                </div>
-                <div class="supplier-import-field">
-                    <label for="{{ source_form.pick_rule.id_for_label }}" class="form-label">Pick file</label>
-                    {{ source_form.pick_rule }}
-                </div>
-                <label class="supplier-link-active">
-                    {{ source_form.is_active }}
-                    <span>Active</span>
-                </label>
-                <button class="button secondary" type="submit">Save source</button>
-            </form>
-
-            <div class="supplier-link-source-list">
-                {% for source in price_sources %}
-                    <div class="supplier-link-source-row">
-                        <div>
-                            <strong>{{ source.get_source_type_display }} · {{ source.get_provider_display }}</strong>
-                            <p class="tone-muted text-small">
-                                {% if source.url %}{{ source.url }}{% else %}Email body link{% endif %}
-                                {% if source.file_pattern %} · file contains "{{ source.file_pattern }}"{% endif %}
-                            </p>
-                            {% if source.last_checked_at %}
-                                <p class="tone-muted text-small">Last {{ source.last_status|default:"checked" }}: {{ source.last_filename|default:source.last_message }}</p>
-                            {% endif %}
-                        </div>
-                        <div class="supplier-link-source-actions">
-                            {% if source.source_type == "fixed_link" %}
-                                <form method="post" action="{% url 'prices:supplier_price_source_import' supplier.pk source.pk %}">
-                                    {% csrf_token %}
-                                    <button class="button secondary" type="submit">Import now</button>
-                                </form>
-                            {% endif %}
-                            <form method="post" action="{% url 'prices:supplier_price_source_delete' supplier.pk source.pk %}">
-                                {% csrf_token %}
-                                <button class="button ghost" type="submit">Delete</button>
-                            </form>
-                        </div>
-                    </div>
-                {% empty %}
-                    <div class="supplier-preview-empty supplier-preview-empty--compact">
-                        <span class="card-label">No link sources</span>
-                        <p>Add a fixed folder link or an email-link source for suppliers who do not attach files.</p>
-                    </div>
-                {% endfor %}
-            </div>
-        </div>
-        </section>
-
-        <section class="supplier-import-tab-panel" id="price-file" data-supplier-import-panel="price-file">
-        <div class="supplier-import-workbench" id="manual-upload">
-            <form method="post" enctype="multipart/form-data" class="supplier-import-form">
-                {% csrf_token %}
-                {% if form.non_field_errors %}
-                    <div class="form-errors">
-                        {{ form.non_field_errors }}
-                    </div>
-                {% endif %}
-
-                <section class="supplier-import-panel supplier-import-panel--config">
-                    <div class="supplier-import-panel__head">
-                        <span class="card-label">Upload</span>
-                        <h2 class="card-title">Price file</h2>
-                        <p class="card-desc">Choose a spreadsheet, then click columns in the preview to fill the mapping.</p>
-                    </div>
-
-                    <div class="supplier-upload-box">
-                        <label for="{{ form.file.id_for_label }}" class="supplier-upload-box__label">
-                            <span>Spreadsheet</span>
-                            <strong>XLS, XLSX, or CSV</strong>
-                        </label>
-                        {{ form.file }}
-                        {% if form.file.errors %}<div class="field-errors">{{ form.file.errors }}</div>{% endif %}
-                    </div>
-
-                    <div class="supplier-field-section">
-                        <div>
-                            <span class="card-label">Workbook</span>
-                            <p class="supplier-field-section__hint">Use sheet selector only when prices live on specific sheets.</p>
-                        </div>
-                        <div class="supplier-import-field">
-                            <label for="{{ form.sheet_selector.id_for_label }}" class="form-label">Sheet selector</label>
-                            {{ form.sheet_selector }}
-                            {% if form.sheet_selector.help_text %}<div class="field-help">{{ form.sheet_selector.help_text }}</div>{% endif %}
-                            {% if form.sheet_selector.errors %}<div class="field-errors">{{ form.sheet_selector.errors }}</div>{% endif %}
-                        </div>
-                        <div class="supplier-import-field supplier-import-field--small">
-                            <label for="{{ form.header_row.id_for_label }}" class="form-label">Header row</label>
-                            {{ form.header_row }}
-                            {% if form.header_row.errors %}<div class="field-errors">{{ form.header_row.errors }}</div>{% endif %}
-                        </div>
-                    </div>
-
-                    <div class="supplier-field-section">
-                        <div>
-                            <span class="card-label">Columns</span>
-                            <p class="supplier-field-section__hint">Column numbers are 1-based. Use Add Name for multi-column names.</p>
-                        </div>
-                        <div class="supplier-mapping-grid">
-                            <div class="supplier-import-field">
-                                <label for="{{ form.sku_column.id_for_label }}" class="form-label">SKU</label>
-                                {{ form.sku_column }}
-                                {% if form.sku_column.errors %}<div class="field-errors">{{ form.sku_column.errors }}</div>{% endif %}
-                            </div>
-                            <div class="supplier-import-field">
-                                <label for="{{ form.name_columns.id_for_label }}" class="form-label">Name</label>
-                                {{ form.name_columns }}
-                                {% if form.name_columns.help_text %}<div class="field-help">{{ form.name_columns.help_text }}</div>{% endif %}
-                                {% if form.name_columns.errors %}<div class="field-errors">{{ form.name_columns.errors }}</div>{% endif %}
-                            </div>
-                            <div class="supplier-import-field">
-                                <label for="{{ form.price_column.id_for_label }}" class="form-label">Price</label>
-                                {{ form.price_column }}
-                                {% if form.price_column.errors %}<div class="field-errors">{{ form.price_column.errors }}</div>{% endif %}
-                            </div>
-                            <div class="supplier-import-field">
-                                <label for="{{ form.currency_column.id_for_label }}" class="form-label">Currency</label>
-                                {{ form.currency_column }}
-                                {% if form.currency_column.help_text %}<div class="field-help">{{ form.currency_column.help_text }}</div>{% endif %}
-                                {% if form.currency_column.errors %}<div class="field-errors">{{ form.currency_column.errors }}</div>{% endif %}
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="supplier-import-actions">
-                        <button class="button" type="submit">Upload and import</button>
-                        <a class="button ghost" href="#mapping-preview">Preview mapping</a>
-                    </div>
-                </section>
-            </form>
-
-            <section class="supplier-import-panel supplier-import-panel--preview" id="mapping-preview">
-                <div class="supplier-import-panel__head supplier-preview-head">
+        {% if active_import_source == "email" %}
+            <section class="supplier-tab-card">
+                <div class="supplier-tab-card__head">
                     <div>
-                        <span class="card-label">Preview</span>
-                        <h2 class="card-title">Mapping preview</h2>
-                        <p class="card-desc">Select a file to load rows. Click a column header to assign the active field.</p>
-                    </div>
-                    <div id="sheet-row" class="supplier-sheet-picker is-hidden">
-                        <label for="sheet-select" class="form-label">Sheet</label>
-                        <select id="sheet-select"></select>
+                        <span class="card-label">Email rules</span>
+                        <h2 class="card-title">Update from email</h2>
+                        <p class="card-desc">Automatic mailbox scans use these rules to match incoming supplier price emails.</p>
                     </div>
                 </div>
 
-                <div class="supplier-preview-toolbar" role="toolbar" aria-label="Mapping tools">
-                    <button type="button" class="button secondary is-active" id="mode-sku" data-mode-button>SKU</button>
-                    <button type="button" class="button secondary" id="mode-name" data-mode-button>Name</button>
-                    <button type="button" class="button secondary" id="mode-name-add" data-mode-button>Add name</button>
-                    <button type="button" class="button secondary" id="mode-price" data-mode-button>Price</button>
-                    <button type="button" class="button secondary" id="mode-currency" data-mode-button>Currency</button>
-                    <span id="mode-status" class="supplier-preview-mode">Mode: SKU</span>
+                <div class="supplier-rule-summary supplier-rule-summary--large">
+                    <div>
+                        <span class="card-label">Sender</span>
+                        <strong>{{ supplier.from_address_pattern|default:"Not configured" }}</strong>
+                    </div>
+                    <div>
+                        <span class="card-label">Subject</span>
+                        <strong>{{ supplier.price_subject_pattern|default:"Any subject" }}</strong>
+                    </div>
+                    <div>
+                        <span class="card-label">Filename</span>
+                        <strong>{{ supplier.price_filename_pattern|default:"Any spreadsheet" }}</strong>
+                    </div>
                 </div>
 
-                <div id="preview-table" class="supplier-preview-table">
-                    <div class="supplier-preview-empty">
-                        <span class="card-label">No file selected</span>
-                        <p>Choose a spreadsheet to preview rows and set mapping columns.</p>
-                    </div>
+                <div class="supplier-import-note">
+                    <strong>Automatic path</strong>
+                    <span>Email autoimport scans mailbox cursors, then updates this supplier only when a matching email or link is found.</span>
                 </div>
             </section>
-        </div>
+        {% elif active_import_source == "link" %}
+            <section class="supplier-tab-card">
+                <div class="supplier-tab-card__head">
+                    <div>
+                        <span class="card-label">Link sources</span>
+                        <h2 class="card-title">Update from link</h2>
+                        <p class="card-desc">Use this when the supplier sends a Yandex Disk, Google Drive, Mail.ru Cloud, or direct spreadsheet link instead of an attachment.</p>
+                    </div>
+                </div>
 
-        <div class="supplier-import-utility" id="email-backfill">
-            <div>
-                <span class="card-label">History</span>
-                <h2 class="card-title">Email backfill</h2>
-                <p class="card-desc">Run a targeted historical scan for this supplier when old prices need to be rebuilt.</p>
+                <form method="post" action="{% url 'prices:supplier_price_source_create' supplier.pk %}" class="supplier-link-source-form">
+                    {% csrf_token %}
+                    <div class="supplier-import-field">
+                        <label for="{{ source_form.source_type.id_for_label }}" class="form-label">Source</label>
+                        {{ source_form.source_type }}
+                    </div>
+                    <div class="supplier-import-field">
+                        <label for="{{ source_form.provider.id_for_label }}" class="form-label">Provider</label>
+                        {{ source_form.provider }}
+                    </div>
+                    <div class="supplier-import-field supplier-link-source-form__url">
+                        <label for="{{ source_form.url.id_for_label }}" class="form-label">Fixed link</label>
+                        {{ source_form.url }}
+                        <div class="field-help">For email-link sources this can stay empty; the importer extracts the link from the email body.</div>
+                    </div>
+                    <div class="supplier-import-field">
+                        <label for="{{ source_form.url_pattern.id_for_label }}" class="form-label">Email link filter</label>
+                        {{ source_form.url_pattern }}
+                    </div>
+                    <div class="supplier-import-field">
+                        <label for="{{ source_form.file_pattern.id_for_label }}" class="form-label">Filename filter</label>
+                        {{ source_form.file_pattern }}
+                    </div>
+                    <div class="supplier-import-field">
+                        <label for="{{ source_form.pick_rule.id_for_label }}" class="form-label">Pick file</label>
+                        {{ source_form.pick_rule }}
+                    </div>
+                    <label class="supplier-link-active">
+                        {{ source_form.is_active }}
+                        <span>Active</span>
+                    </label>
+                    <button class="button secondary" type="submit">Save source</button>
+                </form>
+            </section>
+
+            <section class="supplier-tab-card supplier-tab-card--list">
+                <div class="supplier-tab-card__head">
+                    <div>
+                        <span class="card-label">Saved sources</span>
+                        <h2 class="card-title">Link source list</h2>
+                    </div>
+                </div>
+
+                <div class="supplier-link-source-list">
+                    {% for source in price_sources %}
+                        <div class="supplier-link-source-row">
+                            <div>
+                                <strong>{{ source.get_source_type_display }} &middot; {{ source.get_provider_display }}</strong>
+                                <p class="tone-muted text-small" title="{% if source.url %}{{ source.url }}{% else %}Email body link{% endif %}">
+                                    {% if source.url %}{{ source.url }}{% else %}Email body link{% endif %}
+                                    {% if source.file_pattern %} &middot; file contains "{{ source.file_pattern }}"{% endif %}
+                                </p>
+                                {% if source.last_checked_at %}
+                                    <p class="tone-muted text-small">Last {{ source.last_status|default:"checked" }}: {{ source.last_filename|default:source.last_message }}</p>
+                                {% endif %}
+                            </div>
+                            <div class="supplier-link-source-actions">
+                                {% if source.source_type == "fixed_link" %}
+                                    <form method="post" action="{% url 'prices:supplier_price_source_import' supplier.pk source.pk %}">
+                                        {% csrf_token %}
+                                        <button class="button secondary" type="submit">Import now</button>
+                                    </form>
+                                {% endif %}
+                                <form method="post" action="{% url 'prices:supplier_price_source_delete' supplier.pk source.pk %}">
+                                    {% csrf_token %}
+                                    <button class="button ghost" type="submit">Delete</button>
+                                </form>
+                            </div>
+                        </div>
+                    {% empty %}
+                        <div class="supplier-preview-empty supplier-preview-empty--compact">
+                            <span class="card-label">No link sources</span>
+                            <p>Add a fixed folder link or an email-link source for suppliers who do not attach files.</p>
+                        </div>
+                    {% endfor %}
+                </div>
+            </section>
+        {% else %}
+            <div class="supplier-import-workbench" id="manual-upload">
+                <form method="post" enctype="multipart/form-data" class="supplier-import-form">
+                    {% csrf_token %}
+                    {% if form.non_field_errors %}
+                        <div class="form-errors">
+                            {{ form.non_field_errors }}
+                        </div>
+                    {% endif %}
+
+                    <section class="supplier-import-panel supplier-import-panel--config">
+                        <div class="supplier-import-panel__head">
+                            <span class="card-label">Upload</span>
+                            <h2 class="card-title">Price file</h2>
+                            <p class="card-desc">Choose a spreadsheet, then click columns in the preview to fill the mapping.</p>
+                        </div>
+
+                        <div class="supplier-upload-box">
+                            <label for="{{ form.file.id_for_label }}" class="supplier-upload-box__label">
+                                <span>Spreadsheet</span>
+                                <strong>XLS, XLSX, or CSV</strong>
+                            </label>
+                            {{ form.file }}
+                            {% if form.file.errors %}<div class="field-errors">{{ form.file.errors }}</div>{% endif %}
+                        </div>
+
+                        <div class="supplier-field-section">
+                            <div>
+                                <span class="card-label">Workbook</span>
+                                <p class="supplier-field-section__hint">Use sheet selector only when prices live on specific sheets.</p>
+                            </div>
+                            <div class="supplier-import-field">
+                                <label for="{{ form.sheet_selector.id_for_label }}" class="form-label">Sheet selector</label>
+                                {{ form.sheet_selector }}
+                                {% if form.sheet_selector.help_text %}<div class="field-help">{{ form.sheet_selector.help_text }}</div>{% endif %}
+                                {% if form.sheet_selector.errors %}<div class="field-errors">{{ form.sheet_selector.errors }}</div>{% endif %}
+                            </div>
+                            <div class="supplier-import-field supplier-import-field--small">
+                                <label for="{{ form.header_row.id_for_label }}" class="form-label">Header row</label>
+                                {{ form.header_row }}
+                                {% if form.header_row.errors %}<div class="field-errors">{{ form.header_row.errors }}</div>{% endif %}
+                            </div>
+                        </div>
+
+                        <div class="supplier-field-section">
+                            <div>
+                                <span class="card-label">Columns</span>
+                                <p class="supplier-field-section__hint">Column numbers are 1-based. Use Add Name for multi-column names.</p>
+                            </div>
+                            <div class="supplier-mapping-grid">
+                                <div class="supplier-import-field">
+                                    <label for="{{ form.sku_column.id_for_label }}" class="form-label">SKU</label>
+                                    {{ form.sku_column }}
+                                    {% if form.sku_column.errors %}<div class="field-errors">{{ form.sku_column.errors }}</div>{% endif %}
+                                </div>
+                                <div class="supplier-import-field">
+                                    <label for="{{ form.name_columns.id_for_label }}" class="form-label">Name</label>
+                                    {{ form.name_columns }}
+                                    {% if form.name_columns.help_text %}<div class="field-help">{{ form.name_columns.help_text }}</div>{% endif %}
+                                    {% if form.name_columns.errors %}<div class="field-errors">{{ form.name_columns.errors }}</div>{% endif %}
+                                </div>
+                                <div class="supplier-import-field">
+                                    <label for="{{ form.price_column.id_for_label }}" class="form-label">Price</label>
+                                    {{ form.price_column }}
+                                    {% if form.price_column.errors %}<div class="field-errors">{{ form.price_column.errors }}</div>{% endif %}
+                                </div>
+                                <div class="supplier-import-field">
+                                    <label for="{{ form.currency_column.id_for_label }}" class="form-label">Currency</label>
+                                    {{ form.currency_column }}
+                                    {% if form.currency_column.help_text %}<div class="field-help">{{ form.currency_column.help_text }}</div>{% endif %}
+                                    {% if form.currency_column.errors %}<div class="field-errors">{{ form.currency_column.errors }}</div>{% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="supplier-import-actions">
+                            <button class="button" type="submit">Upload and import</button>
+                        </div>
+                    </section>
+                </form>
+
+                <section class="supplier-import-panel supplier-import-panel--preview" id="mapping-preview">
+                    <div class="supplier-import-panel__head supplier-preview-head">
+                        <div>
+                            <span class="card-label">Preview</span>
+                            <h2 class="card-title">Mapping preview</h2>
+                            <p class="card-desc">Select a file to load rows. Click a column header to assign the active field.</p>
+                        </div>
+                        <div id="sheet-row" class="supplier-sheet-picker is-hidden">
+                            <label for="sheet-select" class="form-label">Sheet</label>
+                            <select id="sheet-select"></select>
+                        </div>
+                    </div>
+
+                    <div class="supplier-preview-toolbar" role="toolbar" aria-label="Mapping tools">
+                        <button type="button" class="button secondary is-active" id="mode-sku" data-mode-button>SKU</button>
+                        <button type="button" class="button secondary" id="mode-name" data-mode-button>Name</button>
+                        <button type="button" class="button secondary" id="mode-name-add" data-mode-button>Add name</button>
+                        <button type="button" class="button secondary" id="mode-price" data-mode-button>Price</button>
+                        <button type="button" class="button secondary" id="mode-currency" data-mode-button>Currency</button>
+                        <span id="mode-status" class="supplier-preview-mode">Mode: SKU</span>
+                    </div>
+
+                    <div id="preview-table" class="supplier-preview-table">
+                        <div class="supplier-preview-empty">
+                            <span class="card-label">No file selected</span>
+                            <p>Choose a spreadsheet to preview rows and set mapping columns.</p>
+                        </div>
+                    </div>
+                </section>
             </div>
-            <form method="post" action="{% url 'prices:supplier_import_email_backfill' supplier.pk %}" class="supplier-backfill-form">
-                {% csrf_token %}
-                <div class="supplier-import-field">
-                    <label for="backfill-start" class="form-label">Start date</label>
-                    <input id="backfill-start" name="start_date" type="date" required>
+
+            <div class="supplier-import-utility" id="email-backfill">
+                <div>
+                    <span class="card-label">History</span>
+                    <h2 class="card-title">Email backfill</h2>
+                    <p class="card-desc">Run a targeted historical scan for this supplier when old prices need to be rebuilt.</p>
                 </div>
-                <div class="supplier-import-field">
-                    <label for="backfill-end" class="form-label">End date</label>
-                    <input id="backfill-end" name="end_date" type="date">
-                </div>
-                <button class="button secondary" type="submit">Run backfill</button>
-            </form>
-        </div>
-        </section>
+                <form method="post" action="{% url 'prices:supplier_import_email_backfill' supplier.pk %}" class="supplier-backfill-form">
+                    {% csrf_token %}
+                    <div class="supplier-import-field">
+                        <label for="backfill-start" class="form-label">Start date</label>
+                        <input id="backfill-start" name="start_date" type="date" required>
+                    </div>
+                    <div class="supplier-import-field">
+                        <label for="backfill-end" class="form-label">End date</label>
+                        <input id="backfill-end" name="end_date" type="date">
+                    </div>
+                    <button class="button secondary" type="submit">Run backfill</button>
+                </form>
+            </div>
+        {% endif %}
     </div>
     <div id="supplier-import-config" data-supplier-id="{{ supplier.pk }}"></div>
     <script src="{% static 'prices/js/supplier-import.js' %}"></script>
