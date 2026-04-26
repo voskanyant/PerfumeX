@@ -1042,7 +1042,7 @@ class SupplierImportBoundaryTests(TestCase):
         )
 
         self.assertEqual(row["check_code"], "no-change")
-        self.assertIn("Manual check", row["check_note"])
+        self.assertEqual(row["check_note"], "")
 
     def test_global_scan_without_supplier_event_does_not_touch_row_status(self):
         now = timezone.now().replace(microsecond=0)
