@@ -9,18 +9,18 @@ from catalog.models import Brand, Perfume
 SAMPLE_HTML = """
 <div>
   <h2 class="tw-gridlist-section-title"> All Fragrances </h2>
-  <a href="/perfume/Van-Cleef-Arpels/Bois-Dore-1.html" class="group prefumeHbox">
+  <a href="/perfume/Van-Cleef-Arpels/Bois-Dore-1.html" class="group prefumeHbox tw-listview-item-unisex">
     <h3 class="tw-perfume-title"> Bois DorÃ© </h3>
     <p class="tw-perfume-designer"> Van Cleef &amp; Arpels </p>
     <span class="tw-year-badge"> 2017 </span>
   </a>
-  <a href="/perfume/Van-Cleef-Arpels/First-2.html" class="group prefumeHbox">
+  <a href="/perfume/Van-Cleef-Arpels/First-2.html" title="Van Cleef &amp; Arpels First женский 1976" class="group prefumeHbox">
     <h3 class="tw-perfume-title"> First </h3>
     <p class="tw-perfume-designer"> Van Cleef &amp; Arpels </p>
     <span class="tw-year-badge"> 1976 </span>
   </a>
   <h2 class="tw-gridlist-section-title"> Collection Extraordinaire </h2>
-  <a href="/perfume/Van-Cleef-Arpels/Bois-Dore-1.html" class="group prefumeHbox">
+  <a href="/perfume/Van-Cleef-Arpels/Bois-Dore-1.html" class="group prefumeHbox tw-listview-item-unisex">
     <h3 class="tw-perfume-title"> Bois DorÃ© </h3>
     <p class="tw-perfume-designer"> Van Cleef &amp; Arpels </p>
     <span class="tw-year-badge"> 2017 </span>
@@ -35,6 +35,7 @@ class HtmlCatalogImporterTests(TestCase):
         by_name = {item.name: item for item in items}
 
         self.assertEqual(len(items), 2)
+        self.assertEqual(sorted(item.audience for item in items), ["Unisex", "Women"])
         self.assertEqual(by_name["Bois Doré"].collection_name, "Collection Extraordinaire")
         self.assertEqual(by_name["Bois Doré"].release_year, 2017)
         self.assertEqual(by_name["First"].collection_name, "")
@@ -48,6 +49,7 @@ class HtmlCatalogImporterTests(TestCase):
 
         perfume.refresh_from_db()
         self.assertEqual(perfume.collection_name, "Collection Extraordinaire")
+        self.assertEqual(perfume.audience, "Unisex")
         self.assertEqual(perfume.release_year, 2017)
         self.assertEqual(len(summary.missing_items), 1)
         self.assertEqual(summary.missing_items[0].name, "First")
@@ -58,6 +60,7 @@ class HtmlCatalogImporterTests(TestCase):
                 alias_text="Bois Doré",
                 canonical_text="Bois Doré",
                 collection_name="Collection Extraordinaire",
+                audience="Unisex",
             ).exists()
         )
 
@@ -68,6 +71,8 @@ class HtmlCatalogImporterTests(TestCase):
         summary = import_brand_catalog(items, apply=True, create_missing_catalog=True)
 
         self.assertEqual(len(summary.created_perfumes), 2)
+        self.assertTrue(Perfume.objects.filter(audience="Unisex").exists())
+        self.assertTrue(Perfume.objects.filter(name="First", audience="Women").exists())
         self.assertTrue(Perfume.objects.filter(name="Bois Doré", collection_name="Collection Extraordinaire").exists())
         self.assertTrue(Perfume.objects.filter(name="First", release_year=1976).exists())
 

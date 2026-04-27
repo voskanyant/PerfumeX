@@ -67,10 +67,11 @@ The current saved-HTML flow is:
 
 1. Parse the external page into structured rows: brand, collection, fragrance name, release year, source path.
 2. Dry-run first and compare extracted rows with local `catalog.Perfume`.
-3. Write a missing report for operator review.
-4. If accepted, create or update catalogue rows.
-5. Create aliases that teach the normalizer how supplier names map to catalogue names and collections.
-6. Reparse only the affected supplier rows unless intentionally rebuilding all parses.
+3. Show the operator the extracted summary and sample rows before applying anything.
+4. Write a missing report for operator review.
+5. If accepted, create or update catalogue rows.
+6. Create aliases that teach the normalizer how supplier names map to catalogue names and collections.
+7. Reparse only the affected supplier rows unless intentionally rebuilding all parses.
 
 For Fragrantica-like saved brand pages, see `assistant_linking/docs/html_catalog_import_rules.md`.
 

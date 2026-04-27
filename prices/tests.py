@@ -21,6 +21,7 @@ from django.test import RequestFactory
 from django.urls import reverse
 from django.utils import timezone
 
+from assistant_linking.models import ParsedSupplierProduct
 from catalog.models import Brand, Perfume, PerfumeVariant
 from prices import forms, models
 from prices.management.commands.import_emails import (
@@ -727,6 +728,69 @@ class OurProductCatalogueListTests(TestCase):
         self.assertContains(response, "100ml")
         self.assertContains(response, "tester")
         self.assertContains(response, "box")
+        self.assertContains(response, reverse("prices:fragrantica_product_review"))
+
+    def test_fragrantica_products_compares_catalogue_with_supplier_parse(self):
+        supplier = models.Supplier.objects.create(name="Antonina")
+        supplier_product = models.SupplierProduct.objects.create(
+            supplier=supplier,
+            catalog_perfume=self.perfume,
+            name="MONTALE Vanilla Extasy edp 100 ml",
+            brand="Montale",
+            size="100 ml",
+        )
+        ParsedSupplierProduct.objects.create(
+            supplier_product=supplier_product,
+            raw_name=supplier_product.name,
+            normalized_text="montale vanilla extasy edp 100 ml",
+            normalized_brand=self.perfume.brand,
+            product_name_text="Vanilla Extasy",
+            collection_name="Classic",
+            concentration="Eau de Parfum",
+            size_ml="100.00",
+            confidence=95,
+        )
+
+        response = self.client.get(
+            reverse("prices:fragrantica_product_review"),
+            {"brand": self.perfume.brand_id},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Fragrantica Products")
+        self.assertContains(response, "Vanilla Extasy")
+        self.assertContains(response, "Classic")
+        self.assertContains(response, "1 parsed supplier rows")
+        self.assertContains(response, "1 linked supplier rows")
+
+    def test_fragrantica_products_shows_supplier_rows_missing_from_catalogue(self):
+        supplier = models.Supplier.objects.create(name="Antonina")
+        supplier_product = models.SupplierProduct.objects.create(
+            supplier=supplier,
+            name="MONTALE Missing Scent edp 100 ml",
+            brand="Montale",
+            size="100 ml",
+        )
+        ParsedSupplierProduct.objects.create(
+            supplier_product=supplier_product,
+            raw_name=supplier_product.name,
+            normalized_text="montale missing scent edp 100 ml",
+            normalized_brand=self.perfume.brand,
+            product_name_text="Missing Scent",
+            collection_name="Classic",
+            concentration="Eau de Parfum",
+            size_ml="100.00",
+            confidence=95,
+        )
+
+        response = self.client.get(
+            reverse("prices:fragrantica_product_review"),
+            {"brand": self.perfume.brand_id},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Supplier products not found in Fragrantica catalogue")
+        self.assertContains(response, "Missing Scent")
 
     def test_our_products_search_matches_multi_word_scent(self):
         clive = Brand.objects.create(name="Clive Christian")

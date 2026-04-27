@@ -65,6 +65,10 @@
                     <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M2 5 8 2l6 3v6l-6 3-6-3V5Z"/><path d="M2 5l6 3 6-3"/></svg>
                     <span>Our Products</span>
                 </a>
+                <a href="{% url 'prices:fragrantica_product_review' %}" class="sidebar-link {% if request.resolver_match.url_name == 'fragrantica_product_review' %}active{% endif %}">
+                    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M3 2.5h10v11H3z"/><path d="M5.5 5h5"/><path d="M5.5 8h5"/><path d="M5.5 11h3"/></svg>
+                    <span>Fragrantica Products</span>
+                </a>
                 <a href="{% url 'prices:product_list' %}" class="sidebar-link {% if request.resolver_match.url_name == 'product_list' or request.resolver_match.url_name == 'product_detail' or request.resolver_match.url_name == 'product_update' %}active{% endif %}">
                     <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="1.25" y="4.25" width="13.5" height="9.5" rx="1"/><path d="M5 4.25V3a3 3 0 0 1 6 0v1.25"/></svg>
                     <span>Suppliers Products</span>
@@ -191,6 +195,10 @@
                 <a href="{% url 'prices:our_product_list' %}" class="sidebar-link {% if request.resolver_match.url_name == 'our_product_list' or request.resolver_match.url_name == 'our_product_detail' or request.resolver_match.url_name == 'our_product_create' or request.resolver_match.url_name == 'our_product_update' %}active{% endif %}">
                     <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M2 5 8 2l6 3v6l-6 3-6-3V5Z"/><path d="M2 5l6 3 6-3"/></svg>
                     <span>Our Products</span>
+                </a>
+                <a href="{% url 'prices:fragrantica_product_review' %}" class="sidebar-link {% if request.resolver_match.url_name == 'fragrantica_product_review' %}active{% endif %}">
+                    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M3 2.5h10v11H3z"/><path d="M5.5 5h5"/><path d="M5.5 8h5"/><path d="M5.5 11h3"/></svg>
+                    <span>Fragrantica Products</span>
                 </a>
                 <a href="{% url 'prices:product_list' %}" class="sidebar-link {% if request.resolver_match.url_name == 'product_list' or request.resolver_match.url_name == 'product_detail' or request.resolver_match.url_name == 'product_update' %}active{% endif %}">
                     <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="1.25" y="4.25" width="13.5" height="9.5" rx="1"/><path d="M5 4.25V3a3 3 0 0 1 6 0v1.25"/></svg>

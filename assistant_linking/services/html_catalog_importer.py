@@ -14,6 +14,21 @@ from catalog.models import Brand, Perfume, Source
 
 ALL_FRAGRANCES_SECTION = "All Fragrances"
 DEFAULT_SOURCE_TYPE = "community"
+AUDIENCE_BY_CLASS = {
+    "tw-listview-item-female": "Women",
+    "tw-listview-item-male": "Men",
+    "tw-listview-item-unisex": "Unisex",
+}
+AUDIENCE_TEXT_PATTERNS = (
+    ("женский", "Women"),
+    ("female", "Women"),
+    ("for women", "Women"),
+    ("мужской", "Men"),
+    ("male", "Men"),
+    ("for men", "Men"),
+    ("унисекс", "Unisex"),
+    ("unisex", "Unisex"),
+)
 
 
 def clean_scraped_text(value: str) -> str:
@@ -31,11 +46,27 @@ def canonical_key(value: str) -> str:
     return normalize_alias_value(clean_scraped_text(value)).replace("&", "and")
 
 
+def audience_from_classes(classes: set[str]) -> str:
+    for class_name, audience in AUDIENCE_BY_CLASS.items():
+        if class_name in classes:
+            return audience
+    return ""
+
+
+def audience_from_text(value: str) -> str:
+    text = clean_scraped_text(value).lower()
+    for pattern, audience in AUDIENCE_TEXT_PATTERNS:
+        if pattern in text:
+            return audience
+    return ""
+
+
 @dataclass
 class CatalogItem:
     brand_name: str
     name: str
     collection_name: str = ""
+    audience: str = ""
     release_year: int | None = None
     source_path: str = ""
 
@@ -83,7 +114,12 @@ class FragranticaBrandCatalogParser(HTMLParser):
             self._start_capture("section")
             return
         if tag == "a" and "prefumeHbox" in classes:
-            self._current_item = {"collection_name": self.current_collection}
+            self._current_item = {
+                "collection_name": self.current_collection,
+                "audience": audience_from_classes(classes)
+                or audience_from_text(attr_map.get("aria-label", ""))
+                or audience_from_text(attr_map.get("title", "")),
+            }
             self._current_href = attr_map.get("href", "")
             return
         if self._current_item is None:
@@ -141,6 +177,7 @@ class FragranticaBrandCatalogParser(HTMLParser):
             brand_name=brand_name,
             name=name,
             collection_name=collection_name,
+            audience=raw.get("audience", ""),
             release_year=year,
             source_path=self._current_href,
         )
@@ -195,6 +232,7 @@ def import_brand_catalog(
                     brand=brand,
                     name=item.name,
                     collection_name=item.collection_name,
+                    audience=item.audience,
                     release_year=item.release_year,
                     verification_status=Perfume.VERIFICATION_REVIEW,
                 )
@@ -212,6 +250,9 @@ def import_brand_catalog(
             if item.release_year and perfume.release_year != item.release_year:
                 perfume.release_year = item.release_year
                 update_fields.append("release_year")
+            if item.audience and perfume.audience != item.audience:
+                perfume.audience = item.audience
+                update_fields.append("audience")
             if apply and update_fields:
                 update_fields.append("updated_at")
                 perfume.save(update_fields=update_fields)
@@ -258,7 +299,7 @@ def _upsert_product_alias(summary: CatalogImportSummary, brand: Brand, perfume: 
             "perfume": perfume,
             "canonical_text": perfume.name,
             "collection_name": item.collection_name,
-            "audience": perfume.audience,
+            "audience": item.audience or perfume.audience,
             "active": True,
             "priority": 80,
         },
@@ -270,6 +311,15 @@ def _upsert_product_alias(summary: CatalogImportSummary, brand: Brand, perfume: 
 def write_missing_report(path: str | Path, items: list[CatalogItem]) -> None:
     with Path(path).open("w", newline="", encoding="utf-8") as file:
         writer = csv.writer(file)
-        writer.writerow(["brand", "collection", "name", "release_year", "source_path"])
+        writer.writerow(["brand", "collection", "name", "audience", "release_year", "source_path"])
         for item in items:
-            writer.writerow([item.brand_name, item.collection_name, item.name, item.release_year or "", item.source_path])
+            writer.writerow(
+                [
+                    item.brand_name,
+                    item.collection_name,
+                    item.name,
+                    item.audience,
+                    item.release_year or "",
+                    item.source_path,
+                ]
+            )

@@ -965,6 +965,107 @@ select:focus {
 .catalogue-admin-table td {
   vertical-align: middle;
 }
+.fragrantica-filter-bar {
+  display: grid;
+  grid-template-columns: minmax(180px, 260px) minmax(220px, 1fr) minmax(160px, 220px) auto;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+.fragrantica-status-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 18px;
+  color: var(--grey-700);
+  font-size: 12px;
+}
+.fragrantica-status-strip span,
+.fragrantica-collections span {
+  border: 1px solid var(--grey-200);
+  border-radius: 999px;
+  padding: 5px 9px;
+  background: var(--grey-50);
+}
+.fragrantica-review-list {
+  display: grid;
+  gap: 12px;
+}
+.fragrantica-review-row {
+  display: grid;
+  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.25fr);
+  gap: 18px;
+  padding: 18px;
+  border: 1px solid var(--grey-200);
+  border-radius: var(--radius-sm);
+  background: var(--white);
+}
+.fragrantica-review-column {
+  min-width: 0;
+}
+.fragrantica-review-kicker {
+  margin-bottom: 8px;
+  color: var(--grey-500);
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+.fragrantica-review-column h2 {
+  margin: 0 0 14px;
+  font-size: 22px;
+  line-height: 1.2;
+}
+.fragrantica-review-column dl {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+}
+.fragrantica-review-column dl div {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr);
+  gap: 12px;
+}
+.fragrantica-review-column dt {
+  color: var(--grey-500);
+  font-size: 12px;
+}
+.fragrantica-review-column dd {
+  margin: 0;
+}
+.fragrantica-row-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 12px;
+  color: var(--grey-600);
+  font-size: 12px;
+}
+.fragrantica-collections {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+  color: var(--grey-600);
+  font-size: 12px;
+}
+.fragrantica-evidence-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+}
+.fragrantica-evidence-list li {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr);
+  gap: 10px;
+}
+.fragrantica-missing-block {
+  margin-top: 18px;
+}
 .search-wrap-inner {
   position: relative;
   display: inline-block;
@@ -1599,6 +1700,15 @@ pre, code {
   .import-tabs__link {
     padding: 9px 0;
     white-space: nowrap;
+  }
+  .fragrantica-filter-bar,
+  .fragrantica-review-row {
+    grid-template-columns: 1fr;
+  }
+  .fragrantica-review-column dl div,
+  .fragrantica-evidence-list li {
+    grid-template-columns: 1fr;
+    gap: 3px;
   }
 
   .search-wrap {

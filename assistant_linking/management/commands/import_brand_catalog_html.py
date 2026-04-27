@@ -67,6 +67,14 @@ class Command(BaseCommand):
         self.stdout.write(f"Collections: {len(summary.collections)}")
         for collection in sorted(summary.collections):
             self.stdout.write(f"  - {collection}")
+        audience_counts = {}
+        for item in summary.source_items:
+            if item.audience:
+                audience_counts[item.audience] = audience_counts.get(item.audience, 0) + 1
+        if audience_counts:
+            self.stdout.write("Audiences:")
+            for audience, count in sorted(audience_counts.items()):
+                self.stdout.write(f"  - {audience}: {count}")
         self.stdout.write(f"Matched catalogue perfumes: {len(summary.matched_perfumes)}")
         self.stdout.write(f"Missing catalogue perfumes: {len(summary.missing_items)}")
         self.stdout.write(f"Created catalogue perfumes: {len(summary.created_perfumes)}")
