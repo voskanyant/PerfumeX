@@ -525,10 +525,10 @@ def _latest_active_mailbox_check_datetime():
     )["latest"]
 
 
-def _supplier_email_check_datetime(supplier, event_dt=None):
+def _supplier_email_check_datetime(supplier, event_dt=None, scanner_last_run_at=None):
     candidates = [supplier.last_email_check_at, event_dt]
     if supplier.from_address_pattern:
-        candidates.append(_latest_active_mailbox_check_datetime())
+        candidates.append(scanner_last_run_at or _latest_active_mailbox_check_datetime())
     return max([dt for dt in candidates if dt], default=None)
 
 
@@ -557,9 +557,14 @@ def _build_latest_check_info(
     run,
     streak_count: int = 1,
     latest_diagnostic=None,
+    scanner_last_run_at=None,
 ) -> dict[str, str | int | None | bool]:
     diagnostic_dt = _diagnostic_check_datetime(latest_diagnostic)
-    fallback_dt = _supplier_email_check_datetime(supplier, diagnostic_dt)
+    fallback_dt = _supplier_email_check_datetime(
+        supplier,
+        diagnostic_dt,
+        scanner_last_run_at=scanner_last_run_at,
+    )
     if run:
         run_dt = _run_activity_datetime(run)
         newest_side_event_dt = max(
@@ -1109,6 +1114,7 @@ def _build_supplier_board_row(
     streak_count: int = 1,
     latest_failed_file=None,
     latest_diagnostic=None,
+    scanner_last_run_at=None,
 ) -> dict[str, object]:
     last_import = _build_last_import_info(successful_batch)
     last_success_dt = last_import.get("datetime")
@@ -1125,7 +1131,11 @@ def _build_supplier_board_row(
         if failed_dt and failed_dt <= last_success_dt:
             latest_failed_file = None
     latest_check = _build_latest_check_info(
-        supplier, latest_run, streak_count, latest_diagnostic=latest_diagnostic
+        supplier,
+        latest_run,
+        streak_count,
+        latest_diagnostic=latest_diagnostic,
+        scanner_last_run_at=scanner_last_run_at,
     )
     health = _build_business_health_info(supplier, last_import, latest_check, streak_count)
     file_summary = _summarize_latest_files(supplier, latest_run, latest_diagnostic)
@@ -1808,6 +1818,7 @@ class SupplierOverviewView(LoginRequiredMixin, TemplateView):
         active_price_mappings = _collect_active_price_mappings()
         _expire_stale_email_import_runs()
         latest_runs, run_streaks = _collect_latest_runs_and_streaks()
+        scanner_last_run_at = models.ImportSettings.get_solo().last_run_at
         rows = []
         for supplier in suppliers:
             rows.append(
@@ -1818,6 +1829,7 @@ class SupplierOverviewView(LoginRequiredMixin, TemplateView):
                     streak_count=run_streaks.get(supplier.id, 1),
                     latest_failed_file=latest_failed_import_files.get(supplier.id),
                     latest_diagnostic=latest_attachment_diagnostics.get(supplier.id),
+                    scanner_last_run_at=scanner_last_run_at,
                 )
             )
             rows[-1]["has_quick_upload"] = supplier.id in active_price_mappings
@@ -2940,6 +2952,7 @@ class SupplierEmailImportStatusAllView(LoginRequiredMixin, View):
         latest_failed_import_files = _collect_latest_failed_import_files()
         latest_attachment_diagnostics = _collect_latest_attachment_diagnostics()
         latest_runs, run_streaks = _collect_latest_runs_and_streaks()
+        scanner_last_run_at = models.ImportSettings.get_solo().last_run_at
         rows = {}
         for supplier in suppliers:
             row = _build_supplier_board_row(
@@ -2949,6 +2962,7 @@ class SupplierEmailImportStatusAllView(LoginRequiredMixin, View):
                 streak_count=run_streaks.get(supplier.id, 1),
                 latest_failed_file=latest_failed_import_files.get(supplier.id),
                 latest_diagnostic=latest_attachment_diagnostics.get(supplier.id),
+                scanner_last_run_at=scanner_last_run_at,
             )
             rows[str(supplier.id)] = {
                 "is_running": row["is_running"],
