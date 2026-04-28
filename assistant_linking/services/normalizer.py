@@ -107,6 +107,10 @@ WOODBOX_TERMS = ("woodbox", "wood box")
 GENDER_TERMS = tuple(alias for alias, _display, _group in DEFAULT_AUDIENCE_ALIASES)
 NAME_AUDIENCE_TERMS = ("pour femme", "femme", "donna", "for her", "pour homme", "homme", "uomo", "man")
 NAME_BEARING_MODIFIER_PHRASES = ("eau fraiche", "eau fraicheur")
+AUDIENCE_NAME_SUFFIXES = {
+    "women": ("woman", "women", "lady", "for her", "pour femme", "femme"),
+    "men": ("man", "men", "for him", "pour homme", "homme"),
+}
 REFILL_MODIFIER = "refill"
 MINI_MODIFIER = "mini"
 
@@ -368,16 +372,50 @@ def _catalog_scent_key(value: str) -> str:
     return re.sub(r"[^a-z0-9а-я]+", "", normalize_text(value))
 
 
+def _catalog_perfume_matches_parse_context(perfume: Perfume, result: ParseResult) -> bool:
+    if result.concentration and perfume.concentration:
+        if normalize_text(result.concentration) != normalize_text(perfume.concentration):
+            return False
+    if result.collection_name and perfume.collection_name:
+        if _catalog_scent_key(result.collection_name) != _catalog_scent_key(perfume.collection_name):
+            return False
+    if result.supplier_gender_hint and perfume.audience:
+        if audience_group(result.supplier_gender_hint) != audience_group(perfume.audience):
+            return False
+    return True
+
+
 def _canonicalize_product_name_from_catalog(result: ParseResult) -> str:
     if not result.normalized_brand or not result.normalized_brand.id or not result.product_name_text:
         return result.product_name_text
     key = _catalog_scent_key(result.product_name_text)
     if len(key) < 3:
         return result.product_name_text
+    perfumes = list(
+        Perfume.objects.filter(brand_id=result.normalized_brand.id).only(
+            "name",
+            "concentration",
+            "audience",
+            "collection_name",
+        )
+    )
     names = {
         perfume.name
-        for perfume in Perfume.objects.filter(brand_id=result.normalized_brand.id).only("name")
+        for perfume in perfumes
         if _catalog_scent_key(perfume.name) == key
+    }
+    if len(names) == 1:
+        return names.pop()
+
+    audience_suffixes = AUDIENCE_NAME_SUFFIXES.get(audience_group(result.supplier_gender_hint), ())
+    if not audience_suffixes:
+        return result.product_name_text
+    audience_variant_keys = {f"{key}{_catalog_scent_key(suffix)}" for suffix in audience_suffixes}
+    names = {
+        perfume.name
+        for perfume in perfumes
+        if _catalog_perfume_matches_parse_context(perfume, result)
+        and _catalog_scent_key(perfume.name) in audience_variant_keys
     }
     if len(names) == 1:
         return names.pop()

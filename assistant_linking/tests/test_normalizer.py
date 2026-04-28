@@ -564,6 +564,41 @@ class NormalizerTests(TestCase):
         self.assertEqual(parsed.supplier_gender_hint, "Men")
         self.assertEqual(parsed.display_identity, "Paco Rabanne / 1 Million / Eau de Toilette / 100ml / Tester")
 
+    def test_catalog_audience_variant_can_canonicalize_scent_name(self):
+        brand = Brand.objects.create(name="Abercrombie & Fitch")
+        brand.perfumes.create(name="Away Tonight Man", concentration="Eau de Parfum", audience="Men")
+        brand.perfumes.create(name="Away Tonight Woman", concentration="Eau de Parfum", audience="Woman")
+        product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="abercrombie-away-tonight-lady",
+            name="Abercrombie & Fitch AWAY TONIGHT lady 30ml edP",
+        )
+
+        parsed = save_parse(product, force=True)
+
+        self.assertEqual(parsed.normalized_brand, brand)
+        self.assertEqual(parsed.product_name_text, "Away Tonight Woman")
+        self.assertEqual(parsed.concentration, "Eau de Parfum")
+        self.assertEqual(parsed.size_ml, Decimal("30.00"))
+        self.assertEqual(parsed.supplier_gender_hint, "Woman")
+        self.assertEqual(parsed.display_identity, "Abercrombie & Fitch / Away Tonight Woman / Eau de Parfum / 30ml")
+
+    def test_catalog_audience_variant_respects_concentration_context(self):
+        brand = Brand.objects.create(name="Abercrombie & Fitch")
+        brand.perfumes.create(name="Away Tonight Woman", concentration="Eau de Toilette", audience="Woman")
+        product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="abercrombie-away-tonight-lady-edp",
+            name="Abercrombie & Fitch AWAY TONIGHT lady 30ml edP",
+        )
+
+        parsed = save_parse(product, force=True)
+
+        self.assertEqual(parsed.normalized_brand, brand)
+        self.assertEqual(parsed.product_name_text, "away tonight")
+        self.assertEqual(parsed.concentration, "Eau de Parfum")
+        self.assertEqual(parsed.supplier_gender_hint, "Woman")
+
     def test_man_eau_fraiche_is_name_bearing_not_modifier_warning(self):
         brand = Brand.objects.create(name="Versace")
         BrandAlias.objects.create(brand=brand, alias_text="VERSACE", normalized_alias="versace")
