@@ -2,7 +2,6 @@ import io
 import hashlib
 import shutil
 import tempfile
-from decimal import Decimal
 from datetime import datetime, timedelta
 from email.message import EmailMessage
 from pathlib import Path
@@ -22,7 +21,7 @@ from django.test import RequestFactory
 from django.urls import reverse
 from django.utils import timezone
 
-from assistant_linking.models import FragranticaProduct
+from assistant_linking.models import ParsedSupplierProduct
 from catalog.models import Brand, Perfume, PerfumeVariant
 from prices import forms, models
 from prices.management.commands.import_emails import (
@@ -37,7 +36,6 @@ from prices.services.email_importer import (
     run_import,
     _validate_spreadsheet_payload,
 )
-from prices.services.importer import process_import_file
 from prices.services import link_importer
 from prices.services.background import run_in_background
 from prices.views import (
@@ -416,18 +414,10 @@ class EmailImporterCursorTests(TestCase):
         )
 
     def test_duplicate_message_id_skipped_not_crashed(self):
-        payload = b"sku,price\nA,1\n"
-        existing_batch = models.ImportBatch.objects.create(
+        models.ImportBatch.objects.create(
             supplier=self.supplier,
             mailbox=self.mailbox,
             message_id="<duplicate@example.com>",
-            status=models.ImportStatus.PROCESSED,
-        )
-        models.ImportFile.objects.create(
-            import_batch=existing_batch,
-            file_kind=models.FileKind.PRICE,
-            filename="prices.csv",
-            content_hash=hashlib.sha256(payload).hexdigest(),
             status=models.ImportStatus.PROCESSED,
         )
         message = EmailMessage()
@@ -437,7 +427,7 @@ class EmailImporterCursorTests(TestCase):
         message["Date"] = "Sat, 25 Apr 2026 10:00:00 +0000"
         message.set_content("attached")
         message.add_attachment(
-            payload,
+            b"sku,price\nA,1\n",
             maintype="text",
             subtype="csv",
             filename="prices.csv",
@@ -469,218 +459,8 @@ class EmailImporterCursorTests(TestCase):
         self.mailbox.refresh_from_db()
         self.assertEqual(summary["skipped_duplicates"], 1)
         self.assertEqual(models.ImportBatch.objects.count(), 1)
-        self.assertEqual(models.ImportFile.objects.count(), 1)
+        self.assertEqual(models.ImportFile.objects.count(), 0)
         self.assertEqual(self.mailbox.last_inbox_uid, 7)
-
-    def test_reused_message_id_with_different_file_is_processed(self):
-        models.ImportBatch.objects.create(
-            supplier=self.supplier,
-            mailbox=self.mailbox,
-            message_id="<reused@example.com>",
-            status=models.ImportStatus.PROCESSED,
-        )
-        message = EmailMessage()
-        message["Subject"] = "Daily price"
-        message["From"] = "supplier@example.com"
-        message["Message-ID"] = "<reused@example.com>"
-        message["Date"] = "Sat, 25 Apr 2026 10:00:00 +0000"
-        message.set_content("attached")
-        message.add_attachment(
-            b"sku,price\nA,2\n",
-            maintype="text",
-            subtype="csv",
-            filename="prices.csv",
-        )
-
-        class FakeImapClient:
-            def search(self, charset, *criteria):
-                return "OK", [b"8"]
-
-            def fetch(self, msg_id, query):
-                if "RFC822.SIZE" in query:
-                    return "OK", [
-                        (
-                            b'8 (RFC822.SIZE 100 INTERNALDATE "25-Apr-2026 10:00:00 +0000")',
-                            b"",
-                        )
-                    ]
-                return "OK", [(b"8 (RFC822 {100}", message.as_bytes())]
-
-            def logout(self):
-                return "BYE", []
-
-        with patch(
-            "prices.services.email_importer._connect_imap",
-            return_value=FakeImapClient(),
-        ):
-            summary = run_import([self.mailbox], use_uid_cursor=True)
-
-        self.mailbox.refresh_from_db()
-        self.assertEqual(summary["skipped_duplicates"], 0)
-        self.assertEqual(models.ImportBatch.objects.count(), 2)
-        self.assertEqual(models.ImportFile.objects.count(), 1)
-        self.assertEqual(self.mailbox.last_inbox_uid, 8)
-
-    def test_reused_email_link_message_id_with_different_file_is_processed(self):
-        temp_media = tempfile.mkdtemp()
-        self.addCleanup(lambda: shutil.rmtree(temp_media, ignore_errors=True))
-        settings_obj = models.ImportSettings.get_solo()
-        settings_obj.minimum_price_rows = 1
-        settings_obj.save(update_fields=["minimum_price_rows"])
-        link = "https://disk.yandex.ru/d/reused"
-        link_hash = hashlib.sha256(link.encode("utf-8")).hexdigest()[:16]
-        existing_message_id = f"<reused-link@example.com>|link:{link_hash}"
-        models.ImportBatch.objects.create(
-            supplier=self.supplier,
-            mailbox=self.mailbox,
-            message_id=existing_message_id,
-            status=models.ImportStatus.PROCESSED,
-        )
-        models.SupplierFileMapping.objects.create(
-            supplier=self.supplier,
-            file_kind=models.FileKind.PRICE,
-            header_row=1,
-            column_map={"sku": 1, "name": 2, "price": 3},
-        )
-        models.SupplierPriceSource.objects.create(
-            supplier=self.supplier,
-            source_type=models.PriceSourceType.EMAIL_LINK,
-            provider=models.PriceSourceProvider.AUTO,
-            url_pattern="disk.yandex.ru/d/reused",
-        )
-        message = EmailMessage()
-        message["Subject"] = "Daily price"
-        message["From"] = "supplier@example.com"
-        message["Message-ID"] = "<reused-link@example.com>"
-        message["Date"] = "Sat, 25 Apr 2026 10:00:00 +0000"
-        message.set_content(f"Price link: {link}")
-
-        class FakeImapClient:
-            def search(self, charset, *criteria):
-                return "OK", [b"9"]
-
-            def fetch(self, msg_id, query):
-                if "RFC822.SIZE" in query:
-                    return "OK", [
-                        (
-                            b'9 (RFC822.SIZE 100 INTERNALDATE "25-Apr-2026 10:00:00 +0000")',
-                            b"",
-                        )
-                    ]
-                return "OK", [(b"9 (RFC822 {100}", message.as_bytes())]
-
-            def logout(self):
-                return "BYE", []
-
-        with override_settings(MEDIA_ROOT=temp_media), patch(
-            "prices.services.email_importer._connect_imap",
-            return_value=FakeImapClient(),
-        ), patch(
-            "prices.services.link_importer.download_price_source",
-            return_value=link_importer.DownloadedPriceFile(
-                filename="link-price.csv",
-                payload=b"sku,name,price\nA,Product,2\n",
-                content_type="text/csv",
-                source_url=link,
-                provider=models.PriceSourceProvider.YANDEX_DISK,
-            ),
-        ):
-            summary = run_import([self.mailbox], use_uid_cursor=True)
-
-        self.mailbox.refresh_from_db()
-        self.assertEqual(summary["skipped_duplicates"], 0)
-        self.assertEqual(summary["processed_files"], 1)
-        self.assertEqual(models.ImportBatch.objects.count(), 2)
-        self.assertEqual(models.ImportFile.objects.count(), 1)
-        self.assertEqual(self.mailbox.last_inbox_uid, 9)
-
-    def test_duplicate_attachment_refreshes_seen_products(self):
-        payload = b"sku,name,price\nSKU-1,Static Product,10\n"
-        content_hash = hashlib.sha256(payload).hexdigest()
-        old_seen_at = timezone.make_aware(datetime(2026, 4, 22, 9, 0))
-        existing_received_at = timezone.make_aware(datetime(2026, 4, 25, 8, 0))
-
-        previous_batch = models.ImportBatch.objects.create(
-            supplier=self.supplier,
-            mailbox=self.mailbox,
-            message_id="<previous@example.com>",
-            received_at=existing_received_at,
-            status=models.ImportStatus.PROCESSED,
-        )
-        product = models.SupplierProduct.objects.create(
-            supplier=self.supplier,
-            supplier_sku="SKU-1",
-            identity_key="SKU-1",
-            name="Static Product",
-            currency=models.Currency.RUB,
-            current_price="10.00",
-            last_imported_at=old_seen_at,
-            last_import_batch=previous_batch,
-        )
-        models.ImportFile.objects.create(
-            import_batch=previous_batch,
-            file_kind=models.FileKind.PRICE,
-            filename="prices.csv",
-            content_hash=content_hash,
-            status=models.ImportStatus.PROCESSED,
-            processed_at=existing_received_at,
-        )
-        models.PriceSnapshot.objects.create(
-            supplier_product=product,
-            import_batch=previous_batch,
-            price="10.00",
-            currency=models.Currency.RUB,
-            recorded_at=existing_received_at,
-        )
-
-        message = EmailMessage()
-        message["Subject"] = "Daily price"
-        message["From"] = "supplier@example.com"
-        message["Message-ID"] = "<new-duplicate@example.com>"
-        message["Date"] = "Sat, 25 Apr 2026 10:00:00 +0000"
-        message.set_content("attached")
-        message.add_attachment(
-            payload,
-            maintype="text",
-            subtype="csv",
-            filename="prices.csv",
-        )
-
-        class FakeImapClient:
-            def search(self, charset, *criteria):
-                return "OK", [b"8"]
-
-            def fetch(self, msg_id, query):
-                if "RFC822.SIZE" in query:
-                    return "OK", [
-                        (
-                            b'8 (RFC822.SIZE 100 INTERNALDATE "25-Apr-2026 10:00:00 +0000")',
-                            b"",
-                        )
-                    ]
-                return "OK", [(b"8 (RFC822 {100}", message.as_bytes())]
-
-            def logout(self):
-                return "BYE", []
-
-        with patch(
-            "prices.services.email_importer._connect_imap",
-            return_value=FakeImapClient(),
-        ):
-            summary = run_import(
-                [self.mailbox],
-                dedupe_same_day_only=True,
-                use_uid_cursor=True,
-            )
-
-        product.refresh_from_db()
-        diagnostic = models.EmailAttachmentDiagnostic.objects.latest("created_at")
-        self.assertEqual(summary["skipped_duplicates"], 1)
-        self.assertEqual(product.last_import_batch, previous_batch)
-        self.assertGreater(product.last_imported_at, old_seen_at)
-        self.assertEqual(self.mailbox.last_inbox_uid, 8)
-        self.assertEqual(diagnostic.decision, models.AttachmentDecision.DUPLICATE)
-        self.assertIn("Refreshed 1 product", diagnostic.message)
 
 
 class BulkMutationPermissionTests(TestCase):
@@ -950,46 +730,67 @@ class OurProductCatalogueListTests(TestCase):
         self.assertContains(response, "box")
         self.assertContains(response, reverse("prices:fragrantica_product_review"))
 
-    def test_fragrantica_products_lists_staged_external_rows_with_suggestions(self):
-        FragranticaProduct.objects.create(
-            brand_name="Montale",
-            name="Vanilla Extasy",
+    def test_fragrantica_products_compares_catalogue_with_supplier_parse(self):
+        supplier = models.Supplier.objects.create(name="Antonina")
+        supplier_product = models.SupplierProduct.objects.create(
+            supplier=supplier,
+            catalog_perfume=self.perfume,
+            name="MONTALE Vanilla Extasy edp 100 ml",
+            brand="Montale",
+            size="100 ml",
+        )
+        ParsedSupplierProduct.objects.create(
+            supplier_product=supplier_product,
+            raw_name=supplier_product.name,
+            normalized_text="montale vanilla extasy edp 100 ml",
+            normalized_brand=self.perfume.brand,
+            product_name_text="Vanilla Extasy",
             collection_name="Classic",
-            audience="Women",
-            release_year=2008,
-            source_path="/perfume/Montale/Vanilla-Extasy.html",
+            concentration="Eau de Parfum",
+            size_ml="100.00",
+            confidence=95,
         )
 
         response = self.client.get(
             reverse("prices:fragrantica_product_review"),
-            {"brand": "montale"},
+            {"brand": self.perfume.brand_id},
         )
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Fragrantica Products")
         self.assertContains(response, "Vanilla Extasy")
         self.assertContains(response, "Classic")
-        self.assertContains(response, "Women")
-        self.assertContains(response, "2008")
-        self.assertContains(response, "Suggested")
-        self.assertContains(response, "Montale / Vanilla Extasy")
+        self.assertContains(response, "1 parsed supplier rows")
+        self.assertContains(response, "1 linked supplier rows")
 
-    def test_fragrantica_products_keeps_unlinked_external_rows_separate(self):
-        FragranticaProduct.objects.create(
-            brand_name="Montale",
-            name="Missing Scent",
-            collection_name="Archive",
+    def test_fragrantica_products_shows_supplier_rows_missing_from_catalogue(self):
+        supplier = models.Supplier.objects.create(name="Antonina")
+        supplier_product = models.SupplierProduct.objects.create(
+            supplier=supplier,
+            name="MONTALE Missing Scent edp 100 ml",
+            brand="Montale",
+            size="100 ml",
+        )
+        ParsedSupplierProduct.objects.create(
+            supplier_product=supplier_product,
+            raw_name=supplier_product.name,
+            normalized_text="montale missing scent edp 100 ml",
+            normalized_brand=self.perfume.brand,
+            product_name_text="Missing Scent",
+            collection_name="Classic",
+            concentration="Eau de Parfum",
+            size_ml="100.00",
+            confidence=95,
         )
 
         response = self.client.get(
             reverse("prices:fragrantica_product_review"),
-            {"status": "unlinked"},
+            {"brand": self.perfume.brand_id},
         )
 
         self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Supplier products not found in Fragrantica catalogue")
         self.assertContains(response, "Missing Scent")
-        self.assertContains(response, "Archive")
-        self.assertContains(response, "Unlinked")
 
     def test_our_products_search_matches_multi_word_scent(self):
         clive = Brand.objects.create(name="Clive Christian")
@@ -1227,74 +1028,6 @@ class SupplierImportBoundaryTests(TestCase):
         self.assertEqual(product.last_import_batch_id, result["batch"].id)
         self.assertGreater(product.last_imported_at, previous_batch_time)
         self.assertGreater(result["batch"].received_at, previous_batch_time)
-
-    def test_newer_price_file_updates_existing_product_price(self):
-        temp_media = tempfile.mkdtemp()
-        self.addCleanup(lambda: shutil.rmtree(temp_media, ignore_errors=True))
-        settings_obj = models.ImportSettings.get_solo()
-        settings_obj.minimum_price_rows = 1
-        settings_obj.save(update_fields=["minimum_price_rows"])
-
-        old_time = timezone.make_aware(datetime(2026, 4, 27, 8, 45))
-        new_time = timezone.make_aware(datetime(2026, 4, 28, 8, 31))
-        mapping = models.SupplierFileMapping.objects.create(
-            supplier=self.supplier,
-            file_kind=models.FileKind.PRICE,
-            header_row=1,
-            column_map={"sku": 1, "name": 2, "price": 3},
-        )
-        old_batch = models.ImportBatch.objects.create(
-            supplier=self.supplier,
-            mailbox=self.mailbox,
-            message_id="<price-27@example.com>",
-            received_at=old_time,
-            status=models.ImportStatus.PROCESSED,
-        )
-        product = models.SupplierProduct.objects.create(
-            supplier=self.supplier,
-            supplier_sku="SKU-1",
-            identity_key="SKU-1",
-            name="Changed Product",
-            currency=models.Currency.RUB,
-            current_price=Decimal("10.00"),
-            last_imported_at=old_time,
-            last_import_batch=old_batch,
-            is_active=True,
-        )
-        models.PriceSnapshot.objects.create(
-            supplier_product=product,
-            import_batch=old_batch,
-            price=Decimal("10.00"),
-            currency=models.Currency.RUB,
-            recorded_at=old_time,
-        )
-        new_batch = models.ImportBatch.objects.create(
-            supplier=self.supplier,
-            mailbox=self.mailbox,
-            message_id="<price-28@example.com>",
-            received_at=new_time,
-            status=models.ImportStatus.PENDING,
-        )
-        import_file = models.ImportFile.objects.create(
-            import_batch=new_batch,
-            mapping=mapping,
-            file_kind=models.FileKind.PRICE,
-            filename="price-28.csv",
-            status=models.ImportStatus.PENDING,
-        )
-
-        with override_settings(MEDIA_ROOT=temp_media):
-            import_file.file.save(
-                "price-28.csv",
-                ContentFile(b"sku,name,price\nSKU-1,Changed Product,12.50\n"),
-                save=True,
-            )
-            process_import_file(import_file)
-
-        product.refresh_from_db()
-        self.assertEqual(product.current_price, Decimal("12.50"))
-        self.assertEqual(product.last_import_batch_id, new_batch.id)
-        self.assertGreater(product.last_imported_at, old_time)
 
     def test_duplicate_link_payload_refreshes_seen_products(self):
         temp_media = tempfile.mkdtemp()

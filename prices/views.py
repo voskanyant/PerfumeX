@@ -58,7 +58,7 @@ from catalog.models import (
     Perfume as CatalogPerfume,
     PerfumeVariant as CatalogPerfumeVariant,
 )
-from assistant_linking.models import FragranticaProduct
+from assistant_linking.models import ParsedSupplierProduct
 from assistant_linking.utils.text import normalize_alias_value
 
 from . import forms, models
@@ -4170,92 +4170,138 @@ class FragranticaProductReviewView(LoginRequiredMixin, TemplateView):
     template_name = "prices/fragrantica_products.html"
     paginate_by = 50
 
-    def _key(self, value: str) -> str:
-        return normalize_alias_value(value or "").replace("&", "and")
+    def _name_key(self, value: str) -> str:
+        return normalize_alias_value(value or "")
 
-    def _status_for_product(self, fragrantica_product, suggested_perfume):
-        if fragrantica_product.match_status == FragranticaProduct.STATUS_IGNORED:
-            return "ignored", "Ignored"
-        if fragrantica_product.matched_perfume_id:
+    def _row_status(self, perfume, evidence):
+        linked_count = getattr(perfume, "linked_supplier_count", 0)
+        evidence_count = len(evidence)
+        perfume_collection = self._name_key(perfume.collection_name)
+        evidence_collections = {
+            self._name_key(item.collection_name)
+            for item in evidence
+            if item.collection_name
+        }
+        has_collection_conflict = bool(
+            perfume_collection
+            and evidence_collections
+            and any(collection != perfume_collection for collection in evidence_collections)
+        )
+        if has_collection_conflict:
+            return "collection_review", "Collection review"
+        if linked_count:
             return "linked", "Linked"
-        if suggested_perfume:
-            return "suggested", "Suggested"
-        return "unlinked", "Unlinked"
+        if evidence_count:
+            return "supplier_evidence", "Supplier evidence"
+        return "catalog_only", "Catalogue only"
 
-    def _suggestions_for(self, products):
-        brand_names = {product.brand_name for product in products if product.brand_name}
-        if not brand_names:
-            return {}
-        catalogue_rows = CatalogPerfume.objects.select_related("brand").filter(brand__name__in=brand_names)
-        by_key = {}
-        for perfume in catalogue_rows:
-            by_key.setdefault((self._key(perfume.brand.name), self._key(perfume.name)), perfume)
-        return by_key
+    def _filtered_perfumes(self, brand_id, search_query):
+        perfumes = CatalogPerfume.objects.select_related("brand").annotate(
+            variant_count=Count("variants", distinct=True),
+            linked_supplier_count=Count("supplier_products", distinct=True),
+        )
+        if brand_id:
+            perfumes = perfumes.filter(brand_id=brand_id)
+        if search_query:
+            perfumes = perfumes.filter(
+                Q(name__icontains=search_query)
+                | Q(brand__name__icontains=search_query)
+                | Q(collection_name__icontains=search_query)
+                | Q(concentration__icontains=search_query)
+            )
+        return perfumes.order_by("brand__name", "collection_name", "name")
+
+    def _parsed_evidence_by_name(self, brand_ids):
+        parsed_rows = ParsedSupplierProduct.objects.select_related(
+            "normalized_brand",
+            "supplier_product",
+            "supplier_product__supplier",
+        ).filter(normalized_brand_id__in=brand_ids)
+        evidence_by_name = defaultdict(list)
+        for parsed in parsed_rows.order_by(
+            "normalized_brand__name",
+            "collection_name",
+            "product_name_text",
+            "supplier_product__supplier__name",
+        ):
+            key = (parsed.normalized_brand_id, self._name_key(parsed.product_name_text))
+            if key[1]:
+                evidence_by_name[key].append(parsed)
+        return evidence_by_name
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        brand_key = self.request.GET.get("brand") or ""
+        brand_id = self.request.GET.get("brand") or ""
+        if brand_id and not str(brand_id).isdigit():
+            brand_id = ""
         search_query = self.request.GET.get("q", "").strip()
         status_filter = self.request.GET.get("status", "all").strip() or "all"
-        if status_filter not in {"all", "linked", "suggested", "unlinked", "ignored"}:
+        if status_filter not in {"all", "linked", "supplier_evidence", "catalog_only", "collection_review"}:
             status_filter = "all"
 
-        queryset = FragranticaProduct.objects.select_related(
-            "matched_perfume",
-            "matched_perfume__brand",
-        )
-        if brand_key:
-            queryset = queryset.filter(normalized_brand_name=brand_key)
-        if search_query:
-            queryset = queryset.filter(
-                Q(name__icontains=search_query)
-                | Q(brand_name__icontains=search_query)
-                | Q(collection_name__icontains=search_query)
-                | Q(audience__icontains=search_query)
-            )
-        products = list(queryset.order_by("brand_name", "collection_name", "name"))
-        suggested_by_key = self._suggestions_for(products)
+        perfumes = list(self._filtered_perfumes(brand_id, search_query))
+        brand_ids = {perfume.brand_id for perfume in perfumes}
+        if brand_id:
+            brand_ids.add(int(brand_id))
+        evidence_by_name = self._parsed_evidence_by_name(brand_ids) if brand_ids else {}
+        catalogue_keys = {
+            (perfume.brand_id, self._name_key(perfume.name))
+            for perfume in perfumes
+            if self._name_key(perfume.name)
+        }
 
         rows = []
         status_counts = defaultdict(int)
-        for product in products:
-            suggested_perfume = None
-            if not product.matched_perfume_id:
-                suggested_perfume = suggested_by_key.get((product.normalized_brand_name, product.normalized_name))
-            status_key, status_label = self._status_for_product(product, suggested_perfume)
+        for perfume in perfumes:
+            evidence = evidence_by_name.get((perfume.brand_id, self._name_key(perfume.name)), [])
+            status_key, status_label = self._row_status(perfume, evidence)
             status_counts[status_key] += 1
             if status_filter != "all" and status_filter != status_key:
                 continue
             rows.append(
                 {
-                    "product": product,
-                    "suggested_perfume": suggested_perfume,
+                    "perfume": perfume,
+                    "evidence": evidence[:5],
+                    "evidence_count": len(evidence),
                     "status_key": status_key,
                     "status_label": status_label,
+                    "collection_names": sorted({item.collection_name for item in evidence if item.collection_name}),
                 }
             )
+
+        missing_supplier_rows = []
+        for (parsed_brand_id, name_key), evidence in evidence_by_name.items():
+            if (parsed_brand_id, name_key) in catalogue_keys:
+                continue
+            first = evidence[0]
+            missing_supplier_rows.append(
+                {
+                    "brand": first.normalized_brand,
+                    "name": first.display_product_name or first.product_name_text,
+                    "collections": sorted({item.collection_name for item in evidence if item.collection_name}),
+                    "count": len(evidence),
+                    "sample": evidence[:3],
+                }
+            )
+        missing_supplier_rows.sort(key=lambda row: (str(row["brand"]), row["name"]))
 
         paginator = Paginator(rows, self.paginate_by)
         page_obj = paginator.get_page(self.request.GET.get("page"))
         query_without_page = self.request.GET.copy()
         query_without_page.pop("page", None)
-        brands = (
-            FragranticaProduct.objects.values("normalized_brand_name", "brand_name")
-            .annotate(product_count=Count("id"))
-            .order_by("brand_name")
-        )
 
         context.update(
             {
-                "brands": brands,
-                "selected_brand_key": brand_key,
+                "brands": CatalogBrand.objects.annotate(perfume_count=Count("perfumes")).order_by("name"),
+                "selected_brand_id": str(brand_id),
                 "search_query": search_query,
                 "status_filter": status_filter,
                 "status_counts": dict(status_counts),
-                "total_count": FragranticaProduct.objects.count(),
-                "source_count": len(products),
+                "total_count": len(perfumes),
                 "filtered_count": len(rows),
                 "rows": page_obj.object_list,
+                "missing_supplier_rows": missing_supplier_rows[:100],
+                "missing_supplier_count": len(missing_supplier_rows),
                 "page_obj": page_obj,
                 "paginator": paginator,
                 "is_paginated": paginator.num_pages > 1,
