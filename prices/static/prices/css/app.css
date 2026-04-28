@@ -1715,6 +1715,28 @@ pre, code {
     margin-bottom: 16px;
   }
 
+  .page-head {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .page-head .page-actions {
+    width: 100%;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .page-head .page-actions .button,
+  .page-head .page-actions form {
+    flex: 1 1 auto;
+  }
+
+  .page-head .page-actions form .button {
+    width: 100%;
+  }
+
   .search-inline-row {
     align-items: stretch;
   }
@@ -1806,6 +1828,7 @@ pre, code {
   .table-mobile:not(.products-mobile) > tbody > tr > td.actions .button,
   .table-mobile:not(.products-mobile) > tbody > tr > td[data-label="Actions"] .button {
     min-width: 36px;
+    width: auto;
   }
 
   .pagination {

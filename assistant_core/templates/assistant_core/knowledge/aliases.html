@@ -55,7 +55,7 @@
 
 <div class="workspace-block space-top-md">
     <div class="table-wrap table-scroll-x">
-        <table class="data-table">
+        <table class="data-table table-mobile">
             <thead>
                 {% if active_section == "brands" %}
                     <tr>
@@ -97,43 +97,43 @@
                 {% for item in items %}
                     <tr>
                         {% if active_section == "brands" %}
-                            <td>{{ item.alias_text }}</td>
-                            <td>{{ item.brand }}</td>
-                            <td>{{ item.supplier|default:"global" }}</td>
-                            <td>{{ item.priority }}</td>
-                            <td>{% if item.is_regex %}regex{% else %}phrase{% endif %}</td>
-                            <td>{{ item.active|yesno:"active,inactive" }}</td>
-                            <td class="actions">
+                            <td data-label="Supplier text">{{ item.alias_text }}</td>
+                            <td data-label="Brand">{{ item.brand }}</td>
+                            <td data-label="Scope">{{ item.supplier|default:"global" }}</td>
+                            <td data-label="Priority">{{ item.priority }}</td>
+                            <td data-label="Matcher">{% if item.is_regex %}regex{% else %}phrase{% endif %}</td>
+                            <td data-label="Status">{{ item.active|yesno:"active,inactive" }}</td>
+                            <td data-label="Actions" class="actions">
                                 <div class="layout-inline gap-sm">
                                     <a class="button ghost" href="{% url 'assistant_core:brand_alias_update' item.pk %}">Edit</a>
                                     <a class="button ghost" href="{% url 'assistant_core:brand_alias_delete' item.pk %}">Delete</a>
                                 </div>
                             </td>
                         {% elif active_section == "products" %}
-                            <td>{{ item.alias_text }}</td>
-                            <td>{{ item.canonical_text }}</td>
-                            <td>{{ item.collection_name|default:"-" }}</td>
-                            <td>{{ item.brand|default:"any brand" }}</td>
-                            <td>{{ item.concentration|default:"-" }}</td>
-                            <td>{{ item.audience|default:"-" }}</td>
-                            <td>{{ item.excluded_terms|default:"-" }}</td>
-                            <td>{{ item.supplier|default:"global" }}</td>
-                            <td>{{ item.active|yesno:"active,inactive" }}</td>
-                            <td class="actions">
+                            <td data-label="Supplier text">{{ item.alias_text }}</td>
+                            <td data-label="Correct scent">{{ item.canonical_text }}</td>
+                            <td data-label="Collection">{{ item.collection_name|default:"-" }}</td>
+                            <td data-label="Brand">{{ item.brand|default:"any brand" }}</td>
+                            <td data-label="Concentration">{{ item.concentration|default:"-" }}</td>
+                            <td data-label="Audience">{{ item.audience|default:"-" }}</td>
+                            <td data-label="Blockers">{{ item.excluded_terms|default:"-" }}</td>
+                            <td data-label="Scope">{{ item.supplier|default:"global" }}</td>
+                            <td data-label="Status">{{ item.active|yesno:"active,inactive" }}</td>
+                            <td data-label="Actions" class="actions">
                                 <div class="layout-inline gap-sm">
                                     <a class="button ghost" href="{% url 'assistant_core:product_alias_update' item.pk %}">Edit</a>
                                     <a class="button ghost" href="{% url 'assistant_core:product_alias_delete' item.pk %}">Delete</a>
                                 </div>
                             </td>
                         {% else %}
-                            <td>{{ item.alias_text }}</td>
-                            <td>{{ item.normalized_alias }}</td>
-                            <td>{{ item.concentration }}</td>
-                            <td>{{ item.supplier|default:"global" }}</td>
-                            <td>{{ item.priority }}</td>
-                            <td>{% if item.is_regex %}regex{% else %}phrase{% endif %}</td>
-                            <td>{{ item.active|yesno:"active,inactive" }}</td>
-                            <td class="actions">
+                            <td data-label="Supplier text">{{ item.alias_text }}</td>
+                            <td data-label="Normalized alias">{{ item.normalized_alias }}</td>
+                            <td data-label="Correct concentration">{{ item.concentration }}</td>
+                            <td data-label="Scope">{{ item.supplier|default:"global" }}</td>
+                            <td data-label="Priority">{{ item.priority }}</td>
+                            <td data-label="Matcher">{% if item.is_regex %}regex{% else %}phrase{% endif %}</td>
+                            <td data-label="Status">{{ item.active|yesno:"active,inactive" }}</td>
+                            <td data-label="Actions" class="actions">
                                 <div class="layout-inline gap-sm">
                                     <a class="button ghost" href="{% url 'assistant_core:concentration_alias_update' item.pk %}">Edit</a>
                                     <a class="button ghost" href="{% url 'assistant_core:concentration_alias_delete' item.pk %}">Delete</a>

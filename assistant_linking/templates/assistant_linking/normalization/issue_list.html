@@ -26,16 +26,17 @@
 </div>
 
 <div class="workspace-block">
-    <table class="data-table">
+    <div class="table-wrap table-scroll-x">
+    <table class="data-table table-mobile">
         <thead><tr><th>Supplier</th><th>Product</th><th>Parsed</th><th>Flags</th><th>Confidence</th></tr></thead>
         <tbody>
         {% for parsed in parses %}
             <tr>
-                <td>{{ parsed.supplier_product.supplier }}</td>
-                <td><a href="{% url 'assistant_linking:normalization_detail' parsed.supplier_product_id %}">{{ parsed.supplier_product.name }}</a></td>
-                <td>{{ parsed.display_identity }}</td>
-                <td>{{ parsed.modifiers|join:", " }} {{ parsed.warnings|join:", " }}</td>
-                <td>{{ parsed.confidence }}</td>
+                <td data-label="Supplier">{{ parsed.supplier_product.supplier }}</td>
+                <td data-label="Product"><a href="{% url 'assistant_linking:normalization_detail' parsed.supplier_product_id %}">{{ parsed.supplier_product.name }}</a></td>
+                <td data-label="Parsed">{{ parsed.display_identity }}</td>
+                <td data-label="Flags">{{ parsed.modifiers|join:", " }} {{ parsed.warnings|join:", " }}</td>
+                <td data-label="Confidence">{{ parsed.confidence }}</td>
             </tr>
         {% empty %}
             <tr>
@@ -46,6 +47,7 @@
         {% endfor %}
         </tbody>
     </table>
+    </div>
 </div>
 {% if page_obj and page_obj.paginator.num_pages > 1 %}
 <nav class="workspace-pagination" aria-label="Pagination">
