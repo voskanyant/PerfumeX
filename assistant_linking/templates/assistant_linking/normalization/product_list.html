@@ -26,7 +26,8 @@
 </div>
 
 <div class="workspace-block space-top-md">
-    <table class="data-table">
+    <div class="table-wrap table-scroll-x">
+    <table class="data-table table-mobile">
         <thead>
             <tr>
                 <th>Supplier</th>
@@ -39,11 +40,11 @@
         <tbody>
         {% for product in products %}
             <tr>
-                <td>{{ product.supplier }}</td>
-                <td>{{ product.name }}</td>
-                <td>{{ product.brand|default:"-" }}</td>
-                <td>{{ product.supplier_sku|default:"-" }}</td>
-                <td><a class="button ghost" href="{% url 'assistant_linking:normalization_detail' product.pk %}">Open detail</a></td>
+                <td data-label="Supplier">{{ product.supplier }}</td>
+                <td data-label="Product">{{ product.name }}</td>
+                <td data-label="Brand">{{ product.brand|default:"-" }}</td>
+                <td data-label="SKU">{{ product.supplier_sku|default:"-" }}</td>
+                <td data-label="Actions" class="actions"><a class="button ghost" href="{% url 'assistant_linking:normalization_detail' product.pk %}">Open detail</a></td>
             </tr>
         {% empty %}
             <tr>
@@ -54,6 +55,7 @@
         {% endfor %}
         </tbody>
     </table>
+    </div>
 </div>
 
 {% if page_obj and page_obj.paginator.num_pages > 1 %}
