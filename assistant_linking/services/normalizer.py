@@ -367,14 +367,14 @@ def _catalog_scent_key(value: str) -> str:
 
 
 def _canonicalize_product_name_from_catalog(result: ParseResult) -> str:
-    if not result.normalized_brand_id or not result.product_name_text:
+    if not result.normalized_brand or not result.normalized_brand.id or not result.product_name_text:
         return result.product_name_text
     key = _catalog_scent_key(result.product_name_text)
     if len(key) < 3:
         return result.product_name_text
     names = {
         perfume.name
-        for perfume in Perfume.objects.filter(brand_id=result.normalized_brand_id).only("name")
+        for perfume in Perfume.objects.filter(brand_id=result.normalized_brand.id).only("name")
         if _catalog_scent_key(perfume.name) == key
     }
     if len(names) == 1:
