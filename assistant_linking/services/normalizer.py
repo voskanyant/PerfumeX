@@ -244,6 +244,8 @@ def audience_group(value: str) -> str:
 
 
 def _disable_regex_alias(alias, *, pattern: str, exc) -> None:
+    if not alias.active:
+        return
     logger.warning(
         "regex alias disabled after timeout/error: model=%s id=%s pattern=%s error=%s",
         alias.__class__.__name__,
@@ -709,20 +711,24 @@ def parse_supplier_product(product: SupplierProduct) -> ParseResult:
             result.raw_size_text = raw_size
             text = compact_text
 
+    product_alias_non_name_terms = [
+        *tester_terms,
+        *sample_terms,
+        *travel_terms,
+        *mini_terms,
+        *set_terms,
+        *refill_terms,
+        *NO_BOX_TERMS,
+        *WOODBOX_TERMS,
+    ]
     product_alias_match_text = _strip_known_terms(
         text,
         [
             *_audience_terms_to_strip(audience_aliases),
-            *tester_terms,
-            *sample_terms,
-            *travel_terms,
-            *mini_terms,
-            *set_terms,
-            *refill_terms,
-            *NO_BOX_TERMS,
-            *WOODBOX_TERMS,
+            *product_alias_non_name_terms,
         ],
     )
+    raw_product_alias_match_text = _strip_known_terms(text, product_alias_non_name_terms)
     product_aliases = ProductAlias.objects.filter(active=True).order_by("supplier_id", "priority", "-alias_text")
     if result.normalized_brand:
         product_aliases = product_aliases.filter(Q(brand_id=result.normalized_brand.id) | Q(brand__isnull=True))
@@ -733,8 +739,8 @@ def parse_supplier_product(product: SupplierProduct) -> ParseResult:
         if alias_text:
             if _contains_phrase(product_alias_match_text, alias_text):
                 alias_match_context = product_alias_match_text
-            elif _contains_phrase(text, alias_text):
-                alias_match_context = text
+            elif _contains_phrase(raw_product_alias_match_text, alias_text):
+                alias_match_context = raw_product_alias_match_text
         if alias_match_context and not any(_contains_phrase(text, term) for term in excluded_terms):
             if product_alias.collection_name:
                 result.collection_name = product_alias.collection_name
