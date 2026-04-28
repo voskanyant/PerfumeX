@@ -978,15 +978,15 @@ select:focus {
   table-layout: fixed;
 }
 .our-products-table {
-  min-width: 1220px;
+  min-width: 0;
 }
 .our-products-col-brand { width: 15%; }
-.our-products-col-scent { width: 17%; }
+.our-products-col-scent { width: 18%; }
 .our-products-col-concentration { width: 16%; }
-.our-products-col-size { width: 13%; }
+.our-products-col-size { width: 12%; }
 .our-products-col-tester { width: 9%; }
-.our-products-col-packing { width: 17%; }
-.our-products-col-actions { width: 13%; }
+.our-products-col-packing { width: 16%; }
+.our-products-col-actions { width: 14%; }
 .our-products-table th,
 .our-products-table td,
 .our-products-admin-table th,
@@ -1007,13 +1007,20 @@ select:focus {
 .our-products-row-actions {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: flex-start;
   gap: 8px;
   flex-wrap: nowrap;
+  padding-right: 8px;
 }
 .our-products-row-actions .button,
 .catalogue-inline-form .button {
   white-space: nowrap;
+}
+.our-products-row-actions .button {
+  flex: 1 1 0;
+  min-width: 0;
+  padding-left: 10px;
+  padding-right: 10px;
 }
 .catalogue-admin-table td {
   vertical-align: middle;
