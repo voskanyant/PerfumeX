@@ -370,6 +370,168 @@ class NormalizerTests(TestCase):
         self.assertEqual(parsed.size_ml, Decimal("100.00"))
         self.assertEqual(parsed.display_identity, "Versace / Eros Flame Man / Eau de Parfum / 100ml / Tester")
 
+    def test_four_digit_number_between_scent_words_stays_in_name(self):
+        brand = Brand.objects.create(name="Norana Perfumes")
+        BrandAlias.objects.create(
+            brand=brand,
+            alias_text="Noran Perfumes",
+            normalized_alias="noran perfumes",
+        )
+        product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="noran-moon-1947-white",
+            name="Noran Perfumes Moon 1947 White edp 100 ml Tester",
+        )
+
+        parsed = parse_supplier_product(product)
+
+        self.assertEqual(parsed.normalized_brand, brand)
+        self.assertEqual(parsed.product_name_text, "moon 1947 white")
+        self.assertIsNone(parsed.release_year)
+        self.assertEqual(parsed.concentration, "Eau de Parfum")
+        self.assertEqual(parsed.size_ml, Decimal("100.00"))
+        self.assertTrue(parsed.is_tester)
+
+    def test_starting_brand_alias_beats_later_brand_name_in_scent(self):
+        montblanc = Brand.objects.create(name="Montblanc")
+        signature = Brand.objects.create(name="Signature")
+        BrandAlias.objects.create(
+            brand=montblanc,
+            alias_text="MONT BLANC",
+            normalized_alias="mont blanc",
+            priority=20,
+        )
+        ProductAlias.objects.create(
+            brand=montblanc,
+            alias_text="signature",
+            canonical_text="",
+            collection_name="Signature",
+            priority=30,
+        )
+        product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="montblanc-signature-absolue",
+            name="MONT BLANC Signature Absolue edp 90 ml",
+        )
+
+        parsed = parse_supplier_product(product)
+
+        self.assertEqual(parsed.normalized_brand, montblanc)
+        self.assertNotEqual(parsed.normalized_brand, signature)
+        self.assertEqual(parsed.collection_name, "Signature")
+        self.assertEqual(parsed.product_name_text, "absolue")
+        self.assertEqual(parsed.concentration, "Eau de Parfum")
+        self.assertEqual(parsed.size_ml, Decimal("90.00"))
+
+    def test_collection_alias_does_not_blank_base_scent_name(self):
+        brand = Brand.objects.create(name="Montblanc")
+        BrandAlias.objects.create(
+            brand=brand,
+            alias_text="MONT BLANC",
+            normalized_alias="mont blanc",
+            priority=20,
+        )
+        ProductAlias.objects.create(
+            brand=brand,
+            alias_text="signature",
+            canonical_text="",
+            collection_name="Signature",
+            priority=30,
+        )
+        product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="montblanc-signature",
+            name="MONT BLANC Signature edp 90 ml",
+        )
+
+        parsed = parse_supplier_product(product)
+
+        self.assertEqual(parsed.normalized_brand, brand)
+        self.assertEqual(parsed.collection_name, "Signature")
+        self.assertEqual(parsed.product_name_text, "signature")
+
+    def test_collection_prefix_alias_behavior_is_global(self):
+        brand = Brand.objects.create(name="Example House")
+        BrandAlias.objects.create(
+            brand=brand,
+            alias_text="Example House",
+            normalized_alias="example house",
+        )
+        ProductAlias.objects.create(
+            brand=brand,
+            alias_text="private collection",
+            canonical_text="",
+            collection_name="Private Collection",
+            priority=30,
+        )
+        product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="example-private-collection-oud",
+            name="Example House Private Collection Oud edp 50 ml",
+        )
+
+        parsed = parse_supplier_product(product)
+
+        self.assertEqual(parsed.normalized_brand, brand)
+        self.assertEqual(parsed.collection_name, "Private Collection")
+        self.assertEqual(parsed.product_name_text, "oud")
+        self.assertEqual(parsed.concentration, "Eau de Parfum")
+        self.assertEqual(parsed.size_ml, Decimal("50.00"))
+
+    def test_woodbox_is_packaging_not_scent_name(self):
+        brand = Brand.objects.create(name="Afnan")
+        BrandAlias.objects.create(brand=brand, alias_text="AFNAN", normalized_alias="afnan")
+        product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="afnan-tribute-blue-woodbox",
+            name="AFNAN TRIBUTE BLUE WOODBOX 100ml edP",
+        )
+
+        parsed = save_parse(product, force=True)
+
+        self.assertEqual(parsed.normalized_brand, brand)
+        self.assertEqual(parsed.product_name_text, "tribute blue")
+        self.assertEqual(parsed.concentration, "Eau de Parfum")
+        self.assertEqual(parsed.size_ml, Decimal("100.00"))
+        self.assertEqual(parsed.variant_type, "standard")
+        self.assertEqual(parsed.packaging, "woodbox")
+        self.assertEqual(parsed.display_identity, "Afnan / Tribute Blue / Eau de Parfum / 100ml / Woodbox")
+
+    def test_product_name_compacts_spaces_around_numeric_dot(self):
+        brand = Brand.objects.create(name="Zarkoperfume")
+        BrandAlias.objects.create(brand=brand, alias_text="Zarkoperfume", normalized_alias="zarkoperfume")
+        product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="zarkoperfume-pink-molecule-090-09",
+            name="Zarkoperfume PINK MOLeCULE 090 . 09 edp 100 ml Tester",
+        )
+
+        parsed = save_parse(product, force=True)
+
+        self.assertEqual(parsed.normalized_brand, brand)
+        self.assertEqual(parsed.product_name_text, "pink molecule 090.09")
+        self.assertEqual(parsed.display_identity, "Zarkoperfume / Pink Molecule 090.09 / Eau de Parfum / 100ml / Tester")
+
+    def test_product_name_uses_brand_catalog_spacing_when_compact_name_matches(self):
+        brand = Brand.objects.create(name="Paco Rabanne")
+        BrandAlias.objects.create(brand=brand, alias_text="PACO RABANNE", normalized_alias="paco rabanne")
+        brand.perfumes.create(name="1 Million", concentration="Eau de Toilette", audience="Men")
+        product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="paco-rabanne-1million-men",
+            name="PACO RABANNE 1Million men edt 100 ml Tester",
+        )
+
+        parsed = save_parse(product, force=True)
+
+        self.assertEqual(parsed.normalized_brand, brand)
+        self.assertEqual(parsed.product_name_text, "1 Million")
+        self.assertEqual(parsed.concentration, "Eau de Toilette")
+        self.assertEqual(parsed.size_ml, Decimal("100.00"))
+        self.assertTrue(parsed.is_tester)
+        self.assertEqual(parsed.supplier_gender_hint, "Men")
+        self.assertEqual(parsed.display_identity, "Paco Rabanne / 1 Million / Eau de Toilette / 100ml / Tester")
+
     def test_man_eau_fraiche_is_name_bearing_not_modifier_warning(self):
         brand = Brand.objects.create(name="Versace")
         BrandAlias.objects.create(brand=brand, alias_text="VERSACE", normalized_alias="versace")
@@ -1020,6 +1182,31 @@ class NormalizerTests(TestCase):
         self.assertEqual(parsed.concentration, "Eau de Cologne")
         self.assertEqual(parsed.size_ml, Decimal("170.00"))
         self.assertTrue(parsed.is_tester)
+
+    def test_brand_scoped_for_her_alias_preserves_narciso_scent_name(self):
+        brand = Brand.objects.create(name="Narciso Rodriguez")
+        BrandAlias.objects.create(brand=brand, alias_text="NARCISO RODRIGUEZ", normalized_alias="narciso rodriguez")
+        ProductAlias.objects.create(
+            brand=brand,
+            alias_text="for her",
+            canonical_text="for Her",
+            audience="Woman",
+            priority=30,
+        )
+        product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="narciso-for-her-edp-100",
+            name="NARCISO RODRIGUEZ for her edp 100 ml",
+        )
+
+        parsed = save_parse(product, force=True)
+
+        self.assertEqual(parsed.normalized_brand, brand)
+        self.assertEqual(parsed.product_name_text, "for Her")
+        self.assertEqual(parsed.concentration, "Eau de Parfum")
+        self.assertEqual(parsed.size_ml, Decimal("100.00"))
+        self.assertEqual(parsed.supplier_gender_hint, "Woman")
+        self.assertEqual(parsed.display_identity, "Narciso Rodriguez / For Her / Eau de Parfum / 100ml")
 
     def test_xerjoff_casamorati_combination_maps_to_casamorati_brand(self):
         xerjoff = Brand.objects.create(name="Xerjoff")
