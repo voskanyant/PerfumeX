@@ -27,7 +27,7 @@
         {% endif %}
     </form>
     {% if refreshed_visible %}
-        <p class="form-help">Visible rows were reparsed.</p>
+        <p class="form-help">{{ refreshed_visible_count }} visible row{{ refreshed_visible_count|pluralize }} reparsed.</p>
     {% endif %}
 </div>
 

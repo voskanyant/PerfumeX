@@ -980,18 +980,57 @@ select:focus {
 .our-products-table {
   min-width: 0;
 }
-.our-products-col-brand { width: 15%; }
+.our-products-col-brand { width: 14%; }
+.our-products-col-collection { width: 13%; }
 .our-products-col-scent { width: 18%; }
 .our-products-col-concentration { width: 16%; }
-.our-products-col-size { width: 12%; }
-.our-products-col-tester { width: 9%; }
-.our-products-col-packing { width: 16%; }
-.our-products-col-actions { width: 14%; }
+.our-products-col-size { width: 10%; }
+.our-products-col-tester { width: 8%; }
+.our-products-col-type { width: 12%; }
+.our-products-col-actions { width: 5%; }
 .our-products-table th,
 .our-products-table td,
 .our-products-admin-table th,
 .our-products-admin-table td {
   vertical-align: middle;
+}
+.our-products-review-table td {
+  padding-top: 14px;
+  padding-bottom: 14px;
+}
+.our-products-review-table tbody tr.is-editing {
+  background: #fbfbfb;
+}
+.catalogue-cell-value {
+  display: block;
+  min-height: 34px;
+  padding: 7px 0;
+  overflow: hidden;
+  color: var(--grey-800);
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.catalogue-cell-value-strong {
+  color: var(--black);
+}
+.is-editing [data-editable-cell] {
+  cursor: text;
+}
+.is-editing [data-editable-cell]:hover .catalogue-cell-value {
+  color: var(--black);
+  text-decoration: underline;
+  text-decoration-color: var(--grey-300);
+  text-underline-offset: 4px;
+}
+.catalogue-inline-input {
+  display: none;
+}
+[data-editable-cell].is-field-open .catalogue-cell-value {
+  display: none;
+}
+[data-editable-cell].is-field-open .catalogue-inline-input:not([type=hidden]) {
+  display: block;
 }
 .our-products-table input:not([type=checkbox]):not([type=radio]):not([type=hidden]),
 .our-products-table select,
@@ -1007,20 +1046,35 @@ select:focus {
 .our-products-row-actions {
   display: flex;
   align-items: center;
-  justify-content: flex-start;
-  gap: 8px;
+  justify-content: flex-end;
+  gap: 0;
   flex-wrap: nowrap;
-  padding-right: 8px;
 }
 .our-products-row-actions .button,
 .catalogue-inline-form .button {
   white-space: nowrap;
 }
 .our-products-row-actions .button {
-  flex: 1 1 0;
-  min-width: 0;
-  padding-left: 10px;
-  padding-right: 10px;
+  flex: 0 0 auto;
+}
+.our-products-edit-button {
+  color: var(--grey-500);
+}
+.our-products-edit-button:hover {
+  color: var(--black);
+}
+.our-products-edit-button .icon-save {
+  display: none;
+}
+.is-editing .our-products-edit-button {
+  border-color: var(--black);
+  color: var(--black);
+}
+.is-editing .our-products-edit-button .icon-edit {
+  display: none;
+}
+.is-editing .our-products-edit-button .icon-save {
+  display: block;
 }
 .catalogue-admin-table td {
   vertical-align: middle;
@@ -1811,6 +1865,20 @@ pre, code {
   .catalogue-inline-form .button {
     flex: 1 1 0;
     justify-content: center;
+  }
+
+  .our-products-review-table .our-products-row-actions {
+    justify-content: flex-end;
+  }
+
+  .our-products-review-table .our-products-row-actions .button {
+    flex: 0 0 auto;
+  }
+
+  .our-products-review-table .catalogue-cell-value {
+    min-height: 0;
+    padding: 0;
+    white-space: normal;
   }
 
   .catalogue-inline-form input {

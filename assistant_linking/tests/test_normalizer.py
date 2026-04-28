@@ -314,6 +314,9 @@ class NormalizerTests(TestCase):
         self.assertEqual(parsed.display_product_name, "Rose of No Man's Land in Bloom")
         self.assertEqual(parsed.display_identity, "Byredo / Rose of No Man's Land in Bloom / Eau de Parfum / 100ml")
 
+        parsed.product_name_text = "for her"
+        self.assertEqual(parsed.display_product_name, "for Her")
+
     def test_femme_keeps_supplier_style_but_matches_women_group(self):
         product = SupplierProduct.objects.create(
             supplier=self.supplier,
@@ -598,6 +601,80 @@ class NormalizerTests(TestCase):
         self.assertEqual(parsed.product_name_text, "away tonight")
         self.assertEqual(parsed.concentration, "Eau de Parfum")
         self.assertEqual(parsed.supplier_gender_hint, "Woman")
+
+    def test_catalog_base_name_can_drop_trailing_audience_name(self):
+        brand = Brand.objects.create(name="Versace")
+        BrandAlias.objects.create(brand=brand, alias_text="VERSACE", normalized_alias="versace")
+        brand.perfumes.create(name="Eros Flame", concentration="Eau de Parfum", audience="Men")
+        product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="versace-eros-flame-man",
+            name="VERSACE EROS Flame Man edp 100 ml 2019 Tester",
+        )
+
+        parsed = save_parse(product, force=True)
+
+        self.assertEqual(parsed.normalized_brand, brand)
+        self.assertEqual(parsed.product_name_text, "Eros Flame")
+        self.assertEqual(parsed.concentration, "Eau de Parfum")
+        self.assertEqual(parsed.size_ml, Decimal("100.00"))
+        self.assertEqual(parsed.supplier_gender_hint, "Men")
+        self.assertTrue(parsed.is_tester)
+        self.assertEqual(parsed.display_identity, "Versace / Eros Flame / Eau de Parfum / 100ml / Tester")
+
+    def test_catalog_base_name_can_drop_trailing_audience_for_ajmal(self):
+        brand = Brand.objects.create(name="Ajmal")
+        BrandAlias.objects.create(brand=brand, alias_text="AJMAL", normalized_alias="ajmal")
+        brand.perfumes.create(name="Silver Shade", concentration="Eau de Parfum", audience="Men")
+        product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="ajmal-silver-shade-man",
+            name="AJMAL SILVER SHADE man 100 ml edP",
+        )
+
+        parsed = save_parse(product, force=True)
+
+        self.assertEqual(parsed.normalized_brand, brand)
+        self.assertEqual(parsed.product_name_text, "Silver Shade")
+        self.assertEqual(parsed.concentration, "Eau de Parfum")
+        self.assertEqual(parsed.size_ml, Decimal("100.00"))
+        self.assertEqual(parsed.supplier_gender_hint, "Men")
+
+    def test_catalog_base_name_keeps_trailing_audience_when_named_sibling_exists(self):
+        brand = Brand.objects.create(name="Versace")
+        BrandAlias.objects.create(brand=brand, alias_text="VERSACE", normalized_alias="versace")
+        brand.perfumes.create(name="Eros Flame", concentration="Eau de Parfum", audience="Men")
+        brand.perfumes.create(name="Eros Flame Femme", concentration="Eau de Parfum", audience="Woman")
+        product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="versace-eros-flame-man-with-femme-sibling",
+            name="VERSACE EROS Flame Man edp 100 ml 2019 Tester",
+        )
+
+        parsed = save_parse(product, force=True)
+
+        self.assertEqual(parsed.normalized_brand, brand)
+        self.assertEqual(parsed.product_name_text, "eros flame man")
+        self.assertEqual(parsed.display_product_name, "Eros Flame Man")
+        self.assertEqual(parsed.concentration, "Eau de Parfum")
+        self.assertEqual(parsed.supplier_gender_hint, "Men")
+
+    def test_catalog_exact_audience_name_still_wins(self):
+        brand = Brand.objects.create(name="Abercrombie & Fitch")
+        brand.perfumes.create(name="Away Tonight Man", concentration="Eau de Parfum", audience="Men")
+        product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="abercrombie-away-tonight-man",
+            name="Abercrombie & Fitch AWAY TONIGHT man 30ml edP",
+        )
+
+        parsed = save_parse(product, force=True)
+
+        self.assertEqual(parsed.normalized_brand, brand)
+        self.assertEqual(parsed.product_name_text, "Away Tonight Man")
+        self.assertEqual(parsed.concentration, "Eau de Parfum")
+        self.assertEqual(parsed.size_ml, Decimal("30.00"))
+        self.assertEqual(parsed.supplier_gender_hint, "Men")
 
     def test_man_eau_fraiche_is_name_bearing_not_modifier_warning(self):
         brand = Brand.objects.create(name="Versace")
@@ -1273,7 +1350,7 @@ class NormalizerTests(TestCase):
         self.assertEqual(parsed.concentration, "Eau de Parfum")
         self.assertEqual(parsed.size_ml, Decimal("100.00"))
         self.assertEqual(parsed.supplier_gender_hint, "Woman")
-        self.assertEqual(parsed.display_identity, "Narciso Rodriguez / For Her / Eau de Parfum / 100ml")
+        self.assertEqual(parsed.display_identity, "Narciso Rodriguez / for Her / Eau de Parfum / 100ml")
 
     def test_xerjoff_casamorati_combination_maps_to_casamorati_brand(self):
         xerjoff = Brand.objects.create(name="Xerjoff")

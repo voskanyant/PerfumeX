@@ -27,7 +27,7 @@ from prices.models import SupplierProduct
 
 
 logger = logging.getLogger(__name__)
-PARSER_VERSION = "deterministic-v12"
+PARSER_VERSION = "deterministic-v13"
 REGEX_ALIAS_TIMEOUT_SECONDS = 1.0
 
 DEFAULT_CONCENTRATION_ALIASES = (
@@ -385,6 +385,47 @@ def _catalog_perfume_matches_parse_context(perfume: Perfume, result: ParseResult
     return True
 
 
+def _catalog_perfume_matches_non_audience_context(perfume: Perfume, result: ParseResult) -> bool:
+    if result.concentration and perfume.concentration:
+        if normalize_text(result.concentration) != normalize_text(perfume.concentration):
+            return False
+    if result.collection_name and perfume.collection_name:
+        if _catalog_scent_key(result.collection_name) != _catalog_scent_key(perfume.collection_name):
+            return False
+    return True
+
+
+def _catalog_base_keys_without_trailing_audience(result: ParseResult) -> set[str]:
+    audience_suffixes = AUDIENCE_NAME_SUFFIXES.get(audience_group(result.supplier_gender_hint), ())
+    if not audience_suffixes:
+        return set()
+    normalized_name = normalize_text(result.product_name_text)
+    base_keys: set[str] = set()
+    for suffix in audience_suffixes:
+        normalized_suffix = normalize_text(suffix)
+        match = re.match(rf"^(?P<base>.+)\s+{re.escape(normalized_suffix)}$", normalized_name)
+        if not match:
+            continue
+        base_key = _catalog_scent_key(match.group("base"))
+        if len(base_key) >= 3:
+            base_keys.add(base_key)
+    return base_keys
+
+
+def _catalog_has_audience_named_sibling(perfumes: list[Perfume], base_key: str, result: ParseResult) -> bool:
+    suffix_keys = {
+        _catalog_scent_key(suffix)
+        for suffixes in AUDIENCE_NAME_SUFFIXES.values()
+        for suffix in suffixes
+    }
+    audience_variant_keys = {f"{base_key}{suffix_key}" for suffix_key in suffix_keys if suffix_key}
+    return any(
+        _catalog_perfume_matches_non_audience_context(perfume, result)
+        and _catalog_scent_key(perfume.name) in audience_variant_keys
+        for perfume in perfumes
+    )
+
+
 def _canonicalize_product_name_from_catalog(result: ParseResult) -> str:
     if not result.normalized_brand or not result.normalized_brand.id or not result.product_name_text:
         return result.product_name_text
@@ -406,6 +447,20 @@ def _canonicalize_product_name_from_catalog(result: ParseResult) -> str:
     }
     if len(names) == 1:
         return names.pop()
+
+    base_keys = _catalog_base_keys_without_trailing_audience(result)
+    if base_keys:
+        names = {
+            perfume.name
+            for perfume in perfumes
+            if _catalog_perfume_matches_parse_context(perfume, result)
+            and _catalog_scent_key(perfume.name) in base_keys
+        }
+        if len(names) == 1:
+            base_key = next(iter(base_keys))
+            if _catalog_has_audience_named_sibling(perfumes, base_key, result):
+                return result.product_name_text
+            return names.pop()
 
     audience_suffixes = AUDIENCE_NAME_SUFFIXES.get(audience_group(result.supplier_gender_hint), ())
     if not audience_suffixes:

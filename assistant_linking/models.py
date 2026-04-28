@@ -74,7 +74,7 @@ def display_title(value: str) -> str:
 
     words = []
     for index, word in enumerate(text.split()):
-        lower_allowed = index > 0
+        lower_allowed = index > 0 or word.lower() in TITLECASE_LOWER_WORDS
         hyphen_parts = []
         for hyphen_part in word.split("-"):
             apostrophe_parts = hyphen_part.split("'")

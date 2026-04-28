@@ -6,12 +6,13 @@ from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.http import Http404, HttpResponse, JsonResponse
 from django.db import transaction
-from django.db.models import Count, Q
+from django.db.models import Count, Max, Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse_lazy
 from django.utils import timezone
 from django.views.generic import DetailView, ListView, TemplateView, View
 
+from assistant_core.models import GlobalRule
 from assistant_linking import forms, models
 from assistant_linking.services.catalog_matcher import candidate_matches, rule_impact, similar_supplier_rows
 from assistant_linking.services.garbage import GARBAGE_MODIFIER, normalize_garbage_keyword
@@ -24,7 +25,7 @@ from assistant_linking.services.normalization_stats import (
     refresh_stats_snapshot,
     snapshot_to_stats,
 )
-from assistant_linking.services.normalizer import save_parse
+from assistant_linking.services.normalizer import PARSER_VERSION, save_parse
 from assistant_linking.services.smart_search import normalize_query
 from catalog.models import Brand, Perfume, PerfumeVariant, compact_decimal_text
 from prices.models import SupplierProduct
@@ -77,6 +78,35 @@ def _complete_parse_query():
 
 def _complete_parses(queryset):
     return queryset.filter(_complete_parse_query())
+
+
+def _normalization_knowledge_updated_at():
+    latest_values = [
+        model.objects.aggregate(latest=Max("updated_at"))["latest"]
+        for model in (
+            models.BrandAlias,
+            models.ProductAlias,
+            models.ConcentrationAlias,
+            GlobalRule,
+            Brand,
+            Perfume,
+            PerfumeVariant,
+        )
+    ]
+    return max((value for value in latest_values if value), default=None)
+
+
+def _parse_needs_visible_refresh(parsed, knowledge_updated_at) -> bool:
+    if parsed.locked_by_human:
+        return False
+    if parsed.parser_version != PARSER_VERSION:
+        return True
+    if not parsed.last_parsed_at:
+        return True
+    supplier_updated_at = getattr(parsed.supplier_product, "updated_at", None)
+    if supplier_updated_at and parsed.last_parsed_at < supplier_updated_at:
+        return True
+    return bool(knowledge_updated_at and parsed.last_parsed_at < knowledge_updated_at)
 
 
 def _normalization_dashboard_stats(request, hidden_keywords: list[str]) -> dict[str, object]:
@@ -450,14 +480,31 @@ class ParsedListView(NormalizationIssueListView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["allow_refresh_visible"] = True
-        if self.request.GET.get(self.refresh_param) == "1":
+        visible_parses = list(context.get("parses", []))
+        force_refresh = self.request.GET.get(self.refresh_param) == "1"
+        knowledge_updated_at = None if force_refresh else _normalization_knowledge_updated_at()
+        refreshed_count = 0
+        refreshed_parses = []
+        for parsed in visible_parses:
+            should_refresh = force_refresh or _parse_needs_visible_refresh(parsed, knowledge_updated_at)
+            if should_refresh:
+                refreshed_parses.append(save_parse(parsed.supplier_product))
+                refreshed_count += 1
+            else:
+                refreshed_parses.append(parsed)
+        if refreshed_count:
             refreshed_parses = [
-                save_parse(parsed.supplier_product)
-                for parsed in context.get("parses", [])
+                models.ParsedSupplierProduct.objects.select_related(
+                    "supplier_product",
+                    "supplier_product__supplier",
+                    "normalized_brand",
+                ).get(pk=parsed.pk)
+                for parsed in refreshed_parses
             ]
             context["parses"] = refreshed_parses
             context["object_list"] = refreshed_parses
             context["refreshed_visible"] = True
+            context["refreshed_visible_count"] = refreshed_count
             if context.get("page_obj"):
                 context["page_obj"].object_list = refreshed_parses
         return context

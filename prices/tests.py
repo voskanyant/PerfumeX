@@ -808,15 +808,18 @@ class OurProductCatalogueListTests(TestCase):
         self.assertContains(response, "Blonde Amber")
 
     def test_staff_can_inline_edit_catalogue_variant_row(self):
+        Brand.objects.create(name="Montale Paris")
         response = self.client.post(
             reverse("prices:our_product_variant_inline_update", args=[self.variant.pk]),
             {
                 "brand_name": "Montale Paris",
                 "perfume_name": "Vanilla Extasy Intense",
+                "collection_name": "Intense",
                 "concentration": "Extrait de Parfum",
                 "size_ml": "50",
                 "is_tester": "0",
                 "packaging": "no box",
+                "variant_type": "travel",
             },
         )
 
@@ -825,10 +828,12 @@ class OurProductCatalogueListTests(TestCase):
         self.perfume.refresh_from_db()
         self.assertEqual(self.perfume.brand.name, "Montale Paris")
         self.assertEqual(self.perfume.name, "Vanilla Extasy Intense")
+        self.assertEqual(self.perfume.collection_name, "Intense")
         self.assertEqual(self.perfume.concentration, "Extrait de Parfum")
         self.assertEqual(self.variant.size_ml, 50)
         self.assertFalse(self.variant.is_tester)
         self.assertEqual(self.variant.packaging, "no box")
+        self.assertEqual(self.variant.variant_type, "travel")
 
     def test_our_products_brands_tab_can_add_brand(self):
         response = self.client.post(

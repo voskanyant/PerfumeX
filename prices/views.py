@@ -4099,6 +4099,12 @@ class OurProductListView(LoginRequiredMixin, ListView):
             .annotate(perfume_count=Count("id"))
             .order_by("concentration")
         )
+        context["variant_type_rows"] = (
+            CatalogPerfumeVariant.objects.exclude(variant_type="")
+            .values_list("variant_type", flat=True)
+            .distinct()
+            .order_by("variant_type")
+        )
         return context
 
     def post(self, request, *args, **kwargs):
@@ -4322,9 +4328,11 @@ class OurProductVariantInlineUpdateView(LoginRequiredMixin, View):
         )
         brand_name = request.POST.get("brand_name", "").strip()
         perfume_name = request.POST.get("perfume_name", "").strip()
+        collection_name = request.POST.get("collection_name", "").strip()
         concentration = request.POST.get("concentration", "").strip()
         size_text = request.POST.get("size_ml", "").strip().lower().replace("ml", "").replace(",", ".").strip()
         packaging = request.POST.get("packaging", "").strip()
+        variant_type = request.POST.get("variant_type", "").strip()
 
         if not brand_name or not perfume_name:
             messages.error(request, "Brand and scent are required.")
@@ -4332,12 +4340,14 @@ class OurProductVariantInlineUpdateView(LoginRequiredMixin, View):
 
         brand = CatalogBrand.objects.filter(name__iexact=brand_name).first()
         if not brand:
-            brand = CatalogBrand.objects.create(name=brand_name)
+            messages.error(request, "Choose an existing brand from the catalogue.")
+            return redirect(next_url)
         perfume = variant.perfume
         perfume.brand = brand
         perfume.name = perfume_name
+        perfume.collection_name = collection_name
         perfume.concentration = concentration
-        perfume.save(update_fields=["brand", "name", "concentration", "updated_at"])
+        perfume.save(update_fields=["brand", "name", "collection_name", "concentration", "updated_at"])
 
         variant.size_ml = None
         variant.size_label = ""
@@ -4348,7 +4358,8 @@ class OurProductVariantInlineUpdateView(LoginRequiredMixin, View):
                 variant.size_label = request.POST.get("size_ml", "").strip()
         variant.is_tester = request.POST.get("is_tester") == "1"
         variant.packaging = packaging
-        variant.save(update_fields=["size_ml", "size_label", "is_tester", "packaging", "updated_at"])
+        variant.variant_type = variant_type or "standard"
+        variant.save(update_fields=["size_ml", "size_label", "is_tester", "packaging", "variant_type", "updated_at"])
         messages.success(request, "Product row updated.")
         return redirect(next_url)
 
