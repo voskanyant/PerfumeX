@@ -414,10 +414,18 @@ class EmailImporterCursorTests(TestCase):
         )
 
     def test_duplicate_message_id_skipped_not_crashed(self):
-        models.ImportBatch.objects.create(
+        payload = b"sku,price\nA,1\n"
+        existing_batch = models.ImportBatch.objects.create(
             supplier=self.supplier,
             mailbox=self.mailbox,
             message_id="<duplicate@example.com>",
+            status=models.ImportStatus.PROCESSED,
+        )
+        models.ImportFile.objects.create(
+            import_batch=existing_batch,
+            file_kind=models.FileKind.PRICE,
+            filename="prices.csv",
+            content_hash=hashlib.sha256(payload).hexdigest(),
             status=models.ImportStatus.PROCESSED,
         )
         message = EmailMessage()
@@ -427,7 +435,7 @@ class EmailImporterCursorTests(TestCase):
         message["Date"] = "Sat, 25 Apr 2026 10:00:00 +0000"
         message.set_content("attached")
         message.add_attachment(
-            b"sku,price\nA,1\n",
+            payload,
             maintype="text",
             subtype="csv",
             filename="prices.csv",
@@ -459,7 +467,7 @@ class EmailImporterCursorTests(TestCase):
         self.mailbox.refresh_from_db()
         self.assertEqual(summary["skipped_duplicates"], 1)
         self.assertEqual(models.ImportBatch.objects.count(), 1)
-        self.assertEqual(models.ImportFile.objects.count(), 0)
+        self.assertEqual(models.ImportFile.objects.count(), 1)
         self.assertEqual(self.mailbox.last_inbox_uid, 7)
 
 
