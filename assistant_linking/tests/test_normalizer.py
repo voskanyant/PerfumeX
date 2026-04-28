@@ -450,6 +450,38 @@ class NormalizerTests(TestCase):
         self.assertEqual(parsed.collection_name, "Signature")
         self.assertEqual(parsed.product_name_text, "signature")
 
+    def test_dunhill_signature_collection_parses_brand_collection_and_scent(self):
+        dunhill = Brand.objects.create(name="Alfred Dunhill")
+        signature = Brand.objects.create(name="Signature")
+        BrandAlias.objects.create(
+            brand=dunhill,
+            alias_text="A.DUNHILL",
+            normalized_alias="a.dunhill",
+            priority=20,
+        )
+        ProductAlias.objects.create(
+            brand=dunhill,
+            alias_text="signature collection",
+            canonical_text="",
+            collection_name="Signature Collection",
+            priority=30,
+        )
+        product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="dunhill-signature-collection-arabian-desert",
+            name="A.DUNHILL SIGNATURE COLLECTION ARABIAN DESERT 100ml edP TEST",
+        )
+
+        parsed = parse_supplier_product(product)
+
+        self.assertEqual(parsed.normalized_brand, dunhill)
+        self.assertNotEqual(parsed.normalized_brand, signature)
+        self.assertEqual(parsed.collection_name, "Signature Collection")
+        self.assertEqual(parsed.product_name_text, "arabian desert")
+        self.assertEqual(parsed.concentration, "Eau de Parfum")
+        self.assertEqual(parsed.size_ml, Decimal("100.00"))
+        self.assertTrue(parsed.is_tester)
+
     def test_collection_prefix_alias_behavior_is_global(self):
         brand = Brand.objects.create(name="Example House")
         BrandAlias.objects.create(
