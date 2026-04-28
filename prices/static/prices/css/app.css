@@ -966,8 +966,10 @@ select:focus {
 .catalogue-inline-form input {
   min-width: 220px;
 }
-.our-products-table-wrap {
+.table-wrap.our-products-table-wrap {
   margin-top: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
 }
 .our-products-table,
 .our-products-admin-table {
@@ -976,15 +978,15 @@ select:focus {
   table-layout: fixed;
 }
 .our-products-table {
-  min-width: 980px;
+  min-width: 1220px;
 }
-.our-products-col-brand { width: 18%; }
-.our-products-col-scent { width: 24%; }
-.our-products-col-concentration { width: 18%; }
-.our-products-col-size { width: 10%; }
+.our-products-col-brand { width: 15%; }
+.our-products-col-scent { width: 17%; }
+.our-products-col-concentration { width: 16%; }
+.our-products-col-size { width: 13%; }
 .our-products-col-tester { width: 9%; }
-.our-products-col-packing { width: 13%; }
-.our-products-col-actions { width: 120px; }
+.our-products-col-packing { width: 17%; }
+.our-products-col-actions { width: 13%; }
 .our-products-table th,
 .our-products-table td,
 .our-products-admin-table th,
@@ -1770,8 +1772,9 @@ pre, code {
     gap: 14px;
   }
 
-  .our-products-table-wrap {
+  .table-wrap.our-products-table-wrap {
     background: transparent;
+    overflow: visible;
   }
 
   .our-products-table,
