@@ -434,6 +434,7 @@ class ModifierConflictListView(NormalizationIssueListView):
 
 class ParsedListView(NormalizationIssueListView):
     issue_title = "Complete parsed products"
+    refresh_param = "refresh"
 
     def get_queryset(self):
         queryset = models.ParsedSupplierProduct.objects.select_related(
@@ -448,14 +449,17 @@ class ParsedListView(NormalizationIssueListView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        refreshed_parses = [
-            save_parse(parsed.supplier_product)
-            for parsed in context.get("parses", [])
-        ]
-        context["parses"] = refreshed_parses
-        context["object_list"] = refreshed_parses
-        if context.get("page_obj"):
-            context["page_obj"].object_list = refreshed_parses
+        context["allow_refresh_visible"] = True
+        if self.request.GET.get(self.refresh_param) == "1":
+            refreshed_parses = [
+                save_parse(parsed.supplier_product)
+                for parsed in context.get("parses", [])
+            ]
+            context["parses"] = refreshed_parses
+            context["object_list"] = refreshed_parses
+            context["refreshed_visible"] = True
+            if context.get("page_obj"):
+                context["page_obj"].object_list = refreshed_parses
         return context
 
 

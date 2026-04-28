@@ -22,7 +22,13 @@
         {% if search_query %}
             <a class="button ghost" href="{{ request.path }}">Reset</a>
         {% endif %}
+        {% if allow_refresh_visible %}
+            <a class="button ghost" href="?{% if search_query %}q={{ search_query|urlencode }}&amp;{% endif %}{% if page_obj %}page={{ page_obj.number }}&amp;{% endif %}refresh=1">Refresh visible rows</a>
+        {% endif %}
     </form>
+    {% if refreshed_visible %}
+        <p class="form-help">Visible rows were reparsed.</p>
+    {% endif %}
 </div>
 
 <div class="workspace-block">
