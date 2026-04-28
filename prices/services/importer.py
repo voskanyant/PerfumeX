@@ -729,7 +729,7 @@ def process_import_file(import_file: models.ImportFile) -> None:
     identity_keys = list(unique_rows.keys())
     existing_products = models.SupplierProduct.objects.filter(
         supplier=supplier, identity_key__in=identity_keys
-    )
+    ).select_related("last_import_batch")
     existing_map = {}
     for product in existing_products:
         key = product.identity_key or _identity_key(product.supplier_sku, product.name)
@@ -768,14 +768,16 @@ def process_import_file(import_file: models.ImportFile) -> None:
                 )
             if not existing_batch_time:
                 existing_batch_time = existing.last_imported_at
-            changed = (
+            content_changed = (
                 existing.name != parsed.name
                 or existing.current_price != parsed.price
                 or existing.currency != parsed.currency
-                or existing.last_import_batch_id != import_file.import_batch_id
+            )
+            seen_changed = (
+                existing.last_import_batch_id != import_file.import_batch_id
                 or not existing.is_active
             )
-            if changed or is_latest_batch:
+            if content_changed or seen_changed or is_latest_batch:
                 if not existing_batch_time or batch_time >= existing_batch_time:
                     if existing.supplier_sku != parsed.sku:
                         sku_taken = models.SupplierProduct.objects.filter(
@@ -783,7 +785,7 @@ def process_import_file(import_file: models.ImportFile) -> None:
                         ).exclude(id=existing.id).exists()
                         if parsed.sku and not sku_taken:
                             existing.supplier_sku = parsed.sku
-                    if changed:
+                    if content_changed:
                         existing.name = parsed.name
                         existing.current_price = parsed.price
                         existing.currency = parsed.currency
