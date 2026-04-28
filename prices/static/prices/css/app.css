@@ -945,8 +945,12 @@ select:focus {
 .toggle input:checked ~ .toggle-thumb { transform: translateX(16px); }
 
 .search-wrap { margin-bottom: 20px; }
+.our-products-catalog {
+  display: grid;
+  gap: 18px;
+}
 .catalogue-tabs {
-  margin-bottom: 22px;
+  margin-bottom: 4px;
 }
 .catalogue-add-row,
 .catalogue-inline-form {
@@ -961,6 +965,53 @@ select:focus {
 .catalogue-add-row input,
 .catalogue-inline-form input {
   min-width: 220px;
+}
+.our-products-table-wrap {
+  margin-top: 0;
+}
+.our-products-table,
+.our-products-admin-table {
+  width: 100%;
+  min-width: 760px;
+  table-layout: fixed;
+}
+.our-products-table {
+  min-width: 980px;
+}
+.our-products-col-brand { width: 18%; }
+.our-products-col-scent { width: 24%; }
+.our-products-col-concentration { width: 18%; }
+.our-products-col-size { width: 10%; }
+.our-products-col-tester { width: 9%; }
+.our-products-col-packing { width: 13%; }
+.our-products-col-actions { width: 120px; }
+.our-products-table th,
+.our-products-table td,
+.our-products-admin-table th,
+.our-products-admin-table td {
+  vertical-align: middle;
+}
+.our-products-table input:not([type=checkbox]):not([type=radio]):not([type=hidden]),
+.our-products-table select,
+.our-products-admin-table input:not([type=checkbox]):not([type=radio]):not([type=hidden]),
+.our-products-admin-table select {
+  width: 100%;
+  min-width: 0;
+  height: 34px;
+}
+.catalogue-flag-cell select {
+  min-width: 0;
+}
+.our-products-row-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: nowrap;
+}
+.our-products-row-actions .button,
+.catalogue-inline-form .button {
+  white-space: nowrap;
 }
 .catalogue-admin-table td {
   vertical-align: middle;
@@ -1715,6 +1766,48 @@ pre, code {
     margin-bottom: 16px;
   }
 
+  .our-products-catalog {
+    gap: 14px;
+  }
+
+  .our-products-table-wrap {
+    background: transparent;
+  }
+
+  .our-products-table,
+  .our-products-admin-table {
+    min-width: 0;
+    table-layout: auto;
+  }
+
+  .our-products-table input:not([type=checkbox]):not([type=radio]):not([type=hidden]),
+  .our-products-table select,
+  .our-products-admin-table input:not([type=checkbox]):not([type=radio]):not([type=hidden]),
+  .our-products-admin-table select {
+    height: 38px;
+    font-size: 16px;
+  }
+
+  .our-products-row-actions,
+  .catalogue-inline-form {
+    width: 100%;
+  }
+
+  .our-products-row-actions {
+    justify-content: stretch;
+  }
+
+  .our-products-row-actions .button,
+  .catalogue-inline-form .button {
+    flex: 1 1 0;
+    justify-content: center;
+  }
+
+  .catalogue-inline-form input {
+    min-width: 0;
+    flex: 1 1 100%;
+  }
+
   .page-head {
     flex-direction: column;
     align-items: stretch;
@@ -1829,6 +1922,15 @@ pre, code {
   .table-mobile:not(.products-mobile) > tbody > tr > td[data-label="Actions"] .button {
     min-width: 36px;
     width: auto;
+  }
+
+  .table-mobile:not(.products-mobile) > tbody > tr > td.empty-state {
+    display: block;
+    padding: 18px 0;
+  }
+
+  .table-mobile:not(.products-mobile) > tbody > tr > td.empty-state::before {
+    content: none;
   }
 
   .pagination {

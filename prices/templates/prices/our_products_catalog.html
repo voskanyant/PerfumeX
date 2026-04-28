@@ -15,7 +15,7 @@
     </div>
 </div>
 
-<div class="workspace-block">
+<div class="workspace-block our-products-catalog">
     <nav class="tabs catalogue-tabs" aria-label="Catalogue management tabs">
         <a class="tab {% if active_tab == 'products' %}active{% endif %}" href="{% url 'prices:our_product_list' %}">Products</a>
         <a class="tab {% if active_tab == 'brands' %}active{% endif %}" href="{% url 'prices:our_product_list' %}?tab=brands">Brands</a>
@@ -29,14 +29,24 @@
         <input type="text" name="q" value="{{ search_query }}" placeholder="Search brand, scent, size, packaging...">
         <button class="button ghost" type="submit">Search</button>
     </form>
-    <table class="data-table">
+    <div class="table-wrap table-scroll-x our-products-table-wrap">
+    <table class="data-table table-mobile our-products-table">
+        <colgroup>
+            <col class="our-products-col-brand">
+            <col class="our-products-col-scent">
+            <col class="our-products-col-concentration">
+            <col class="our-products-col-size">
+            <col class="our-products-col-tester">
+            <col class="our-products-col-packing">
+            <col class="our-products-col-actions">
+        </colgroup>
         <thead>
             <tr>
                 <th>Brand</th>
                 <th>Scent</th>
                 <th>Concentration</th>
                 <th>Size</th>
-                <th></th>
+                <th>Tester</th>
                 <th>Packing</th>
                 <th>Actions</th>
             </tr>
@@ -44,25 +54,27 @@
         <tbody>
         {% for variant in variants %}
             <tr>
-                <td>
+                <td data-label="Brand">
                     <form id="variant-form-{{ variant.pk }}" method="post" action="{% url 'prices:our_product_variant_inline_update' variant.pk %}"></form>
                     <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token }}" form="variant-form-{{ variant.pk }}">
                     <input type="hidden" name="next" value="{{ request.get_full_path }}" form="variant-form-{{ variant.pk }}">
                     <input type="text" name="brand_name" value="{{ variant.perfume.brand.name }}" form="variant-form-{{ variant.pk }}">
                 </td>
-                <td><input type="text" name="perfume_name" value="{{ variant.perfume.name }}" form="variant-form-{{ variant.pk }}"></td>
-                <td><input type="text" name="concentration" value="{{ variant.perfume.concentration }}" list="catalog-concentration-options" form="variant-form-{{ variant.pk }}"></td>
-                <td><input type="text" name="size_ml" value="{{ variant.display_size }}" form="variant-form-{{ variant.pk }}"></td>
-                <td>
+                <td data-label="Scent"><input type="text" name="perfume_name" value="{{ variant.perfume.name }}" form="variant-form-{{ variant.pk }}"></td>
+                <td data-label="Concentration"><input type="text" name="concentration" value="{{ variant.perfume.concentration }}" list="catalog-concentration-options" form="variant-form-{{ variant.pk }}"></td>
+                <td data-label="Size"><input type="text" name="size_ml" value="{{ variant.display_size }}" form="variant-form-{{ variant.pk }}"></td>
+                <td data-label="Tester" class="catalogue-flag-cell">
                     <select name="is_tester" form="variant-form-{{ variant.pk }}">
                         <option value="0"></option>
                         <option value="1" {% if variant.is_tester %}selected{% endif %}>tester</option>
                     </select>
                 </td>
-                <td><input type="text" name="packaging" value="{{ variant.packaging }}" form="variant-form-{{ variant.pk }}"></td>
-                <td>
+                <td data-label="Packing"><input type="text" name="packaging" value="{{ variant.packaging }}" form="variant-form-{{ variant.pk }}"></td>
+                <td data-label="Actions" class="actions">
+                    <div class="our-products-row-actions">
                     <button class="button ghost" type="submit" form="variant-form-{{ variant.pk }}">Save</button>
                     <a class="button ghost" href="{% url 'assistant_core:catalog_variant_delete' variant.pk %}">Delete</a>
+                    </div>
                 </td>
             </tr>
         {% empty %}
@@ -74,6 +86,7 @@
         {% endfor %}
         </tbody>
     </table>
+    </div>
     <datalist id="catalog-concentration-options">
         <option value="Eau de Parfum"></option>
         <option value="Eau de Toilette"></option>
@@ -102,7 +115,8 @@
             <input type="text" name="name" placeholder="New brand name">
             <button class="button primary" type="submit">Add brand</button>
         </form>
-        <table class="data-table catalogue-admin-table">
+        <div class="table-wrap table-scroll-x our-products-table-wrap">
+        <table class="data-table table-mobile catalogue-admin-table our-products-admin-table">
             <thead>
                 <tr>
                     <th>Brand</th>
@@ -113,9 +127,9 @@
             <tbody>
             {% for brand in brand_rows %}
                 <tr>
-                    <td>{{ brand.name }}</td>
-                    <td>{{ brand.perfume_count }}</td>
-                    <td>
+                    <td data-label="Brand">{{ brand.name }}</td>
+                    <td data-label="Products">{{ brand.perfume_count }}</td>
+                    <td data-label="Actions" class="actions">
                         <form method="post" class="catalogue-inline-form">
                             {% csrf_token %}
                             <input type="hidden" name="tab" value="brands">
@@ -130,8 +144,10 @@
             {% endfor %}
             </tbody>
         </table>
+        </div>
     {% elif active_tab == 'collections' %}
-        <table class="data-table catalogue-admin-table">
+        <div class="table-wrap table-scroll-x our-products-table-wrap">
+        <table class="data-table table-mobile catalogue-admin-table our-products-admin-table">
             <thead>
                 <tr>
                     <th>Collection</th>
@@ -143,9 +159,9 @@
             <tbody>
             {% for row in collection_rows %}
                 <tr>
-                    <td>{{ row.collection_name }}</td>
-                    <td>{{ row.perfume_count }}</td>
-                    <td>
+                    <td data-label="Collection">{{ row.collection_name }}</td>
+                    <td data-label="Products">{{ row.perfume_count }}</td>
+                    <td data-label="Rename">
                         <form method="post" class="catalogue-inline-form">
                             {% csrf_token %}
                             <input type="hidden" name="tab" value="collections">
@@ -155,7 +171,7 @@
                             <button class="button ghost" type="submit">Save</button>
                         </form>
                     </td>
-                    <td>
+                    <td data-label="Actions" class="actions">
                         <form method="post" class="catalogue-inline-form">
                             {% csrf_token %}
                             <input type="hidden" name="tab" value="collections">
@@ -170,8 +186,10 @@
             {% endfor %}
             </tbody>
         </table>
+        </div>
     {% elif active_tab == 'concentrations' %}
-        <table class="data-table catalogue-admin-table">
+        <div class="table-wrap table-scroll-x our-products-table-wrap">
+        <table class="data-table table-mobile catalogue-admin-table our-products-admin-table">
             <thead>
                 <tr>
                     <th>Concentration</th>
@@ -183,9 +201,9 @@
             <tbody>
             {% for row in concentration_rows %}
                 <tr>
-                    <td>{{ row.concentration }}</td>
-                    <td>{{ row.perfume_count }}</td>
-                    <td>
+                    <td data-label="Concentration">{{ row.concentration }}</td>
+                    <td data-label="Products">{{ row.perfume_count }}</td>
+                    <td data-label="Rename">
                         <form method="post" class="catalogue-inline-form">
                             {% csrf_token %}
                             <input type="hidden" name="tab" value="concentrations">
@@ -195,7 +213,7 @@
                             <button class="button ghost" type="submit">Save</button>
                         </form>
                     </td>
-                    <td>
+                    <td data-label="Actions" class="actions">
                         <form method="post" class="catalogue-inline-form">
                             {% csrf_token %}
                             <input type="hidden" name="tab" value="concentrations">
@@ -210,6 +228,7 @@
             {% endfor %}
             </tbody>
         </table>
+        </div>
     {% endif %}
 </div>
 {% endblock %}
