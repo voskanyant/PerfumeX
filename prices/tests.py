@@ -470,6 +470,107 @@ class EmailImporterCursorTests(TestCase):
         self.assertEqual(models.ImportFile.objects.count(), 1)
         self.assertEqual(self.mailbox.last_inbox_uid, 7)
 
+    def test_uid_cursor_recovers_unseen_recent_uid_below_cursor_once(self):
+        payload = b"sku,price\nA,1\n"
+        self.mailbox.last_inbox_uid = 10
+        self.mailbox.save(update_fields=["last_inbox_uid"])
+        existing_batch = models.ImportBatch.objects.create(
+            supplier=self.supplier,
+            mailbox=self.mailbox,
+            message_id="<existing@example.com>",
+            received_at=timezone.make_aware(datetime(2026, 4, 29, 0, 0, 0)),
+            status=models.ImportStatus.PROCESSED,
+        )
+        models.ImportFile.objects.create(
+            import_batch=existing_batch,
+            file_kind=models.FileKind.PRICE,
+            filename="prices.csv",
+            content_hash=hashlib.sha256(payload).hexdigest(),
+            status=models.ImportStatus.PROCESSED,
+            processed_at=timezone.make_aware(datetime(2026, 4, 29, 0, 1, 0)),
+        )
+        message = EmailMessage()
+        message["Subject"] = "Daily price"
+        message["From"] = "supplier@example.com"
+        message["Message-ID"] = "<late-low-uid@example.com>"
+        message["Date"] = "Wed, 29 Apr 2026 00:24:00 +0000"
+        message.set_content("attached")
+        message.add_attachment(
+            payload,
+            maintype="text",
+            subtype="csv",
+            filename="prices.csv",
+        )
+
+        class FakeImapClient:
+            def search(self, charset, *criteria):
+                return "OK", [b"9"]
+
+            def fetch(self, msg_id, query):
+                if "RFC822.SIZE" in query:
+                    return "OK", [
+                        (
+                            b'9 (RFC822.SIZE 100 INTERNALDATE "29-Apr-2026 00:24:00 +0000")',
+                            b"",
+                        )
+                    ]
+                return "OK", [(b"9 (RFC822 {100}", message.as_bytes())]
+
+            def logout(self):
+                return "BYE", []
+
+        with patch(
+            "prices.services.email_importer._connect_imap",
+            return_value=FakeImapClient(),
+        ):
+            first_summary = run_import([self.mailbox], use_uid_cursor=True)
+
+        self.mailbox.refresh_from_db()
+        self.assertEqual(first_summary["messages_scanned"], 1)
+        self.assertEqual(first_summary["skipped_duplicates"], 1)
+        self.assertEqual(self.mailbox.last_inbox_uid, 10)
+        self.assertTrue(
+            models.EmailAttachmentDiagnostic.objects.filter(
+                mailbox=self.mailbox,
+                message_folder="INBOX",
+                message_uid="9",
+                decision=models.AttachmentDecision.DUPLICATE,
+            ).exists()
+        )
+
+        with patch(
+            "prices.services.email_importer._connect_imap",
+            return_value=FakeImapClient(),
+        ):
+            second_summary = run_import([self.mailbox], use_uid_cursor=True)
+
+        self.assertEqual(second_summary["messages_scanned"], 0)
+        self.assertEqual(second_summary["skipped_duplicates"], 0)
+
+    def test_supplier_specific_run_updates_check_state_when_no_email_found(self):
+        class EmptyImapClient:
+            def search(self, charset, *criteria):
+                return "OK", [b""]
+
+            def logout(self):
+                return "BYE", []
+
+        with patch(
+            "prices.services.email_importer._connect_imap",
+            return_value=EmptyImapClient(),
+        ):
+            summary = run_import([self.mailbox], supplier_id=self.supplier.id)
+
+        self.supplier.refresh_from_db()
+        self.assertEqual(summary["messages_found"], 0)
+        self.assertIsNotNone(self.supplier.last_email_check_at)
+        self.assertEqual(self.supplier.last_email_matched, 0)
+        self.assertEqual(self.supplier.last_email_processed, 0)
+        self.assertEqual(
+            self.supplier.last_email_last_message,
+            "Supplier-specific check found no price email.",
+        )
+
 
 class BulkMutationPermissionTests(TestCase):
     def setUp(self):

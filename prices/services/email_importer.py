@@ -26,6 +26,7 @@ from prices.services.importer import mark_import_batch_products_seen, process_im
 logger = logging.getLogger(__name__)
 
 SUPPORTED_PRICE_EXTENSIONS = (".csv", ".xlsx", ".xls")
+UID_CURSOR_RECOVERY_OVERLAP = 500
 IMAGE_EXTENSIONS = (".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".tiff")
 NON_PRICE_FILENAME_TERMS = (
     "invoice",
@@ -869,18 +870,39 @@ def run_import(
             if use_uid_cursor and not supplier and not from_filter and not subject_filter:
                 filtered_items = []
                 counts_by_folder = {}
+                recovered_by_folder = {}
                 for folder_name, msg_id in work_items:
                     cursor_field = _folder_cursor_field(folder_name)
                     last_uid = getattr(mailbox, cursor_field, 0) or 0
                     uid_int = _uid_to_int(msg_id)
-                    if uid_int is None or uid_int <= last_uid:
+                    if uid_int is None:
                         continue
+                    if uid_int <= last_uid:
+                        recovery_floor = max(0, last_uid - UID_CURSOR_RECOVERY_OVERLAP)
+                        if uid_int <= recovery_floor or _mailbox_uid_has_diagnostic(
+                            mailbox.pk,
+                            folder_name,
+                            msg_id,
+                        ):
+                            continue
+                        recovered_by_folder[folder_name] = (
+                            recovered_by_folder.get(folder_name, 0) + 1
+                        )
                     filtered_items.append((folder_name, msg_id))
                     counts_by_folder[folder_name] = counts_by_folder.get(folder_name, 0) + 1
                 details = ", ".join(
                     f"{folder}={count}" for folder, count in sorted(counts_by_folder.items())
                 ) or "none"
                 note(f"{mailbox.name}: new by UID cursor {details}.")
+                if recovered_by_folder:
+                    recovery_details = ", ".join(
+                        f"{folder}={count}"
+                        for folder, count in sorted(recovered_by_folder.items())
+                    )
+                    note(
+                        f"{mailbox.name}: cursor recovery rechecking {recovery_details} "
+                        f"within last {UID_CURSOR_RECOVERY_OVERLAP} UID(s)."
+                    )
                 work_items = filtered_items
             if limit:
                 if use_uid_cursor and not supplier and not from_filter and not subject_filter:
@@ -2005,6 +2027,47 @@ def run_import(
                 client.logout()
             except Exception:
                 pass
+    if supplier:
+        stats = supplier_stats.get(
+            supplier.id,
+            {
+                "matched": 0,
+                "processed": 0,
+                "errors": summary.get("errors", 0),
+                "last_message": "",
+                "duplicates": 0,
+                "skipped": 0,
+            },
+        )
+        if not stats.get("last_message"):
+            parts = []
+            if stats.get("duplicates"):
+                parts.append(f"{stats.get('duplicates')} duplicate(s)")
+            if stats.get("skipped"):
+                parts.append(f"{stats.get('skipped')} skipped")
+            if stats.get("errors"):
+                parts.append(f"{stats.get('errors')} import issue(s)")
+            stats["last_message"] = (
+                ", ".join(parts)
+                if parts
+                else "Supplier-specific check found no price email."
+            )
+        supplier.last_email_check_at = run_started
+        supplier.last_email_matched = stats.get("matched", 0)
+        supplier.last_email_processed = stats.get("processed", 0)
+        supplier.last_email_errors = stats.get("errors", 0)
+        supplier.last_email_last_message = stats.get("last_message") or ""
+        supplier.last_email_mailboxes = mailbox_names
+        supplier.save(
+            update_fields=[
+                "last_email_check_at",
+                "last_email_matched",
+                "last_email_processed",
+                "last_email_errors",
+                "last_email_last_message",
+                "last_email_mailboxes",
+            ]
+        )
     if not supplier and fallback_suppliers is not None:
         fallback_by_id = {
             fallback_supplier.id: fallback_supplier for fallback_supplier in fallback_suppliers
@@ -2116,6 +2179,14 @@ def _uid_display(uid) -> str:
 
 def _folder_cursor_field(folder_name: str) -> str:
     return "last_inbox_uid" if folder_name == "INBOX" else "last_all_mail_uid"
+
+
+def _mailbox_uid_has_diagnostic(mailbox_pk: int, folder_name: str, msg_id) -> bool:
+    return models.EmailAttachmentDiagnostic.objects.filter(
+        mailbox_id=mailbox_pk,
+        message_folder=folder_name,
+        message_uid=_uid_display(msg_id),
+    ).exists()
 
 
 def _advance_mailbox_uid_cursor(mailbox_pk: int, cursor_field: str, new_uid: int, logger_func=None) -> bool:
