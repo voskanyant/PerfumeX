@@ -320,6 +320,19 @@ def _decoded_terms() -> tuple[str, ...]:
     return _kb_terms("parser_decoded_term", DECODED_TERMS)
 
 
+def _structured_packaging_terms() -> tuple[str, ...]:
+    return (
+        *NO_BOX_TERMS,
+        *WOODBOX_TERMS,
+        *NEW_DESIGN_PACKAGING_TERMS,
+        *OLD_DESIGN_PACKAGING_TERMS,
+        *WITH_CAP_PACKAGING_TERMS,
+        *DENTED_PACKAGING_TERMS,
+        *GRAY_BOX_TERMS,
+        *GRAY_BOX_COLOR_TERMS,
+    )
+
+
 def _audience_aliases() -> tuple[tuple[str, str, str], ...]:
     aliases = [
         (normalize_text(alias), display, group)
@@ -998,7 +1011,8 @@ def parse_supplier_product(product: SupplierProduct) -> ParseResult:
     is_non_perfume = is_bag or is_cosmetic_poudre
 
     garbage_keyword = match_garbage_keyword(text)
-    if garbage_keyword:
+    structured_packaging_keywords = {normalize_text(term) for term in _structured_packaging_terms()}
+    if garbage_keyword and normalize_text(garbage_keyword) not in structured_packaging_keywords:
         result.modifiers = [GARBAGE_MODIFIER]
         result.warnings = [f"{GARBAGE_WARNING_PREFIX}: {garbage_keyword}"]
         result.confidence = 100
