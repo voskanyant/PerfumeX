@@ -290,7 +290,13 @@ def _imap_search(client, mailbox, criteria, logger, selected_folder="INBOX"):
         return "NO", [], None
     for attempt in range(2):
         try:
-            status, data = client.search(None, *criteria)
+            # Cursor state is stored as IMAP UID values. Plain SEARCH returns
+            # sequence numbers, which are mailbox-position ids and can skip real
+            # new mail after messages are moved or deleted.
+            if hasattr(client, "uid"):
+                status, data = client.uid("SEARCH", None, *criteria)
+            else:
+                status, data = client.search(None, *criteria)
             return status, data, client
         except (
             imaplib.IMAP4.abort,
@@ -315,7 +321,10 @@ def _imap_fetch(client, mailbox, msg_id, query, logger, selected_folder="INBOX")
         return "NO", [], None
     for attempt in range(2):
         try:
-            status, data = client.fetch(msg_id, query)
+            if hasattr(client, "uid"):
+                status, data = client.uid("FETCH", msg_id, query)
+            else:
+                status, data = client.fetch(msg_id, query)
             return status, data, client
         except (
             imaplib.IMAP4.abort,
@@ -2013,7 +2022,10 @@ def run_import(
                     continue
                 if processed_any and mark_seen:
                     try:
-                        client.store(msg_id, "+FLAGS", "\\Seen")
+                        if hasattr(client, "uid"):
+                            client.uid("STORE", msg_id, "+FLAGS", "\\Seen")
+                        else:
+                            client.store(msg_id, "+FLAGS", "\\Seen")
                     except (imaplib.IMAP4.abort, socket.timeout, ssl.SSLError):
                         _log(_log_line, "Failed to mark message as seen.")
 

@@ -30,6 +30,8 @@ from prices.management.commands.import_emails import (
 )
 from prices.services.email_importer import (
     _advance_mailbox_uid_cursor,
+    _imap_fetch,
+    _imap_search,
     _is_non_price_filename,
     _is_unnamed_body_part,
     _reason_from_error,
@@ -344,6 +346,49 @@ class EmailImporterCursorTests(TestCase):
             host="imap.example.com",
             username="cursor@example.com",
             password="secret",
+        )
+
+    def test_imap_helpers_use_uid_ids_for_search_and_fetch(self):
+        class FakeUidClient:
+            def __init__(self):
+                self.calls = []
+
+            def uid(self, command, *args):
+                self.calls.append((command, args))
+                if command == "SEARCH":
+                    return "OK", [b"347326"]
+                if command == "FETCH":
+                    return "OK", [(b"347326 (RFC822.SIZE 100)", b"payload")]
+                return "OK", []
+
+        client = FakeUidClient()
+
+        search_status, search_data, search_client = _imap_search(
+            client,
+            self.mailbox,
+            ["SINCE", "29-Apr-2026"],
+            logger=None,
+        )
+        fetch_status, fetch_data, fetch_client = _imap_fetch(
+            client,
+            self.mailbox,
+            b"347326",
+            "(BODY.PEEK[])",
+            logger=None,
+        )
+
+        self.assertEqual(search_status, "OK")
+        self.assertEqual(search_data, [b"347326"])
+        self.assertIs(search_client, client)
+        self.assertEqual(fetch_status, "OK")
+        self.assertEqual(fetch_data, [(b"347326 (RFC822.SIZE 100)", b"payload")])
+        self.assertIs(fetch_client, client)
+        self.assertEqual(
+            client.calls,
+            [
+                ("SEARCH", (None, "SINCE", "29-Apr-2026")),
+                ("FETCH", (b"347326", "(BODY.PEEK[])")),
+            ],
         )
 
     def test_import_batch_unique_constraint_enforced_for_mailbox_message_id(self):
