@@ -41,40 +41,40 @@
                             <div class="our-products-full-name" aria-label="Product identity">
                                 <span class="catalogue-field catalogue-field-brand" data-label="Brand" data-editable-cell>
                                     <span class="catalogue-cell-value catalogue-cell-value-strong">{{ variant.perfume.brand.name }}</span>
-                                    <input class="catalogue-inline-input" type="text" name="brand_name" value="{{ variant.perfume.brand.name }}" list="catalog-brand-options" disabled>
+                                    <input class="catalogue-inline-input" type="text" name="brand_name" value="{{ variant.perfume.brand.name }}" list="catalog-brand-options" placeholder="Brand" disabled>
                                 </span>
-                                <span class="identity-separator">/</span>
-                                <span class="catalogue-field catalogue-field-collection" data-label="Collection" data-editable-cell>
-                                    <span class="catalogue-cell-value">{{ variant.perfume.collection_name|default:"-" }}</span>
-                                    <input class="catalogue-inline-input" type="text" name="collection_name" value="{{ variant.perfume.collection_name|default_if_none:'' }}" list="catalog-collection-options" disabled>
+                                <span class="catalogue-field catalogue-field-collection {% if not variant.perfume.collection_name %}is-empty{% endif %}" data-label="Collection" data-editable-cell>
+                                    <span class="identity-separator">/</span>
+                                    <span class="catalogue-cell-value" data-empty-label="Collection">{{ variant.perfume.collection_name|default:"Collection" }}</span>
+                                    <input class="catalogue-inline-input" type="text" name="collection_name" value="{{ variant.perfume.collection_name|default_if_none:'' }}" list="catalog-collection-options" placeholder="Collection" disabled>
                                 </span>
-                                <span class="identity-separator">/</span>
                                 <span class="catalogue-field catalogue-field-scent" data-label="Scent" data-editable-cell>
+                                    <span class="identity-separator">/</span>
                                     <span class="catalogue-cell-value catalogue-cell-value-strong">{{ variant.perfume.name }}</span>
-                                    <input class="catalogue-inline-input" type="text" name="perfume_name" value="{{ variant.perfume.name }}" disabled>
+                                    <input class="catalogue-inline-input" type="text" name="perfume_name" value="{{ variant.perfume.name }}" placeholder="Product name" disabled>
                                 </span>
-                                <span class="identity-separator">/</span>
-                                <span class="catalogue-field catalogue-field-concentration" data-label="Concentration" data-editable-cell>
-                                    <span class="catalogue-cell-value">{{ variant.perfume.concentration|default:"-" }}</span>
-                                    <input class="catalogue-inline-input" type="text" name="concentration" value="{{ variant.perfume.concentration|default_if_none:'' }}" list="catalog-concentration-options" disabled>
+                                <span class="catalogue-field catalogue-field-concentration {% if not variant.perfume.concentration %}is-empty{% endif %}" data-label="Concentration" data-editable-cell>
+                                    <span class="identity-separator">/</span>
+                                    <span class="catalogue-cell-value" data-empty-label="Concentration">{{ variant.perfume.concentration|default:"Concentration" }}</span>
+                                    <input class="catalogue-inline-input" type="text" name="concentration" value="{{ variant.perfume.concentration|default_if_none:'' }}" list="catalog-concentration-options" placeholder="Concentration" disabled>
                                 </span>
-                                <span class="identity-separator">/</span>
-                                <span class="catalogue-field catalogue-field-size" data-label="Size" data-editable-cell>
-                                    <span class="catalogue-cell-value">{{ variant.display_size|default:"-" }}</span>
-                                    <input class="catalogue-inline-input" type="text" name="size_ml" value="{{ variant.display_size|default_if_none:'' }}" disabled>
+                                <span class="catalogue-field catalogue-field-size {% if not variant.display_size %}is-empty{% endif %}" data-label="Size" data-editable-cell>
+                                    <span class="identity-separator">/</span>
+                                    <span class="catalogue-cell-value" data-empty-label="Size">{{ variant.display_size|default:"Size" }}</span>
+                                    <input class="catalogue-inline-input" type="text" name="size_ml" value="{{ variant.display_size|default_if_none:'' }}" placeholder="Size" disabled>
                                 </span>
-                                <span class="identity-separator">/</span>
-                                <span class="catalogue-field catalogue-field-tester" data-label="Tester" data-editable-cell>
-                                    <span class="catalogue-cell-value">{% if variant.is_tester %}Tester{% else %}-{% endif %}</span>
+                                <span class="catalogue-field catalogue-field-tester {% if not variant.is_tester %}is-empty{% endif %}" data-label="Tester" data-editable-cell>
+                                    <span class="identity-separator">/</span>
+                                    <span class="catalogue-cell-value" data-empty-label="Tester">{% if variant.is_tester %}Tester{% else %}Tester{% endif %}</span>
                                     <select class="catalogue-inline-input" name="is_tester" disabled>
                                         <option value="0"></option>
                                         <option value="1" {% if variant.is_tester %}selected{% endif %}>Tester</option>
                                     </select>
                                 </span>
-                                <span class="identity-separator">/</span>
-                                <span class="catalogue-field catalogue-field-type" data-label="Type" data-editable-cell>
+                                <span class="catalogue-field catalogue-field-type {% if not variant.variant_type or variant.variant_type == 'standard' %}is-empty{% endif %}" data-label="Type" data-editable-cell>
+                                    <span class="identity-separator">/</span>
                                     <span class="catalogue-cell-value">{{ variant.variant_type|default:"standard" }}</span>
-                                    <input class="catalogue-inline-input" type="text" name="variant_type" value="{{ variant.variant_type|default:'standard' }}" list="catalog-variant-type-options" disabled>
+                                    <input class="catalogue-inline-input" type="text" name="variant_type" value="{{ variant.variant_type|default:'standard' }}" list="catalog-variant-type-options" placeholder="Type" disabled>
                                 </span>
                             </div>
                         </div>
@@ -285,9 +285,17 @@
 
     function openCellField(cell) {
         var row = cell.closest("[data-catalogue-row]");
-        if (!row || !row.classList.contains("is-editing")) return;
+        if (!row) return;
+        if (!row.classList.contains("is-editing")) {
+            setRowEditing(row, true);
+        }
         var field = cell.querySelector(".catalogue-inline-input:not([type='hidden'])");
         if (!field) return;
+        row.querySelectorAll("[data-editable-cell].is-field-open").forEach(function (openCell) {
+            if (openCell !== cell) {
+                openCell.classList.remove("is-field-open");
+            }
+        });
         field.disabled = false;
         cell.classList.add("is-field-open");
         field.focus();
@@ -303,16 +311,31 @@
     }
 
     document.querySelectorAll("[data-catalogue-row]").forEach(function (row) {
+        var form = row.querySelector(".catalogue-row-form");
         row.querySelectorAll("[data-editable-cell]").forEach(function (cell) {
             cell.addEventListener("click", function () {
                 if (!window.matchMedia("(max-width: 767px)").matches) return;
                 openCellField(cell);
             });
-            cell.addEventListener("dblclick", function () {
+            cell.addEventListener("dblclick", function (event) {
+                event.preventDefault();
                 openCellField(cell);
             });
+            cell.querySelectorAll(".catalogue-inline-input").forEach(function (field) {
+                field.addEventListener("keydown", function (event) {
+                    if (event.key === "Escape") {
+                        event.preventDefault();
+                        cell.classList.remove("is-field-open");
+                        field.blur();
+                    }
+                    if (event.key === "Enter" && field.tagName !== "SELECT") {
+                        event.preventDefault();
+                        enableRowFields(row);
+                        if (form) form.requestSubmit();
+                    }
+                });
+            });
         });
-        var form = row.querySelector(".catalogue-row-form");
         if (form) {
             form.addEventListener("submit", function () {
                 enableRowFields(row);
