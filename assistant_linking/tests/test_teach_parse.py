@@ -409,7 +409,7 @@ class TeachParseTests(TestCase):
         self.assertIsNone(stale_parse.size_ml)
         self.assertEqual(stale_parse.parser_version, "deterministic-old")
 
-    def test_parsed_products_page_refreshes_stale_visible_saved_parse_rows(self):
+    def test_parsed_products_page_does_not_auto_refresh_stale_visible_saved_parse_rows(self):
         brand = Brand.objects.create(name="Van Cleef & Arpels")
         BrandAlias.objects.create(
             brand=brand,
@@ -446,10 +446,10 @@ class TeachParseTests(TestCase):
         response = self.client.get(reverse("assistant_linking:normalization_parsed"))
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "1 visible row reparsed.")
-        self.assertContains(response, "Van Cleef &amp; Arpels / Collection Extraordinaire / Neroli Amara / Eau de Parfum / 15ml / Tester")
+        self.assertNotContains(response, "visible row reparsed")
         stale_parse.refresh_from_db()
-        self.assertEqual(stale_parse.collection_name, "Collection Extraordinaire")
+        self.assertEqual(stale_parse.collection_name, "")
+        self.assertEqual(stale_parse.parser_version, "deterministic-old")
 
     def test_parsed_products_page_does_not_refresh_fresh_visible_saved_parse_rows(self):
         brand = Brand.objects.create(name="Van Cleef & Arpels")

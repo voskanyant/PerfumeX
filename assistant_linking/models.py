@@ -1,6 +1,7 @@
 import re
 
 from django.conf import settings
+from django.contrib.postgres.indexes import GinIndex
 from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.db import models
@@ -228,6 +229,9 @@ class ParsedSupplierProduct(TimeStampedModel):
 
     class Meta:
         ordering = ("supplier_product__supplier__name", "supplier_product__name")
+        indexes = [
+            GinIndex(fields=["modifiers"], name="alink_parse_modifiers_gin"),
+        ]
 
     def __str__(self) -> str:
         return f"Parsed: {self.supplier_product}"

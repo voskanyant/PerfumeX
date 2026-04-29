@@ -6,7 +6,7 @@ from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.http import Http404, HttpResponse, JsonResponse
 from django.db import transaction
-from django.db.models import Count, Max, Q
+from django.db.models import Count, Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse_lazy
 from django.utils import timezone
@@ -27,7 +27,7 @@ from assistant_linking.services.normalization_stats import (
     refresh_stats_snapshot,
     snapshot_to_stats,
 )
-from assistant_linking.services.normalizer import PARSER_VERSION, save_parse
+from assistant_linking.services.normalizer import save_parse
 from assistant_linking.services.smart_search import normalize_query
 from catalog.models import Brand, Perfume, PerfumeVariant, compact_decimal_text
 from prices.models import SupplierProduct
@@ -124,35 +124,6 @@ def _complete_parse_query():
 
 def _complete_parses(queryset):
     return queryset.filter(_complete_parse_query())
-
-
-def _normalization_knowledge_updated_at():
-    latest_values = [
-        model.objects.aggregate(latest=Max("updated_at"))["latest"]
-        for model in (
-            models.BrandAlias,
-            models.ProductAlias,
-            models.ConcentrationAlias,
-            GlobalRule,
-            Brand,
-            Perfume,
-            PerfumeVariant,
-        )
-    ]
-    return max((value for value in latest_values if value), default=None)
-
-
-def _parse_needs_visible_refresh(parsed, knowledge_updated_at) -> bool:
-    if parsed.locked_by_human:
-        return False
-    if parsed.parser_version != PARSER_VERSION:
-        return True
-    if not parsed.last_parsed_at:
-        return True
-    supplier_updated_at = getattr(parsed.supplier_product, "updated_at", None)
-    if supplier_updated_at and parsed.last_parsed_at < supplier_updated_at:
-        return True
-    return bool(knowledge_updated_at and parsed.last_parsed_at < knowledge_updated_at)
 
 
 def _normalization_dashboard_stats(request, hidden_keywords: list[str]) -> dict[str, object]:
@@ -621,12 +592,10 @@ class ParsedListView(NormalizationIssueListView):
         context["allow_refresh_visible"] = True
         visible_parses = list(context.get("parses", []))
         force_refresh = self.request.GET.get(self.refresh_param) == "1"
-        knowledge_updated_at = None if force_refresh else _normalization_knowledge_updated_at()
         refreshed_count = 0
         refreshed_parses = []
         for parsed in visible_parses:
-            should_refresh = force_refresh or _parse_needs_visible_refresh(parsed, knowledge_updated_at)
-            if should_refresh:
+            if force_refresh:
                 refreshed_parses.append(save_parse(parsed.supplier_product))
                 refreshed_count += 1
             else:
