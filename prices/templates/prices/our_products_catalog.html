@@ -15,7 +15,7 @@
     </div>
 </div>
 
-<div class="workspace-block">
+<div class="workspace-block our-products-catalog">
     <nav class="tabs catalogue-tabs" aria-label="Catalogue management tabs">
         <a class="tab {% if active_tab == 'products' %}active{% endif %}" href="{% url 'prices:our_product_list' %}">Products</a>
         <a class="tab {% if active_tab == 'brands' %}active{% endif %}" href="{% url 'prices:our_product_list' %}?tab=brands">Brands</a>
@@ -29,58 +29,106 @@
         <input type="text" name="q" value="{{ search_query }}" placeholder="Search brand, scent, size, packaging...">
         <button class="button ghost" type="submit">Search</button>
     </form>
-    <table class="data-table">
-        <thead>
-            <tr>
-                <th>Brand</th>
-                <th>Scent</th>
-                <th>Concentration</th>
-                <th>Size</th>
-                <th></th>
-                <th>Packing</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody>
+    <div class="our-products-list" aria-label="Catalogue products">
         {% for variant in variants %}
-            <tr>
-                <td>
-                    <form id="variant-form-{{ variant.pk }}" method="post" action="{% url 'prices:our_product_variant_inline_update' variant.pk %}"></form>
-                    <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token }}" form="variant-form-{{ variant.pk }}">
-                    <input type="hidden" name="next" value="{{ request.get_full_path }}" form="variant-form-{{ variant.pk }}">
-                    <input type="text" name="brand_name" value="{{ variant.perfume.brand.name }}" form="variant-form-{{ variant.pk }}">
-                </td>
-                <td><input type="text" name="perfume_name" value="{{ variant.perfume.name }}" form="variant-form-{{ variant.pk }}"></td>
-                <td><input type="text" name="concentration" value="{{ variant.perfume.concentration }}" list="catalog-concentration-options" form="variant-form-{{ variant.pk }}"></td>
-                <td><input type="text" name="size_ml" value="{{ variant.display_size }}" form="variant-form-{{ variant.pk }}"></td>
-                <td>
-                    <select name="is_tester" form="variant-form-{{ variant.pk }}">
-                        <option value="0"></option>
-                        <option value="1" {% if variant.is_tester %}selected{% endif %}>tester</option>
-                    </select>
-                </td>
-                <td><input type="text" name="packaging" value="{{ variant.packaging }}" form="variant-form-{{ variant.pk }}"></td>
-                <td>
-                    <button class="button ghost" type="submit" form="variant-form-{{ variant.pk }}">Save</button>
-                    <a class="button ghost" href="{% url 'assistant_core:catalog_variant_delete' variant.pk %}">Delete</a>
-                </td>
-            </tr>
+            <article class="our-products-card" data-catalogue-row>
+                <form id="variant-form-{{ variant.pk }}" class="catalogue-row-form" method="post" action="{% url 'prices:our_product_variant_inline_update' variant.pk %}">
+                    {% csrf_token %}
+                    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                    <input type="hidden" name="packaging" value="{{ variant.packaging|default_if_none:'' }}">
+                    <div class="our-products-card-main">
+                        <div class="our-products-card-body">
+                            <div class="our-products-full-name" aria-label="Product identity">
+                                <span class="catalogue-field catalogue-field-brand" data-label="Brand" data-editable-cell>
+                                    <span class="catalogue-cell-value catalogue-cell-value-strong">{{ variant.perfume.brand.name }}</span>
+                                    <input class="catalogue-inline-input" type="text" name="brand_name" value="{{ variant.perfume.brand.name }}" list="catalog-brand-options" disabled>
+                                </span>
+                                <span class="identity-separator">/</span>
+                                <span class="catalogue-field catalogue-field-collection" data-label="Collection" data-editable-cell>
+                                    <span class="catalogue-cell-value">{{ variant.perfume.collection_name|default:"-" }}</span>
+                                    <input class="catalogue-inline-input" type="text" name="collection_name" value="{{ variant.perfume.collection_name|default_if_none:'' }}" list="catalog-collection-options" disabled>
+                                </span>
+                                <span class="identity-separator">/</span>
+                                <span class="catalogue-field catalogue-field-scent" data-label="Scent" data-editable-cell>
+                                    <span class="catalogue-cell-value catalogue-cell-value-strong">{{ variant.perfume.name }}</span>
+                                    <input class="catalogue-inline-input" type="text" name="perfume_name" value="{{ variant.perfume.name }}" disabled>
+                                </span>
+                                <span class="identity-separator">/</span>
+                                <span class="catalogue-field catalogue-field-concentration" data-label="Concentration" data-editable-cell>
+                                    <span class="catalogue-cell-value">{{ variant.perfume.concentration|default:"-" }}</span>
+                                    <input class="catalogue-inline-input" type="text" name="concentration" value="{{ variant.perfume.concentration|default_if_none:'' }}" list="catalog-concentration-options" disabled>
+                                </span>
+                                <span class="identity-separator">/</span>
+                                <span class="catalogue-field catalogue-field-size" data-label="Size" data-editable-cell>
+                                    <span class="catalogue-cell-value">{{ variant.display_size|default:"-" }}</span>
+                                    <input class="catalogue-inline-input" type="text" name="size_ml" value="{{ variant.display_size|default_if_none:'' }}" disabled>
+                                </span>
+                                <span class="identity-separator">/</span>
+                                <span class="catalogue-field catalogue-field-tester" data-label="Tester" data-editable-cell>
+                                    <span class="catalogue-cell-value">{% if variant.is_tester %}Tester{% else %}-{% endif %}</span>
+                                    <select class="catalogue-inline-input" name="is_tester" disabled>
+                                        <option value="0"></option>
+                                        <option value="1" {% if variant.is_tester %}selected{% endif %}>Tester</option>
+                                    </select>
+                                </span>
+                                <span class="identity-separator">/</span>
+                                <span class="catalogue-field catalogue-field-type" data-label="Type" data-editable-cell>
+                                    <span class="catalogue-cell-value">{{ variant.variant_type|default:"standard" }}</span>
+                                    <input class="catalogue-inline-input" type="text" name="variant_type" value="{{ variant.variant_type|default:'standard' }}" list="catalog-variant-type-options" disabled>
+                                </span>
+                            </div>
+                        </div>
+                        <button class="button ghost icon our-products-edit-button" type="submit" data-row-edit-toggle title="Edit row" aria-label="Edit row">
+                            <svg class="icon icon-edit" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="M12 20h9"/>
+                                <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/>
+                            </svg>
+                            <svg class="icon icon-save" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z"/>
+                                <path d="M17 21v-8H7v8"/>
+                                <path d="M7 3v5h8"/>
+                            </svg>
+                        </button>
+                    </div>
+                </form>
+            </article>
         {% empty %}
-            <tr>
-                <td colspan="7" class="empty-state">
-                    No catalogue products yet. <a href="{% url 'assistant_core:catalog_import' %}">Import Excel</a>
-                </td>
-            </tr>
+            <div class="empty-state">
+                No catalogue products yet. <a href="{% url 'assistant_core:catalog_import' %}">Import Excel</a>
+            </div>
         {% endfor %}
-        </tbody>
-    </table>
+    </div>
+    <datalist id="catalog-brand-options">
+        {% for brand in brand_rows %}
+            <option value="{{ brand.name }}"></option>
+        {% endfor %}
+    </datalist>
+    <datalist id="catalog-collection-options">
+        {% for row in collection_rows %}
+            <option value="{{ row.collection_name }}"></option>
+        {% endfor %}
+    </datalist>
     <datalist id="catalog-concentration-options">
+        {% for row in concentration_rows %}
+            <option value="{{ row.concentration }}"></option>
+        {% endfor %}
         <option value="Eau de Parfum"></option>
         <option value="Eau de Toilette"></option>
         <option value="Eau de Cologne"></option>
         <option value="Parfum"></option>
         <option value="Extrait de Parfum"></option>
         <option value="Perfume Oil"></option>
+    </datalist>
+    <datalist id="catalog-variant-type-options">
+        <option value="standard"></option>
+        <option value="tester"></option>
+        <option value="sample"></option>
+        <option value="travel"></option>
+        <option value="set"></option>
+        <option value="mini"></option>
+        {% for variant_type in variant_type_rows %}
+            <option value="{{ variant_type }}"></option>
+        {% endfor %}
     </datalist>
 
     {% if is_paginated %}
@@ -102,7 +150,8 @@
             <input type="text" name="name" placeholder="New brand name">
             <button class="button primary" type="submit">Add brand</button>
         </form>
-        <table class="data-table catalogue-admin-table">
+        <div class="table-wrap table-scroll-x our-products-table-wrap">
+        <table class="data-table table-mobile catalogue-admin-table our-products-admin-table">
             <thead>
                 <tr>
                     <th>Brand</th>
@@ -113,9 +162,9 @@
             <tbody>
             {% for brand in brand_rows %}
                 <tr>
-                    <td>{{ brand.name }}</td>
-                    <td>{{ brand.perfume_count }}</td>
-                    <td>
+                    <td data-label="Brand">{{ brand.name }}</td>
+                    <td data-label="Products">{{ brand.perfume_count }}</td>
+                    <td data-label="Actions" class="actions">
                         <form method="post" class="catalogue-inline-form">
                             {% csrf_token %}
                             <input type="hidden" name="tab" value="brands">
@@ -130,8 +179,10 @@
             {% endfor %}
             </tbody>
         </table>
+        </div>
     {% elif active_tab == 'collections' %}
-        <table class="data-table catalogue-admin-table">
+        <div class="table-wrap table-scroll-x our-products-table-wrap">
+        <table class="data-table table-mobile catalogue-admin-table our-products-admin-table">
             <thead>
                 <tr>
                     <th>Collection</th>
@@ -143,9 +194,9 @@
             <tbody>
             {% for row in collection_rows %}
                 <tr>
-                    <td>{{ row.collection_name }}</td>
-                    <td>{{ row.perfume_count }}</td>
-                    <td>
+                    <td data-label="Collection">{{ row.collection_name }}</td>
+                    <td data-label="Products">{{ row.perfume_count }}</td>
+                    <td data-label="Rename">
                         <form method="post" class="catalogue-inline-form">
                             {% csrf_token %}
                             <input type="hidden" name="tab" value="collections">
@@ -155,7 +206,7 @@
                             <button class="button ghost" type="submit">Save</button>
                         </form>
                     </td>
-                    <td>
+                    <td data-label="Actions" class="actions">
                         <form method="post" class="catalogue-inline-form">
                             {% csrf_token %}
                             <input type="hidden" name="tab" value="collections">
@@ -170,8 +221,10 @@
             {% endfor %}
             </tbody>
         </table>
+        </div>
     {% elif active_tab == 'concentrations' %}
-        <table class="data-table catalogue-admin-table">
+        <div class="table-wrap table-scroll-x our-products-table-wrap">
+        <table class="data-table table-mobile catalogue-admin-table our-products-admin-table">
             <thead>
                 <tr>
                     <th>Concentration</th>
@@ -183,9 +236,9 @@
             <tbody>
             {% for row in concentration_rows %}
                 <tr>
-                    <td>{{ row.concentration }}</td>
-                    <td>{{ row.perfume_count }}</td>
-                    <td>
+                    <td data-label="Concentration">{{ row.concentration }}</td>
+                    <td data-label="Products">{{ row.perfume_count }}</td>
+                    <td data-label="Rename">
                         <form method="post" class="catalogue-inline-form">
                             {% csrf_token %}
                             <input type="hidden" name="tab" value="concentrations">
@@ -195,7 +248,7 @@
                             <button class="button ghost" type="submit">Save</button>
                         </form>
                     </td>
-                    <td>
+                    <td data-label="Actions" class="actions">
                         <form method="post" class="catalogue-inline-form">
                             {% csrf_token %}
                             <input type="hidden" name="tab" value="concentrations">
@@ -210,6 +263,72 @@
             {% endfor %}
             </tbody>
         </table>
+        </div>
     {% endif %}
 </div>
+{% endblock %}
+{% block extra_scripts %}
+{{ block.super }}
+<script>
+(function () {
+    function setRowEditing(row, isEditing) {
+        row.classList.toggle("is-editing", isEditing);
+        row.querySelectorAll("[data-editable-cell]").forEach(function (cell) {
+            cell.classList.remove("is-field-open");
+        });
+        var button = row.querySelector("[data-row-edit-toggle]");
+        if (button) {
+            button.title = isEditing ? "Save row" : "Edit row";
+            button.setAttribute("aria-label", isEditing ? "Save row" : "Edit row");
+        }
+    }
+
+    function openCellField(cell) {
+        var row = cell.closest("[data-catalogue-row]");
+        if (!row || !row.classList.contains("is-editing")) return;
+        var field = cell.querySelector(".catalogue-inline-input:not([type='hidden'])");
+        if (!field) return;
+        field.disabled = false;
+        cell.classList.add("is-field-open");
+        field.focus();
+        if (typeof field.select === "function") {
+            field.select();
+        }
+    }
+
+    function enableRowFields(row) {
+        row.querySelectorAll(".catalogue-inline-input").forEach(function (field) {
+            field.disabled = false;
+        });
+    }
+
+    document.querySelectorAll("[data-catalogue-row]").forEach(function (row) {
+        row.querySelectorAll("[data-editable-cell]").forEach(function (cell) {
+            cell.addEventListener("click", function () {
+                if (!window.matchMedia("(max-width: 767px)").matches) return;
+                openCellField(cell);
+            });
+            cell.addEventListener("dblclick", function () {
+                openCellField(cell);
+            });
+        });
+        var form = row.querySelector(".catalogue-row-form");
+        if (form) {
+            form.addEventListener("submit", function () {
+                enableRowFields(row);
+            });
+        }
+        var button = row.querySelector("[data-row-edit-toggle]");
+        if (!button) return;
+        button.addEventListener("click", function (event) {
+            if (!row.classList.contains("is-editing")) {
+                event.preventDefault();
+                setRowEditing(row, true);
+                return;
+            }
+            enableRowFields(row);
+        });
+    });
+})();
+</script>
 {% endblock %}

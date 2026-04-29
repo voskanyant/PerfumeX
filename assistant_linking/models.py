@@ -1,6 +1,7 @@
 import re
 
 from django.conf import settings
+from django.contrib.postgres.indexes import GinIndex
 from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.db import models
@@ -10,6 +11,10 @@ from catalog.models import compact_decimal_text
 
 
 CONCENTRATION_ALIAS_CACHE_KEY = "assistant_linking:concentration_aliases:v1"
+BAG_MODIFIER = "bag"
+COSMETIC_PUDRE_MODIFIER = "cosmetic_poudre"
+DEODORANT_MODIFIER = "deodorant"
+MANUAL_REVIEW_MODIFIER = "manual_review"
 PERFUME_CATEGORY_CONCENTRATIONS = {
     "Eau de Parfum",
     "Eau de Toilette",
@@ -74,7 +79,7 @@ def display_title(value: str) -> str:
 
     words = []
     for index, word in enumerate(text.split()):
-        lower_allowed = index > 0
+        lower_allowed = index > 0 or (word[:1].islower() and word.lower() in TITLECASE_LOWER_WORDS)
         hyphen_parts = []
         for hyphen_part in word.split("-"):
             apostrophe_parts = hyphen_part.split("'")
@@ -224,6 +229,9 @@ class ParsedSupplierProduct(TimeStampedModel):
 
     class Meta:
         ordering = ("supplier_product__supplier__name", "supplier_product__name")
+        indexes = [
+            GinIndex(fields=["modifiers"], name="alink_parse_modifiers_gin"),
+        ]
 
     def __str__(self) -> str:
         return f"Parsed: {self.supplier_product}"
@@ -252,6 +260,14 @@ class ParsedSupplierProduct(TimeStampedModel):
 
     @property
     def display_variant_type(self) -> str:
+        if BAG_MODIFIER in (self.modifiers or []) or self.variant_type == BAG_MODIFIER:
+            return "Bag"
+        if COSMETIC_PUDRE_MODIFIER in (self.modifiers or []) or self.variant_type == "poudre":
+            return "Poudre"
+        if DEODORANT_MODIFIER in (self.modifiers or []) or self.variant_type == DEODORANT_MODIFIER:
+            return "Deodorant"
+        if self.variant_type == "decoded":
+            return "Decoded"
         if self.is_tester or self.variant_type == "tester":
             return "Tester"
         if self.is_sample or self.variant_type == "sample":
@@ -264,6 +280,12 @@ class ParsedSupplierProduct(TimeStampedModel):
 
     @property
     def product_category_label(self) -> str:
+        if BAG_MODIFIER in (self.modifiers or []) or self.variant_type == BAG_MODIFIER:
+            return "Bags"
+        if COSMETIC_PUDRE_MODIFIER in (self.modifiers or []) or self.variant_type == "poudre":
+            return "Cosmetics"
+        if DEODORANT_MODIFIER in (self.modifiers or []) or self.variant_type == DEODORANT_MODIFIER:
+            return "Deodorants"
         if self.concentration in HAIR_CARE_CATEGORY_CONCENTRATIONS:
             return "Hair Care"
         if self.concentration in PERFUME_CATEGORY_CONCENTRATIONS:
@@ -271,11 +293,19 @@ class ParsedSupplierProduct(TimeStampedModel):
         return "Unknown"
 
     @property
+    def product_subcategory_label(self) -> str:
+        if COSMETIC_PUDRE_MODIFIER in (self.modifiers or []) or self.variant_type == "poudre":
+            return "Poudre"
+        return ""
+
+    @property
     def display_packaging(self) -> str:
         return display_label(self.packaging, default="Standard")
 
     @property
     def identity_variant_label(self) -> str:
+        if self.product_category_label in {"Bags", "Cosmetics", "Deodorants"}:
+            return ""
         variant = self.display_variant_type
         if variant and variant != "Standard":
             return variant
@@ -290,10 +320,13 @@ class ParsedSupplierProduct(TimeStampedModel):
 
     @property
     def display_identity(self) -> str:
+        product_name = self.display_product_name
+        if product_name and normalize_alias_value(product_name) == normalize_alias_value(self.display_brand):
+            product_name = ""
         parts = [
             self.display_brand,
             self.display_collection_name,
-            self.display_product_name,
+            product_name,
             self.concentration,
             self.display_size,
             self.identity_variant_label,
@@ -318,6 +351,10 @@ class NormalizationStatsSnapshot(TimeStampedModel):
     garbage_count = models.PositiveIntegerField(default=0)
     tester_sample_count = models.PositiveIntegerField(default=0)
     set_count = models.PositiveIntegerField(default=0)
+    bag_count = models.PositiveIntegerField(default=0)
+    cosmetic_count = models.PositiveIntegerField(default=0)
+    deodorant_count = models.PositiveIntegerField(default=0)
+    manual_review_count = models.PositiveIntegerField(default=0)
     recent_parse_ids = models.JSONField(default=list, blank=True)
     generated_at = models.DateTimeField(null=True, blank=True, db_index=True)
     is_stale = models.BooleanField(default=False, db_index=True)

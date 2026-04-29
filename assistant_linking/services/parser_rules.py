@@ -44,10 +44,34 @@ PARSER_RULE_KIND_OPTIONS = (
         "example": "coffret",
     },
     {
+        "key": "parser_bag_term",
+        "label": "Bag term",
+        "description": "Routes bags and shopping packets to the Bags category.",
+        "example": "пакет",
+    },
+    {
+        "key": "parser_cosmetic_poudre_term",
+        "label": "Cosmetic poudre term",
+        "description": "Routes powder rows to Cosmetics / Poudre.",
+        "example": "пудра",
+    },
+    {
+        "key": "parser_deodorant_term",
+        "label": "Deodorant term",
+        "description": "Routes deodorant rows without perfume concentration to Deodorants.",
+        "example": "deo",
+    },
+    {
         "key": "parser_refill_term",
         "label": "Refill term",
         "description": "Adds the refill modifier to matching rows.",
         "example": "refill",
+    },
+    {
+        "key": "parser_decoded_term",
+        "label": "Decoded term",
+        "description": "Marks decoded rows without treating the marker as part of the scent name.",
+        "example": "dec",
     },
     {
         "key": "parser_audience_term",

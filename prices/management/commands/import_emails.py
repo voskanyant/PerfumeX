@@ -181,6 +181,7 @@ class Command(BaseCommand):
                     self.stdout.write("Skipped. Last run too recent.")
                     return
 
+            run_started_at = timezone.now()
             mailboxes = models.Mailbox.objects.filter(is_active=True).order_by(
                 "priority", "id"
             )
@@ -222,7 +223,7 @@ class Command(BaseCommand):
                 .order_by("name")
             )
             if not suppliers:
-                settings_obj.last_run_at = timezone.now()
+                settings_obj.last_run_at = run_started_at
                 settings_obj.save(update_fields=["last_run_at"])
                 return
 
@@ -365,7 +366,7 @@ class Command(BaseCommand):
                     f"Auto-deactivated stale supplier products: {deactivated} (older than {stale_days} days)."
                 )
 
-            settings_obj.last_run_at = timezone.now()
+            settings_obj.last_run_at = run_started_at
             settings_obj.save(update_fields=["last_run_at"])
         finally:
             lock_cm.__exit__(None, None, None)

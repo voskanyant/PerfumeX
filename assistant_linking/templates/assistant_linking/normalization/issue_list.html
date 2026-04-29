@@ -22,20 +22,27 @@
         {% if search_query %}
             <a class="button ghost" href="{{ request.path }}">Reset</a>
         {% endif %}
+        {% if allow_refresh_visible %}
+            <a class="button ghost" href="?{% if search_query %}q={{ search_query|urlencode }}&amp;{% endif %}{% if page_obj %}page={{ page_obj.number }}&amp;{% endif %}refresh=1">Refresh visible rows</a>
+        {% endif %}
     </form>
+    {% if refreshed_visible %}
+        <p class="form-help">{{ refreshed_visible_count }} visible row{{ refreshed_visible_count|pluralize }} reparsed.</p>
+    {% endif %}
 </div>
 
 <div class="workspace-block">
-    <table class="data-table">
+    <div class="table-wrap table-scroll-x">
+    <table class="data-table table-mobile">
         <thead><tr><th>Supplier</th><th>Product</th><th>Parsed</th><th>Flags</th><th>Confidence</th></tr></thead>
         <tbody>
         {% for parsed in parses %}
             <tr>
-                <td>{{ parsed.supplier_product.supplier }}</td>
-                <td><a href="{% url 'assistant_linking:normalization_detail' parsed.supplier_product_id %}">{{ parsed.supplier_product.name }}</a></td>
-                <td>{{ parsed.display_identity }}</td>
-                <td>{{ parsed.modifiers|join:", " }} {{ parsed.warnings|join:", " }}</td>
-                <td>{{ parsed.confidence }}</td>
+                <td data-label="Supplier">{{ parsed.supplier_product.supplier }}</td>
+                <td data-label="Product"><a href="{% url 'assistant_linking:normalization_detail' parsed.supplier_product_id %}">{{ parsed.supplier_product.name }}</a></td>
+                <td data-label="Parsed">{{ parsed.display_identity }}</td>
+                <td data-label="Flags">{{ parsed.modifiers|join:", " }} {{ parsed.warnings|join:", " }}</td>
+                <td data-label="Confidence">{{ parsed.confidence }}</td>
             </tr>
         {% empty %}
             <tr>
@@ -46,6 +53,7 @@
         {% endfor %}
         </tbody>
     </table>
+    </div>
 </div>
 {% if page_obj and page_obj.paginator.num_pages > 1 %}
 <nav class="workspace-pagination" aria-label="Pagination">

@@ -36,6 +36,10 @@ def _token_score(source: str, candidate: str) -> int:
     return round(45 * (len(overlap) / max(len(candidate_tokens), 1)))
 
 
+def _packaging_key(value: str) -> str:
+    return normalize_text((value or "").replace("_", " "))
+
+
 def _variant_score(parsed: ParsedSupplierProduct, variant: PerfumeVariant | None) -> tuple[int, list[str], list[str]]:
     if not variant:
         return 0, [], []
@@ -55,7 +59,7 @@ def _variant_score(parsed: ParsedSupplierProduct, variant: PerfumeVariant | None
         else:
             conflicts.append("type differs")
     if parsed.packaging and variant.packaging:
-        if parsed.packaging == variant.packaging:
+        if _packaging_key(parsed.packaging) == _packaging_key(variant.packaging):
             score += 6
             reasons.append("packaging matches")
         else:

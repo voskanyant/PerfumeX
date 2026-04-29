@@ -26,10 +26,17 @@
     </div>
     <h3 class="kpi-link-title space-top-sm">Recent manual decisions</h3>
     <div class="table-wrap table-scroll-x">
-    <table class="table data-table">
+    <table class="table data-table table-mobile">
+        <thead>
+            <tr><th>Supplier product</th><th>Decision</th><th>Created at</th></tr>
+        </thead>
         <tbody>
         {% for decision in recent_decisions %}
-            <tr><td>{{ decision.supplier_product }}</td><td>{{ decision.decision_type }}</td><td>{{ decision.created_at }}</td></tr>
+            <tr>
+                <td data-label="Supplier product">{{ decision.supplier_product }}</td>
+                <td data-label="Decision">{{ decision.decision_type }}</td>
+                <td data-label="Created at">{{ decision.created_at }}</td>
+            </tr>
         {% empty %}
             {% include "prices/components/table_empty.html" with colspan=3 message="No decisions yet." cta_url=linking_queue_url cta_label="Open linking queue" %}
         {% endfor %}

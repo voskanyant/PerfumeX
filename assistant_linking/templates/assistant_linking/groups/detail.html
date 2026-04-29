@@ -27,17 +27,17 @@
         <span>{{ group.display_identity }}</span>
         <span>{{ group.status }}</span>
     </div>
-    <table class="data-table">
+    <table class="data-table table-mobile">
         <thead><tr><th></th><th>Supplier</th><th>Product</th><th>Active</th><th>Role</th><th>Catalogue link</th></tr></thead>
         <tbody>
         {% for item in items %}
             <tr data-queue-row>
-                <td><input type="checkbox" name="item_ids" value="{{ item.pk }}"></td>
-                <td>{{ item.supplier_product.supplier }}</td>
-                <td><a href="{% url 'assistant_linking:product_workbench' item.supplier_product_id %}" data-queue-accept>{{ item.supplier_product.name }}</a></td>
-                <td>{{ item.supplier_product.is_active|yesno:"active,inactive" }}</td>
-                <td>{{ item.role }}</td>
-                <td>{{ item.supplier_product.catalog_perfume|default:"unlinked" }}</td>
+                <td data-label="Select"><input type="checkbox" name="item_ids" value="{{ item.pk }}"></td>
+                <td data-label="Supplier">{{ item.supplier_product.supplier }}</td>
+                <td data-label="Product"><a href="{% url 'assistant_linking:product_workbench' item.supplier_product_id %}" data-queue-accept>{{ item.supplier_product.name }}</a></td>
+                <td data-label="Active">{{ item.supplier_product.is_active|yesno:"active,inactive" }}</td>
+                <td data-label="Role">{{ item.role }}</td>
+                <td data-label="Catalogue link">{{ item.supplier_product.catalog_perfume|default:"unlinked" }}</td>
             </tr>
         {% empty %}
             <tr>

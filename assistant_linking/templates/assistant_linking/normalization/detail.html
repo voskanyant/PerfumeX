@@ -38,6 +38,7 @@
         <h2 class="kpi-link-title">Supplier parsed fields</h2>
         <p>Normalized: {{ parsed.display_identity }}</p>
         <p>Category: {{ parsed.product_category_label }}</p>
+        {% if parsed.product_subcategory_label %}<p>Subcategory: {{ parsed.product_subcategory_label }}</p>{% endif %}
         <p>Brand: {{ parsed.display_brand }}</p>
         <p>Name: {{ parsed.display_product_name }}</p>
         {% if parsed.release_year %}<p>Year: {{ parsed.release_year }}</p>{% endif %}
@@ -53,9 +54,11 @@
             <p>No warnings.</p>
         {% endfor %}
         {% if suggested_catalog_candidate %}
-            <div class="flash flash--warning">
-                Catalogue match suggests {{ suggested_catalog_candidate.perfume.concentration }}. Supplier text parsed as {{ parsed.concentration }}.
-            </div>
+            {% with conflict_warning="Catalogue match suggests "|add:suggested_catalog_candidate.perfume.concentration|add:". Supplier text parsed as "|add:parsed.concentration|add:"." %}
+                {% if conflict_warning not in parsed.warnings %}
+                    <div class="flash flash--warning">{{ conflict_warning }}</div>
+                {% endif %}
+            {% endwith %}
         {% endif %}
     </div>
 </div>

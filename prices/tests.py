@@ -30,6 +30,8 @@ from prices.management.commands.import_emails import (
 )
 from prices.services.email_importer import (
     _advance_mailbox_uid_cursor,
+    _imap_fetch,
+    _imap_search,
     _is_non_price_filename,
     _is_unnamed_body_part,
     _reason_from_error,
@@ -346,6 +348,49 @@ class EmailImporterCursorTests(TestCase):
             password="secret",
         )
 
+    def test_imap_helpers_use_uid_ids_for_search_and_fetch(self):
+        class FakeUidClient:
+            def __init__(self):
+                self.calls = []
+
+            def uid(self, command, *args):
+                self.calls.append((command, args))
+                if command == "SEARCH":
+                    return "OK", [b"347326"]
+                if command == "FETCH":
+                    return "OK", [(b"347326 (RFC822.SIZE 100)", b"payload")]
+                return "OK", []
+
+        client = FakeUidClient()
+
+        search_status, search_data, search_client = _imap_search(
+            client,
+            self.mailbox,
+            ["SINCE", "29-Apr-2026"],
+            logger=None,
+        )
+        fetch_status, fetch_data, fetch_client = _imap_fetch(
+            client,
+            self.mailbox,
+            b"347326",
+            "(BODY.PEEK[])",
+            logger=None,
+        )
+
+        self.assertEqual(search_status, "OK")
+        self.assertEqual(search_data, [b"347326"])
+        self.assertIs(search_client, client)
+        self.assertEqual(fetch_status, "OK")
+        self.assertEqual(fetch_data, [(b"347326 (RFC822.SIZE 100)", b"payload")])
+        self.assertIs(fetch_client, client)
+        self.assertEqual(
+            client.calls,
+            [
+                ("SEARCH", (None, "SINCE", "29-Apr-2026")),
+                ("FETCH", (b"347326", "(BODY.PEEK[])")),
+            ],
+        )
+
     def test_import_batch_unique_constraint_enforced_for_mailbox_message_id(self):
         models.ImportBatch.objects.create(
             supplier=self.supplier,
@@ -409,15 +454,82 @@ class EmailImporterCursorTests(TestCase):
 
         self.mailbox.refresh_from_db()
         self.assertEqual(self.mailbox.last_inbox_uid, 42)
+        cursor = models.MailboxFolderCursor.objects.get(mailbox=self.mailbox, folder="INBOX")
+        self.assertEqual(cursor.last_uid, 42)
         self.assertTrue(
             models.ImportBatch.objects.filter(message_id="<commit@example.com>").exists()
         )
 
+    def test_uid_cursor_is_scoped_by_mailbox_folder(self):
+        self.mailbox.last_all_mail_uid = 500
+        self.mailbox.save(update_fields=["last_all_mail_uid"])
+
+        with transaction.atomic():
+            advanced = _advance_mailbox_uid_cursor(self.mailbox.pk, "Archive", 42)
+
+        self.assertTrue(advanced)
+        archive_cursor = models.MailboxFolderCursor.objects.get(
+            mailbox=self.mailbox,
+            folder="Archive",
+        )
+        self.assertEqual(archive_cursor.last_uid, 42)
+        self.mailbox.refresh_from_db()
+        self.assertEqual(self.mailbox.last_all_mail_uid, 500)
+
+    def test_reactivating_mailbox_resets_folder_cursors(self):
+        models.MailboxFolderCursor.objects.create(
+            mailbox=self.mailbox,
+            folder="Archive",
+            last_uid=42,
+            last_checked_at=timezone.now(),
+        )
+        self.mailbox.is_active = False
+        self.mailbox.save(update_fields=["is_active"])
+        self.mailbox.last_inbox_uid = 100
+        self.mailbox.last_all_mail_uid = 500
+        self.mailbox.last_checked_at = timezone.now()
+        self.mailbox.save(update_fields=["last_inbox_uid", "last_all_mail_uid", "last_checked_at"])
+
+        self.mailbox.is_active = True
+        self.mailbox.save(update_fields=["is_active", "last_inbox_uid", "last_all_mail_uid", "last_checked_at"])
+
+        self.mailbox.refresh_from_db()
+        self.assertEqual(self.mailbox.last_inbox_uid, 0)
+        self.assertEqual(self.mailbox.last_all_mail_uid, 0)
+        self.assertIsNone(self.mailbox.last_checked_at)
+        self.assertFalse(models.MailboxFolderCursor.objects.filter(mailbox=self.mailbox).exists())
+
+    def test_gmail_all_mail_cursor_seeds_from_legacy_all_mail_uid(self):
+        self.mailbox.last_all_mail_uid = 500
+        self.mailbox.save(update_fields=["last_all_mail_uid"])
+
+        with transaction.atomic():
+            advanced = _advance_mailbox_uid_cursor(
+                self.mailbox.pk,
+                "[Gmail]/All Mail",
+                450,
+            )
+
+        self.assertFalse(advanced)
+        gmail_cursor = models.MailboxFolderCursor.objects.get(
+            mailbox=self.mailbox,
+            folder="[Gmail]/All Mail",
+        )
+        self.assertEqual(gmail_cursor.last_uid, 500)
+
     def test_duplicate_message_id_skipped_not_crashed(self):
-        models.ImportBatch.objects.create(
+        payload = b"sku,price\nA,1\n"
+        existing_batch = models.ImportBatch.objects.create(
             supplier=self.supplier,
             mailbox=self.mailbox,
             message_id="<duplicate@example.com>",
+            status=models.ImportStatus.PROCESSED,
+        )
+        models.ImportFile.objects.create(
+            import_batch=existing_batch,
+            file_kind=models.FileKind.PRICE,
+            filename="prices.csv",
+            content_hash=hashlib.sha256(payload).hexdigest(),
             status=models.ImportStatus.PROCESSED,
         )
         message = EmailMessage()
@@ -427,7 +539,7 @@ class EmailImporterCursorTests(TestCase):
         message["Date"] = "Sat, 25 Apr 2026 10:00:00 +0000"
         message.set_content("attached")
         message.add_attachment(
-            b"sku,price\nA,1\n",
+            payload,
             maintype="text",
             subtype="csv",
             filename="prices.csv",
@@ -459,8 +571,170 @@ class EmailImporterCursorTests(TestCase):
         self.mailbox.refresh_from_db()
         self.assertEqual(summary["skipped_duplicates"], 1)
         self.assertEqual(models.ImportBatch.objects.count(), 1)
-        self.assertEqual(models.ImportFile.objects.count(), 0)
+        self.assertEqual(models.ImportFile.objects.count(), 1)
         self.assertEqual(self.mailbox.last_inbox_uid, 7)
+
+    def test_uid_cursor_recovers_unseen_recent_uid_below_cursor_once(self):
+        payload = b"sku,price\nA,1\n"
+        self.mailbox.last_inbox_uid = 10
+        self.mailbox.save(update_fields=["last_inbox_uid"])
+        existing_batch = models.ImportBatch.objects.create(
+            supplier=self.supplier,
+            mailbox=self.mailbox,
+            message_id="<existing@example.com>",
+            received_at=timezone.make_aware(datetime(2026, 4, 29, 0, 0, 0)),
+            status=models.ImportStatus.PROCESSED,
+        )
+        models.ImportFile.objects.create(
+            import_batch=existing_batch,
+            file_kind=models.FileKind.PRICE,
+            filename="prices.csv",
+            content_hash=hashlib.sha256(payload).hexdigest(),
+            status=models.ImportStatus.PROCESSED,
+            processed_at=timezone.make_aware(datetime(2026, 4, 29, 0, 1, 0)),
+        )
+        message = EmailMessage()
+        message["Subject"] = "Daily price"
+        message["From"] = "supplier@example.com"
+        message["Message-ID"] = "<late-low-uid@example.com>"
+        message["Date"] = "Wed, 29 Apr 2026 00:24:00 +0000"
+        message.set_content("attached")
+        message.add_attachment(
+            payload,
+            maintype="text",
+            subtype="csv",
+            filename="prices.csv",
+        )
+
+        class FakeImapClient:
+            def search(self, charset, *criteria):
+                return "OK", [b"9"]
+
+            def fetch(self, msg_id, query):
+                if "RFC822.SIZE" in query:
+                    return "OK", [
+                        (
+                            b'9 (RFC822.SIZE 100 INTERNALDATE "29-Apr-2026 00:24:00 +0000")',
+                            b"",
+                        )
+                    ]
+                return "OK", [(b"9 (RFC822 {100}", message.as_bytes())]
+
+            def logout(self):
+                return "BYE", []
+
+        with patch(
+            "prices.services.email_importer._connect_imap",
+            return_value=FakeImapClient(),
+        ):
+            first_summary = run_import([self.mailbox], use_uid_cursor=True)
+
+        self.mailbox.refresh_from_db()
+        self.assertEqual(first_summary["messages_scanned"], 1)
+        self.assertEqual(first_summary["skipped_duplicates"], 1)
+        self.assertEqual(self.mailbox.last_inbox_uid, 10)
+        self.assertTrue(
+            models.EmailAttachmentDiagnostic.objects.filter(
+                mailbox=self.mailbox,
+                message_folder="INBOX",
+                message_uid="9",
+                decision=models.AttachmentDecision.DUPLICATE,
+            ).exists()
+        )
+
+        with patch(
+            "prices.services.email_importer._connect_imap",
+            return_value=FakeImapClient(),
+        ):
+            second_summary = run_import([self.mailbox], use_uid_cursor=True)
+
+        self.assertEqual(second_summary["messages_scanned"], 0)
+        self.assertEqual(second_summary["skipped_duplicates"], 0)
+
+    def test_same_day_duplicate_attachment_does_not_order_by_missing_import_file_created_at(self):
+        payload = b"sku,price\nA,1\n"
+        existing_batch = models.ImportBatch.objects.create(
+            supplier=self.supplier,
+            mailbox=self.mailbox,
+            message_id="<same-day-existing@example.com>",
+            received_at=timezone.make_aware(datetime(2026, 4, 29, 9, 0, 0)),
+            status=models.ImportStatus.PROCESSED,
+        )
+        models.ImportFile.objects.create(
+            import_batch=existing_batch,
+            file_kind=models.FileKind.PRICE,
+            filename="prices.csv",
+            content_hash=hashlib.sha256(payload).hexdigest(),
+            status=models.ImportStatus.PROCESSED,
+            processed_at=timezone.make_aware(datetime(2026, 4, 29, 9, 1, 0)),
+        )
+        message = EmailMessage()
+        message["Subject"] = "Daily price"
+        message["From"] = "supplier@example.com"
+        message["Message-ID"] = "<same-day-new-copy@example.com>"
+        message["Date"] = "Wed, 29 Apr 2026 10:00:00 +0000"
+        message.set_content("attached")
+        message.add_attachment(
+            payload,
+            maintype="text",
+            subtype="csv",
+            filename="prices.csv",
+        )
+
+        class FakeImapClient:
+            def search(self, charset, *criteria):
+                return "OK", [b"11"]
+
+            def fetch(self, msg_id, query):
+                if "RFC822.SIZE" in query:
+                    return "OK", [
+                        (
+                            b'11 (RFC822.SIZE 100 INTERNALDATE "29-Apr-2026 10:00:00 +0000")',
+                            b"",
+                        )
+                    ]
+                return "OK", [(b"11 (RFC822 {100}", message.as_bytes())]
+
+            def logout(self):
+                return "BYE", []
+
+        with patch(
+            "prices.services.email_importer._connect_imap",
+            return_value=FakeImapClient(),
+        ):
+            summary = run_import(
+                [self.mailbox],
+                use_uid_cursor=True,
+                dedupe_same_day_only=True,
+            )
+
+        self.assertEqual(summary["skipped_duplicates"], 1)
+        self.assertEqual(models.ImportBatch.objects.count(), 1)
+        self.assertEqual(models.ImportFile.objects.count(), 1)
+
+    def test_supplier_specific_run_updates_check_state_when_no_email_found(self):
+        class EmptyImapClient:
+            def search(self, charset, *criteria):
+                return "OK", [b""]
+
+            def logout(self):
+                return "BYE", []
+
+        with patch(
+            "prices.services.email_importer._connect_imap",
+            return_value=EmptyImapClient(),
+        ):
+            summary = run_import([self.mailbox], supplier_id=self.supplier.id)
+
+        self.supplier.refresh_from_db()
+        self.assertEqual(summary["messages_found"], 0)
+        self.assertIsNotNone(self.supplier.last_email_check_at)
+        self.assertEqual(self.supplier.last_email_matched, 0)
+        self.assertEqual(self.supplier.last_email_processed, 0)
+        self.assertEqual(
+            self.supplier.last_email_last_message,
+            "Supplier-specific check found no price email.",
+        )
 
 
 class BulkMutationPermissionTests(TestCase):
@@ -808,15 +1082,18 @@ class OurProductCatalogueListTests(TestCase):
         self.assertContains(response, "Blonde Amber")
 
     def test_staff_can_inline_edit_catalogue_variant_row(self):
+        Brand.objects.create(name="Montale Paris")
         response = self.client.post(
             reverse("prices:our_product_variant_inline_update", args=[self.variant.pk]),
             {
                 "brand_name": "Montale Paris",
                 "perfume_name": "Vanilla Extasy Intense",
+                "collection_name": "Intense",
                 "concentration": "Extrait de Parfum",
                 "size_ml": "50",
                 "is_tester": "0",
                 "packaging": "no box",
+                "variant_type": "travel",
             },
         )
 
@@ -825,10 +1102,12 @@ class OurProductCatalogueListTests(TestCase):
         self.perfume.refresh_from_db()
         self.assertEqual(self.perfume.brand.name, "Montale Paris")
         self.assertEqual(self.perfume.name, "Vanilla Extasy Intense")
+        self.assertEqual(self.perfume.collection_name, "Intense")
         self.assertEqual(self.perfume.concentration, "Extrait de Parfum")
         self.assertEqual(self.variant.size_ml, 50)
         self.assertFalse(self.variant.is_tester)
         self.assertEqual(self.variant.packaging, "no box")
+        self.assertEqual(self.variant.variant_type, "travel")
 
     def test_our_products_brands_tab_can_add_brand(self):
         response = self.client.post(
@@ -1837,6 +2116,63 @@ class ImportSchedulerTests(TestCase):
 
         settings_obj.last_run_at = now - timedelta(minutes=18)
         self.assertTrue(_should_skip_recent_run(settings_obj, now=now))
+
+    @patch("prices.management.commands.import_emails.run_import")
+    @patch("prices.management.commands.import_emails.timezone.now")
+    def test_import_emails_records_run_start_time_for_cron_cadence(
+        self, mock_now, mock_run_import
+    ):
+        start = timezone.make_aware(datetime(2026, 1, 1, 12, 0))
+        end = start + timedelta(minutes=2)
+        current_time = {"value": start}
+        mock_now.side_effect = lambda: current_time["value"]
+
+        def finish_run(*args, **kwargs):
+            current_time["value"] = end
+            return {
+                "matched_files": 0,
+                "processed_files": 0,
+                "skipped_duplicates": 0,
+                "errors": 0,
+                "remaining_backlog": 0,
+                "timed_out": False,
+            }
+
+        mock_run_import.side_effect = finish_run
+        settings_obj = models.ImportSettings.get_solo()
+        settings_obj.interval_minutes = 20
+        settings_obj.supplier_timeout_minutes = 0
+        settings_obj.deactivate_products_after_days = 0
+        settings_obj.save(
+            update_fields=[
+                "interval_minutes",
+                "supplier_timeout_minutes",
+                "deactivate_products_after_days",
+            ]
+        )
+        models.ExchangeRate.objects.create(
+            rate_date=start.date(),
+            from_currency=models.Currency.USD,
+            to_currency=models.Currency.RUB,
+            rate="100.000000",
+            source="CBR + test",
+        )
+        models.Mailbox.objects.create(
+            name="scheduler",
+            host="imap.example.com",
+            username="scheduler@example.com",
+            password="secret",
+        )
+        models.Supplier.objects.create(
+            name="Scheduler Supplier",
+            from_address_pattern="price@example.com",
+        )
+
+        call_command("import_emails")
+
+        settings_obj.refresh_from_db()
+        self.assertEqual(settings_obj.last_run_at, start)
+        self.assertFalse(_should_skip_recent_run(settings_obj, now=start + timedelta(minutes=20)))
 
 
 class HiddenProductKeywordTests(TestCase):
