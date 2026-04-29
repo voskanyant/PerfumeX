@@ -556,6 +556,29 @@ class NormalizerTests(TestCase):
         self.assertEqual(parsed.variant_type, "sample")
         self.assertEqual(parsed.packaging, "dented no_box")
 
+    def test_masculine_dented_packaging_note_is_structured(self):
+        brand = Brand.objects.create(name="Afnan")
+        BrandAlias.objects.create(brand=brand, alias_text="Afnan", normalized_alias="afnan")
+        product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="afnan-tribute-blue-dented",
+            name="Afnan Tribute Blue Exlusive (M) 100ml EDP подмятый",
+        )
+
+        parsed = save_parse(product, force=True)
+
+        self.assertEqual(parsed.normalized_brand, brand)
+        self.assertEqual(parsed.product_name_text, "tribute blue exlusive")
+        self.assertEqual(parsed.supplier_gender_hint, "Men")
+        self.assertEqual(parsed.size_ml, Decimal("100.00"))
+        self.assertEqual(parsed.concentration, "Eau de Parfum")
+        self.assertEqual(parsed.packaging, "dented")
+        self.assertNotIn("подмятый", parsed.product_name_text.lower())
+        self.assertEqual(
+            parsed.display_identity,
+            "Afnan / Tribute Blue Exlusive / Eau de Parfum / 100ml / Dented",
+        )
+
     def test_display_identity_title_cases_scent_but_keeps_joiners_lowercase(self):
         product = SupplierProduct.objects.create(
             supplier=self.supplier,
@@ -621,6 +644,33 @@ class NormalizerTests(TestCase):
         self.assertEqual(parsed.normalized_brand, brand)
         self.assertEqual(parsed.product_name_text, "Example Self Title")
         self.assertEqual(parsed.display_identity, "Example Self Title / Eau de Parfum / 50ml")
+
+    def test_brand_alias_left_as_name_can_confirm_self_titled_catalogue_scent(self):
+        brand = Brand.objects.create(name="Salvador Dali")
+        BrandAlias.objects.create(
+            brand=brand,
+            alias_text="SD",
+            normalized_alias="sd",
+            priority=25,
+        )
+        brand.perfumes.create(
+            name="Salvador Dali",
+            concentration="Eau de Parfum",
+        )
+        product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="salvador-dali-self-titled",
+            name="SD Salvador Dali edp 30 ml",
+        )
+
+        parsed = save_parse(product, force=True)
+
+        self.assertEqual(parsed.normalized_brand, brand)
+        self.assertEqual(parsed.product_name_text, "Salvador Dali")
+        self.assertEqual(parsed.concentration, "Eau de Parfum")
+        self.assertEqual(parsed.size_ml, Decimal("30.00"))
+        self.assertNotIn("product name missing", parsed.warnings)
+        self.assertEqual(parsed.display_identity, "Salvador Dali / Eau de Parfum / 30ml")
 
     def test_ambiguous_self_titled_catalogue_candidates_go_to_manual_review(self):
         brand = Brand.objects.create(name="Example Ambiguous")
@@ -1163,6 +1213,114 @@ class NormalizerTests(TestCase):
         self.assertEqual(parsed.concentration, "Eau de Toilette")
         self.assertEqual(parsed.size_ml, Decimal("125.00"))
         self.assertTrue(parsed.is_tester)
+
+    def test_redundant_pour_femme_suffix_drops_when_scent_already_has_her(self):
+        brand = Brand.objects.create(name="Zadig & Voltaire")
+        BrandAlias.objects.create(brand=brand, alias_text="Zadig & Voltaire", normalized_alias="zadig voltaire")
+        brand.perfumes.create(name="This Is Her", concentration="Eau de Parfum", audience="Woman")
+        product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="zadig-this-is-her-pour-femme",
+            name="Zadig & Voltaire This is her pour femme edp 100 ml",
+        )
+
+        parsed = save_parse(product, force=True)
+
+        self.assertEqual(parsed.normalized_brand, brand)
+        self.assertEqual(parsed.product_name_text, "This Is Her")
+        self.assertEqual(parsed.concentration, "Eau de Parfum")
+        self.assertEqual(parsed.size_ml, Decimal("100.00"))
+        self.assertEqual(parsed.supplier_gender_hint, "Pour Femme")
+        self.assertEqual(parsed.display_identity, "Zadig & Voltaire / This Is Her / Eau de Parfum / 100ml")
+
+    def test_brand_scoped_collection_alias_extracts_armand_basi_uniform(self):
+        brand = Brand.objects.create(name="Armand Basi")
+        BrandAlias.objects.create(brand=brand, alias_text="A.Basi", normalized_alias="a.basi")
+        brand.perfumes.create(name="Don't Look Back", collection_name="Uniform", concentration="Eau de Toilette")
+        ProductAlias.objects.create(
+            brand=brand,
+            alias_text="uniform",
+            canonical_text="",
+            collection_name="Uniform",
+            priority=30,
+            active=True,
+        )
+        product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="armand-basi-uniform-dont-look-back",
+            name="A.Basi Uniform Don't Look Back (L) 100ml edt",
+        )
+
+        parsed = save_parse(product, force=True)
+
+        self.assertEqual(parsed.normalized_brand, brand)
+        self.assertEqual(parsed.collection_name, "Uniform")
+        self.assertEqual(parsed.product_name_text, "Don't Look Back")
+        self.assertEqual(parsed.concentration, "Eau de Toilette")
+        self.assertEqual(parsed.size_ml, Decimal("100.00"))
+        self.assertEqual(parsed.supplier_gender_hint, "Woman")
+        self.assertEqual(
+            parsed.display_identity,
+            "Armand Basi / Uniform / Don't Look Back / Eau de Toilette / 100ml",
+        )
+
+    def test_catalog_base_name_can_drop_trailing_supplier_marketing_garbage(self):
+        brand = Brand.objects.create(name="Afnan")
+        BrandAlias.objects.create(brand=brand, alias_text="Afnan", normalized_alias="afnan")
+        brand.perfumes.create(name="Tribute White", concentration="Eau de Parfum", audience="Woman")
+        product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="afnan-tribute-white-exclusive-new",
+            name="Afnan Tribute White Exlusive (L) 100ml EDP TECTEP NEW!!!",
+        )
+
+        parsed = save_parse(product, force=True)
+
+        self.assertEqual(parsed.normalized_brand, brand)
+        self.assertEqual(parsed.product_name_text, "Tribute White")
+        self.assertEqual(parsed.concentration, "Eau de Parfum")
+        self.assertEqual(parsed.size_ml, Decimal("100.00"))
+        self.assertEqual(parsed.supplier_gender_hint, "Woman")
+        self.assertTrue(parsed.is_tester)
+        self.assertEqual(parsed.display_identity, "Afnan / Tribute White / Eau de Parfum / 100ml / Tester")
+
+    def test_catalog_base_name_drops_marketing_garbage_even_when_supplier_gender_differs(self):
+        brand = Brand.objects.create(name="Afnan")
+        BrandAlias.objects.create(brand=brand, alias_text="Afnan", normalized_alias="afnan")
+        brand.perfumes.create(name="Tribute Blue", concentration="Eau de Parfum", audience="Unisex")
+        product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="afnan-tribute-blue-exclusive-dented",
+            name="Afnan Tribute Blue Exlusive (M) 100ml EDP подмятый",
+        )
+
+        parsed = save_parse(product, force=True)
+
+        self.assertEqual(parsed.normalized_brand, brand)
+        self.assertEqual(parsed.product_name_text, "Tribute Blue")
+        self.assertEqual(parsed.concentration, "Eau de Parfum")
+        self.assertEqual(parsed.size_ml, Decimal("100.00"))
+        self.assertEqual(parsed.supplier_gender_hint, "Men")
+        self.assertEqual(parsed.packaging, "dented")
+        self.assertEqual(parsed.display_identity, "Afnan / Tribute Blue / Eau de Parfum / 100ml / Dented")
+
+    def test_trailing_new_after_size_is_supplier_status_garbage(self):
+        brand = Brand.objects.create(name="Afnan")
+        BrandAlias.objects.create(brand=brand, alias_text="Afnan", normalized_alias="afnan")
+        product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="afnan-rave-carbon-new-after-size",
+            name="Afnan Rave Carbon (L) 100ml EDP NEW!!!",
+        )
+
+        parsed = save_parse(product, force=True)
+
+        self.assertEqual(parsed.normalized_brand, brand)
+        self.assertEqual(parsed.product_name_text, "rave carbon")
+        self.assertEqual(parsed.concentration, "Eau de Parfum")
+        self.assertEqual(parsed.size_ml, Decimal("100.00"))
+        self.assertEqual(parsed.supplier_gender_hint, "Woman")
+        self.assertEqual(parsed.display_identity, "Afnan / Rave Carbon / Eau de Parfum / 100ml")
 
     def test_specific_product_alias_beats_blocked_generic_alias(self):
         brand = Brand.objects.create(name="Thierry Mugler")

@@ -166,20 +166,29 @@ DENTED_PACKAGING_TERMS = (
     "dented",
     "creased",
     "подмятая",
+    "подмятый",
+    "подмятые",
+    "подмято",
+    "подмята",
     "подмят",
     "помятая",
+    "помятый",
+    "помятые",
+    "помято",
+    "помята",
     "помят",
 )
 DECODED_TERMS = ("decoded", "dec", "декод", "декодированный")
 GRAY_BOX_TERMS = ("gray box", "grey box", "серый бокс", "серый короб", "серая коробка")
 GRAY_BOX_COLOR_TERMS = ("серый", "серая", "сер", "gray", "grey")
 GENDER_TERMS = tuple(alias for alias, _display, _group in DEFAULT_AUDIENCE_ALIASES)
-NAME_AUDIENCE_TERMS = ("pour femme", "femme", "donna", "for her", "pour homme", "homme", "uomo", "man")
+NAME_AUDIENCE_TERMS = ("pour femme", "femme", "donna", "for her", "her", "pour homme", "homme", "uomo", "man")
 NAME_BEARING_MODIFIER_PHRASES = ("eau fraiche", "eau fraicheur")
 AUDIENCE_NAME_SUFFIXES = {
-    "women": ("woman", "women", "lady", "for woman", "for women", "for her", "pour femme", "femme"),
+    "women": ("woman", "women", "lady", "for woman", "for women", "for her", "her", "pour femme", "femme"),
     "men": ("man", "men", "for man", "for men", "for him", "pour homme", "homme"),
 }
+TRAILING_MARKETING_GARBAGE_TERMS = ("new", "exclusive", "exlusive")
 REFILL_MODIFIER = "refill"
 MINI_MODIFIER = "mini"
 
@@ -477,6 +486,32 @@ def _clean_product_name_text(value: str) -> str:
     return name[:255]
 
 
+def _strip_trailing_supplier_status_garbage(result: ParseResult) -> str:
+    if not result.product_name_text or not result.size_ml:
+        return result.product_name_text
+    name = result.product_name_text.strip()
+    stripped = re.sub(r"\s+new[\W_]*$", "", name, flags=re.IGNORECASE).strip()
+    return _clean_product_name_text(stripped) or result.product_name_text
+
+
+def _strip_redundant_trailing_audience_suffix(result: ParseResult) -> str:
+    if not result.product_name_text or not result.supplier_gender_hint:
+        return result.product_name_text
+    suffixes = AUDIENCE_NAME_SUFFIXES.get(audience_group(result.supplier_gender_hint), ())
+    if not suffixes:
+        return result.product_name_text
+    name = result.product_name_text
+    for suffix in sorted(suffixes, key=len, reverse=True):
+        suffix_pattern = re.escape(normalize_text(suffix)).replace(r"\ ", r"\s+")
+        match = re.match(rf"^(?P<base>.+)\s+{suffix_pattern}$", name, flags=re.IGNORECASE)
+        if not match:
+            continue
+        base = match.group("base").strip()
+        if any(normalize_text(other) != normalize_text(suffix) and _contains_phrase(base, other) for other in suffixes):
+            return _clean_product_name_text(base)
+    return result.product_name_text
+
+
 def _strip_cyrillic_name_tokens_for_latin_brand(result: ParseResult) -> str:
     if not result.normalized_brand or not result.product_name_text:
         return result.product_name_text
@@ -550,6 +585,24 @@ def _catalog_has_audience_named_sibling(perfumes: list[Perfume], base_key: str, 
     )
 
 
+def _catalog_base_keys_without_trailing_marketing_garbage(result: ParseResult) -> set[str]:
+    compact_name = _catalog_scent_key(result.product_name_text)
+    base_keys: set[str] = set()
+    changed = True
+    while changed:
+        changed = False
+        for term in TRAILING_MARKETING_GARBAGE_TERMS:
+            term_key = _catalog_scent_key(term)
+            if not term_key or not compact_name.endswith(term_key):
+                continue
+            compact_name = compact_name[: -len(term_key)]
+            if len(compact_name) >= 3:
+                base_keys.add(compact_name)
+            changed = True
+            break
+    return base_keys
+
+
 def _canonicalize_product_name_from_catalog(result: ParseResult) -> str:
     if not result.normalized_brand or not result.normalized_brand.id or not result.product_name_text:
         return result.product_name_text
@@ -586,6 +639,17 @@ def _canonicalize_product_name_from_catalog(result: ParseResult) -> str:
                 return result.product_name_text
             return names.pop()
 
+    base_keys = _catalog_base_keys_without_trailing_marketing_garbage(result)
+    if base_keys:
+        names = {
+            perfume.name
+            for perfume in perfumes
+            if _catalog_perfume_matches_non_audience_context(perfume, result)
+            and _catalog_scent_key(perfume.name) in base_keys
+        }
+        if len(names) == 1:
+            return names.pop()
+
     audience_suffixes = AUDIENCE_NAME_SUFFIXES.get(audience_group(result.supplier_gender_hint), ())
     if not audience_suffixes:
         return result.product_name_text
@@ -601,8 +665,30 @@ def _canonicalize_product_name_from_catalog(result: ParseResult) -> str:
     return result.product_name_text
 
 
+def _product_name_is_brand_identity(result: ParseResult) -> bool:
+    if not result.normalized_brand or not result.normalized_brand.id or not result.product_name_text:
+        return False
+    name_key = _catalog_scent_key(result.product_name_text)
+    if not name_key:
+        return False
+    brand_key = _catalog_scent_key(result.normalized_brand.name)
+    if name_key == brand_key:
+        return True
+    alias_keys = {
+        _catalog_scent_key(alias)
+        for alias in BrandAlias.objects.filter(
+            brand_id=result.normalized_brand.id,
+            active=True,
+        ).values_list("normalized_alias", flat=True)
+        if alias
+    }
+    return name_key in alias_keys
+
+
 def _apply_self_titled_catalog_name(result: ParseResult) -> None:
-    if not result.normalized_brand or not result.normalized_brand.id or result.product_name_text:
+    if not result.normalized_brand or not result.normalized_brand.id:
+        return
+    if result.product_name_text and not _product_name_is_brand_identity(result):
         return
     brand_key = _catalog_scent_key(result.normalized_brand.name)
     candidates = []
@@ -1224,7 +1310,9 @@ def parse_supplier_product(product: SupplierProduct) -> ParseResult:
         result.product_name_text = _clean_product_name_text(remaining)
 
     result.product_name_text = _clean_product_name_text(result.product_name_text)
+    result.product_name_text = _strip_trailing_supplier_status_garbage(result)
     result.product_name_text = _strip_cyrillic_name_tokens_for_latin_brand(result)
+    result.product_name_text = _strip_redundant_trailing_audience_suffix(result)
     _apply_self_titled_catalog_name(result)
     result.product_name_text = _canonicalize_product_name_from_catalog(result)
 

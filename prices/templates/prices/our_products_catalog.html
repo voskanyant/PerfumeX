@@ -38,7 +38,7 @@
                     <input type="hidden" name="packaging" value="{{ variant.packaging|default_if_none:'' }}">
                     <div class="our-products-card-main">
                         <div class="our-products-card-body">
-                            <div class="our-products-full-name">
+                            <div class="our-products-full-name" aria-label="Product identity">
                                 <span class="catalogue-field catalogue-field-brand" data-label="Brand" data-editable-cell>
                                     <span class="catalogue-cell-value catalogue-cell-value-strong">{{ variant.perfume.brand.name }}</span>
                                     <input class="catalogue-inline-input" type="text" name="brand_name" value="{{ variant.perfume.brand.name }}" list="catalog-brand-options" disabled>
@@ -53,24 +53,26 @@
                                     <span class="catalogue-cell-value catalogue-cell-value-strong">{{ variant.perfume.name }}</span>
                                     <input class="catalogue-inline-input" type="text" name="perfume_name" value="{{ variant.perfume.name }}" disabled>
                                 </span>
-                            </div>
-                            <div class="our-products-details" aria-label="Variant details">
-                                <span class="our-products-detail-pill" data-label="Concentration" data-editable-cell>
+                                <span class="identity-separator">/</span>
+                                <span class="catalogue-field catalogue-field-concentration" data-label="Concentration" data-editable-cell>
                                     <span class="catalogue-cell-value">{{ variant.perfume.concentration|default:"-" }}</span>
                                     <input class="catalogue-inline-input" type="text" name="concentration" value="{{ variant.perfume.concentration|default_if_none:'' }}" list="catalog-concentration-options" disabled>
                                 </span>
-                                <span class="our-products-detail-pill" data-label="Size" data-editable-cell>
+                                <span class="identity-separator">/</span>
+                                <span class="catalogue-field catalogue-field-size" data-label="Size" data-editable-cell>
                                     <span class="catalogue-cell-value">{{ variant.display_size|default:"-" }}</span>
                                     <input class="catalogue-inline-input" type="text" name="size_ml" value="{{ variant.display_size|default_if_none:'' }}" disabled>
                                 </span>
-                                <span class="our-products-detail-pill" data-label="Tester" data-editable-cell>
+                                <span class="identity-separator">/</span>
+                                <span class="catalogue-field catalogue-field-tester" data-label="Tester" data-editable-cell>
                                     <span class="catalogue-cell-value">{% if variant.is_tester %}Tester{% else %}-{% endif %}</span>
                                     <select class="catalogue-inline-input" name="is_tester" disabled>
                                         <option value="0"></option>
                                         <option value="1" {% if variant.is_tester %}selected{% endif %}>Tester</option>
                                     </select>
                                 </span>
-                                <span class="our-products-detail-pill" data-label="Type" data-editable-cell>
+                                <span class="identity-separator">/</span>
+                                <span class="catalogue-field catalogue-field-type" data-label="Type" data-editable-cell>
                                     <span class="catalogue-cell-value">{{ variant.variant_type|default:"standard" }}</span>
                                     <input class="catalogue-inline-input" type="text" name="variant_type" value="{{ variant.variant_type|default:'standard' }}" list="catalog-variant-type-options" disabled>
                                 </span>
