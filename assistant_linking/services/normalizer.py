@@ -251,8 +251,16 @@ def _split_terms(value: str) -> list[str]:
     return [normalize_text(term) for term in re.split(r"[,;\n]+", value or "") if normalize_text(term)]
 
 
+def _phrase_pattern(phrase: str) -> str:
+    escaped = re.escape(normalize_text(phrase)).replace(r"\.", r"\.\s*")
+    return rf"(?<![a-z0-9а-яё]){escaped}(?![a-z0-9а-яё])"
+
+
 def _contains_phrase(text: str, phrase: str) -> bool:
-    return bool(re.search(rf"(^|\s){re.escape(phrase)}($|\s)", text))
+    normalized_phrase = normalize_text(phrase)
+    if not normalized_phrase:
+        return False
+    return bool(re.search(_phrase_pattern(normalized_phrase), text))
 
 
 def _contains_any_phrase(text: str, terms: tuple[str, ...]) -> bool:
@@ -398,7 +406,7 @@ def _safe_regex_sub(pattern: str, replacement: str, text: str, alias=None) -> st
 def _strip_known_terms(text: str, terms: list[str]) -> str:
     remaining = text
     for term in [normalize_text(term) for term in terms if term]:
-        remaining = re.sub(rf"(^|\s){re.escape(term)}($|\s)", " ", remaining)
+        remaining = re.sub(_phrase_pattern(term), " ", remaining)
     return re.sub(r"\s+", " ", remaining).strip()
 
 
@@ -406,7 +414,7 @@ def _strip_first_phrase(text: str, phrase: str) -> str:
     normalized_phrase = normalize_text(phrase)
     if not normalized_phrase:
         return text
-    return re.sub(rf"(^|\s){re.escape(normalized_phrase)}($|\s)", " ", text, count=1).strip()
+    return re.sub(_phrase_pattern(normalized_phrase), " ", text, count=1).strip()
 
 
 def _strip_concentration_aliases(text: str, rows: list[tuple]) -> str:
@@ -746,6 +754,9 @@ def _extract_packaging_descriptor(text: str) -> tuple[str, list[str]]:
                 terms.append(normalized)
                 add_packaging("gray_box")
 
+    if "gray_box" in packaging_parts:
+        packaging_parts = [part for part in packaging_parts if part not in {"new_design", "old_design"}]
+
     unique_terms: list[str] = []
     seen: set[str] = set()
     for term in sorted(terms, key=len, reverse=True):
@@ -875,7 +886,12 @@ def _generated_brand_alias_candidates(brand: Brand) -> set[str]:
     }
     if compact_rest != rest_text:
         aliases.add(f"{first[:1]}.{compact_rest}")
-    if len(tokens) == 2 and len(rest[0]) >= 4:
+    if (
+        len(tokens) == 2
+        and len(rest[0]) >= 4
+        and not first.startswith(rest[0][:4])
+        and not rest[0].startswith(first[:4])
+    ):
         aliases.add(rest[0])
     return {alias for alias in aliases if len(alias) >= 4}
 
