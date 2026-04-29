@@ -740,7 +740,11 @@ def _parse_backlog_remaining(message: str) -> int:
 
 def _build_autoimport_scan_status() -> dict[str, object]:
     settings_obj = models.ImportSettings.get_solo()
-    mailboxes = list(models.Mailbox.objects.filter(is_active=True).order_by("priority", "id"))
+    mailboxes = list(
+        models.Mailbox.objects.filter(is_active=True)
+        .prefetch_related("folder_cursors")
+        .order_by("priority", "id")
+    )
     cron_status = _get_cron_status()
     since = None
     if settings_obj.last_run_at:
@@ -768,6 +772,20 @@ def _build_autoimport_scan_status() -> dict[str, object]:
         mode_note = "No automatic mailbox scan has been recorded."
     mailbox_rows = []
     for mailbox in mailboxes:
+        folder_cursors = [
+            {
+                "folder": cursor.folder,
+                "last_uid": cursor.last_uid or 0,
+                "last_checked": _short_relative_datetime(cursor.last_checked_at)
+                if cursor.last_checked_at
+                else "Not checked",
+                "last_checked_full": _format_local_datetime(cursor.last_checked_at),
+            }
+            for cursor in sorted(
+                mailbox.folder_cursors.all(),
+                key=lambda item: (item.folder != "INBOX", item.folder.lower()),
+            )
+        ]
         mailbox_rows.append(
             {
                 "name": mailbox.name,
@@ -777,6 +795,7 @@ def _build_autoimport_scan_status() -> dict[str, object]:
                 "last_checked_full": _format_local_datetime(mailbox.last_checked_at),
                 "inbox_uid": mailbox.last_inbox_uid or 0,
                 "all_mail_uid": mailbox.last_all_mail_uid or 0,
+                "folder_cursors": folder_cursors,
             }
         )
     return {
@@ -795,7 +814,7 @@ def _build_autoimport_scan_status() -> dict[str, object]:
         else "",
         "mailboxes": mailbox_rows,
         "cursor_note": (
-            "Cursor means the saved last processed mailbox UID. Normal cron uses it to read only newer emails; "
+            "Cursor means the saved last processed UID for each mailbox folder. Normal cron uses it to read only newer emails; "
             "supplier refresh/backfill uses supplier filters and date windows."
         ),
     }

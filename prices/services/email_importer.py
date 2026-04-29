@@ -26,6 +26,7 @@ from prices.services.importer import mark_import_batch_products_seen, process_im
 logger = logging.getLogger(__name__)
 
 SUPPORTED_PRICE_EXTENSIONS = (".csv", ".xlsx", ".xls")
+UID_CURSOR_RECOVERY_OVERLAP = 500
 IMAGE_EXTENSIONS = (".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".tiff")
 NON_PRICE_FILENAME_TERMS = (
     "invoice",
@@ -40,6 +41,16 @@ NON_PRICE_FILENAME_TERMS = (
     "акт",
     "отчет",
     "счет",
+)
+NON_PRICE_FILENAME_TERMS = NON_PRICE_FILENAME_TERMS + (
+    "сверка",
+    "наклад",
+    "накладная",
+    "акт",
+    "отчет",
+    "отчёт",
+    "счет",
+    "счёт",
 )
 
 
@@ -649,6 +660,85 @@ def run_import(
             _log_line(f"Diagnostic write failed: {_short(exc, 160)}")
             return None
 
+    def create_import_batch_for_message(
+        *,
+        supplier_obj,
+        mailbox_obj,
+        folder,
+        msg_id,
+        identity_message_id,
+        received_at_value,
+        file_kind,
+        content_hash,
+    ):
+        identity_message_id = (identity_message_id or "")[:255]
+        if not identity_message_id:
+            return (
+                models.ImportBatch.objects.create(
+                    supplier=supplier_obj,
+                    mailbox=mailbox_obj,
+                    message_folder=folder,
+                    message_id="",
+                    received_at=received_at_value,
+                    status=models.ImportStatus.PENDING,
+                ),
+                None,
+            )
+
+        existing_batch = models.ImportBatch.objects.filter(
+            mailbox=mailbox_obj,
+            message_id=identity_message_id,
+        ).first()
+        if not existing_batch:
+            return (
+                models.ImportBatch.objects.create(
+                    supplier=supplier_obj,
+                    mailbox=mailbox_obj,
+                    message_folder=folder,
+                    message_id=identity_message_id,
+                    received_at=received_at_value,
+                    status=models.ImportStatus.PENDING,
+                ),
+                None,
+            )
+
+        existing_same_file = models.ImportFile.objects.filter(
+            import_batch=existing_batch,
+            file_kind=file_kind,
+            content_hash=content_hash,
+        ).exists()
+        if existing_same_file:
+            return None, existing_batch
+
+        scoped_message_id = _short(
+            f"{identity_message_id} uid={folder}/{_uid_display(msg_id)} hash={content_hash[:12]}",
+            255,
+        )
+        _log_line(
+            f"{mailbox_obj.name}: message_id={_short(identity_message_id, 80)} "
+            f"already exists as batch_id={existing_batch.id}, "
+            "but file hash is different; processing as a UID-scoped message."
+        )
+        try:
+            batch = models.ImportBatch.objects.create(
+                supplier=supplier_obj,
+                mailbox=mailbox_obj,
+                message_folder=folder,
+                message_id=scoped_message_id,
+                received_at=received_at_value,
+                status=models.ImportStatus.PENDING,
+            )
+        except IntegrityError:
+            batch = models.ImportBatch.objects.create(
+                supplier=supplier_obj,
+                mailbox=mailbox_obj,
+                message_folder=folder,
+                message_id="",
+                received_at=received_at_value,
+                status=models.ImportStatus.PENDING,
+            )
+        return batch, None
+
     client = None
     try:
         for mailbox in mailboxes:
@@ -780,18 +870,38 @@ def run_import(
             if use_uid_cursor and not supplier and not from_filter and not subject_filter:
                 filtered_items = []
                 counts_by_folder = {}
+                recovered_by_folder = {}
                 for folder_name, msg_id in work_items:
-                    cursor_field = _folder_cursor_field(folder_name)
-                    last_uid = getattr(mailbox, cursor_field, 0) or 0
+                    last_uid = _get_mailbox_folder_last_uid(mailbox, folder_name)
                     uid_int = _uid_to_int(msg_id)
-                    if uid_int is None or uid_int <= last_uid:
+                    if uid_int is None:
                         continue
+                    if uid_int <= last_uid:
+                        recovery_floor = max(0, last_uid - UID_CURSOR_RECOVERY_OVERLAP)
+                        if uid_int <= recovery_floor or _mailbox_uid_has_diagnostic(
+                            mailbox.pk,
+                            folder_name,
+                            msg_id,
+                        ):
+                            continue
+                        recovered_by_folder[folder_name] = (
+                            recovered_by_folder.get(folder_name, 0) + 1
+                        )
                     filtered_items.append((folder_name, msg_id))
                     counts_by_folder[folder_name] = counts_by_folder.get(folder_name, 0) + 1
                 details = ", ".join(
                     f"{folder}={count}" for folder, count in sorted(counts_by_folder.items())
                 ) or "none"
                 note(f"{mailbox.name}: new by UID cursor {details}.")
+                if recovered_by_folder:
+                    recovery_details = ", ".join(
+                        f"{folder}={count}"
+                        for folder, count in sorted(recovered_by_folder.items())
+                    )
+                    note(
+                        f"{mailbox.name}: cursor recovery rechecking {recovery_details} "
+                        f"within last {UID_CURSOR_RECOVERY_OVERLAP} UID(s)."
+                    )
                 work_items = filtered_items
             if limit:
                 if use_uid_cursor and not supplier and not from_filter and not subject_filter:
@@ -909,7 +1019,6 @@ def run_import(
                     )
                     continue
                 uid_int = _uid_to_int(msg_id)
-                cursor_field = _folder_cursor_field(item_folder)
                 message = email.message_from_bytes(raw_email)
                 subject = _decode_header(message.get("Subject", ""))
                 from_addr = parseaddr(message.get("From", ""))[1]
@@ -1207,6 +1316,8 @@ def run_import(
                             valid_attachment_processed = True
 
                             summary["price_candidates"] += 1
+                            existing_duplicate_file = None
+                            existing_processed_duplicate_file = None
                             if dedupe_same_day_only and received_at:
                                 day_start_utc, day_end_utc = _local_day_window_bounds(
                                     received_at, dedupe_day_window
@@ -1215,7 +1326,7 @@ def run_import(
                                 # mailboxes so the same attachment hash is imported once.
                                 # Include pending files too so repeated attachments in the same run
                                 # are skipped immediately.
-                                exists = models.ImportFile.objects.filter(
+                                duplicate_qs = models.ImportFile.objects.filter(
                                     content_hash=content_hash,
                                     file_kind=file_kind,
                                     import_batch__supplier=matched_supplier,
@@ -1225,26 +1336,49 @@ def run_import(
                                         models.ImportStatus.PENDING,
                                         models.ImportStatus.PROCESSED,
                                     ],
-                                ).exists()
+                                )
+                                existing_duplicate_file = duplicate_qs.first()
+                                existing_processed_duplicate_file = (
+                                    duplicate_qs.filter(status=models.ImportStatus.PROCESSED)
+                                    .select_related("import_batch")
+                                    .order_by("-processed_at", "-created_at")
+                                    .first()
+                                )
+                                exists = existing_duplicate_file is not None
                             else:
-                                exists = models.ImportFile.objects.filter(
+                                duplicate_qs = models.ImportFile.objects.filter(
                                     content_hash=content_hash,
                                     status=models.ImportStatus.PROCESSED,
                                     import_batch__supplier=matched_supplier,
-                                ).exists()
+                                )
+                                existing_duplicate_file = (
+                                    duplicate_qs.select_related("import_batch").first()
+                                )
+                                existing_processed_duplicate_file = existing_duplicate_file
+                                exists = existing_duplicate_file is not None
                             if exists:
+                                seen_count = 0
+                                if existing_processed_duplicate_file:
+                                    seen_count = mark_import_batch_products_seen(
+                                        existing_processed_duplicate_file.import_batch
+                                    )
                                 summary["skipped_duplicates"] += 1
                                 summary["skipped_files"] += 1
                                 set_run_message(
                                     f"Duplicate skipped: {matched_supplier.name} / {_short(filename, 90)}"
                                 )
                                 _log_line(
-                                    f"{mailbox.name}: SKIP duplicate '{filename}' (supplier={matched_supplier.name}, hash={content_hash[:10]}...)."
+                                    f"{mailbox.name}: SKIP duplicate '{filename}' "
+                                    f"(supplier={matched_supplier.name}, hash={content_hash[:10]}..., "
+                                    f"refreshed_products={seen_count})."
                                 )
                                 record_diagnostic(
                                     decision=models.AttachmentDecision.DUPLICATE,
                                     reason_code=models.AttachmentReason.DUPLICATE_HASH,
-                                    message="Duplicate price attachment hash.",
+                                    message=(
+                                        "Duplicate price attachment hash. "
+                                        f"Refreshed {seen_count} product(s)."
+                                    ),
                                     mailbox=mailbox,
                                     folder=item_folder,
                                     msg_id=msg_id,
@@ -1267,45 +1401,31 @@ def run_import(
 
                             batch = batch_by_supplier.get(matched_supplier.id)
                             if not batch:
-                                if message_id:
-                                    existing_batch = models.ImportBatch.objects.filter(
-                                        mailbox=mailbox,
-                                        message_id=message_id,
-                                    ).first()
-                                    if existing_batch:
-                                        summary["skipped_duplicates"] += 1
-                                        summary["skipped_files"] += 1
-                                        stats["duplicates"] = stats.get("duplicates", 0) + 1
-                                        set_run_message(
-                                            f"Duplicate email skipped: {matched_supplier.name} / {_short(filename, 90)}"
-                                        )
-                                        _log_line(
-                                            f"{mailbox.name}: SKIP duplicate message_id={_short(message_id, 80)} existing_batch_id={existing_batch.id}."
-                                        )
-                                        if run_id:
-                                            models.EmailImportRun.objects.filter(id=run_id).update(
-                                                skipped_duplicates=F("skipped_duplicates") + 1
-                                            )
-                                        continue
-                                    batch = models.ImportBatch.objects.create(
-                                        supplier=matched_supplier,
-                                        mailbox=mailbox,
-                                        message_folder=item_folder,
-                                        message_id=message_id,
-                                        received_at=received_at,
-                                        status=models.ImportStatus.PENDING,
+                                batch, duplicate_batch = create_import_batch_for_message(
+                                    supplier_obj=matched_supplier,
+                                    mailbox_obj=mailbox,
+                                    folder=item_folder,
+                                    msg_id=msg_id,
+                                    identity_message_id=message_id,
+                                    received_at_value=received_at,
+                                    file_kind=file_kind,
+                                    content_hash=content_hash,
+                                )
+                                if duplicate_batch:
+                                    summary["skipped_duplicates"] += 1
+                                    summary["skipped_files"] += 1
+                                    stats["duplicates"] = stats.get("duplicates", 0) + 1
+                                    set_run_message(
+                                        f"Duplicate email skipped: {matched_supplier.name} / {_short(filename, 90)}"
                                     )
-                                else:
-                                    # Some providers omit Message-ID; never collapse such
-                                    # emails into old batches with blank IDs.
-                                    batch = models.ImportBatch.objects.create(
-                                        supplier=matched_supplier,
-                                        mailbox=mailbox,
-                                        message_folder=item_folder,
-                                        message_id="",
-                                        received_at=received_at,
-                                        status=models.ImportStatus.PENDING,
+                                    _log_line(
+                                        f"{mailbox.name}: SKIP duplicate message_id={_short(message_id, 80)} existing_batch_id={duplicate_batch.id}."
                                     )
+                                    if run_id:
+                                        models.EmailImportRun.objects.filter(id=run_id).update(
+                                            skipped_duplicates=F("skipped_duplicates") + 1
+                                        )
+                                    continue
                                 batch_by_supplier[matched_supplier.id] = batch
 
                             mapping = models.SupplierFileMapping.objects.filter(
@@ -1656,14 +1776,37 @@ def run_import(
                                     if source_link:
                                         batch_message_id = f"{batch_message_id}|link:{hashlib.sha256(source_link.encode('utf-8')).hexdigest()[:16]}"
                                     imported_at = timezone.now()
-                                    batch = models.ImportBatch.objects.create(
-                                        supplier=matched_supplier,
-                                        mailbox=mailbox,
-                                        message_folder=item_folder,
-                                        message_id=batch_message_id[:255],
-                                        received_at=imported_at,
-                                        status=models.ImportStatus.PENDING,
+                                    batch, duplicate_batch = create_import_batch_for_message(
+                                        supplier_obj=matched_supplier,
+                                        mailbox_obj=mailbox,
+                                        folder=item_folder,
+                                        msg_id=msg_id,
+                                        identity_message_id=batch_message_id,
+                                        received_at_value=imported_at,
+                                        file_kind=models.FileKind.PRICE,
+                                        content_hash=content_hash,
                                     )
+                                    if duplicate_batch:
+                                        summary["skipped_duplicates"] += 1
+                                        summary["skipped_files"] += 1
+                                        stats["duplicates"] = stats.get("duplicates", 0) + 1
+                                        source.last_checked_at = timezone.now()
+                                        source.last_status = "duplicate"
+                                        source.last_message = "Duplicate email/link source message."
+                                        source.last_filename = filename
+                                        source.save(
+                                            update_fields=[
+                                                "last_checked_at",
+                                                "last_status",
+                                                "last_message",
+                                                "last_filename",
+                                            ]
+                                        )
+                                        if run_id:
+                                            models.EmailImportRun.objects.filter(id=run_id).update(
+                                                skipped_duplicates=F("skipped_duplicates") + 1
+                                            )
+                                        continue
                                     mapping = models.SupplierFileMapping.objects.filter(
                                         supplier=matched_supplier,
                                         file_kind=models.FileKind.PRICE,
@@ -1849,7 +1992,7 @@ def run_import(
                                 batch.save(update_fields=["status"])
 
                         if use_uid_cursor and not supplier and not from_filter and not subject_filter:
-                            _advance_mailbox_uid_cursor(mailbox.pk, cursor_field, uid_int, _log_line)
+                            _advance_mailbox_uid_cursor(mailbox.pk, item_folder, uid_int, _log_line)
                 except IntegrityError as exc:
                     summary["skipped_duplicates"] += 1
                     summary["skipped_files"] += 1
@@ -1861,7 +2004,7 @@ def run_import(
                     _log_line(message)
                     if use_uid_cursor and not supplier and not from_filter and not subject_filter and uid_int:
                         with transaction.atomic():
-                            _advance_mailbox_uid_cursor(mailbox.pk, cursor_field, uid_int, _log_line)
+                            _advance_mailbox_uid_cursor(mailbox.pk, item_folder, uid_int, _log_line)
                     continue
                 if processed_any and mark_seen:
                     try:
@@ -1882,6 +2025,47 @@ def run_import(
                 client.logout()
             except Exception:
                 pass
+    if supplier:
+        stats = supplier_stats.get(
+            supplier.id,
+            {
+                "matched": 0,
+                "processed": 0,
+                "errors": summary.get("errors", 0),
+                "last_message": "",
+                "duplicates": 0,
+                "skipped": 0,
+            },
+        )
+        if not stats.get("last_message"):
+            parts = []
+            if stats.get("duplicates"):
+                parts.append(f"{stats.get('duplicates')} duplicate(s)")
+            if stats.get("skipped"):
+                parts.append(f"{stats.get('skipped')} skipped")
+            if stats.get("errors"):
+                parts.append(f"{stats.get('errors')} import issue(s)")
+            stats["last_message"] = (
+                ", ".join(parts)
+                if parts
+                else "Supplier-specific check found no price email."
+            )
+        supplier.last_email_check_at = run_started
+        supplier.last_email_matched = stats.get("matched", 0)
+        supplier.last_email_processed = stats.get("processed", 0)
+        supplier.last_email_errors = stats.get("errors", 0)
+        supplier.last_email_last_message = stats.get("last_message") or ""
+        supplier.last_email_mailboxes = mailbox_names
+        supplier.save(
+            update_fields=[
+                "last_email_check_at",
+                "last_email_matched",
+                "last_email_processed",
+                "last_email_errors",
+                "last_email_last_message",
+                "last_email_mailboxes",
+            ]
+        )
     if not supplier and fallback_suppliers is not None:
         fallback_by_id = {
             fallback_supplier.id: fallback_supplier for fallback_supplier in fallback_suppliers
@@ -1995,23 +2179,95 @@ def _folder_cursor_field(folder_name: str) -> str:
     return "last_inbox_uid" if folder_name == "INBOX" else "last_all_mail_uid"
 
 
-def _advance_mailbox_uid_cursor(mailbox_pk: int, cursor_field: str, new_uid: int, logger_func=None) -> bool:
+def _should_seed_folder_cursor_from_legacy_all_mail(folder_name: str) -> bool:
+    normalized = (folder_name or "").strip().lower()
+    return (
+        normalized.startswith("[gmail]/")
+        or normalized.startswith("[google mail]/")
+        or "all mail" in normalized
+    )
+
+
+def _normalize_cursor_folder(folder_or_field: str) -> str:
+    if folder_or_field == "last_inbox_uid":
+        return "INBOX"
+    if folder_or_field == "last_all_mail_uid":
+        return "__legacy_all_mail__"
+    return folder_or_field or "INBOX"
+
+
+def _get_mailbox_folder_last_uid(mailbox, folder_name: str) -> int:
+    folder_name = _normalize_cursor_folder(folder_name)
+    cursor_uid = (
+        models.MailboxFolderCursor.objects.filter(mailbox=mailbox, folder=folder_name)
+        .values_list("last_uid", flat=True)
+        .first()
+    )
+    if folder_name == "INBOX" or _should_seed_folder_cursor_from_legacy_all_mail(folder_name):
+        legacy_uid = getattr(mailbox, _folder_cursor_field(folder_name), 0) or 0
+    else:
+        legacy_uid = 0
+    if cursor_uid is None:
+        return legacy_uid
+    return max(int(cursor_uid or 0), int(legacy_uid or 0))
+
+
+def _mailbox_uid_has_diagnostic(mailbox_pk: int, folder_name: str, msg_id) -> bool:
+    return models.EmailAttachmentDiagnostic.objects.filter(
+        mailbox_id=mailbox_pk,
+        message_folder=folder_name,
+        message_uid=_uid_display(msg_id),
+    ).exists()
+
+
+def _advance_mailbox_uid_cursor(mailbox_pk: int, folder_name: str, new_uid: int, logger_func=None) -> bool:
     if not new_uid:
         return False
+    folder_name = _normalize_cursor_folder(folder_name)
+    cursor_field = _folder_cursor_field(folder_name)
     locked_mailbox = models.Mailbox.objects.select_for_update().get(pk=mailbox_pk)
-    current_uid = getattr(locked_mailbox, cursor_field, 0) or 0
+    folder_cursor, _ = models.MailboxFolderCursor.objects.select_for_update().get_or_create(
+        mailbox=locked_mailbox,
+        folder=folder_name,
+        defaults={
+            "last_uid": (
+                getattr(locked_mailbox, cursor_field, 0) or 0
+                if folder_name == "INBOX"
+                or _should_seed_folder_cursor_from_legacy_all_mail(folder_name)
+                else 0
+            ),
+            "last_checked_at": locked_mailbox.last_checked_at,
+        },
+    )
+    legacy_uid = (
+        getattr(locked_mailbox, cursor_field, 0) or 0
+        if folder_name == "INBOX" or _should_seed_folder_cursor_from_legacy_all_mail(folder_name)
+        else 0
+    )
+    current_uid = max(
+        legacy_uid,
+        folder_cursor.last_uid or 0,
+    )
     if new_uid <= current_uid:
         message = (
             f"Skipped UID cursor decrease for mailbox={locked_mailbox.pk} "
-            f"field={cursor_field}: current={current_uid}, new={new_uid}."
+            f"folder={folder_name}: current={current_uid}, new={new_uid}."
         )
         logger.warning(message)
         if logger_func:
             logger_func(message)
         return False
-    setattr(locked_mailbox, cursor_field, new_uid)
-    locked_mailbox.last_checked_at = timezone.now()
-    locked_mailbox.save(update_fields=[cursor_field, "last_checked_at"])
+    now = timezone.now()
+    folder_cursor.last_uid = new_uid
+    folder_cursor.last_checked_at = now
+    folder_cursor.save(update_fields=["last_uid", "last_checked_at", "updated_at"])
+    update_fields = ["last_checked_at"]
+    legacy_existing = getattr(locked_mailbox, cursor_field, 0) or 0
+    if new_uid > legacy_existing:
+        setattr(locked_mailbox, cursor_field, new_uid)
+        update_fields.append(cursor_field)
+    locked_mailbox.last_checked_at = now
+    locked_mailbox.save(update_fields=update_fields)
     return True
 
 

@@ -61,8 +61,14 @@
                                 <div class="import-scan-mailbox">
                                     <strong>{{ mailbox.name }}</strong>
                                     <span title="{{ mailbox.last_checked_full }}">{{ mailbox.last_checked }}</span>
-                                    <span>INBOX UID {{ mailbox.inbox_uid }}</span>
-                                    <span>All Mail UID {{ mailbox.all_mail_uid }}</span>
+                                    {% if mailbox.folder_cursors %}
+                                        {% for cursor in mailbox.folder_cursors %}
+                                            <span title="{{ cursor.last_checked_full }}">{{ cursor.folder }} UID {{ cursor.last_uid }}</span>
+                                        {% endfor %}
+                                    {% else %}
+                                        <span>INBOX UID {{ mailbox.inbox_uid }}</span>
+                                        <span>All Mail UID {{ mailbox.all_mail_uid }}</span>
+                                    {% endif %}
                                 </div>
                             {% endfor %}
                         </div>
