@@ -5,7 +5,7 @@ from django.core.management import call_command
 from django.test import TestCase
 from django.urls import reverse
 
-from assistant_linking.models import BrandAlias, ParsedSupplierProduct, ProductAlias
+from assistant_linking.models import MANUAL_REVIEW_MODIFIER, BrandAlias, ParsedSupplierProduct, ProductAlias
 from assistant_linking.services.catalog_matcher import rule_impact
 from assistant_linking.services.normalizer import save_parse
 from catalog.models import Brand, Perfume, PerfumeVariant
@@ -310,8 +310,20 @@ class TeachParseTests(TestCase):
         parsed = response.context["parsed"]
         form = response.context["teach_form"]
         self.assertEqual(parsed.concentration, "Eau de Parfum")
+        self.assertIn(MANUAL_REVIEW_MODIFIER, parsed.modifiers)
         self.assertEqual(form["concentration"].value(), "Extrait de Parfum")
         self.assertContains(response, "Catalogue match suggests Extrait de Parfum")
+
+        parsed_response = self.client.get(reverse("assistant_linking:normalization_parsed"))
+        manual_response = self.client.get(reverse("assistant_linking:normalization_manual_review"))
+        dashboard_response = self.client.get(reverse("assistant_linking:normalization_dashboard"), {"refresh": "1"})
+
+        parsed_product_ids = {item.supplier_product_id for item in parsed_response.context["parses"]}
+        manual_product_ids = {item.supplier_product_id for item in manual_response.context["parses"]}
+        self.assertNotIn(product.id, parsed_product_ids)
+        self.assertIn(product.id, manual_product_ids)
+        self.assertEqual(dashboard_response.context["manual_review_count"], 1)
+        self.assertEqual(dashboard_response.context["parsed_count"], 0)
 
     def test_missing_brand_list_uses_saved_parse_rows(self):
         product = SupplierProduct.objects.create(
@@ -757,6 +769,128 @@ class TeachParseTests(TestCase):
         set_product_ids = {item.supplier_product_id for item in set_response.context["parses"]}
         self.assertIn(set_product.id, set_product_ids)
         self.assertNotIn(regular_product.id, set_product_ids)
+
+    def test_bag_rows_have_separate_queue_and_do_not_pollute_perfume_issues(self):
+        brand = Brand.objects.create(name="Dolce & Gabbana")
+        BrandAlias.objects.create(
+            brand=brand,
+            alias_text="Dolce&Gabbana",
+            normalized_alias="dolce&gabbana",
+        )
+        bag_product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="bag-row",
+            name="Dolce&Gabbana ПАКЕТ (черный) 19.5*8.5*13*",
+        )
+        perfume_product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="perfume-row",
+            name="Dolce&Gabbana Light Blue edp 100ml",
+        )
+        bag_parse = save_parse(bag_product)
+        save_parse(perfume_product)
+
+        parsed_response = self.client.get(reverse("assistant_linking:normalization_parsed"))
+        missing_concentration_response = self.client.get(reverse("assistant_linking:normalization_missing_concentration"))
+        bag_response = self.client.get(reverse("assistant_linking:normalization_bags"))
+        dashboard_response = self.client.get(reverse("assistant_linking:normalization_dashboard"), {"refresh": "1"})
+
+        self.assertEqual(bag_parse.product_category_label, "Bags")
+        self.assertEqual(parsed_response.status_code, 200)
+        parsed_product_ids = {item.supplier_product_id for item in parsed_response.context["parses"]}
+        self.assertNotIn(bag_product.id, parsed_product_ids)
+        self.assertIn(perfume_product.id, parsed_product_ids)
+        missing_product_ids = {item.supplier_product_id for item in missing_concentration_response.context["parses"]}
+        self.assertNotIn(bag_product.id, missing_product_ids)
+        bag_product_ids = {item.supplier_product_id for item in bag_response.context["parses"]}
+        self.assertIn(bag_product.id, bag_product_ids)
+        self.assertNotIn(perfume_product.id, bag_product_ids)
+        self.assertEqual(dashboard_response.context["bag_count"], 1)
+        self.assertEqual(dashboard_response.context["parsed_count"], 1)
+
+    def test_cosmetic_poudre_rows_have_separate_queue_and_subcategory(self):
+        brand = Brand.objects.create(name="Dior")
+        BrandAlias.objects.create(
+            brand=brand,
+            alias_text="Dior",
+            normalized_alias="dior",
+        )
+        cosmetic_product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="cosmetic-poudre-row",
+            name="Dior Пудра 01",
+        )
+        perfume_product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="perfume-row-for-cosmetic-test",
+            name="Dior Sauvage edp 100ml",
+        )
+        cosmetic_parse = save_parse(cosmetic_product)
+        save_parse(perfume_product)
+
+        parsed_response = self.client.get(reverse("assistant_linking:normalization_parsed"))
+        missing_concentration_response = self.client.get(reverse("assistant_linking:normalization_missing_concentration"))
+        cosmetic_response = self.client.get(reverse("assistant_linking:normalization_cosmetics"))
+        detail_response = self.client.get(
+            reverse("assistant_linking:normalization_detail", args=[cosmetic_product.id])
+        )
+        dashboard_response = self.client.get(reverse("assistant_linking:normalization_dashboard"), {"refresh": "1"})
+
+        self.assertEqual(cosmetic_parse.product_category_label, "Cosmetics")
+        self.assertEqual(cosmetic_parse.product_subcategory_label, "Poudre")
+        parsed_product_ids = {item.supplier_product_id for item in parsed_response.context["parses"]}
+        self.assertNotIn(cosmetic_product.id, parsed_product_ids)
+        self.assertIn(perfume_product.id, parsed_product_ids)
+        missing_product_ids = {item.supplier_product_id for item in missing_concentration_response.context["parses"]}
+        self.assertNotIn(cosmetic_product.id, missing_product_ids)
+        cosmetic_product_ids = {item.supplier_product_id for item in cosmetic_response.context["parses"]}
+        self.assertIn(cosmetic_product.id, cosmetic_product_ids)
+        self.assertNotIn(perfume_product.id, cosmetic_product_ids)
+        self.assertContains(detail_response, "Category: Cosmetics")
+        self.assertContains(detail_response, "Subcategory: Poudre")
+        self.assertEqual(dashboard_response.context["cosmetic_count"], 1)
+        self.assertEqual(dashboard_response.context["parsed_count"], 1)
+
+    def test_deodorant_rows_have_separate_queue_when_concentration_missing(self):
+        brand = Brand.objects.create(name="Chanel")
+        BrandAlias.objects.create(
+            brand=brand,
+            alias_text="Chanel",
+            normalized_alias="chanel",
+        )
+        deodorant_product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="deodorant-row",
+            name="Chanel Bleu deo spray 100ml",
+        )
+        perfume_product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="perfume-row-for-deodorant-test",
+            name="Chanel Bleu edp 100ml",
+        )
+        deodorant_parse = save_parse(deodorant_product)
+        save_parse(perfume_product)
+
+        parsed_response = self.client.get(reverse("assistant_linking:normalization_parsed"))
+        missing_concentration_response = self.client.get(reverse("assistant_linking:normalization_missing_concentration"))
+        deodorant_response = self.client.get(reverse("assistant_linking:normalization_deodorants"))
+        detail_response = self.client.get(
+            reverse("assistant_linking:normalization_detail", args=[deodorant_product.id])
+        )
+        dashboard_response = self.client.get(reverse("assistant_linking:normalization_dashboard"), {"refresh": "1"})
+
+        self.assertEqual(deodorant_parse.product_category_label, "Deodorants")
+        parsed_product_ids = {item.supplier_product_id for item in parsed_response.context["parses"]}
+        self.assertNotIn(deodorant_product.id, parsed_product_ids)
+        self.assertIn(perfume_product.id, parsed_product_ids)
+        missing_product_ids = {item.supplier_product_id for item in missing_concentration_response.context["parses"]}
+        self.assertNotIn(deodorant_product.id, missing_product_ids)
+        deodorant_product_ids = {item.supplier_product_id for item in deodorant_response.context["parses"]}
+        self.assertIn(deodorant_product.id, deodorant_product_ids)
+        self.assertNotIn(perfume_product.id, deodorant_product_ids)
+        self.assertContains(detail_response, "Category: Deodorants")
+        self.assertEqual(dashboard_response.context["deodorant_count"], 1)
+        self.assertEqual(dashboard_response.context["parsed_count"], 1)
 
     def test_dashboard_counts_only_complete_rows_as_parsed(self):
         brand = Brand.objects.create(name="Montale")

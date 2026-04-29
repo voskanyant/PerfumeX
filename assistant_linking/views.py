@@ -10,6 +10,8 @@ from django.db.models import Count, Max, Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse_lazy
 from django.utils import timezone
+from django.utils.decorators import method_decorator
+from django.views.decorators.cache import never_cache
 from django.views.generic import DetailView, ListView, TemplateView, View
 
 from assistant_core.models import GlobalRule
@@ -66,6 +68,50 @@ def _hide_parsed_products(queryset, request):
 
 def _exclude_garbage_parses(queryset):
     return queryset.exclude(modifiers__contains=[GARBAGE_MODIFIER])
+
+
+def _exclude_bag_parses(queryset):
+    return queryset.exclude(modifiers__contains=[models.BAG_MODIFIER]).exclude(variant_type=models.BAG_MODIFIER)
+
+
+def _exclude_cosmetic_parses(queryset):
+    return queryset.exclude(modifiers__contains=[models.COSMETIC_PUDRE_MODIFIER]).exclude(variant_type="poudre")
+
+
+def _exclude_deodorant_parses(queryset):
+    return queryset.exclude(modifiers__contains=[models.DEODORANT_MODIFIER]).exclude(
+        variant_type=models.DEODORANT_MODIFIER
+    )
+
+
+def _exclude_non_perfume_parses(queryset):
+    return _exclude_deodorant_parses(_exclude_cosmetic_parses(_exclude_bag_parses(queryset)))
+
+
+def _exclude_manual_review_parses(queryset):
+    return queryset.exclude(modifiers__contains=[models.MANUAL_REVIEW_MODIFIER])
+
+
+def _normal_perfume_parses(queryset):
+    return _exclude_manual_review_parses(_exclude_non_perfume_parses(queryset))
+
+
+def _bag_parses(queryset):
+    return queryset.filter(Q(modifiers__contains=[models.BAG_MODIFIER]) | Q(variant_type=models.BAG_MODIFIER))
+
+
+def _cosmetic_parses(queryset):
+    return queryset.filter(Q(modifiers__contains=[models.COSMETIC_PUDRE_MODIFIER]) | Q(variant_type="poudre"))
+
+
+def _deodorant_parses(queryset):
+    return queryset.filter(
+        Q(modifiers__contains=[models.DEODORANT_MODIFIER]) | Q(variant_type=models.DEODORANT_MODIFIER)
+    )
+
+
+def _manual_review_parses(queryset):
+    return queryset.filter(modifiers__contains=[models.MANUAL_REVIEW_MODIFIER])
 
 
 def _exclude_set_parses(queryset):
@@ -318,6 +364,7 @@ class NormalizationSearchMixin:
         return context
 
 
+@method_decorator(never_cache, name="dispatch")
 class UnparsedListView(NormalizationSearchMixin, StaffAssistantMixin, ListView):
     model = SupplierProduct
     template_name = "assistant_linking/normalization/product_list.html"
@@ -338,6 +385,30 @@ class UnparsedListView(NormalizationSearchMixin, StaffAssistantMixin, ListView):
         queryset = _hide_supplier_products(queryset, self.request)
         return queryset.order_by("supplier__name", "name")
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        visible_products = list(context.get("products", []))
+        refreshed_count = 0
+        if visible_products:
+            for product in visible_products:
+                save_parse(product)
+                refreshed_count += 1
+            visible_ids = [product.pk for product in visible_products]
+            still_unparsed_ids = set(
+                SupplierProduct.objects.filter(
+                    pk__in=visible_ids,
+                    assistant_parse__isnull=True,
+                ).values_list("pk", flat=True)
+            )
+            visible_products = [product for product in visible_products if product.pk in still_unparsed_ids]
+            context["products"] = visible_products
+            context["object_list"] = visible_products
+            if context.get("page_obj"):
+                context["page_obj"].object_list = visible_products
+        context["refreshed_visible_count"] = refreshed_count
+        context["moved_visible_count"] = refreshed_count - len(visible_products)
+        return context
+
 
 class LowConfidenceListView(NormalizationSearchMixin, StaffAssistantMixin, ListView):
     model = models.ParsedSupplierProduct
@@ -352,7 +423,9 @@ class LowConfidenceListView(NormalizationSearchMixin, StaffAssistantMixin, ListV
             "normalized_brand",
         ).filter(confidence__lt=75)
         queryset = _apply_parsed_search(queryset, self.get_search_query())
-        queryset = _exclude_set_parses(_exclude_garbage_parses(_hide_parsed_products(queryset, self.request)))
+        queryset = _normal_perfume_parses(
+            _exclude_set_parses(_exclude_garbage_parses(_hide_parsed_products(queryset, self.request)))
+        )
         return queryset.order_by("confidence", "supplier_product__supplier__name", "supplier_product__name")
 
 
@@ -374,7 +447,9 @@ class MissingBrandListView(NormalizationIssueListView):
             "normalized_brand",
         ).filter(normalized_brand__isnull=True)
         queryset = _apply_parsed_search(queryset, self.get_search_query())
-        queryset = _exclude_set_parses(_exclude_garbage_parses(_hide_parsed_products(queryset, self.request)))
+        queryset = _normal_perfume_parses(
+            _exclude_set_parses(_exclude_garbage_parses(_hide_parsed_products(queryset, self.request)))
+        )
         return queryset.order_by("supplier_product__name")
 
 
@@ -388,7 +463,9 @@ class MissingNameListView(NormalizationIssueListView):
             "normalized_brand",
         ).filter(product_name_text="")
         queryset = _apply_parsed_search(queryset, self.get_search_query())
-        queryset = _exclude_set_parses(_exclude_garbage_parses(_hide_parsed_products(queryset, self.request)))
+        queryset = _normal_perfume_parses(
+            _exclude_set_parses(_exclude_garbage_parses(_hide_parsed_products(queryset, self.request)))
+        )
         return queryset.order_by("supplier_product__name")
 
 
@@ -402,7 +479,9 @@ class MissingConcentrationListView(NormalizationIssueListView):
             "normalized_brand",
         ).filter(concentration="")
         queryset = _apply_parsed_search(queryset, self.get_search_query())
-        queryset = _exclude_set_parses(_exclude_garbage_parses(_hide_parsed_products(queryset, self.request)))
+        queryset = _normal_perfume_parses(
+            _exclude_set_parses(_exclude_garbage_parses(_hide_parsed_products(queryset, self.request)))
+        )
         return queryset.order_by("supplier_product__name")
 
 
@@ -416,7 +495,9 @@ class MissingSizeListView(NormalizationIssueListView):
             "normalized_brand",
         ).filter(size_ml__isnull=True)
         queryset = _apply_parsed_search(queryset, self.get_search_query())
-        queryset = _exclude_set_parses(_exclude_garbage_parses(_hide_parsed_products(queryset, self.request)))
+        queryset = _normal_perfume_parses(
+            _exclude_set_parses(_exclude_garbage_parses(_hide_parsed_products(queryset, self.request)))
+        )
         return queryset.order_by("supplier_product__name")
 
 
@@ -430,7 +511,7 @@ class TesterSampleListView(NormalizationIssueListView):
             "normalized_brand",
         ).filter(Q(is_tester=True) | Q(is_sample=True) | Q(is_travel=True), is_set=False)
         queryset = _apply_parsed_search(queryset, self.get_search_query())
-        queryset = _exclude_garbage_parses(_hide_parsed_products(queryset, self.request))
+        queryset = _normal_perfume_parses(_exclude_garbage_parses(_hide_parsed_products(queryset, self.request)))
         return queryset.order_by("supplier_product__name")
 
 
@@ -448,6 +529,62 @@ class SetListView(NormalizationIssueListView):
         return queryset.order_by("supplier_product__supplier__name", "supplier_product__name")
 
 
+class BagListView(NormalizationIssueListView):
+    issue_title = "Bag rows"
+
+    def get_queryset(self):
+        queryset = models.ParsedSupplierProduct.objects.select_related(
+            "supplier_product",
+            "supplier_product__supplier",
+            "normalized_brand",
+        )
+        queryset = _bag_parses(_exclude_garbage_parses(_hide_parsed_products(queryset, self.request)))
+        queryset = _apply_parsed_search(queryset, self.get_search_query())
+        return queryset.order_by("supplier_product__supplier__name", "supplier_product__name")
+
+
+class CosmeticListView(NormalizationIssueListView):
+    issue_title = "Cosmetics rows"
+
+    def get_queryset(self):
+        queryset = models.ParsedSupplierProduct.objects.select_related(
+            "supplier_product",
+            "supplier_product__supplier",
+            "normalized_brand",
+        )
+        queryset = _cosmetic_parses(_exclude_garbage_parses(_hide_parsed_products(queryset, self.request)))
+        queryset = _apply_parsed_search(queryset, self.get_search_query())
+        return queryset.order_by("supplier_product__supplier__name", "supplier_product__name")
+
+
+class DeodorantListView(NormalizationIssueListView):
+    issue_title = "Deodorant rows"
+
+    def get_queryset(self):
+        queryset = models.ParsedSupplierProduct.objects.select_related(
+            "supplier_product",
+            "supplier_product__supplier",
+            "normalized_brand",
+        )
+        queryset = _deodorant_parses(_exclude_garbage_parses(_hide_parsed_products(queryset, self.request)))
+        queryset = _apply_parsed_search(queryset, self.get_search_query())
+        return queryset.order_by("supplier_product__supplier__name", "supplier_product__name")
+
+
+class ManualReviewListView(NormalizationIssueListView):
+    issue_title = "Manual approval"
+
+    def get_queryset(self):
+        queryset = models.ParsedSupplierProduct.objects.select_related(
+            "supplier_product",
+            "supplier_product__supplier",
+            "normalized_brand",
+        )
+        queryset = _manual_review_parses(_exclude_garbage_parses(_hide_parsed_products(queryset, self.request)))
+        queryset = _apply_parsed_search(queryset, self.get_search_query())
+        return queryset.order_by("supplier_product__supplier__name", "supplier_product__name")
+
+
 class ModifierConflictListView(NormalizationIssueListView):
     issue_title = "Identity modifiers"
 
@@ -458,7 +595,9 @@ class ModifierConflictListView(NormalizationIssueListView):
             "normalized_brand",
         ).exclude(modifiers=[])
         queryset = _apply_parsed_search(queryset, self.get_search_query())
-        queryset = _exclude_set_parses(_exclude_garbage_parses(_hide_parsed_products(queryset, self.request)))
+        queryset = _normal_perfume_parses(
+            _exclude_set_parses(_exclude_garbage_parses(_hide_parsed_products(queryset, self.request)))
+        )
         return queryset.order_by("supplier_product__name")
 
 
@@ -474,7 +613,7 @@ class ParsedListView(NormalizationIssueListView):
         )
         queryset = _hide_parsed_products(queryset, self.request)
         queryset = _apply_parsed_search(queryset, self.get_search_query())
-        queryset = _complete_parses(_exclude_garbage_parses(queryset))
+        queryset = _complete_parses(_normal_perfume_parses(_exclude_garbage_parses(queryset)))
         return queryset.order_by("-updated_at", "supplier_product__supplier__name", "supplier_product__name")
 
     def get_context_data(self, **kwargs):
@@ -493,14 +632,18 @@ class ParsedListView(NormalizationIssueListView):
             else:
                 refreshed_parses.append(parsed)
         if refreshed_count:
-            refreshed_parses = [
-                models.ParsedSupplierProduct.objects.select_related(
-                    "supplier_product",
-                    "supplier_product__supplier",
-                    "normalized_brand",
-                ).get(pk=parsed.pk)
-                for parsed in refreshed_parses
-            ]
+            refreshed_queryset = models.ParsedSupplierProduct.objects.select_related(
+                "supplier_product",
+                "supplier_product__supplier",
+                "normalized_brand",
+            ).filter(pk__in=[parsed.pk for parsed in refreshed_parses])
+            refreshed_parses = list(
+                _complete_parses(_normal_perfume_parses(_exclude_garbage_parses(refreshed_queryset))).order_by(
+                    "-updated_at",
+                    "supplier_product__supplier__name",
+                    "supplier_product__name",
+                )
+            )
             context["parses"] = refreshed_parses
             context["object_list"] = refreshed_parses
             context["refreshed_visible"] = True

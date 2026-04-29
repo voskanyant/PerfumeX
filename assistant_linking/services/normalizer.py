@@ -13,7 +13,11 @@ import logging
 import regex
 
 from assistant_linking.models import (
+    BAG_MODIFIER,
     CONCENTRATION_ALIAS_CACHE_KEY,
+    COSMETIC_PUDRE_MODIFIER,
+    DEODORANT_MODIFIER,
+    MANUAL_REVIEW_MODIFIER,
     BrandAlias,
     ConcentrationAlias,
     ParsedSupplierProduct,
@@ -27,8 +31,9 @@ from prices.models import SupplierProduct
 
 
 logger = logging.getLogger(__name__)
-PARSER_VERSION = "deterministic-v13"
+PARSER_VERSION = "deterministic-v23"
 REGEX_ALIAS_TIMEOUT_SECONDS = 1.0
+CATALOG_CONCENTRATION_CONFLICT_WARNING = "Catalogue match suggests {suggested}. Supplier text parsed as {parsed}."
 
 DEFAULT_CONCENTRATION_ALIASES = (
     ("extrait de parfum", "Extrait de Parfum"),
@@ -93,23 +98,87 @@ DEFAULT_AUDIENCE_ALIASES = (
     ("мужская", "Men", "men"),
     ("мужские", "Men", "men"),
     ("unisex", "Unisex", "unisex"),
+    ("u", "Unisex", "unisex"),
     ("унисекс", "Unisex", "unisex"),
     ("уни", "Unisex", "unisex"),
 )
 
 MODIFIER_TERMS = ("intense", "elixir", "absolu", "eau intense", "extreme", "sport", "fraiche", "fraicheur")
-TESTER_TERMS = ("tester", "test", "тестер", "тест")
+TESTER_TERMS = ("tester", "test", "tectep", "тестер", "тест")
 SAMPLE_TERMS = ("sample", "пробник", "vial")
 TRAVEL_TERMS = ("travel",)
 SET_TERMS = ("set", "набор", "coffret")
-NO_BOX_TERMS = ("no box", "without box", "без короб")
+BAG_TERMS = ("пакет",)
+COSMETIC_PUDRE_TERMS = ("пудра",)
+DEODORANT_TERMS = ("deo", "deodorant", "deo spray", "deodorant spray", "deo stick", "deostick", "дезодорант")
+NO_BOX_TERMS = ("no box", "without box", "без короб", "без коробки", "б к", "бк", "b k", "bk")
 WOODBOX_TERMS = ("woodbox", "wood box")
+NEW_DESIGN_PACKAGING_TERMS = (
+    "new design",
+    "new box",
+    "new packaging",
+    "новый дизайн",
+    "новая упаковка",
+    "нов дизайн",
+    "нов. дизайн",
+    "нов диз",
+    "нов. диз",
+    "нов ди",
+    "нов. ди",
+)
+OLD_DESIGN_PACKAGING_TERMS = (
+    "old design",
+    "old box",
+    "old packaging",
+    "старый дизайн",
+    "ст дизайн",
+    "ст. дизайн",
+    "ст диз",
+    "ст. диз",
+    "ст д",
+    "ст.д",
+)
+WITH_CAP_PACKAGING_TERMS = (
+    "with cap",
+    "with lid",
+    "с крышкой",
+    "с крыш",
+    "с фирм крышкой",
+    "с фирм. крышкой",
+    "с фирм.крышкой",
+    "с фирм.крыш.",
+    "с фир.крыш.",
+    "с фирменной крышкой",
+    "c фирм крышкой",
+    "c фирм. крышкой",
+    "c фирм.крышкой",
+    "c фирм.крыш.",
+    "c фир.крыш.",
+    "фирм крыш",
+    "фирм. крыш",
+    "фирм.крыш",
+    "фирм.крыш.",
+    "фир крыш",
+    "фир.крыш",
+    "фир.крыш.",
+)
+DENTED_PACKAGING_TERMS = (
+    "dented",
+    "creased",
+    "подмятая",
+    "подмят",
+    "помятая",
+    "помят",
+)
+DECODED_TERMS = ("decoded", "dec", "декод", "декодированный")
+GRAY_BOX_TERMS = ("gray box", "grey box", "серый бокс", "серый короб", "серая коробка")
+GRAY_BOX_COLOR_TERMS = ("серый", "серая", "сер", "gray", "grey")
 GENDER_TERMS = tuple(alias for alias, _display, _group in DEFAULT_AUDIENCE_ALIASES)
 NAME_AUDIENCE_TERMS = ("pour femme", "femme", "donna", "for her", "pour homme", "homme", "uomo", "man")
 NAME_BEARING_MODIFIER_PHRASES = ("eau fraiche", "eau fraicheur")
 AUDIENCE_NAME_SUFFIXES = {
-    "women": ("woman", "women", "lady", "for her", "pour femme", "femme"),
-    "men": ("man", "men", "for him", "pour homme", "homme"),
+    "women": ("woman", "women", "lady", "for woman", "for women", "for her", "pour femme", "femme"),
+    "men": ("man", "men", "for man", "for men", "for him", "pour homme", "homme"),
 }
 REFILL_MODIFIER = "refill"
 MINI_MODIFIER = "mini"
@@ -143,15 +212,18 @@ def normalize_text(value: str) -> str:
     text = unicodedata.normalize("NFKC", value or "").lower()
     for pattern, replacement in get_regex_preprocess_rules():
         text = _safe_regex_sub(pattern, replacement, text)
+    text = re.sub(r"(?<=[a-z])(?=[а-яё])|(?<=[а-яё])(?=[a-z])", " ", text)
+    text = re.sub(r"\b[tт][eе][sсc][tт][eе][rрp](?:[сc])?\b", " tester ", text)
     text = re.sub(r"\beau de (?:parfum(?:e|ume)?|perfume)\b", "eau de parfum", text)
     text = re.sub(r"\beau de parf\b(?!um)", "eau de parfum", text)
     text = re.sub(r"(?<=\d),(?=\d)", ".", text)
     text = re.sub(r"(\d+)\.0\s*(?=мл|ml)", r"\1 ", text)
     text = re.sub(r"(\d+)\s*мл\.?", r"\1 ml", text)
-    text = re.sub(r"\b(edp|edt|edc)(?=\d)", r"\1 ", text)
+    text = re.sub(r"\b(edp|edt|edc)(?=[a-zа-яё]|\d)", r"\1 ", text)
     text = re.sub(r"(?<=\d)(edp|edt|edc)\b", r" \1", text)
     text = re.sub(r"\b(eau de parfum|eau de toilette|eau de cologne|extrait de parfum|extrait|parfum)(?=\d)", r"\1 ", text)
     text = re.sub(r"(?<=\d)(eau de parfum|eau de toilette|eau de cologne|extrait de parfum|extrait|parfum)\b", r" \1", text)
+    text = re.sub(r"(?<=[a-zа-яё])(?=\d+(?:\s)?(?:ml|мл)\b)", " ", text)
     text = re.sub(r"[\u00a0_\\/,;:|()\[\]{}+]+", " ", text)
     text = re.sub(r"\s+", " ", text).strip()
     return text
@@ -220,8 +292,24 @@ def _set_terms() -> tuple[str, ...]:
     return _kb_terms("parser_set_term", SET_TERMS)
 
 
+def _bag_terms() -> tuple[str, ...]:
+    return _kb_terms("parser_bag_term", BAG_TERMS)
+
+
+def _cosmetic_poudre_terms() -> tuple[str, ...]:
+    return _kb_terms("parser_cosmetic_poudre_term", COSMETIC_PUDRE_TERMS)
+
+
+def _deodorant_terms() -> tuple[str, ...]:
+    return _kb_terms("parser_deodorant_term", DEODORANT_TERMS)
+
+
 def _refill_terms() -> tuple[str, ...]:
     return _kb_terms("parser_refill_term", ())
+
+
+def _decoded_terms() -> tuple[str, ...]:
+    return _kb_terms("parser_decoded_term", DECODED_TERMS)
 
 
 def _audience_aliases() -> tuple[tuple[str, str, str], ...]:
@@ -368,6 +456,21 @@ def _clean_product_name_text(value: str) -> str:
     return name[:255]
 
 
+def _strip_cyrillic_name_tokens_for_latin_brand(result: ParseResult) -> str:
+    if not result.normalized_brand or not result.product_name_text:
+        return result.product_name_text
+    brand_name = result.normalized_brand.name
+    if re.search(r"[а-яё]", brand_name, flags=re.IGNORECASE) or not re.search(r"[a-z]", brand_name, flags=re.IGNORECASE):
+        return result.product_name_text
+    if not re.search(r"[a-z]", result.product_name_text, flags=re.IGNORECASE):
+        return result.product_name_text
+    if not re.search(r"[а-яё]", result.product_name_text, flags=re.IGNORECASE):
+        return result.product_name_text
+    stripped = re.sub(r"(?<!\S)\S*[а-яё]\S*(?!\S)", " ", result.product_name_text, flags=re.IGNORECASE)
+    stripped = _clean_product_name_text(stripped)
+    return stripped or result.product_name_text
+
+
 def _catalog_scent_key(value: str) -> str:
     return re.sub(r"[^a-z0-9а-я]+", "", normalize_text(value))
 
@@ -477,6 +580,29 @@ def _canonicalize_product_name_from_catalog(result: ParseResult) -> str:
     return result.product_name_text
 
 
+def _apply_self_titled_catalog_name(result: ParseResult) -> None:
+    if not result.normalized_brand or not result.normalized_brand.id or result.product_name_text:
+        return
+    brand_key = _catalog_scent_key(result.normalized_brand.name)
+    candidates = []
+    for perfume in Perfume.objects.filter(brand_id=result.normalized_brand.id).only(
+        "name",
+        "concentration",
+        "audience",
+        "collection_name",
+    ):
+        if not _catalog_perfume_matches_parse_context(perfume, result):
+            continue
+        name_key = _catalog_scent_key(perfume.name)
+        if not name_key or name_key == brand_key:
+            candidates.append(perfume)
+    if len(candidates) == 1:
+        result.product_name_text = candidates[0].name.strip() or result.normalized_brand.name
+    elif len(candidates) > 1:
+        result.modifiers.append(MANUAL_REVIEW_MODIFIER)
+        result.warnings.append("self-titled catalogue match ambiguous")
+
+
 def _release_year_context_terms() -> set[str]:
     terms = {
         "edp",
@@ -567,6 +693,66 @@ def _modifiers_from_name_bearing_phrases(product_name_text: str) -> set[str]:
                 if _contains_phrase(phrase, normalize_text(modifier))
             )
     return modifiers
+
+
+def _extract_packaging_descriptor(text: str) -> tuple[str, list[str]]:
+    terms: list[str] = []
+    packaging_parts: list[str] = []
+
+    def add_packaging(value: str) -> None:
+        if value and value not in packaging_parts:
+            packaging_parts.append(value)
+
+    for term in NEW_DESIGN_PACKAGING_TERMS:
+        normalized = normalize_text(term)
+        if _contains_phrase(text, normalized):
+            terms.append(normalized)
+            add_packaging("new_design")
+
+    for term in OLD_DESIGN_PACKAGING_TERMS:
+        normalized = normalize_text(term)
+        if _contains_phrase(text, normalized):
+            terms.append(normalized)
+            add_packaging("old_design")
+
+    for term in WITH_CAP_PACKAGING_TERMS:
+        normalized = normalize_text(term)
+        if _contains_phrase(text, normalized):
+            terms.append(normalized)
+            add_packaging("with_cap")
+
+    for term in DENTED_PACKAGING_TERMS:
+        normalized = normalize_text(term)
+        if _contains_phrase(text, normalized):
+            terms.append(normalized)
+            add_packaging("dented")
+
+    for term in [*NO_BOX_TERMS, *WOODBOX_TERMS, *GRAY_BOX_TERMS]:
+        normalized = normalize_text(term)
+        if not _contains_phrase(text, normalized):
+            continue
+        terms.append(normalized)
+        if normalized in {normalize_text(value) for value in NO_BOX_TERMS}:
+            add_packaging("no_box")
+        elif normalized in {normalize_text(value) for value in WOODBOX_TERMS}:
+            add_packaging("woodbox")
+        else:
+            add_packaging("gray_box")
+
+    if "new_design" in packaging_parts or "old_design" in packaging_parts:
+        for term in GRAY_BOX_COLOR_TERMS:
+            normalized = normalize_text(term)
+            if _contains_phrase(text, normalized):
+                terms.append(normalized)
+                add_packaging("gray_box")
+
+    unique_terms: list[str] = []
+    seen: set[str] = set()
+    for term in sorted(terms, key=len, reverse=True):
+        if term and term not in seen:
+            seen.add(term)
+            unique_terms.append(term)
+    return " ".join(packaging_parts)[:80], unique_terms
 
 
 def _audience_terms_to_strip(audience_aliases: tuple[tuple[str, str, str], ...]) -> list[str]:
@@ -663,7 +849,8 @@ def _brand_alias_match(alias: BrandAlias, text: str):
         return None
     if alias.is_regex:
         return _safe_regex_search(pattern, text, alias=alias)
-    return re.search(rf"(^|\s){re.escape(pattern)}($|\s)", text)
+    pattern = re.escape(pattern).replace(r"\.", r"\.\s*")
+    return re.search(rf"(^|\s){pattern}($|\s)", text)
 
 
 def _brand_name_match(brand: Brand, text: str):
@@ -671,6 +858,51 @@ def _brand_name_match(brand: Brand, text: str):
     if not brand_text:
         return None
     return re.search(rf"(^|\s){re.escape(brand_text)}($|\s)", text)
+
+
+def _generated_brand_alias_candidates(brand: Brand) -> set[str]:
+    tokens = normalize_text(brand.name).split()
+    tokens = [token for token in tokens if re.search(r"[a-z0-9а-я]", token)]
+    if len(tokens) < 2:
+        return set()
+    first, *rest = tokens
+    rest_text = " ".join(rest)
+    compact_rest = "".join(rest)
+    aliases = {
+        f"{first[:1]}.{rest_text}",
+        f"{first[:1]}. {rest_text}",
+        f"{first[:1]} {rest_text}",
+    }
+    if compact_rest != rest_text:
+        aliases.add(f"{first[:1]}.{compact_rest}")
+    if len(tokens) == 2 and len(rest[0]) >= 4:
+        aliases.add(rest[0])
+    return {alias for alias in aliases if len(alias) >= 4}
+
+
+def _generated_brand_alias_entries(brands: list[Brand]) -> list[tuple[str, Brand]]:
+    full_brand_names = {normalize_text(brand.name): brand.id for brand in brands}
+    alias_brand_ids: dict[str, set[int]] = {}
+    alias_brands: dict[tuple[str, int], Brand] = {}
+    for brand in brands:
+        for alias in _generated_brand_alias_candidates(brand):
+            alias_brand_ids.setdefault(alias, set()).add(brand.id)
+            alias_brands[(alias, brand.id)] = brand
+
+    entries: list[tuple[str, Brand]] = []
+    for alias, brand_ids in alias_brand_ids.items():
+        if len(brand_ids) != 1:
+            continue
+        brand_id = next(iter(brand_ids))
+        if alias in full_brand_names and full_brand_names[alias] != brand_id:
+            continue
+        entries.append((alias, alias_brands[(alias, brand_id)]))
+    return sorted(entries, key=lambda item: (-len(item[0]), item[0]))
+
+
+def _generated_brand_alias_match(alias_text: str, text: str):
+    pattern = re.escape(alias_text).replace(r"\.", r"\.\s*")
+    return re.search(rf"(^|\s){pattern}($|\s)", text)
 
 
 def _ordered_brand_aliases(aliases: list[BrandAlias]) -> list[BrandAlias]:
@@ -702,10 +934,16 @@ def _match_aliases(text: str, supplier_id: int | None):
         Brand.objects.filter(is_active=True),
         key=lambda brand: (-len(normalize_text(brand.name)), brand.name.lower()),
     )
+    generated_brand_aliases = _generated_brand_alias_entries(brands)
     for brand in brands:
         match = _brand_name_match(brand, text)
         if match and match.start() == 0:
             return None, brand
+
+    for alias_text, brand in generated_brand_aliases:
+        match = _generated_brand_alias_match(alias_text, text)
+        if match and match.start() == 0:
+            return alias_text, brand
 
     for alias in _ordered_brand_aliases(supplier_aliases) + _ordered_brand_aliases(global_aliases):
         if _brand_alias_match(alias, text):
@@ -714,6 +952,9 @@ def _match_aliases(text: str, supplier_id: int | None):
     for brand in brands:
         if _brand_name_match(brand, text):
             return None, brand
+    for alias_text, brand in generated_brand_aliases:
+        if _generated_brand_alias_match(alias_text, text):
+            return alias_text, brand
     return None, None
 
 
@@ -721,6 +962,10 @@ def parse_supplier_product(product: SupplierProduct) -> ParseResult:
     raw = product.name or ""
     text = normalize_text(" ".join([product.brand or "", raw, product.size or ""]))
     result = ParseResult(raw_name=raw, normalized_text=text)
+    is_bag = _contains_any_phrase(text, _bag_terms())
+    is_cosmetic_poudre = _contains_any_phrase(text, _cosmetic_poudre_terms())
+    is_deodorant_candidate = _contains_any_phrase(text, _deodorant_terms())
+    is_non_perfume = is_bag or is_cosmetic_poudre
 
     garbage_keyword = match_garbage_keyword(text)
     if garbage_keyword:
@@ -729,32 +974,35 @@ def parse_supplier_product(product: SupplierProduct) -> ParseResult:
         result.confidence = 100
         return result
 
-    size, raw_size, text = _extract_size(text)
-    result.size_ml = size
-    result.raw_size_text = raw_size
-    result.release_year, text = _extract_release_year(text)
+    if not is_non_perfume:
+        size, raw_size, text = _extract_size(text)
+        result.size_ml = size
+        result.raw_size_text = raw_size
+        result.release_year, text = _extract_release_year(text)
 
-    concentration_alias_rows = get_concentration_alias_rows()
-    supplier_aliases = [row for row in concentration_alias_rows if row[0] == product.supplier_id]
-    global_aliases = [row for row in concentration_alias_rows if row[0] is None]
-    applicable_concentration_aliases = supplier_aliases + global_aliases
-    for row in applicable_concentration_aliases:
-        _, needle, value, is_regex, *rest = row
-        alias_id = rest[0] if rest else None
-        if is_regex:
-            alias = ConcentrationAlias.objects.filter(pk=alias_id).first() if alias_id else None
-            matched = _safe_regex_search(needle, text, alias=alias)
-            if not matched:
-                continue
-            result.concentration = value
-            text = _safe_regex_sub(needle, " ", text, alias=alias).strip()
-            break
-        if re.search(rf"(^|\s){re.escape(needle)}($|\s)", text):
-            result.concentration = value
-            text = re.sub(rf"(^|\s){re.escape(needle)}($|\s)", " ", text).strip()
-            break
-    if result.concentration:
-        text = _strip_concentration_aliases(text, applicable_concentration_aliases)
+        concentration_alias_rows = get_concentration_alias_rows()
+        supplier_aliases = [row for row in concentration_alias_rows if row[0] == product.supplier_id]
+        global_aliases = [row for row in concentration_alias_rows if row[0] is None]
+        applicable_concentration_aliases = supplier_aliases + global_aliases
+        for row in applicable_concentration_aliases:
+            _, needle, value, is_regex, *rest = row
+            alias_id = rest[0] if rest else None
+            if is_regex:
+                alias = ConcentrationAlias.objects.filter(pk=alias_id).first() if alias_id else None
+                matched = _safe_regex_search(needle, text, alias=alias)
+                if not matched:
+                    continue
+                result.concentration = value
+                text = _safe_regex_sub(needle, " ", text, alias=alias).strip()
+                break
+            if re.search(rf"(^|\s){re.escape(needle)}($|\s)", text):
+                result.concentration = value
+                text = re.sub(rf"(^|\s){re.escape(needle)}($|\s)", " ", text).strip()
+                break
+        if result.concentration:
+            text = _strip_concentration_aliases(text, applicable_concentration_aliases)
+    is_deodorant = is_deodorant_candidate and not result.concentration
+    is_non_perfume = is_non_perfume or is_deodorant
 
     audience_aliases = _audience_aliases()
     for alias_text, display_value, _group in audience_aliases:
@@ -768,22 +1016,37 @@ def parse_supplier_product(product: SupplierProduct) -> ParseResult:
     mini_terms = _mini_terms()
     set_terms = _set_terms()
     refill_terms = _refill_terms()
+    decoded_terms = _decoded_terms()
+    cosmetic_poudre_terms = _cosmetic_poudre_terms()
+    deodorant_terms = _deodorant_terms()
+    detected_packaging, packaging_descriptor_terms = _extract_packaging_descriptor(text)
 
     result.is_tester = _contains_any_phrase(text, tester_terms)
     result.is_sample = _contains_any_phrase(text, sample_terms)
     result.is_travel = _contains_any_phrase(text, travel_terms)
     is_mini = _contains_any_phrase(text, mini_terms)
     result.is_set = _contains_any_phrase(text, set_terms)
+    is_decoded = _contains_any_phrase(text, decoded_terms)
     if result.raw_size_text and "*" in result.raw_size_text:
         result.is_set = True
-    if _contains_any_phrase(text, NO_BOX_TERMS):
-        result.packaging = "no_box"
-    elif _contains_any_phrase(text, WOODBOX_TERMS):
-        result.packaging = "woodbox"
+    if detected_packaging:
+        result.packaging = detected_packaging
     else:
         result.packaging = ""
-    result.variant_type = "sample" if result.is_sample else ("travel" if result.is_travel else ("mini" if is_mini else ("set" if result.is_set else ("tester" if result.is_tester else "standard"))))
+    result.variant_type = "sample" if result.is_sample else ("travel" if result.is_travel else ("mini" if is_mini else ("set" if result.is_set else ("decoded" if is_decoded else ("tester" if result.is_tester else "standard")))))
+    if is_bag:
+        result.variant_type = BAG_MODIFIER
+    elif is_cosmetic_poudre:
+        result.variant_type = "poudre"
+    elif is_deodorant:
+        result.variant_type = DEODORANT_MODIFIER
     result.modifiers = [term for term in MODIFIER_TERMS if re.search(rf"(^|\s){re.escape(term)}($|\s)", text)]
+    if is_bag:
+        result.modifiers.append(BAG_MODIFIER)
+    if is_cosmetic_poudre:
+        result.modifiers.append(COSMETIC_PUDRE_MODIFIER)
+    if is_deodorant:
+        result.modifiers.append(DEODORANT_MODIFIER)
     if is_mini and MINI_MODIFIER not in result.modifiers:
         result.modifiers.append(MINI_MODIFIER)
     if _contains_any_phrase(text, refill_terms):
@@ -792,12 +1055,12 @@ def parse_supplier_product(product: SupplierProduct) -> ParseResult:
     alias, brand = _match_aliases(text, product.supplier_id)
     if brand:
         result.normalized_brand = brand
-        result.detected_brand_text = alias.alias_text if alias else brand.name
+        result.detected_brand_text = alias if isinstance(alias, str) else (alias.alias_text if alias else brand.name)
         text = _strip_first_phrase(text, result.detected_brand_text)
-        if alias and alias.supplier_id:
+        if alias and not isinstance(alias, str) and alias.supplier_id:
             result.warnings.append("supplier-specific alias overrode global alias")
 
-    if not result.size_ml:
+    if not is_non_perfume and not result.size_ml:
         size, raw_size, compact_text = _extract_loose_trailing_size(text)
         if size is not None:
             result.size_ml = size
@@ -810,7 +1073,11 @@ def parse_supplier_product(product: SupplierProduct) -> ParseResult:
         *travel_terms,
         *mini_terms,
         *set_terms,
+        *cosmetic_poudre_terms,
+        *deodorant_terms,
         *refill_terms,
+        *decoded_terms,
+        *packaging_descriptor_terms,
         *NO_BOX_TERMS,
         *WOODBOX_TERMS,
     ]
@@ -897,7 +1164,11 @@ def parse_supplier_product(product: SupplierProduct) -> ParseResult:
                 *travel_terms,
                 *mini_terms,
                 *set_terms,
+                *cosmetic_poudre_terms,
+                *deodorant_terms,
                 *refill_terms,
+                *decoded_terms,
+                *packaging_descriptor_terms,
                 *NO_BOX_TERMS,
                 *WOODBOX_TERMS,
             ],
@@ -905,6 +1176,8 @@ def parse_supplier_product(product: SupplierProduct) -> ParseResult:
         result.product_name_text = _clean_product_name_text(remaining)
 
     result.product_name_text = _clean_product_name_text(result.product_name_text)
+    result.product_name_text = _strip_cyrillic_name_tokens_for_latin_brand(result)
+    _apply_self_titled_catalog_name(result)
     result.product_name_text = _canonicalize_product_name_from_catalog(result)
 
     if not result.normalized_brand:
@@ -914,22 +1187,27 @@ def parse_supplier_product(product: SupplierProduct) -> ParseResult:
     name_bearing_modifiers = _modifiers_from_name_bearing_phrases(result.product_name_text)
     if name_bearing_modifiers:
         result.modifiers = [modifier for modifier in result.modifiers if modifier not in name_bearing_modifiers]
-    if not result.concentration:
+    if not is_non_perfume and not result.concentration:
         result.warnings.append("concentration missing")
-    if not result.size_ml:
+    if not is_non_perfume and not result.size_ml:
         result.warnings.append("size ambiguous")
-    if not result.supplier_gender_hint:
+    if not is_non_perfume and not result.supplier_gender_hint:
         result.warnings.append("gender missing")
     for modifier in result.modifiers:
+        if modifier in {BAG_MODIFIER, COSMETIC_PUDRE_MODIFIER, DEODORANT_MODIFIER}:
+            continue
         result.warnings.append(f"{modifier} detected")
 
-    score = 25
-    score += 25 if result.normalized_brand else 0
-    score += 15 if result.product_name_text else 0
-    score += 15 if result.concentration else 0
-    score += 15 if result.size_ml else 0
-    score += 5 if result.supplier_gender_hint else 0
-    result.confidence = min(score, 100)
+    if is_non_perfume:
+        result.confidence = min(60 + (25 if result.normalized_brand else 0) + (15 if result.product_name_text else 0), 100)
+    else:
+        score = 25
+        score += 25 if result.normalized_brand else 0
+        score += 15 if result.product_name_text else 0
+        score += 15 if result.concentration else 0
+        score += 15 if result.size_ml else 0
+        score += 5 if result.supplier_gender_hint else 0
+        result.confidence = min(score, 100)
     result.normalized_text = normalize_text(" ".join([result.normalized_text, result.product_name_text]))
     return result
 
@@ -966,7 +1244,45 @@ def save_parse(product: SupplierProduct, *, force: bool = False) -> ParsedSuppli
             "last_parsed_at": timezone.now(),
         },
     )
+    _apply_catalog_conflict_manual_review(obj)
     from assistant_linking.services.normalization_stats import mark_stats_stale
 
     mark_stats_stale()
     return obj
+
+
+def _apply_catalog_conflict_manual_review(parsed: ParsedSupplierProduct) -> None:
+    if parsed.supplier_product.catalog_perfume_id:
+        return
+    if not parsed.concentration:
+        return
+    if parsed.product_category_label != "Perfume":
+        return
+    from assistant_linking.services.catalog_matcher import candidate_matches
+
+    candidates = candidate_matches(parsed, limit=1)
+    if not candidates:
+        return
+    candidate = candidates[0]
+    if candidate.score < 80 or "concentration differs" not in candidate.conflicts:
+        return
+    suggested = candidate.perfume.concentration
+    if not suggested or suggested == parsed.concentration:
+        return
+    warning = CATALOG_CONCENTRATION_CONFLICT_WARNING.format(
+        suggested=suggested,
+        parsed=parsed.concentration,
+    )
+    modifiers = list(parsed.modifiers or [])
+    warnings = list(parsed.warnings or [])
+    changed = False
+    if MANUAL_REVIEW_MODIFIER not in modifiers:
+        modifiers.append(MANUAL_REVIEW_MODIFIER)
+        changed = True
+    if warning not in warnings:
+        warnings.append(warning)
+        changed = True
+    if changed:
+        parsed.modifiers = modifiers
+        parsed.warnings = warnings
+        parsed.save(update_fields=["modifiers", "warnings", "updated_at"])

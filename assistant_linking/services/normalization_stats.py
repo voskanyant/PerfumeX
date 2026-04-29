@@ -6,7 +6,14 @@ from typing import Any
 from django.db.models import Count, Q
 from django.utils import timezone
 
-from assistant_linking.models import NormalizationStatsSnapshot, ParsedSupplierProduct
+from assistant_linking.models import (
+    BAG_MODIFIER,
+    COSMETIC_PUDRE_MODIFIER,
+    DEODORANT_MODIFIER,
+    MANUAL_REVIEW_MODIFIER,
+    NormalizationStatsSnapshot,
+    ParsedSupplierProduct,
+)
 from assistant_linking.services.garbage import GARBAGE_MODIFIER
 from assistant_linking.services.normalizer import PARSER_VERSION
 from prices.models import SupplierProduct
@@ -31,7 +38,21 @@ COUNT_KEYS = (
     "garbage_count",
     "tester_sample_count",
     "set_count",
+    "bag_count",
+    "cosmetic_count",
+    "deodorant_count",
+    "manual_review_count",
 )
+
+NON_PERFUME_QUERY = (
+    Q(modifiers__contains=[BAG_MODIFIER])
+    | Q(variant_type=BAG_MODIFIER)
+    | Q(modifiers__contains=[COSMETIC_PUDRE_MODIFIER])
+    | Q(variant_type="poudre")
+    | Q(modifiers__contains=[DEODORANT_MODIFIER])
+    | Q(variant_type=DEODORANT_MODIFIER)
+)
+MANUAL_REVIEW_QUERY = Q(modifiers__contains=[MANUAL_REVIEW_MODIFIER])
 
 
 def complete_parse_query() -> Q:
@@ -41,6 +62,8 @@ def complete_parse_query() -> Q:
         & ~Q(concentration="")
         & Q(size_ml__isnull=False)
         & Q(is_set=False)
+        & ~NON_PERFUME_QUERY
+        & ~MANUAL_REVIEW_QUERY
     )
 
 
@@ -95,7 +118,17 @@ def refresh_stats_snapshot(*, hidden_keywords: list[str] | None = None) -> Norma
         fields=PARSED_PRODUCT_HIDDEN_FIELDS,
     )
     non_garbage_queryset = parsed_queryset.exclude(modifiers__contains=[GARBAGE_MODIFIER])
-    normal_product_queryset = non_garbage_queryset.exclude(is_set=True)
+    bag_queryset = non_garbage_queryset.filter(Q(modifiers__contains=[BAG_MODIFIER]) | Q(variant_type=BAG_MODIFIER))
+    cosmetic_queryset = non_garbage_queryset.filter(
+        Q(modifiers__contains=[COSMETIC_PUDRE_MODIFIER]) | Q(variant_type="poudre")
+    )
+    deodorant_queryset = non_garbage_queryset.filter(
+        Q(modifiers__contains=[DEODORANT_MODIFIER]) | Q(variant_type=DEODORANT_MODIFIER)
+    )
+    manual_review_queryset = non_garbage_queryset.filter(MANUAL_REVIEW_QUERY)
+    normal_product_queryset = non_garbage_queryset.exclude(is_set=True).exclude(NON_PERFUME_QUERY).exclude(
+        MANUAL_REVIEW_QUERY
+    )
     unparsed_queryset = apply_hidden_product_keywords(
         SupplierProduct.objects.all(),
         hidden_keywords,
@@ -117,6 +150,10 @@ def refresh_stats_snapshot(*, hidden_keywords: list[str] | None = None) -> Norma
     )
     counts["garbage_count"] = parsed_queryset.filter(modifiers__contains=[GARBAGE_MODIFIER]).count()
     counts["set_count"] = non_garbage_queryset.filter(is_set=True).count()
+    counts["bag_count"] = bag_queryset.count()
+    counts["cosmetic_count"] = cosmetic_queryset.count()
+    counts["deodorant_count"] = deodorant_queryset.count()
+    counts["manual_review_count"] = manual_review_queryset.count()
     counts["unparsed_count"] = unparsed_queryset.filter(assistant_parse__isnull=True).count()
     counts["recent_parse_ids"] = list(
         normal_product_queryset.filter(complete_parse_query())

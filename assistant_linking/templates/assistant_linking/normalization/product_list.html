@@ -23,6 +23,9 @@
             <a class="button ghost" href="{% url 'assistant_linking:normalization_unparsed' %}">Reset</a>
         {% endif %}
     </form>
+    {% if moved_visible_count %}
+        <p class="form-help">{{ moved_visible_count }} visible row{{ moved_visible_count|pluralize }} parsed and moved to the normalisation queues.</p>
+    {% endif %}
 </div>
 
 <div class="workspace-block space-top-md">
@@ -69,4 +72,14 @@
     {% endif %}
 </nav>
 {% endif %}
+{% endblock %}
+{% block extra_scripts %}
+{{ block.super }}
+<script>
+window.addEventListener("pageshow", function (event) {
+    if (event.persisted) {
+        window.location.reload();
+    }
+});
+</script>
 {% endblock %}

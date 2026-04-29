@@ -971,40 +971,102 @@ select:focus {
   overflow-x: auto;
   overflow-y: hidden;
 }
-.our-products-table,
 .our-products-admin-table {
   width: 100%;
   min-width: 760px;
   table-layout: fixed;
 }
-.our-products-table {
-  min-width: 0;
-}
-.our-products-col-brand { width: 14%; }
-.our-products-col-collection { width: 13%; }
-.our-products-col-scent { width: 18%; }
-.our-products-col-concentration { width: 16%; }
-.our-products-col-size { width: 10%; }
-.our-products-col-tester { width: 8%; }
-.our-products-col-type { width: 12%; }
-.our-products-col-actions { width: 5%; }
-.our-products-table th,
-.our-products-table td,
 .our-products-admin-table th,
 .our-products-admin-table td {
   vertical-align: middle;
 }
-.our-products-review-table td {
-  padding-top: 14px;
-  padding-bottom: 14px;
+.our-products-list {
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
+  border: 1px solid var(--grey-200);
+  border-radius: var(--radius-md);
+  background: var(--white);
+  box-shadow: var(--shadow-sm);
 }
-.our-products-review-table tbody tr.is-editing {
+.our-products-card {
+  max-width: 100%;
+  border-bottom: 1px solid var(--grey-200);
+}
+.our-products-card:last-child {
+  border-bottom: 0;
+}
+.our-products-card.is-editing {
   background: #fbfbfb;
 }
-.catalogue-cell-value {
+.our-products-card .catalogue-row-form {
   display: block;
-  min-height: 34px;
-  padding: 7px 0;
+  margin: 0;
+}
+.our-products-card-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 18px;
+  align-items: start;
+  padding: 18px 22px;
+}
+.our-products-card-body {
+  min-width: 0;
+}
+.our-products-full-name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px 8px;
+  min-width: 0;
+  color: var(--grey-700);
+  font-size: 17px;
+  line-height: 1.35;
+}
+.catalogue-field {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  max-width: 100%;
+}
+.catalogue-field-brand,
+.catalogue-field-scent {
+  color: var(--black);
+}
+.identity-separator {
+  color: var(--grey-300);
+}
+.our-products-details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+  min-width: 0;
+}
+.our-products-detail-pill {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  max-width: 100%;
+  padding: 6px 10px;
+  border: 1px solid var(--grey-200);
+  border-radius: var(--radius-sm);
+  background: var(--grey-50);
+  color: var(--grey-700);
+}
+.our-products-detail-pill::before {
+  content: attr(data-label);
+  margin-right: 8px;
+  color: var(--grey-400);
+  font-family: 'DM Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.catalogue-cell-value {
+  display: inline-block;
+  max-width: 100%;
+  min-width: 0;
   overflow: hidden;
   color: var(--grey-800);
   line-height: 1.35;
@@ -1032,13 +1094,23 @@ select:focus {
 [data-editable-cell].is-field-open .catalogue-inline-input:not([type=hidden]) {
   display: block;
 }
-.our-products-table input:not([type=checkbox]):not([type=radio]):not([type=hidden]),
-.our-products-table select,
+.our-products-list input:not([type=checkbox]):not([type=radio]):not([type=hidden]),
+.our-products-list select,
 .our-products-admin-table input:not([type=checkbox]):not([type=radio]):not([type=hidden]),
 .our-products-admin-table select {
   width: 100%;
   min-width: 0;
   height: 34px;
+}
+.our-products-list input:not([type=checkbox]):not([type=radio]):not([type=hidden]),
+.our-products-list select {
+  max-width: min(100%, 280px);
+}
+.our-products-full-name input:not([type=checkbox]):not([type=radio]):not([type=hidden]) {
+  min-width: min(240px, 100%);
+}
+.our-products-detail-pill .catalogue-inline-input:not([type=hidden]) {
+  min-width: 120px;
 }
 .catalogue-flag-cell select {
   min-width: 0;
@@ -1059,6 +1131,12 @@ select:focus {
 }
 .our-products-edit-button {
   color: var(--grey-500);
+  flex: 0 0 auto;
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  padding: 0;
+  align-self: start;
 }
 .our-products-edit-button:hover {
   color: var(--black);
@@ -1838,18 +1916,69 @@ pre, code {
     overflow: visible;
   }
 
-  .our-products-table,
   .our-products-admin-table {
     min-width: 0;
     table-layout: auto;
   }
 
-  .our-products-table input:not([type=checkbox]):not([type=radio]):not([type=hidden]),
-  .our-products-table select,
+  .our-products-list input:not([type=checkbox]):not([type=radio]):not([type=hidden]),
+  .our-products-list select,
   .our-products-admin-table input:not([type=checkbox]):not([type=radio]):not([type=hidden]),
   .our-products-admin-table select {
     height: 38px;
     font-size: 16px;
+  }
+
+  .our-products-list {
+    border-radius: var(--radius-md);
+  }
+
+  .our-products-card-main {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 10px;
+    padding: 16px 14px;
+  }
+
+  .our-products-full-name {
+    gap: 4px 6px;
+    font-size: 16px;
+  }
+
+  .our-products-details {
+    gap: 7px;
+    margin-top: 10px;
+  }
+
+  .our-products-detail-pill {
+    flex: 1 1 140px;
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 3px;
+    padding: 8px 9px;
+  }
+
+  .our-products-detail-pill::before {
+    margin-right: 0;
+  }
+
+  .catalogue-field.is-field-open,
+  .our-products-detail-pill.is-field-open {
+    flex: 1 1 100%;
+    width: 100%;
+  }
+
+  .our-products-list input:not([type=checkbox]):not([type=radio]):not([type=hidden]),
+  .our-products-list select,
+  .our-products-full-name input:not([type=checkbox]):not([type=radio]):not([type=hidden]),
+  .our-products-detail-pill .catalogue-inline-input:not([type=hidden]) {
+    max-width: 100%;
+    width: 100%;
+  }
+
+  .our-products-edit-button {
+    width: 38px;
+    height: 38px;
+    min-width: 38px;
   }
 
   .our-products-row-actions,
@@ -1867,17 +1996,7 @@ pre, code {
     justify-content: center;
   }
 
-  .our-products-review-table .our-products-row-actions {
-    justify-content: flex-end;
-  }
-
-  .our-products-review-table .our-products-row-actions .button {
-    flex: 0 0 auto;
-  }
-
-  .our-products-review-table .catalogue-cell-value {
-    min-height: 0;
-    padding: 0;
+  .our-products-list .catalogue-cell-value {
     white-space: normal;
   }
 
