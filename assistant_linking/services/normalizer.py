@@ -31,7 +31,7 @@ from prices.models import SupplierProduct
 
 
 logger = logging.getLogger(__name__)
-PARSER_VERSION = "deterministic-v23"
+PARSER_VERSION = "deterministic-v24"
 REGEX_ALIAS_TIMEOUT_SECONDS = 1.0
 CATALOG_CONCENTRATION_CONFLICT_WARNING = "Catalogue match suggests {suggested}. Supplier text parsed as {parsed}."
 
@@ -974,11 +974,24 @@ def _match_aliases(text: str, supplier_id: int | None):
     return None, None
 
 
+def _match_initial_brand_name(text: str) -> Brand | None:
+    brands = sorted(
+        Brand.objects.all(),
+        key=lambda brand: (-len(normalize_text(brand.name)), brand.name.lower()),
+    )
+    for brand in brands:
+        match = _brand_name_match(brand, text)
+        if match and match.start() == 0:
+            return brand
+    return None
+
+
 def parse_supplier_product(product: SupplierProduct) -> ParseResult:
     raw = product.name or ""
     text = normalize_text(" ".join([product.brand or "", raw, product.size or ""]))
     result = ParseResult(raw_name=raw, normalized_text=text)
     initial_alias, initial_brand = _match_aliases(text, product.supplier_id)
+    initial_direct_brand = _match_initial_brand_name(text)
     is_bag = _contains_any_phrase(text, _bag_terms())
     is_cosmetic_poudre = _contains_any_phrase(text, _cosmetic_poudre_terms())
     is_deodorant_candidate = _contains_any_phrase(text, _deodorant_terms())
@@ -1072,6 +1085,8 @@ def parse_supplier_product(product: SupplierProduct) -> ParseResult:
     alias, brand = _match_aliases(text, product.supplier_id)
     if not brand and initial_brand:
         alias, brand = initial_alias, initial_brand
+    if not brand and initial_direct_brand:
+        alias, brand = None, initial_direct_brand
     if brand:
         result.normalized_brand = brand
         result.detected_brand_text = alias if isinstance(alias, str) else (alias.alias_text if alias else brand.name)
