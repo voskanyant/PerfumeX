@@ -409,9 +409,68 @@ class EmailImporterCursorTests(TestCase):
 
         self.mailbox.refresh_from_db()
         self.assertEqual(self.mailbox.last_inbox_uid, 42)
+        cursor = models.MailboxFolderCursor.objects.get(mailbox=self.mailbox, folder="INBOX")
+        self.assertEqual(cursor.last_uid, 42)
         self.assertTrue(
             models.ImportBatch.objects.filter(message_id="<commit@example.com>").exists()
         )
+
+    def test_uid_cursor_is_scoped_by_mailbox_folder(self):
+        self.mailbox.last_all_mail_uid = 500
+        self.mailbox.save(update_fields=["last_all_mail_uid"])
+
+        with transaction.atomic():
+            advanced = _advance_mailbox_uid_cursor(self.mailbox.pk, "Archive", 42)
+
+        self.assertTrue(advanced)
+        archive_cursor = models.MailboxFolderCursor.objects.get(
+            mailbox=self.mailbox,
+            folder="Archive",
+        )
+        self.assertEqual(archive_cursor.last_uid, 42)
+        self.mailbox.refresh_from_db()
+        self.assertEqual(self.mailbox.last_all_mail_uid, 500)
+
+    def test_reactivating_mailbox_resets_folder_cursors(self):
+        models.MailboxFolderCursor.objects.create(
+            mailbox=self.mailbox,
+            folder="Archive",
+            last_uid=42,
+            last_checked_at=timezone.now(),
+        )
+        self.mailbox.is_active = False
+        self.mailbox.save(update_fields=["is_active"])
+        self.mailbox.last_inbox_uid = 100
+        self.mailbox.last_all_mail_uid = 500
+        self.mailbox.last_checked_at = timezone.now()
+        self.mailbox.save(update_fields=["last_inbox_uid", "last_all_mail_uid", "last_checked_at"])
+
+        self.mailbox.is_active = True
+        self.mailbox.save(update_fields=["is_active", "last_inbox_uid", "last_all_mail_uid", "last_checked_at"])
+
+        self.mailbox.refresh_from_db()
+        self.assertEqual(self.mailbox.last_inbox_uid, 0)
+        self.assertEqual(self.mailbox.last_all_mail_uid, 0)
+        self.assertIsNone(self.mailbox.last_checked_at)
+        self.assertFalse(models.MailboxFolderCursor.objects.filter(mailbox=self.mailbox).exists())
+
+    def test_gmail_all_mail_cursor_seeds_from_legacy_all_mail_uid(self):
+        self.mailbox.last_all_mail_uid = 500
+        self.mailbox.save(update_fields=["last_all_mail_uid"])
+
+        with transaction.atomic():
+            advanced = _advance_mailbox_uid_cursor(
+                self.mailbox.pk,
+                "[Gmail]/All Mail",
+                450,
+            )
+
+        self.assertFalse(advanced)
+        gmail_cursor = models.MailboxFolderCursor.objects.get(
+            mailbox=self.mailbox,
+            folder="[Gmail]/All Mail",
+        )
+        self.assertEqual(gmail_cursor.last_uid, 500)
 
     def test_duplicate_message_id_skipped_not_crashed(self):
         payload = b"sku,price\nA,1\n"

@@ -113,6 +113,7 @@ class Mailbox(models.Model):
     def save(self, *args, **kwargs):
         # If mailbox was deactivated and is turned on again, reset UID cursors
         # so importer doesn't stay pinned to stale offsets.
+        reset_folder_cursors = False
         if self.pk:
             previous = Mailbox.objects.filter(pk=self.pk).values(
                 "is_active", "last_inbox_uid", "last_all_mail_uid", "last_checked_at"
@@ -121,13 +122,42 @@ class Mailbox(models.Model):
                 self.last_inbox_uid = 0
                 self.last_all_mail_uid = 0
                 self.last_checked_at = None
-        return super().save(*args, **kwargs)
+                reset_folder_cursors = True
+        result = super().save(*args, **kwargs)
+        if reset_folder_cursors:
+            self.folder_cursors.all().delete()
+        return result
 
     def password_requires_reset(self) -> bool:
         return looks_like_encrypted_token(self.password)
 
     def __str__(self) -> str:
         return self.name
+
+
+class MailboxFolderCursor(models.Model):
+    mailbox = models.ForeignKey(
+        Mailbox, on_delete=models.CASCADE, related_name="folder_cursors"
+    )
+    folder = models.CharField(max_length=255)
+    last_uid = models.BigIntegerField(default=0)
+    last_checked_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["mailbox", "folder"], name="uniq_mailbox_folder_cursor"
+            )
+        ]
+        indexes = [
+            models.Index(fields=["mailbox", "folder"], name="prices_mfc_mailbox_folder_idx"),
+            models.Index(fields=["last_checked_at"], name="prices_mfc_checked_idx"),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.mailbox} / {self.folder}"
 
 
 class SupplierMailboxRule(models.Model):

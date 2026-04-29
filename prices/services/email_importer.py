@@ -872,8 +872,7 @@ def run_import(
                 counts_by_folder = {}
                 recovered_by_folder = {}
                 for folder_name, msg_id in work_items:
-                    cursor_field = _folder_cursor_field(folder_name)
-                    last_uid = getattr(mailbox, cursor_field, 0) or 0
+                    last_uid = _get_mailbox_folder_last_uid(mailbox, folder_name)
                     uid_int = _uid_to_int(msg_id)
                     if uid_int is None:
                         continue
@@ -1020,7 +1019,6 @@ def run_import(
                     )
                     continue
                 uid_int = _uid_to_int(msg_id)
-                cursor_field = _folder_cursor_field(item_folder)
                 message = email.message_from_bytes(raw_email)
                 subject = _decode_header(message.get("Subject", ""))
                 from_addr = parseaddr(message.get("From", ""))[1]
@@ -1994,7 +1992,7 @@ def run_import(
                                 batch.save(update_fields=["status"])
 
                         if use_uid_cursor and not supplier and not from_filter and not subject_filter:
-                            _advance_mailbox_uid_cursor(mailbox.pk, cursor_field, uid_int, _log_line)
+                            _advance_mailbox_uid_cursor(mailbox.pk, item_folder, uid_int, _log_line)
                 except IntegrityError as exc:
                     summary["skipped_duplicates"] += 1
                     summary["skipped_files"] += 1
@@ -2006,7 +2004,7 @@ def run_import(
                     _log_line(message)
                     if use_uid_cursor and not supplier and not from_filter and not subject_filter and uid_int:
                         with transaction.atomic():
-                            _advance_mailbox_uid_cursor(mailbox.pk, cursor_field, uid_int, _log_line)
+                            _advance_mailbox_uid_cursor(mailbox.pk, item_folder, uid_int, _log_line)
                     continue
                 if processed_any and mark_seen:
                     try:
@@ -2181,6 +2179,39 @@ def _folder_cursor_field(folder_name: str) -> str:
     return "last_inbox_uid" if folder_name == "INBOX" else "last_all_mail_uid"
 
 
+def _should_seed_folder_cursor_from_legacy_all_mail(folder_name: str) -> bool:
+    normalized = (folder_name or "").strip().lower()
+    return (
+        normalized.startswith("[gmail]/")
+        or normalized.startswith("[google mail]/")
+        or "all mail" in normalized
+    )
+
+
+def _normalize_cursor_folder(folder_or_field: str) -> str:
+    if folder_or_field == "last_inbox_uid":
+        return "INBOX"
+    if folder_or_field == "last_all_mail_uid":
+        return "__legacy_all_mail__"
+    return folder_or_field or "INBOX"
+
+
+def _get_mailbox_folder_last_uid(mailbox, folder_name: str) -> int:
+    folder_name = _normalize_cursor_folder(folder_name)
+    cursor_uid = (
+        models.MailboxFolderCursor.objects.filter(mailbox=mailbox, folder=folder_name)
+        .values_list("last_uid", flat=True)
+        .first()
+    )
+    if folder_name == "INBOX" or _should_seed_folder_cursor_from_legacy_all_mail(folder_name):
+        legacy_uid = getattr(mailbox, _folder_cursor_field(folder_name), 0) or 0
+    else:
+        legacy_uid = 0
+    if cursor_uid is None:
+        return legacy_uid
+    return max(int(cursor_uid or 0), int(legacy_uid or 0))
+
+
 def _mailbox_uid_has_diagnostic(mailbox_pk: int, folder_name: str, msg_id) -> bool:
     return models.EmailAttachmentDiagnostic.objects.filter(
         mailbox_id=mailbox_pk,
@@ -2189,23 +2220,54 @@ def _mailbox_uid_has_diagnostic(mailbox_pk: int, folder_name: str, msg_id) -> bo
     ).exists()
 
 
-def _advance_mailbox_uid_cursor(mailbox_pk: int, cursor_field: str, new_uid: int, logger_func=None) -> bool:
+def _advance_mailbox_uid_cursor(mailbox_pk: int, folder_name: str, new_uid: int, logger_func=None) -> bool:
     if not new_uid:
         return False
+    folder_name = _normalize_cursor_folder(folder_name)
+    cursor_field = _folder_cursor_field(folder_name)
     locked_mailbox = models.Mailbox.objects.select_for_update().get(pk=mailbox_pk)
-    current_uid = getattr(locked_mailbox, cursor_field, 0) or 0
+    folder_cursor, _ = models.MailboxFolderCursor.objects.select_for_update().get_or_create(
+        mailbox=locked_mailbox,
+        folder=folder_name,
+        defaults={
+            "last_uid": (
+                getattr(locked_mailbox, cursor_field, 0) or 0
+                if folder_name == "INBOX"
+                or _should_seed_folder_cursor_from_legacy_all_mail(folder_name)
+                else 0
+            ),
+            "last_checked_at": locked_mailbox.last_checked_at,
+        },
+    )
+    legacy_uid = (
+        getattr(locked_mailbox, cursor_field, 0) or 0
+        if folder_name == "INBOX" or _should_seed_folder_cursor_from_legacy_all_mail(folder_name)
+        else 0
+    )
+    current_uid = max(
+        legacy_uid,
+        folder_cursor.last_uid or 0,
+    )
     if new_uid <= current_uid:
         message = (
             f"Skipped UID cursor decrease for mailbox={locked_mailbox.pk} "
-            f"field={cursor_field}: current={current_uid}, new={new_uid}."
+            f"folder={folder_name}: current={current_uid}, new={new_uid}."
         )
         logger.warning(message)
         if logger_func:
             logger_func(message)
         return False
-    setattr(locked_mailbox, cursor_field, new_uid)
-    locked_mailbox.last_checked_at = timezone.now()
-    locked_mailbox.save(update_fields=[cursor_field, "last_checked_at"])
+    now = timezone.now()
+    folder_cursor.last_uid = new_uid
+    folder_cursor.last_checked_at = now
+    folder_cursor.save(update_fields=["last_uid", "last_checked_at", "updated_at"])
+    update_fields = ["last_checked_at"]
+    legacy_existing = getattr(locked_mailbox, cursor_field, 0) or 0
+    if new_uid > legacy_existing:
+        setattr(locked_mailbox, cursor_field, new_uid)
+        update_fields.append(cursor_field)
+    locked_mailbox.last_checked_at = now
+    locked_mailbox.save(update_fields=update_fields)
     return True
 
 
