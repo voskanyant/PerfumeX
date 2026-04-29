@@ -606,6 +606,67 @@ class EmailImporterCursorTests(TestCase):
         self.assertEqual(second_summary["messages_scanned"], 0)
         self.assertEqual(second_summary["skipped_duplicates"], 0)
 
+    def test_same_day_duplicate_attachment_does_not_order_by_missing_import_file_created_at(self):
+        payload = b"sku,price\nA,1\n"
+        existing_batch = models.ImportBatch.objects.create(
+            supplier=self.supplier,
+            mailbox=self.mailbox,
+            message_id="<same-day-existing@example.com>",
+            received_at=timezone.make_aware(datetime(2026, 4, 29, 9, 0, 0)),
+            status=models.ImportStatus.PROCESSED,
+        )
+        models.ImportFile.objects.create(
+            import_batch=existing_batch,
+            file_kind=models.FileKind.PRICE,
+            filename="prices.csv",
+            content_hash=hashlib.sha256(payload).hexdigest(),
+            status=models.ImportStatus.PROCESSED,
+            processed_at=timezone.make_aware(datetime(2026, 4, 29, 9, 1, 0)),
+        )
+        message = EmailMessage()
+        message["Subject"] = "Daily price"
+        message["From"] = "supplier@example.com"
+        message["Message-ID"] = "<same-day-new-copy@example.com>"
+        message["Date"] = "Wed, 29 Apr 2026 10:00:00 +0000"
+        message.set_content("attached")
+        message.add_attachment(
+            payload,
+            maintype="text",
+            subtype="csv",
+            filename="prices.csv",
+        )
+
+        class FakeImapClient:
+            def search(self, charset, *criteria):
+                return "OK", [b"11"]
+
+            def fetch(self, msg_id, query):
+                if "RFC822.SIZE" in query:
+                    return "OK", [
+                        (
+                            b'11 (RFC822.SIZE 100 INTERNALDATE "29-Apr-2026 10:00:00 +0000")',
+                            b"",
+                        )
+                    ]
+                return "OK", [(b"11 (RFC822 {100}", message.as_bytes())]
+
+            def logout(self):
+                return "BYE", []
+
+        with patch(
+            "prices.services.email_importer._connect_imap",
+            return_value=FakeImapClient(),
+        ):
+            summary = run_import(
+                [self.mailbox],
+                use_uid_cursor=True,
+                dedupe_same_day_only=True,
+            )
+
+        self.assertEqual(summary["skipped_duplicates"], 1)
+        self.assertEqual(models.ImportBatch.objects.count(), 1)
+        self.assertEqual(models.ImportFile.objects.count(), 1)
+
     def test_supplier_specific_run_updates_check_state_when_no_email_found(self):
         class EmptyImapClient:
             def search(self, charset, *criteria):

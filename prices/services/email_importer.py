@@ -1341,7 +1341,12 @@ def run_import(
                                 existing_processed_duplicate_file = (
                                     duplicate_qs.filter(status=models.ImportStatus.PROCESSED)
                                     .select_related("import_batch")
-                                    .order_by("-processed_at", "-created_at")
+                                    .order_by(
+                                        "-processed_at",
+                                        "-import_batch__received_at",
+                                        "-import_batch__created_at",
+                                        "-id",
+                                    )
                                     .first()
                                 )
                                 exists = existing_duplicate_file is not None
