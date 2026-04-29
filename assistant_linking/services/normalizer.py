@@ -978,6 +978,7 @@ def parse_supplier_product(product: SupplierProduct) -> ParseResult:
     raw = product.name or ""
     text = normalize_text(" ".join([product.brand or "", raw, product.size or ""]))
     result = ParseResult(raw_name=raw, normalized_text=text)
+    initial_alias, initial_brand = _match_aliases(text, product.supplier_id)
     is_bag = _contains_any_phrase(text, _bag_terms())
     is_cosmetic_poudre = _contains_any_phrase(text, _cosmetic_poudre_terms())
     is_deodorant_candidate = _contains_any_phrase(text, _deodorant_terms())
@@ -1069,6 +1070,8 @@ def parse_supplier_product(product: SupplierProduct) -> ParseResult:
         result.modifiers.append(REFILL_MODIFIER)
 
     alias, brand = _match_aliases(text, product.supplier_id)
+    if not brand and initial_brand:
+        alias, brand = initial_alias, initial_brand
     if brand:
         result.normalized_brand = brand
         result.detected_brand_text = alias if isinstance(alias, str) else (alias.alias_text if alias else brand.name)
