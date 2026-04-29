@@ -2072,6 +2072,63 @@ class ImportSchedulerTests(TestCase):
         settings_obj.last_run_at = now - timedelta(minutes=18)
         self.assertTrue(_should_skip_recent_run(settings_obj, now=now))
 
+    @patch("prices.management.commands.import_emails.run_import")
+    @patch("prices.management.commands.import_emails.timezone.now")
+    def test_import_emails_records_run_start_time_for_cron_cadence(
+        self, mock_now, mock_run_import
+    ):
+        start = timezone.make_aware(datetime(2026, 1, 1, 12, 0))
+        end = start + timedelta(minutes=2)
+        current_time = {"value": start}
+        mock_now.side_effect = lambda: current_time["value"]
+
+        def finish_run(*args, **kwargs):
+            current_time["value"] = end
+            return {
+                "matched_files": 0,
+                "processed_files": 0,
+                "skipped_duplicates": 0,
+                "errors": 0,
+                "remaining_backlog": 0,
+                "timed_out": False,
+            }
+
+        mock_run_import.side_effect = finish_run
+        settings_obj = models.ImportSettings.get_solo()
+        settings_obj.interval_minutes = 20
+        settings_obj.supplier_timeout_minutes = 0
+        settings_obj.deactivate_products_after_days = 0
+        settings_obj.save(
+            update_fields=[
+                "interval_minutes",
+                "supplier_timeout_minutes",
+                "deactivate_products_after_days",
+            ]
+        )
+        models.ExchangeRate.objects.create(
+            rate_date=start.date(),
+            from_currency=models.Currency.USD,
+            to_currency=models.Currency.RUB,
+            rate="100.000000",
+            source="CBR + test",
+        )
+        models.Mailbox.objects.create(
+            name="scheduler",
+            host="imap.example.com",
+            username="scheduler@example.com",
+            password="secret",
+        )
+        models.Supplier.objects.create(
+            name="Scheduler Supplier",
+            from_address_pattern="price@example.com",
+        )
+
+        call_command("import_emails")
+
+        settings_obj.refresh_from_db()
+        self.assertEqual(settings_obj.last_run_at, start)
+        self.assertFalse(_should_skip_recent_run(settings_obj, now=start + timedelta(minutes=20)))
+
 
 class HiddenProductKeywordTests(TestCase):
     def setUp(self):
