@@ -14,7 +14,6 @@ from django.utils.decorators import method_decorator
 from django.views.decorators.cache import never_cache
 from django.views.generic import DetailView, ListView, TemplateView, View
 
-from assistant_core.models import GlobalRule
 from assistant_linking import forms, models
 from assistant_linking.services.catalog_matcher import candidate_matches, rule_impact, similar_supplier_rows
 from assistant_linking.services.garbage import GARBAGE_MODIFIER, normalize_garbage_keyword
