@@ -82,9 +82,9 @@
                         <div class="fragrantica-product-meta">
                             <span class="score-badge score-badge--{% if row.status_key == 'linked' %}success{% elif row.status_key == 'collection_review' %}warning{% elif row.status_key == 'supplier_evidence' %}strong{% else %}muted{% endif %}">{{ row.status_label }}</span>
                             <span>{{ row.perfume.variant_count }} variant{{ row.perfume.variant_count|pluralize }}</span>
-                            <span>{{ row.evidence_count }} supplier row{{ row.evidence_count|pluralize }}</span>
+                            <span>{{ row.evidence_count }} parsed supplier row{{ row.evidence_count|pluralize }}</span>
                             {% if row.perfume.linked_supplier_count %}
-                                <span>{{ row.perfume.linked_supplier_count }} linked</span>
+                                <span>{{ row.perfume.linked_supplier_count }} linked supplier row{{ row.perfume.linked_supplier_count|pluralize }}</span>
                             {% endif %}
                             {% if row.collection_names %}
                                 <span>Supplier collections: {{ row.collection_names|join:", " }}</span>
