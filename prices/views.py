@@ -1190,20 +1190,9 @@ def _build_supplier_board_row(
 
 
 def _board_sort_key(row: dict[str, object]) -> tuple:
-    check_priority = {
-        "failed": 0,
-        "warning": 1,
-        "not-configured": 2,
-        "no-files": 3,
-        "no-change": 4,
-        "idle": 5,
-        "successful": 6,
-        "running": 7,
-    }
     return (
-        int(row["health_severity"]),
-        check_priority.get(str(row["check_code"]), 9),
         -int(row["last_import_sort_age_seconds"]),
+        int(row["health_severity"]),
         str(row["supplier"].name).lower(),
     )
 
