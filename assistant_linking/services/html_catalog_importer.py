@@ -33,10 +33,20 @@ def clean_scraped_text(value: str) -> str:
     text = html.unescape(re.sub(r"\s+", " ", value or "")).strip()
     if not text:
         return ""
-    try:
-        repaired = text.encode("latin1").decode("utf-8")
-    except UnicodeError:
-        repaired = text
+    repaired = text
+    for _ in range(3):
+        candidate = ""
+        for codec in ("latin1", "cp1252"):
+            try:
+                candidate = repaired.encode(codec).decode("utf-8")
+                break
+            except UnicodeError:
+                continue
+        if not candidate:
+            break
+        if candidate == repaired:
+            break
+        repaired = candidate
     return re.sub(r"\s+", " ", repaired).strip()
 
 

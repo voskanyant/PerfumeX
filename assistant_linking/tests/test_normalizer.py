@@ -1418,7 +1418,7 @@ class NormalizerTests(TestCase):
         self.assertEqual(parsed.normalized_brand, dunhill)
         self.assertEqual(parsed.detected_brand_text, "A.DUNHILL")
         self.assertEqual(parsed.collection_name, "Signature Collection")
-        self.assertEqual(parsed.product_name_text, "Arabian Desert")
+        self.assertEqual(parsed.product_name_text, "arabian desert")
         self.assertEqual(parsed.concentration, "Eau de Parfum")
         self.assertEqual(parsed.size_ml, Decimal("100.00"))
         self.assertTrue(parsed.is_tester)

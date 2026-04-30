@@ -17,11 +17,15 @@ from assistant_linking.models import (
     CONCENTRATION_ALIAS_CACHE_KEY,
     COSMETIC_PUDRE_MODIFIER,
     DEODORANT_MODIFIER,
+    HAIR_CARE_CATEGORY_CONCENTRATIONS,
     MANUAL_REVIEW_MODIFIER,
+    PERFUME_CATEGORY_CONCENTRATIONS,
     BrandAlias,
     ConcentrationAlias,
     ParsedSupplierProduct,
     ProductAlias,
+    display_label,
+    display_title,
 )
 from assistant_linking.services.garbage import GARBAGE_MODIFIER, GARBAGE_WARNING_PREFIX, match_garbage_keyword
 from assistant_linking.services.parser_rules import (
@@ -220,6 +224,104 @@ class ParseResult:
     modifiers: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
     confidence: int = 0
+
+    @property
+    def display_brand(self) -> str:
+        if self.normalized_brand:
+            return str(self.normalized_brand)
+        return self.detected_brand_text
+
+    @property
+    def display_size(self) -> str:
+        if self.raw_size_text and "*" in self.raw_size_text:
+            return self.raw_size_text
+        if self.size_ml is None:
+            return ""
+        return f"{compact_decimal_text(self.size_ml)}ml"
+
+    @property
+    def display_product_name(self) -> str:
+        return display_title(self.product_name_text)
+
+    @property
+    def display_collection_name(self) -> str:
+        return display_title(self.collection_name)
+
+    @property
+    def display_variant_type(self) -> str:
+        if BAG_MODIFIER in (self.modifiers or []) or self.variant_type == BAG_MODIFIER:
+            return "Bag"
+        if COSMETIC_PUDRE_MODIFIER in (self.modifiers or []) or self.variant_type == "poudre":
+            return "Poudre"
+        if DEODORANT_MODIFIER in (self.modifiers or []) or self.variant_type == DEODORANT_MODIFIER:
+            return "Deodorant"
+        if self.variant_type == "decoded":
+            return "Decoded"
+        if self.is_tester or self.variant_type == "tester":
+            return "Tester"
+        if self.is_sample or self.variant_type == "sample":
+            return "Sample"
+        if self.is_travel or self.variant_type == "travel":
+            return "Travel"
+        if self.is_set or self.variant_type == "set":
+            return "Set"
+        return display_label(self.variant_type, default="Standard")
+
+    @property
+    def product_category_label(self) -> str:
+        if BAG_MODIFIER in (self.modifiers or []) or self.variant_type == BAG_MODIFIER:
+            return "Bags"
+        if COSMETIC_PUDRE_MODIFIER in (self.modifiers or []) or self.variant_type == "poudre":
+            return "Cosmetics"
+        if DEODORANT_MODIFIER in (self.modifiers or []) or self.variant_type == DEODORANT_MODIFIER:
+            return "Deodorants"
+        if self.concentration in HAIR_CARE_CATEGORY_CONCENTRATIONS:
+            return "Hair Care"
+        if self.concentration in PERFUME_CATEGORY_CONCENTRATIONS:
+            return "Perfume"
+        return "Unknown"
+
+    @property
+    def product_subcategory_label(self) -> str:
+        if COSMETIC_PUDRE_MODIFIER in (self.modifiers or []) or self.variant_type == "poudre":
+            return "Poudre"
+        return ""
+
+    @property
+    def display_packaging(self) -> str:
+        return display_label(self.packaging, default="Standard")
+
+    @property
+    def identity_variant_label(self) -> str:
+        if self.product_category_label in {"Bags", "Cosmetics", "Deodorants"}:
+            return ""
+        variant = self.display_variant_type
+        if variant and variant != "Standard":
+            return variant
+        return ""
+
+    @property
+    def identity_packaging_label(self) -> str:
+        packaging = self.display_packaging
+        if packaging and packaging != "Standard" and packaging != self.identity_variant_label:
+            return packaging
+        return ""
+
+    @property
+    def display_identity(self) -> str:
+        product_name = self.display_product_name
+        if product_name and normalize_alias_value(product_name) == normalize_alias_value(self.display_brand):
+            product_name = ""
+        parts = [
+            self.display_brand,
+            self.display_collection_name,
+            product_name,
+            self.concentration,
+            self.display_size,
+            self.identity_variant_label,
+            self.identity_packaging_label,
+        ]
+        return " / ".join(part for part in parts if part)
 
 
 def normalize_text(value: str) -> str:
@@ -640,7 +742,7 @@ def _canonicalize_product_name_from_catalog(result: ParseResult) -> str:
         if _catalog_scent_key(perfume.name) == key
     }
     if len(names) == 1:
-        return names.pop()
+        return result.product_name_text
 
     base_keys = _catalog_base_keys_without_trailing_audience(result)
     if base_keys:
