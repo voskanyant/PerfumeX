@@ -28,6 +28,8 @@
             <a class="tab {% if active_import_source == 'file' %}active{% endif %}" href="{% url 'prices:supplier_import' supplier.pk %}?source=file">Price file</a>
         </nav>
 
+        <div class="supplier-import-shell">
+            <div class="supplier-source-column">
         {% if active_import_source == "email" %}
             <section class="supplier-tab-card">
                 <div class="supplier-tab-card__head">
@@ -156,6 +158,7 @@
                 </div>
             </section>
         {% endif %}
+            </div>
 
         <section class="supplier-common-tools supplier-common-tools--{{ active_import_source }}">
             <div class="supplier-common-tools__head">
@@ -314,6 +317,7 @@
                 </form>
             </div>
         </section>
+        </div>
     </div>
     <div id="supplier-import-config" data-supplier-id="{{ supplier.pk }}"></div>
     <script src="{% static 'prices/js/supplier-import.js' %}"></script>
