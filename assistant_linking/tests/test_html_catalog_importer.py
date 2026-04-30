@@ -56,7 +56,7 @@ class HtmlCatalogImporterTests(TestCase):
         self.assertTrue(
             FragranticaProduct.objects.filter(
                 brand_name="Van Cleef & Arpels",
-                name="Bois DorÃ©",
+                normalized_name="bois dore",
                 collection_name="Collection Extraordinaire",
                 audience="Unisex",
                 release_year=2017,
@@ -68,7 +68,7 @@ class HtmlCatalogImporterTests(TestCase):
         FragranticaProduct.objects.create(
             brand_name="Van Cleef & Arpels",
             normalized_brand_name="van cleef and arpels",
-            name="Bois DorÃ©",
+            name="Bois Doré",
             normalized_name="bois dore",
             source_path="/perfume/Van-Cleef-Arpels/Bois-Dore-1.html",
         )

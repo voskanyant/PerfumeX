@@ -3,6 +3,7 @@ from __future__ import annotations
 import csv
 import html
 import re
+import unicodedata
 from dataclasses import dataclass, field
 from html.parser import HTMLParser
 from pathlib import Path
@@ -51,7 +52,9 @@ def clean_scraped_text(value: str) -> str:
 
 
 def canonical_key(value: str) -> str:
-    return normalize_alias_value(clean_scraped_text(value)).replace("&", "and")
+    text = unicodedata.normalize("NFKD", clean_scraped_text(value))
+    text = "".join(char for char in text if not unicodedata.combining(char))
+    return normalize_alias_value(text).replace("&", "and")
 
 
 def audience_from_classes(classes: set[str]) -> str:
