@@ -74,6 +74,12 @@ PARSER_RULE_KIND_OPTIONS = (
         "example": "dec",
     },
     {
+        "key": "parser_variant_type_term",
+        "label": "Variant type alias",
+        "description": "Sets parsed type from supplier text. Format: alias => variant_type.",
+        "example": "woodbox => woodbox",
+    },
+    {
         "key": "parser_audience_term",
         "label": "Audience alias",
         "description": "Sets audience from supplier text. Format: alias => Display | men/women/unisex.",
@@ -135,6 +141,17 @@ def _parse_audience_rule(rule_text: str) -> tuple[str, str, str] | None:
     return alias, display, group
 
 
+def _parse_variant_type_rule(rule_text: str) -> tuple[str, str] | None:
+    if "=>" not in (rule_text or ""):
+        return None
+    alias, target = rule_text.split("=>", 1)
+    alias = normalize_alias_value(alias)
+    target = normalize_alias_value(target).replace(" ", "_")
+    if not alias or not target:
+        return None
+    return alias, target
+
+
 def validate_parser_rule_text(rule_kind: str, rule_text: str) -> str:
     if rule_kind not in PARSER_RULE_KINDS:
         return "Choose a valid parser rule kind."
@@ -142,6 +159,8 @@ def validate_parser_rule_text(rule_kind: str, rule_text: str) -> str:
         return "Add at least one parser term."
     if rule_kind == "parser_audience_term" and not _parse_audience_rule(rule_text):
         return "Audience aliases must use: alias => Display | men/women/unisex."
+    if rule_kind == "parser_variant_type_term" and not _parse_variant_type_rule(rule_text):
+        return "Variant type aliases must use: alias => variant_type."
     if rule_kind == "regex_preprocess":
         parsed = _parse_preprocess_rule(rule_text)
         if not parsed:
@@ -179,6 +198,11 @@ def get_parser_rules() -> dict[str, list]:
                 if parsed:
                     rules[rule_kind].append(parsed)
                 continue
+            if rule_kind == "parser_variant_type_term":
+                parsed = _parse_variant_type_rule(rule_text)
+                if parsed:
+                    rules[rule_kind].append(parsed)
+                continue
             for term in normalize_parser_terms(rule_text):
                 rules[rule_kind].append(term)
     except (OperationalError, ProgrammingError) as exc:
@@ -199,3 +223,7 @@ def get_regex_preprocess_rules() -> tuple[tuple[str, str], ...]:
 
 def get_audience_alias_rules() -> tuple[tuple[str, str, str], ...]:
     return tuple(get_parser_rules().get("parser_audience_term", ()))
+
+
+def get_variant_type_alias_rules() -> tuple[tuple[str, str], ...]:
+    return tuple(get_parser_rules().get("parser_variant_type_term", ()))

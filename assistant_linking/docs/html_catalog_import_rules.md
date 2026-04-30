@@ -1,6 +1,6 @@
 # HTML Catalogue Import Rules
 
-This importer follows `assistant_linking/docs/assistant_learning_design.md`: saved catalogue HTML is converted into catalogue facts and aliases, not hardcoded parser exceptions.
+This importer follows `assistant_linking/docs/assistant_learning_design.md`: saved catalogue HTML is converted into staged external catalogue rows, not hardcoded parser exceptions and not immediate edits to Our Products.
 
 Use `python manage.py import_brand_catalog_html <path>` for saved brand catalogue pages.
 
@@ -14,19 +14,19 @@ Current parser rule:
 - Release year comes from `span.tw-year-badge`.
 - Audience comes from the fragrance row class first: `tw-listview-item-female` -> `Women`, `tw-listview-item-male` -> `Men`, `tw-listview-item-unisex` -> `Unisex`. If those classes are missing, use the row `aria-label`/`title` text as a fallback for `женский`, `мужской`, `унисекс`, `female`, `male`, and `unisex`.
 
-Default command mode is dry-run. Use it first to compare source catalogue rows with local `catalog.Perfume` rows and generate a missing CSV.
+Default command mode is dry-run. Use it first to inspect source catalogue rows before staging them in `assistant_linking.FragranticaProduct`.
 
 Operator preview rule:
 
 - Always run a dry-run first.
-- Show the operator the extracted brand, collection list, item count, sample rows, and missing/matched report before using `--apply`.
+- Show the operator the extracted brand, collection list, item count, sample rows, and new/existing staged-row report before using `--apply`.
 - Do not push code or tell the operator the extraction is complete until the operator has seen the dry-run result and confirmed the apply step.
-- Keep the dry-run report path in the handoff or final response so the operator can inspect what will be imported.
+- Keep the dry-run report path in the handoff or final response so the operator can inspect what will be staged.
 
 Write behavior:
 
-- `--apply` updates matched local `catalog.Perfume.collection_name`, `audience`, and `release_year`.
-- `--create-aliases` creates brand/product aliases so supplier normalization can learn the collection.
-- `--create-missing-catalog` creates missing `catalog.Perfume` rows as review-status catalogue entries.
-- `--reparse-supplier-products` reparses supplier products whose names contain the imported brand name after aliases are written, because new aliases can change rows that are not otherwise stale.
-- `--reparse-all-supplier-products` refreshes the full supplier catalogue and should be reserved for intentional full rebuilds.
+- `--apply` creates or updates `assistant_linking.FragranticaProduct` rows only.
+- HTML import must not create/update `catalog.Perfume`, `BrandAlias`, or `ProductAlias` rows directly.
+- `--create-aliases` and `--create-missing-catalog` are disabled because links and merges must be reviewed first.
+- `--reparse-supplier-products` should be used only after approved aliases or catalogue changes are created from the review/linking interface.
+- `--reparse-all-supplier-products` refreshes the full supplier catalogue and should be reserved for intentional full rebuilds after approved knowledge changes.
