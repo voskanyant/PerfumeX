@@ -2,7 +2,7 @@ from django.core.management import call_command
 from django.test import TestCase
 
 from assistant_linking.models import FragranticaProduct
-from assistant_linking.services.html_catalog_importer import import_brand_catalog, parse_brand_catalog_html
+from assistant_linking.services.html_catalog_importer import canonical_key, import_brand_catalog, parse_brand_catalog_html
 from catalog.models import Brand, Perfume
 
 
@@ -32,13 +32,13 @@ SAMPLE_HTML = """
 class HtmlCatalogImporterTests(TestCase):
     def test_parser_assigns_specific_collection_over_all_fragrances(self):
         items = parse_brand_catalog_html(SAMPLE_HTML)
-        by_name = {item.name: item for item in items}
+        by_name = {canonical_key(item.name): item for item in items}
 
         self.assertEqual(len(items), 2)
         self.assertEqual(sorted(item.audience for item in items), ["Unisex", "Women"])
-        self.assertEqual(by_name["Bois DorÃ©"].collection_name, "Collection Extraordinaire")
-        self.assertEqual(by_name["Bois DorÃ©"].release_year, 2017)
-        self.assertEqual(by_name["First"].collection_name, "")
+        self.assertEqual(by_name["bois dore"].collection_name, "Collection Extraordinaire")
+        self.assertEqual(by_name["bois dore"].release_year, 2017)
+        self.assertEqual(by_name["first"].collection_name, "")
 
     def test_import_stages_fragrantica_products_without_touching_catalogue(self):
         brand = Brand.objects.create(name="Van Cleef & Arpels")
