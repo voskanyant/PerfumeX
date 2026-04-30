@@ -729,6 +729,7 @@ tr.is-selected-row > td {
 /* Supplier import / mapping workspace */
 .supplier-import-page {
   gap: 18px;
+  max-width: 1520px;
 }
 
 .supplier-import-page .breadcrumbs {
@@ -759,10 +760,11 @@ tr.is-selected-row > td {
 }
 
 .supplier-source-tabs {
-  margin-bottom: 2px;
+  margin-bottom: 0;
   overflow-x: auto;
   overflow-y: hidden;
   scrollbar-width: none;
+  border-bottom: 1px solid var(--grey-200);
 }
 
 .supplier-source-tabs::-webkit-scrollbar {
@@ -781,6 +783,8 @@ tr.is-selected-row > td {
 
 .supplier-tab-card {
   padding: 22px 24px;
+  width: 100%;
+  min-width: 0;
 }
 
 .supplier-tab-card__head,
@@ -874,13 +878,16 @@ tr.is-selected-row > td {
 }
 
 .supplier-common-tools {
-  padding: 24px;
+  padding: 0;
+  overflow: hidden;
 }
 
 .supplier-common-tools__head {
   align-items: end;
-  padding-bottom: 18px;
+  margin-bottom: 0;
+  padding: 22px 24px;
   border-bottom: 1px solid var(--grey-200);
+  background: linear-gradient(180deg, var(--white), var(--grey-50));
 }
 
 .supplier-common-tools__head .card-desc {
@@ -890,8 +897,8 @@ tr.is-selected-row > td {
 
 .supplier-import-workbench {
   display: grid;
-  grid-template-columns: minmax(360px, 440px) minmax(0, 1fr);
-  gap: 18px;
+  grid-template-columns: minmax(420px, 520px) minmax(0, 1fr);
+  gap: 0;
   align-items: stretch;
 }
 
@@ -902,24 +909,44 @@ tr.is-selected-row > td {
 }
 
 .supplier-import-panel {
-  padding: 20px;
+  padding: 22px 24px;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
 }
 
 .supplier-import-panel--config {
   display: grid;
-  gap: 18px;
+  gap: 16px;
+  border-right: 1px solid var(--grey-200);
+  background: var(--white);
 }
 
 .supplier-import-panel--preview {
   display: flex;
   flex-direction: column;
-  min-height: 520px;
+  min-height: 500px;
+  background: #fcfcfc;
 }
 
 .supplier-upload-box {
   display: grid;
   gap: 10px;
   padding: 14px;
+}
+
+.supplier-upload-box--muted {
+  color: var(--grey-650);
+}
+
+.supplier-upload-box--muted p {
+  margin: 0;
+  color: var(--grey-600);
+}
+
+.supplier-common-tools--email .supplier-upload-box--muted,
+.supplier-common-tools--link .supplier-upload-box--muted {
+  background: var(--white);
 }
 
 .supplier-upload-box__label {
@@ -936,8 +963,8 @@ tr.is-selected-row > td {
 
 .supplier-field-section {
   display: grid;
-  gap: 12px;
-  padding-top: 18px;
+  gap: 11px;
+  padding-top: 16px;
   border-top: 1px solid var(--grey-200);
 }
 
@@ -963,7 +990,7 @@ tr.is-selected-row > td {
 .supplier-mapping-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+  gap: 11px;
 }
 
 .supplier-import-actions {
@@ -995,10 +1022,10 @@ tr.is-selected-row > td {
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
-  padding: 12px;
+  padding: 10px;
   border: 1px solid var(--grey-200);
   border-radius: var(--radius-sm);
-  background: var(--grey-50);
+  background: var(--white);
 }
 
 .supplier-preview-toolbar .button.is-active {
@@ -1069,8 +1096,12 @@ tr.is-selected-row > td {
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: end;
   gap: 18px;
-  margin-top: 18px;
-  padding: 18px 20px;
+  margin: 0;
+  padding: 18px 24px;
+  border-width: 1px 0 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: var(--grey-50);
 }
 
 .supplier-backfill-form {
@@ -2574,10 +2605,22 @@ pre, code {
   }
 
   .supplier-tab-card,
-  .supplier-common-tools,
   .supplier-import-panel,
   .supplier-import-utility {
     padding: 16px;
+  }
+
+  .supplier-common-tools {
+    padding: 0;
+  }
+
+  .supplier-common-tools__head {
+    padding: 16px;
+  }
+
+  .supplier-import-panel--config {
+    border-right: 0;
+    border-bottom: 1px solid var(--grey-200);
   }
 
   .supplier-rule-summary,

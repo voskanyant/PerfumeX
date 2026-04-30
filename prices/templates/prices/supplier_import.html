@@ -157,7 +157,7 @@
             </section>
         {% endif %}
 
-        <section class="supplier-common-tools">
+        <section class="supplier-common-tools supplier-common-tools--{{ active_import_source }}">
             <div class="supplier-common-tools__head">
                 <div>
                     <span class="card-label">Mapping and tools</span>
@@ -177,19 +177,28 @@
 
                     <section class="supplier-import-panel supplier-import-panel--config">
                         <div class="supplier-import-panel__head">
-                            <span class="card-label">Upload</span>
-                            <h2 class="card-title">Price file</h2>
-                            <p class="card-desc">Choose a spreadsheet, then click columns in the preview to fill the mapping.</p>
+                            <div>
+                                <span class="card-label">Shared mapping</span>
+                                <h2 class="card-title">Workbook columns</h2>
+                                <p class="card-desc">Save these columns once; email imports, link imports, and manual files reuse the same mapping.</p>
+                            </div>
                         </div>
 
-                        <div class="supplier-upload-box">
-                            <label for="{{ form.file.id_for_label }}" class="supplier-upload-box__label">
-                                <span>Spreadsheet</span>
-                                <strong>XLS, XLSX, or CSV</strong>
-                            </label>
-                            {{ form.file }}
-                            {% if form.file.errors %}<div class="field-errors">{{ form.file.errors }}</div>{% endif %}
-                        </div>
+                        {% if active_import_source == "file" %}
+                            <div class="supplier-upload-box">
+                                <label for="{{ form.file.id_for_label }}" class="supplier-upload-box__label">
+                                    <span>Manual spreadsheet</span>
+                                    <strong>XLS, XLSX, or CSV</strong>
+                                </label>
+                                {{ form.file }}
+                                {% if form.file.errors %}<div class="field-errors">{{ form.file.errors }}</div>{% endif %}
+                            </div>
+                        {% else %}
+                            <div class="supplier-upload-box supplier-upload-box--muted">
+                                <span class="card-label">Manual upload</span>
+                                <p>Use the Price file tab only when you need to test a local spreadsheet. Automatic imports use the mapping below.</p>
+                            </div>
+                        {% endif %}
 
                         <div class="supplier-field-section">
                             <div>
@@ -243,7 +252,9 @@
 
                         <div class="supplier-import-actions">
                             <button class="button secondary" type="submit" name="action" value="save_mapping">Save mapping</button>
-                            <button class="button" type="submit" name="action" value="upload_import">Upload and import</button>
+                            {% if active_import_source == "file" %}
+                                <button class="button" type="submit" name="action" value="upload_import">Upload and import</button>
+                            {% endif %}
                         </div>
                     </section>
                 </form>
@@ -273,7 +284,11 @@
                     <div id="preview-table" class="supplier-preview-table">
                         <div class="supplier-preview-empty">
                             <span class="card-label">No file selected</span>
-                            <p>Choose a spreadsheet to preview rows and set mapping columns.</p>
+                            {% if active_import_source == "file" %}
+                                <p>Choose a spreadsheet to preview rows and set mapping columns.</p>
+                            {% else %}
+                                <p>Switch to the Price file tab when you need to preview a local spreadsheet. Saved mapping still applies here.</p>
+                            {% endif %}
                         </div>
                     </div>
                 </section>
