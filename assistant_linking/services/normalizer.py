@@ -602,6 +602,7 @@ def _clean_product_name_text(value: str) -> str:
     name = re.sub(r"\s+", " ", value or "").strip()
     name = re.sub(r"(?<=\d)\s*\.\s*(?=\d)", ".", name)
     name = re.sub(r"\s+(?:19|20)\d{2}$", "", name).strip()
+    name = re.sub(r"[\s,.;:_-]+$", "", name).strip()
     return name[:255]
 
 
@@ -742,7 +743,7 @@ def _canonicalize_product_name_from_catalog(result: ParseResult) -> str:
         if _catalog_scent_key(perfume.name) == key
     }
     if len(names) == 1:
-        return result.product_name_text
+        return names.pop()
 
     base_keys = _catalog_base_keys_without_trailing_audience(result)
     if base_keys:

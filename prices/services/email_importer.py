@@ -699,17 +699,35 @@ def run_import(
             message_id=identity_message_id,
         ).first()
         if not existing_batch:
-            return (
-                models.ImportBatch.objects.create(
-                    supplier=supplier_obj,
+            try:
+                return (
+                    models.ImportBatch.objects.create(
+                        supplier=supplier_obj,
+                        mailbox=mailbox_obj,
+                        message_folder=folder,
+                        message_id=identity_message_id,
+                        received_at=received_at_value,
+                        status=models.ImportStatus.PENDING,
+                    ),
+                    None,
+                )
+            except IntegrityError:
+                existing_batch = models.ImportBatch.objects.filter(
                     mailbox=mailbox_obj,
-                    message_folder=folder,
                     message_id=identity_message_id,
-                    received_at=received_at_value,
-                    status=models.ImportStatus.PENDING,
-                ),
-                None,
-            )
+                ).first()
+                if not existing_batch:
+                    return (
+                        models.ImportBatch.objects.create(
+                            supplier=supplier_obj,
+                            mailbox=mailbox_obj,
+                            message_folder=folder,
+                            message_id="",
+                            received_at=received_at_value,
+                            status=models.ImportStatus.PENDING,
+                        ),
+                        None,
+                    )
 
         existing_same_file = models.ImportFile.objects.filter(
             import_batch=existing_batch,
