@@ -7,13 +7,11 @@ from dataclasses import dataclass, field
 from html.parser import HTMLParser
 from pathlib import Path
 
-from assistant_linking.models import BrandAlias, ProductAlias
+from assistant_linking.models import FragranticaProduct
 from assistant_linking.utils.text import normalize_alias_value
-from catalog.models import Brand, Perfume, Source
 
 
 ALL_FRAGRANCES_SECTION = "All Fragrances"
-DEFAULT_SOURCE_TYPE = "community"
 AUDIENCE_BY_CLASS = {
     "tw-listview-item-female": "Women",
     "tw-listview-item-male": "Men",
@@ -77,16 +75,13 @@ class CatalogItem:
 
 @dataclass
 class CatalogImportSummary:
-    brand: Brand | None = None
+    brand_name: str = ""
     source_items: list[CatalogItem] = field(default_factory=list)
     collections: set[str] = field(default_factory=set)
-    matched_perfumes: list[Perfume] = field(default_factory=list)
+    existing_fragrantica_products: list[FragranticaProduct] = field(default_factory=list)
     missing_items: list[CatalogItem] = field(default_factory=list)
-    created_perfumes: list[Perfume] = field(default_factory=list)
-    updated_perfumes: list[Perfume] = field(default_factory=list)
-    created_aliases: int = 0
-    updated_aliases: int = 0
-    created_sources: int = 0
+    created_fragrantica_products: list[FragranticaProduct] = field(default_factory=list)
+    updated_fragrantica_products: list[FragranticaProduct] = field(default_factory=list)
 
 
 class FragranticaBrandCatalogParser(HTMLParser):
@@ -210,102 +205,62 @@ def import_brand_catalog(
     if not items:
         return summary
     resolved_brand_name = clean_scraped_text(brand_name or items[0].brand_name)
-    if apply:
-        brand, _ = Brand.objects.get_or_create(name=resolved_brand_name)
-    else:
-        brand = Brand.objects.filter(name__iexact=resolved_brand_name).first()
-        if brand is None:
-            brand = Brand(name=resolved_brand_name)
-    summary.brand = brand
+    summary.brand_name = resolved_brand_name
     summary.collections = {item.collection_name for item in items if item.collection_name}
 
-    matched_keys: set[tuple[str, str]] = set()
-    existing_perfumes = list(Perfume.objects.select_related("brand").filter(brand__name__iexact=resolved_brand_name))
-    existing_by_key = {canonical_key(perfume.name): perfume for perfume in existing_perfumes}
-
     for item in items:
-        perfume = existing_by_key.get(canonical_key(item.name))
-        if perfume is None:
+        normalized_brand = canonical_key(item.brand_name or resolved_brand_name)
+        normalized_name = canonical_key(item.name)
+        source_path = item.source_path or ""
+        fragrantica_product = FragranticaProduct.objects.filter(
+            normalized_brand_name=normalized_brand,
+            normalized_name=normalized_name,
+            source_path=source_path,
+        ).first()
+        if fragrantica_product is None:
             summary.missing_items.append(item)
-            if apply and create_missing_catalog:
-                perfume = Perfume.objects.create(
-                    brand=brand,
+            if apply:
+                fragrantica_product = FragranticaProduct.objects.create(
+                    brand_name=item.brand_name or resolved_brand_name,
+                    normalized_brand_name=normalized_brand,
                     name=item.name,
+                    normalized_name=normalized_name,
                     collection_name=item.collection_name,
                     audience=item.audience,
                     release_year=item.release_year,
-                    verification_status=Perfume.VERIFICATION_REVIEW,
+                    source_path=source_path,
+                    source_url=source_url,
                 )
-                existing_by_key[canonical_key(item.name)] = perfume
-                summary.created_perfumes.append(perfume)
-            else:
-                continue
+                summary.created_fragrantica_products.append(fragrantica_product)
         else:
-            summary.matched_perfumes.append(perfume)
-            matched_keys.add(item.key)
+            summary.existing_fragrantica_products.append(fragrantica_product)
             update_fields = []
-            if item.collection_name and perfume.collection_name != item.collection_name:
-                perfume.collection_name = item.collection_name
+            if fragrantica_product.brand_name != (item.brand_name or resolved_brand_name):
+                fragrantica_product.brand_name = item.brand_name or resolved_brand_name
+                update_fields.append("brand_name")
+            if fragrantica_product.name != item.name:
+                fragrantica_product.name = item.name
+                update_fields.append("name")
+            if item.collection_name and fragrantica_product.collection_name != item.collection_name:
+                fragrantica_product.collection_name = item.collection_name
                 update_fields.append("collection_name")
-            if item.release_year and perfume.release_year != item.release_year:
-                perfume.release_year = item.release_year
+            if item.release_year and fragrantica_product.release_year != item.release_year:
+                fragrantica_product.release_year = item.release_year
                 update_fields.append("release_year")
-            if item.audience and perfume.audience != item.audience:
-                perfume.audience = item.audience
+            if item.audience and fragrantica_product.audience != item.audience:
+                fragrantica_product.audience = item.audience
                 update_fields.append("audience")
+            if source_url and fragrantica_product.source_url != source_url:
+                fragrantica_product.source_url = source_url
+                update_fields.append("source_url")
             if apply and update_fields:
+                fragrantica_product.normalized_brand_name = normalized_brand
+                fragrantica_product.normalized_name = normalized_name
+                update_fields.extend(["normalized_brand_name", "normalized_name"])
                 update_fields.append("updated_at")
-                perfume.save(update_fields=update_fields)
-                summary.updated_perfumes.append(perfume)
-        if apply and source_url:
-            source, created = Source.objects.get_or_create(
-                perfume=perfume,
-                url=source_url,
-                defaults={
-                    "title": f"{resolved_brand_name} catalogue",
-                    "source_type": DEFAULT_SOURCE_TYPE,
-                    "source_domain": "fragrantica.com",
-                    "reliability": "medium",
-                },
-            )
-            if created:
-                summary.created_sources += 1
-        if apply and create_aliases:
-            _upsert_product_alias(summary, brand, perfume, item)
-
-    if apply and create_aliases:
-        _upsert_brand_alias(summary, brand, resolved_brand_name)
-    summary.matched_perfumes = [perfume for perfume in summary.matched_perfumes if (canonical_key(perfume.brand.name), canonical_key(perfume.name)) in matched_keys]
+                fragrantica_product.save(update_fields=update_fields)
+                summary.updated_fragrantica_products.append(fragrantica_product)
     return summary
-
-
-def _upsert_brand_alias(summary: CatalogImportSummary, brand: Brand, alias_text: str) -> None:
-    _, created = BrandAlias.objects.update_or_create(
-        brand=brand,
-        supplier=None,
-        alias_text=alias_text,
-        defaults={"normalized_alias": normalize_alias_value(alias_text), "active": True, "priority": 80},
-    )
-    summary.created_aliases += int(created)
-    summary.updated_aliases += int(not created)
-
-
-def _upsert_product_alias(summary: CatalogImportSummary, brand: Brand, perfume: Perfume, item: CatalogItem) -> None:
-    _, created = ProductAlias.objects.update_or_create(
-        brand=brand,
-        supplier=None,
-        alias_text=item.name,
-        defaults={
-            "perfume": perfume,
-            "canonical_text": perfume.name,
-            "collection_name": item.collection_name,
-            "audience": item.audience or perfume.audience,
-            "active": True,
-            "priority": 80,
-        },
-    )
-    summary.created_aliases += int(created)
-    summary.updated_aliases += int(not created)
 
 
 def write_missing_report(path: str | Path, items: list[CatalogItem]) -> None:

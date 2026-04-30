@@ -166,6 +166,73 @@ class ProductAlias(TimeStampedModel):
         return f"{self.alias_text} -> {self.canonical_text}"
 
 
+class FragranticaProduct(TimeStampedModel):
+    STATUS_UNLINKED = "unlinked"
+    STATUS_LINKED = "linked"
+    STATUS_IGNORED = "ignored"
+    STATUS_CHOICES = (
+        (STATUS_UNLINKED, "Unlinked"),
+        (STATUS_LINKED, "Linked"),
+        (STATUS_IGNORED, "Ignored"),
+    )
+
+    brand_name = models.CharField(max_length=200, db_index=True)
+    normalized_brand_name = models.CharField(max_length=255, db_index=True)
+    name = models.CharField(max_length=220, db_index=True)
+    normalized_name = models.CharField(max_length=255, db_index=True)
+    collection_name = models.CharField(max_length=180, blank=True, db_index=True)
+    audience = models.CharField(max_length=80, blank=True, db_index=True)
+    release_year = models.PositiveSmallIntegerField(null=True, blank=True, db_index=True)
+    source_path = models.CharField(max_length=500, blank=True)
+    source_url = models.URLField(blank=True)
+    source_domain = models.CharField(max_length=160, default="fragrantica.com", db_index=True)
+    matched_perfume = models.ForeignKey(
+        "catalog.Perfume",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="fragrantica_products",
+        db_index=True,
+    )
+    match_status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default=STATUS_UNLINKED,
+        db_index=True,
+    )
+
+    class Meta:
+        ordering = ("brand_name", "collection_name", "name")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["normalized_brand_name", "normalized_name", "source_path"],
+                name="uniq_fragrantica_product_source",
+            )
+        ]
+
+    def save(self, *args, **kwargs):
+        if not self.normalized_brand_name:
+            self.normalized_brand_name = normalize_alias_value(self.brand_name).replace("&", "and")
+        if not self.normalized_name:
+            self.normalized_name = normalize_alias_value(self.name).replace("&", "and")
+        if self.matched_perfume_id and self.match_status == self.STATUS_UNLINKED:
+            self.match_status = self.STATUS_LINKED
+        return super().save(*args, **kwargs)
+
+    def __str__(self) -> str:
+        return f"{self.brand_name} / {self.name}"
+
+    @property
+    def source_href(self) -> str:
+        if self.source_url:
+            return self.source_url
+        if self.source_path.startswith(("http://", "https://")):
+            return self.source_path
+        if self.source_path.startswith("/"):
+            return f"https://www.fragrantica.com{self.source_path}"
+        return self.source_path
+
+
 class ConcentrationAlias(TimeStampedModel):
     concentration = models.CharField(max_length=80, db_index=True)
     alias_text = models.CharField(max_length=255, db_index=True)

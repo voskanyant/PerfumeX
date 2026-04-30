@@ -475,6 +475,38 @@ class NormalizerTests(TestCase):
             "Armani / Emporio Armani Stronger with You / Amber / Eau de Parfum / 100ml",
         )
 
+    def test_dunhill_signature_collection_alias_keeps_brand_and_collection_separate(self):
+        dunhill = Brand.objects.create(name="Alfred Dunhill")
+        BrandAlias.objects.create(
+            brand=dunhill,
+            alias_text="A.DUNHILL",
+            normalized_alias="a.dunhill",
+            priority=20,
+        )
+        ProductAlias.objects.create(
+            brand=dunhill,
+            alias_text="signature collection",
+            canonical_text="",
+            collection_name="Signature Collection",
+            priority=30,
+            active=True,
+        )
+        product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="dunhill-arabian-desert-signature",
+            name="A.DUNHILL SIGNATURE COLLECTION ARABIAN DESERT 100ml edP TEST",
+        )
+
+        parsed = parse_supplier_product(product)
+
+        self.assertEqual(parsed.normalized_brand, dunhill)
+        self.assertEqual(parsed.detected_brand_text, "A.DUNHILL")
+        self.assertEqual(parsed.collection_name, "Signature Collection")
+        self.assertEqual(parsed.product_name_text, "Arabian Desert")
+        self.assertEqual(parsed.concentration, "Eau de Parfum")
+        self.assertEqual(parsed.size_ml, Decimal("100.00"))
+        self.assertTrue(parsed.is_tester)
+
     def test_catalog_link_copies_collection_name_to_parse(self):
         armani = Brand.objects.create(name="Armani")
         perfume = armani.perfumes.create(
@@ -493,6 +525,33 @@ class NormalizerTests(TestCase):
 
         self.assertEqual(parsed.product_name_text, "Amber")
         self.assertEqual(parsed.collection_name, "Emporio Armani Stronger With You")
+
+    def test_catalog_identity_infers_collection_without_supplier_collection_text(self):
+        brand = Brand.objects.create(name="Van Cleef & Arpels")
+        BrandAlias.objects.create(
+            brand=brand,
+            alias_text="VAN CLEEF & ARPELS",
+            normalized_alias="van cleef & arpels",
+        )
+        brand.perfumes.create(
+            name="Orchid Leather",
+            concentration="Eau de Parfum",
+            collection_name="Collection Extraordinaire",
+        )
+        product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="vca-orchid-leather-no-collection",
+            name="VAN CLEEF & ARPELS Orchid Leather edp 75ml TESTER",
+        )
+
+        parsed = parse_supplier_product(product)
+
+        self.assertEqual(parsed.normalized_brand, brand)
+        self.assertEqual(parsed.product_name_text, "orchid leather")
+        self.assertEqual(parsed.concentration, "Eau de Parfum")
+        self.assertEqual(parsed.collection_name, "Collection Extraordinaire")
+        self.assertEqual(parsed.size_ml, Decimal("75.00"))
+        self.assertTrue(parsed.is_tester)
 
     def test_product_alias_can_make_modifier_name_bearing(self):
         armani = Brand.objects.create(name="Armani")
@@ -1118,6 +1177,59 @@ class NormalizerTests(TestCase):
         self.assertEqual(parsed.product_name_text, "l'ame slave")
         self.assertEqual(parsed.concentration, "Eau de Parfum")
         self.assertEqual(parsed.size_ml, Decimal("100.00"))
+
+    def test_kb_preprocess_normalizes_spaced_decimal_dots_between_digits(self):
+        brand = Brand.objects.create(name="Zarkoperfume")
+        GlobalRule.objects.create(
+            title="Normalize spaced decimal dots",
+            rule_kind="regex_preprocess",
+            scope_type="global",
+            rule_text=r"(?<=\d)\s*\.\s*(?=\d) => .",
+            approved=True,
+            active=True,
+            priority=18,
+        )
+        cache.clear()
+        product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="zarko-pink-molecule-spaced-dot",
+            name="Zarkoperfume PINK MOLeCULE 090 . 09 edp 100 ml Tester",
+        )
+
+        parsed = parse_supplier_product(product)
+
+        self.assertEqual(parsed.normalized_brand, brand)
+        self.assertEqual(parsed.product_name_text, "pink molecule 090.09")
+        self.assertEqual(parsed.concentration, "Eau de Parfum")
+        self.assertEqual(parsed.size_ml, Decimal("100.00"))
+        self.assertTrue(parsed.is_tester)
+
+    def test_kb_variant_type_alias_removes_woodbox_from_scent_name(self):
+        brand = Brand.objects.create(name="Afnan")
+        GlobalRule.objects.create(
+            title="Variant type: woodbox",
+            rule_kind="parser_variant_type_term",
+            scope_type="global",
+            rule_text="woodbox => woodbox",
+            approved=True,
+            active=True,
+            priority=40,
+        )
+        cache.clear()
+        product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="afnan-tribute-blue-woodbox",
+            name="AFNAN TRIBUTE BLUE WOODBOX 100ml edP",
+        )
+
+        parsed = parse_supplier_product(product)
+
+        self.assertEqual(parsed.normalized_brand, brand)
+        self.assertEqual(parsed.product_name_text, "tribute blue")
+        self.assertEqual(parsed.concentration, "Eau de Parfum")
+        self.assertEqual(parsed.size_ml, Decimal("100.00"))
+        self.assertEqual(parsed.variant_type, "woodbox")
+        self.assertEqual(parsed.display_variant_type, "Woodbox")
 
     def test_brand_alias_rejects_bad_regex(self):
         alias = BrandAlias(

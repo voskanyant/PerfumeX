@@ -65,13 +65,13 @@ External catalogue pages should be treated as source data, not as parser code.
 
 The current saved-HTML flow is:
 
-1. Parse the external page into structured rows: brand, collection, fragrance name, release year, source path.
-2. Dry-run first and compare extracted rows with local `catalog.Perfume`.
-3. Show the operator the extracted summary and sample rows before applying anything.
-4. Write a missing report for operator review.
-5. If accepted, create or update catalogue rows.
-6. Create aliases that teach the normalizer how supplier names map to catalogue names and collections.
-7. Reparse only the affected supplier rows unless intentionally rebuilding all parses.
+1. Parse the external page into structured rows: brand, collection, fragrance name, audience, release year, source path.
+2. Dry-run first and show the operator extracted rows, collections, counts, and sample rows before applying anything.
+3. If accepted, stage external rows in `assistant_linking.FragranticaProduct`.
+4. Review staged Fragrantica rows next to local `catalog.Perfume` rows.
+5. Link or merge into `catalog.Perfume` only after review. Our Products remains the source of truth.
+6. Create aliases or parser knowledge only from approved links/merges, not directly from raw HTML import.
+7. Reparse affected supplier rows only after approved knowledge changes.
 
 For Fragrantica-like saved brand pages, see `assistant_linking/docs/html_catalog_import_rules.md`.
 
@@ -80,6 +80,9 @@ For Fragrantica-like saved brand pages, see `assistant_linking/docs/html_catalog
 Later AI-backed assistant features should read from the same knowledge surfaces instead of inventing private behavior:
 
 - Use catalogue rows as the canonical product universe.
+- Use catalogue collection facts to enrich normalization when brand, scent, and concentration match unambiguously. Supplier, size, tester, and packaging should not affect that collection lookup.
+- Use parser variant-type terms for packaging/type words that should be stripped from scent names and stored as parsed type, such as `woodbox`.
+- Use staged external catalogue rows as evidence and merge candidates, not as canonical products by themselves.
 - Use aliases as explainable normalization rules.
 - Use `GlobalRule` rows as editable parser policy.
 - Use manual decisions as supervised examples.

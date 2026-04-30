@@ -20,9 +20,14 @@ from assistant_linking.models import (
     ProductAlias,
 )
 from assistant_linking.services.garbage import GARBAGE_MODIFIER, GARBAGE_WARNING_PREFIX, match_garbage_keyword
-from assistant_linking.services.parser_rules import get_audience_alias_rules, get_parser_terms, get_regex_preprocess_rules
+from assistant_linking.services.parser_rules import (
+    get_audience_alias_rules,
+    get_parser_terms,
+    get_regex_preprocess_rules,
+    get_variant_type_alias_rules,
+)
 from assistant_linking.utils.text import normalize_alias_value
-from catalog.models import Brand, compact_decimal_text
+from catalog.models import Brand, Perfume, compact_decimal_text
 from prices.models import SupplierProduct
 
 
@@ -219,6 +224,22 @@ def _refill_terms() -> tuple[str, ...]:
     return _kb_terms("parser_refill_term", ())
 
 
+def _variant_type_aliases() -> tuple[tuple[str, str], ...]:
+    aliases = [
+        (normalize_text(alias), normalize_text(variant_type).replace(" ", "_"))
+        for alias, variant_type in get_variant_type_alias_rules()
+    ]
+    return tuple(
+        (alias, variant_type)
+        for alias, variant_type in aliases
+        if alias and variant_type
+    )
+
+
+def _variant_type_terms() -> tuple[str, ...]:
+    return tuple(alias for alias, _variant_type in _variant_type_aliases())
+
+
 def _audience_aliases() -> tuple[tuple[str, str, str], ...]:
     aliases = [
         (normalize_text(alias), display, group)
@@ -360,6 +381,23 @@ def _clean_product_name_text(value: str) -> str:
     return name[:255]
 
 
+def _catalog_collection_for_identity(brand: Brand | None, product_name_text: str, concentration: str) -> str:
+    if not brand or not product_name_text or not concentration:
+        return ""
+    target_name = normalize_text(product_name_text)
+    matches = []
+    for perfume in Perfume.objects.filter(
+        brand=brand,
+        concentration__iexact=concentration,
+    ).exclude(collection_name=""):
+        if normalize_text(perfume.name) == target_name:
+            matches.append(perfume.collection_name)
+    collections = {collection for collection in matches if collection}
+    if len(collections) == 1:
+        return next(iter(collections))
+    return ""
+
+
 def _extract_release_year(text: str) -> tuple[int | None, str]:
     matches = list(re.finditer(r"(?<!\d)(?P<year>(?:19|20)\d{2})(?!\d)", text))
     if not matches:
@@ -450,7 +488,7 @@ def _extract_loose_trailing_size(text: str) -> tuple[Decimal | None, str, str]:
         "мини",
         "набор",
     )
-    trailing_terms = tuple({*trailing_terms, *_tester_terms(), *_sample_terms(), *_travel_terms(), *_mini_terms(), *_set_terms(), *_refill_terms()})
+    trailing_terms = tuple({*trailing_terms, *_tester_terms(), *_sample_terms(), *_travel_terms(), *_mini_terms(), *_set_terms(), *_refill_terms(), *_variant_type_terms()})
     trailing_pattern = "|".join(re.escape(term) for term in trailing_terms)
     match = re.search(
         rf"(?P<prefix>.*?)(?:^|\s)(?P<size>\d+(?:[.,]\d+)?)(?:\s+(?:{trailing_pattern}))*\s*$",
@@ -540,16 +578,23 @@ def parse_supplier_product(product: SupplierProduct) -> ParseResult:
     mini_terms = _mini_terms()
     set_terms = _set_terms()
     refill_terms = _refill_terms()
+    variant_type_aliases = _variant_type_aliases()
+    variant_type_terms = tuple(alias for alias, _variant_type in variant_type_aliases)
 
     result.is_tester = _contains_any_phrase(text, tester_terms)
     result.is_sample = _contains_any_phrase(text, sample_terms)
     result.is_travel = _contains_any_phrase(text, travel_terms)
     is_mini = _contains_any_phrase(text, mini_terms)
     result.is_set = _contains_any_phrase(text, set_terms)
+    custom_variant_type = ""
+    for alias_text, variant_type in variant_type_aliases:
+        if _contains_phrase(text, alias_text):
+            custom_variant_type = variant_type
+            break
     if result.raw_size_text and "*" in result.raw_size_text:
         result.is_set = True
     result.packaging = "no_box" if _contains_any_phrase(text, NO_BOX_TERMS) else ""
-    result.variant_type = "sample" if result.is_sample else ("travel" if result.is_travel else ("mini" if is_mini else ("set" if result.is_set else ("tester" if result.is_tester else "standard"))))
+    result.variant_type = "sample" if result.is_sample else ("travel" if result.is_travel else ("mini" if is_mini else ("set" if result.is_set else (custom_variant_type or ("tester" if result.is_tester else "standard")))))
     result.modifiers = [term for term in MODIFIER_TERMS if re.search(rf"(^|\s){re.escape(term)}($|\s)", text)]
     if is_mini and MINI_MODIFIER not in result.modifiers:
         result.modifiers.append(MINI_MODIFIER)
@@ -581,6 +626,7 @@ def parse_supplier_product(product: SupplierProduct) -> ParseResult:
             *mini_terms,
             *set_terms,
             *refill_terms,
+            *variant_type_terms,
             *NO_BOX_TERMS,
         ],
     )
@@ -651,12 +697,19 @@ def parse_supplier_product(product: SupplierProduct) -> ParseResult:
                 *mini_terms,
                 *set_terms,
                 *refill_terms,
+                *variant_type_terms,
                 *NO_BOX_TERMS,
             ],
         )
         result.product_name_text = _clean_product_name_text(remaining)
 
     result.product_name_text = _clean_product_name_text(result.product_name_text)
+    if not result.collection_name:
+        result.collection_name = _catalog_collection_for_identity(
+            result.normalized_brand,
+            result.product_name_text,
+            result.concentration,
+        )
 
     if not result.normalized_brand:
         result.warnings.append("brand missing")
