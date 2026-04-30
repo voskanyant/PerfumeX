@@ -1463,7 +1463,7 @@ class NormalizerTests(TestCase):
         parsed = parse_supplier_product(product)
 
         self.assertEqual(parsed.normalized_brand, brand)
-        self.assertEqual(parsed.product_name_text, "orchid leather")
+        self.assertEqual(parsed.product_name_text, "Orchid Leather")
         self.assertEqual(parsed.concentration, "Eau de Parfum")
         self.assertEqual(parsed.collection_name, "Collection Extraordinaire")
         self.assertEqual(parsed.size_ml, Decimal("75.00"))

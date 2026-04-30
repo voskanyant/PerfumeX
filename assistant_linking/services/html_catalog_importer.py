@@ -34,7 +34,7 @@ def clean_scraped_text(value: str) -> str:
     if not text:
         return ""
     repaired = text
-    for _ in range(3):
+    for _ in range(2):
         candidate = ""
         for codec in ("latin1", "cp1252"):
             try:
