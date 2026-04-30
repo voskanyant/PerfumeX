@@ -82,7 +82,7 @@ class HtmlCatalogImporterTests(TestCase):
         self.assertEqual(FragranticaProduct.objects.count(), 2)
         self.assertTrue(
             FragranticaProduct.objects.filter(
-                name="Bois DorÃ©",
+                normalized_name="bois dore",
                 collection_name="Collection Extraordinaire",
                 audience="Unisex",
                 release_year=2017,
