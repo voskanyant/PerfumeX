@@ -75,6 +75,13 @@
                                 <label class="switch-label inactive-switch-label" for="{{ inactive_switch_id }}">Show inactive</label>
                             </div>
                         </div>
+                        <div class="filter-item">
+                            <label for="{{ inactive_suppliers_switch_id }}">Inactive suppliers</label>
+                            <div class="switch-row inactive-switch-wrap">
+                                <input class="switch-input" id="{{ inactive_suppliers_switch_id }}" data-show-inactive-suppliers-switch type="checkbox" role="switch"{% if include_inactive_suppliers %} checked{% endif %}>
+                                <label class="switch-label inactive-switch-label" for="{{ inactive_suppliers_switch_id }}">Show inactive</label>
+                            </div>
+                        </div>
                     {% endif %}
                     {% if include_product_filters %}
                         <div class="filter-item">

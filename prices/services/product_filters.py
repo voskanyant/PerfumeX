@@ -20,6 +20,7 @@ FRONT_FILTER_KEYS = (
     "q",
     "currency",
     "supplier",
+    "include_inactive_suppliers",
     "status",
     "price_min",
     "price_max",
@@ -55,6 +56,7 @@ class SupplierProductFilterState:
     exclude_terms: list[str]
     currency: str
     supplier_filter_ids: list[int]
+    include_inactive_suppliers: bool
     status_filter: str
     smart_search_enabled: bool
 
@@ -193,6 +195,11 @@ def smart_search_enabled_from_request(request) -> bool:
     return raw in {"1", "true", "yes", "on"}
 
 
+def include_inactive_suppliers_from_request(request) -> bool:
+    raw = (request.GET.get("include_inactive_suppliers") or "").strip().lower()
+    return raw in {"1", "true", "yes", "on"}
+
+
 def supplier_product_filter_state_from_request(request) -> SupplierProductFilterState:
     query = request.GET.get("q", "").strip()
     include_tokens, inline_exclude_tokens = parse_search_query(query)
@@ -205,6 +212,7 @@ def supplier_product_filter_state_from_request(request) -> SupplierProductFilter
         exclude_terms=parse_exclude_terms(exclude_raw),
         currency=request.GET.get("currency", "").strip() or models.Currency.USD,
         supplier_filter_ids=supplier_filter_ids_from_request(request),
+        include_inactive_suppliers=include_inactive_suppliers_from_request(request),
         status_filter=normalize_supplier_product_status(request.GET.get("status")),
         smart_search_enabled=smart_search_enabled_from_request(request),
     )
@@ -233,6 +241,8 @@ def apply_supplier_product_filter_state(
         queryset = queryset.exclude(name__icontains=term)
     if filter_state.supplier_filter_ids:
         queryset = queryset.filter(supplier_id__in=filter_state.supplier_filter_ids)
+    if not filter_state.include_inactive_suppliers:
+        queryset = queryset.filter(supplier__is_active=True)
     if filter_state.status_filter == "active":
         queryset = queryset.filter(is_active=True)
     elif filter_state.status_filter == "inactive":
@@ -289,16 +299,20 @@ def build_supplier_product_filter_context(
     price_min_raw: str = "",
     price_max_raw: str = "",
 ) -> dict:
+    supplier_options = models.Supplier.objects
+    if not filter_state.include_inactive_suppliers:
+        supplier_options = supplier_options.filter(is_active=True)
     return {
         "currency_filter": filter_state.currency,
         "currency_options": [choice[0] for choice in models.Currency.choices],
         "supplier_filter": serialize_supplier_filter_ids(
             filter_state.supplier_filter_ids
         ),
-        "supplier_options": models.Supplier.objects.order_by("name"),
+        "supplier_options": supplier_options.order_by("name"),
         "supplier_filter_names": build_supplier_filter_names(
             filter_state.supplier_filter_ids
         ),
+        "include_inactive_suppliers": filter_state.include_inactive_suppliers,
         "status_filter": filter_state.status_filter,
         "status_options": [
             ("all", "All"),

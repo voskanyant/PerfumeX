@@ -11,7 +11,7 @@ from assistant_linking.services.normalization_stats import (
     refresh_stats_snapshot,
     snapshot_to_stats,
 )
-from assistant_linking.services.normalizer import save_parse
+from assistant_linking.services.normalizer import parse_supplier_product, save_parse
 from prices.models import SupplierProduct
 from prices.services.product_visibility import apply_hidden_product_keywords
 
@@ -220,18 +220,33 @@ def build_unparsed_queryset(
     return queryset.order_by("supplier__name", "name")
 
 
+def attach_unparsed_parse_previews(
+    products,
+    *,
+    parse_preview_builder=parse_supplier_product,
+):
+    for product in products:
+        product.parsed_preview = parse_preview_builder(product)
+    return products
+
+
 def refresh_visible_unparsed_context(
     context,
     *,
     force_refresh=False,
     supplier_product_model=SupplierProduct,
     parse_saver=save_parse,
+    parse_preview_builder=parse_supplier_product,
 ):
     context["allow_refresh_visible"] = True
+    visible_products = list(context.get("products", []))
     if not force_refresh:
+        attach_unparsed_parse_previews(
+            visible_products,
+            parse_preview_builder=parse_preview_builder,
+        )
         return context
 
-    visible_products = list(context.get("products", []))
     refreshed_count = 0
     if visible_products:
         for product in visible_products:
@@ -251,6 +266,10 @@ def refresh_visible_unparsed_context(
         context["object_list"] = visible_products
         if context.get("page_obj"):
             context["page_obj"].object_list = visible_products
+    attach_unparsed_parse_previews(
+        visible_products,
+        parse_preview_builder=parse_preview_builder,
+    )
     context["refreshed_visible_count"] = refreshed_count
     context["moved_visible_count"] = refreshed_count - len(visible_products)
     return context

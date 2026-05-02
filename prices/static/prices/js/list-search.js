@@ -11,6 +11,7 @@
     var clearSupplierFilterBtn = document.querySelector("[data-clear-supplier-filter-button]");
     var statusFilter = document.getElementById("status-filter");
     var showInactiveSwitch = document.querySelector("[data-show-inactive-switch]");
+    var showInactiveSuppliersSwitch = document.querySelector("[data-show-inactive-suppliers-switch]");
     var excludeFilter = document.getElementById("exclude-filter");
     var excludeApplyBtn = document.getElementById("exclude-apply-btn");
     var smartSearchSwitch = document.getElementById("smart-search-switch");
@@ -189,6 +190,13 @@
                 url.searchParams.set("supplier", supplierFilter.value);
             } else {
                 url.searchParams.delete("supplier");
+            }
+        }
+        if (showInactiveSuppliersSwitch) {
+            if (showInactiveSuppliersSwitch.checked) {
+                url.searchParams.set("include_inactive_suppliers", "1");
+            } else {
+                url.searchParams.delete("include_inactive_suppliers");
             }
         }
         var statusValue = getStatusFilterValue();
@@ -813,6 +821,7 @@
             query,
             currencyFilter ? currencyFilter.value : "",
             supplierFilter ? supplierFilter.value : "",
+            showInactiveSuppliersSwitch && showInactiveSuppliersSwitch.checked ? "1" : "",
             getStatusFilterValue(),
             smartSearchSwitch && smartSearchSwitch.checked ? "1" : "",
             excludeFilter ? excludeFilter.value.trim() : "",
@@ -846,6 +855,9 @@
         }
         if (supplierFilter && supplierFilter.value) {
             url += "&supplier=" + encodeURIComponent(supplierFilter.value);
+        }
+        if (showInactiveSuppliersSwitch && showInactiveSuppliersSwitch.checked) {
+            url += "&include_inactive_suppliers=1";
         }
         var statusValue = getStatusFilterValue();
         if (statusValue && statusValue !== "all") {
@@ -1028,6 +1040,14 @@
     }
     if (showInactiveSwitch) {
         showInactiveSwitch.addEventListener("change", function () {
+            var url = new URL(window.location.href);
+            setCommonFilters(url);
+            url.searchParams.delete("page");
+            window.location.href = url.toString();
+        });
+    }
+    if (showInactiveSuppliersSwitch) {
+        showInactiveSuppliersSwitch.addEventListener("change", function () {
             var url = new URL(window.location.href);
             setCommonFilters(url);
             url.searchParams.delete("page");

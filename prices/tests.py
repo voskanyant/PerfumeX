@@ -2,12 +2,13 @@ import io
 import hashlib
 import shutil
 import tempfile
+from collections import defaultdict
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 from email.message import EmailMessage
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import ANY, patch
+from unittest.mock import ANY, Mock, call, patch
 
 from django.contrib.messages import get_messages
 from django.contrib.auth import get_user_model
@@ -4051,6 +4052,7 @@ class ProductDisplayServiceTests(SimpleTestCase):
             exclude_terms=["tester"],
             currency=models.Currency.RUB,
             supplier_filter_ids=[2],
+            include_inactive_suppliers=False,
             status_filter="active",
             smart_search_enabled=True,
         )
@@ -4272,6 +4274,7 @@ class ProductDisplayServiceTests(SimpleTestCase):
             exclude_terms=[],
             currency=models.Currency.USD,
             supplier_filter_ids=[],
+            include_inactive_suppliers=False,
             status_filter="all",
             smart_search_enabled=False,
         )
@@ -6448,7 +6451,7 @@ class CatalogReviewServiceTests(SimpleTestCase):
             variant_rows.calls,
         )
 
-    def test_build_fragrantica_product_review_context_groups_and_filters_rows(self):
+    def test_build_fragrantica_product_review_context_filters_fragrantica_rows(self):
         from prices.services.catalog_review import (
             build_fragrantica_product_review_context,
         )
@@ -6462,17 +6465,33 @@ class CatalogReviewServiceTests(SimpleTestCase):
                 self.calls.append(("select_related", fields))
                 return self
 
-            def annotate(self, **kwargs):
-                self.calls.append(("annotate", sorted(kwargs)))
-                return self
-
             def filter(self, *args, **kwargs):
                 self.calls.append(("filter", args, kwargs))
-                return self
+                rows = self.rows
+                if "brand_name__iexact" in kwargs:
+                    rows = [
+                        row
+                        for row in rows
+                        if row.brand_name.lower()
+                        == kwargs["brand_name__iexact"].lower()
+                    ]
+                if "match_status" in kwargs:
+                    rows = [
+                        row
+                        for row in rows
+                        if row.match_status == kwargs["match_status"]
+                    ]
+                filtered = FakeQuerySet(rows)
+                filtered.calls = self.calls
+                return filtered
 
             def order_by(self, *fields):
                 self.calls.append(("order_by", fields))
                 return self
+
+            def values(self, *fields):
+                self.calls.append(("values", fields))
+                return FakeValuesQuerySet(self.rows, fields)
 
             def __iter__(self):
                 return iter(self.rows)
@@ -6483,81 +6502,115 @@ class CatalogReviewServiceTests(SimpleTestCase):
             def count(self):
                 return len(self.rows)
 
+        class FakeValuesQuerySet:
+            def __init__(self, rows, fields):
+                self.rows = rows
+                self.fields = fields
+                self.count_name = None
+
+            def annotate(self, **kwargs):
+                self.count_name = next(iter(kwargs))
+                return self
+
+            def order_by(self, *fields):
+                return sorted(
+                    self._dict_rows(),
+                    key=lambda row: tuple(row[field] for field in fields),
+                )
+
+            def values_list(self, *fields):
+                return [
+                    tuple(row[field] for field in fields) for row in self._dict_rows()
+                ]
+
+            def _dict_rows(self):
+                grouped = defaultdict(int)
+                for row in self.rows:
+                    key = tuple(getattr(row, field) for field in self.fields)
+                    grouped[key] += 1
+                return [
+                    {
+                        **dict(zip(self.fields, key, strict=False)),
+                        self.count_name or "count": count,
+                    }
+                    for key, count in grouped.items()
+                ]
+
+        class FakePerfumeQuerySet:
+            def select_related(self, *fields):
+                return self
+
+            def filter(self, *args, **kwargs):
+                return self
+
+            def __iter__(self):
+                return iter(())
+
         class FakePaginator:
             def __init__(self, rows, page_size):
-                self.rows = rows
+                self.rows = list(rows)
                 self.page_size = page_size
                 self.num_pages = 2
 
             def get_page(self, page_number):
                 return SimpleNamespace(object_list=self.rows, number=page_number)
 
-        linked = SimpleNamespace(
-            brand_id=1,
-            name="Linked Scent",
-            collection_name="Classic",
-            linked_supplier_count=1,
-        )
-        with_evidence = SimpleNamespace(
-            brand_id=1,
+        unlinked = SimpleNamespace(
+            brand_name="Montale",
             name="Evidence Scent",
             collection_name="Classic",
-            linked_supplier_count=0,
+            audience="Women",
+            release_year=2008,
+            match_status="unlinked",
+            matched_perfume=None,
         )
-        matching_evidence = SimpleNamespace(
-            normalized_brand_id=1,
-            normalized_brand="Montale",
-            display_product_name="Evidence Scent",
-            product_name_text="Evidence Scent",
+        linked = SimpleNamespace(
+            brand_name="Montale",
+            name="Linked Scent",
             collection_name="Classic",
+            audience="Men",
+            release_year=2010,
+            match_status="linked",
+            matched_perfume=None,
         )
-        missing_evidence = SimpleNamespace(
-            normalized_brand_id=1,
-            normalized_brand="Montale",
-            display_product_name="Missing Scent",
-            product_name_text="Missing Scent",
-            collection_name="Classic",
+        other_brand = SimpleNamespace(
+            brand_name="Amouage",
+            name="Other Scent",
+            collection_name="",
+            audience="Unisex",
+            release_year=2020,
+            match_status="unlinked",
+            matched_perfume=None,
         )
-        perfume_rows = FakeQuerySet([linked, with_evidence])
-        parsed_rows = FakeQuerySet([matching_evidence, missing_evidence])
-        brand_rows = FakeQuerySet([])
-        fragrantica_rows = FakeQuerySet([])
+        fragrantica_rows = FakeQuerySet([unlinked, linked, other_brand])
         request = RequestFactory().get(
             "/admin/fragrantica-products/",
             {
-                "brand": "1",
-                "q": "vanilla",
-                "status": "supplier_evidence",
+                "brand": "Montale",
+                "status": "unlinked",
                 "page": "3",
             },
         )
 
         result = build_fragrantica_product_review_context(
             request,
-            brand_manager=brand_rows,
             fragrantica_manager=fragrantica_rows,
-            perfume_manager=perfume_rows,
-            parsed_product_manager=parsed_rows,
+            perfume_manager=FakePerfumeQuerySet(),
             paginator_class=FakePaginator,
             page_size=25,
         )
 
-        self.assertEqual(result["selected_brand_id"], "1")
-        self.assertEqual(result["search_query"], "vanilla")
-        self.assertEqual(result["status_filter"], "supplier_evidence")
-        self.assertEqual(result["status_counts"], {"linked": 1, "supplier_evidence": 1})
-        self.assertEqual(result["total_count"], 2)
+        self.assertEqual(result["selected_brand"], "Montale")
+        self.assertEqual(result["search_query"], "")
+        self.assertEqual(result["status_filter"], "unlinked")
+        self.assertEqual(result["status_counts"], {"unlinked": 1, "linked": 1})
+        self.assertEqual(result["total_count"], 3)
         self.assertEqual(result["filtered_count"], 1)
-        self.assertEqual(result["rows"][0]["perfume"], with_evidence)
-        self.assertEqual(result["rows"][0]["evidence_count"], 1)
-        self.assertEqual(result["missing_supplier_count"], 1)
-        self.assertEqual(result["missing_supplier_rows"][0]["name"], "Missing Scent")
+        self.assertEqual(result["rows"][0]["source"], unlinked)
         self.assertNotIn("page=", result["query_string"])
         self.assertEqual(result["paginator"].page_size, 25)
-        self.assertIn(("filter", (), {"brand_id": "1"}), perfume_rows.calls)
         self.assertIn(
-            ("filter", (), {"normalized_brand_id__in": {1}}),
-            parsed_rows.calls,
+            ("filter", (), {"brand_name__iexact": "Montale"}), fragrantica_rows.calls
         )
 
     def test_build_catalog_tab_action_result_handles_catalogue_tab_mutations(self):
@@ -7299,13 +7352,19 @@ class ProductFilterServiceTests(SimpleTestCase):
 
         request = RequestFactory().get(
             "/products/",
-            {"q": "oud", "supplier": ["3", "4"], "exclude": "tester"},
+            {
+                "q": "oud",
+                "supplier": ["3", "4"],
+                "include_inactive_suppliers": "1",
+                "exclude": "tester",
+            },
         )
 
         self.assertTrue(has_front_filter_params(request))
         values = collect_front_filter_values(request)
         self.assertEqual(values["q"], "oud")
         self.assertEqual(values["supplier"], "3,4")
+        self.assertEqual(values["include_inactive_suppliers"], "1")
         self.assertEqual(values["exclude"], "tester")
 
     def test_viewer_front_filter_redirect_saves_explicit_filters(self):
@@ -7336,6 +7395,7 @@ class ProductFilterServiceTests(SimpleTestCase):
             supplier_front_filters={
                 "q": "oud",
                 "supplier": "3,4",
+                "include_inactive_suppliers": "1",
                 "status": " ",
                 "unexpected": "ignored",
             }
@@ -7347,7 +7407,10 @@ class ProductFilterServiceTests(SimpleTestCase):
             save_func=lambda request: self.fail("empty query should not save filters"),
         )
 
-        self.assertEqual(redirect_url, "/products/?q=oud&supplier=3%2C4")
+        self.assertEqual(
+            redirect_url,
+            "/products/?q=oud&supplier=3%2C4&include_inactive_suppliers=1",
+        )
 
     def test_supplier_filter_ids_from_request_merges_repeated_values(self):
         from prices.services.product_filters import (
@@ -7430,6 +7493,7 @@ class ProductFilterServiceTests(SimpleTestCase):
                 "currency": models.Currency.RUB,
                 "exclude": "sample, mini",
                 "smart": "on",
+                "include_inactive_suppliers": "1",
             },
         )
         request.user = AnonymousUser()
@@ -7444,6 +7508,7 @@ class ProductFilterServiceTests(SimpleTestCase):
         self.assertEqual(state.currency, models.Currency.RUB)
         self.assertEqual(state.exclude_terms, ["sample", "mini"])
         self.assertTrue(state.smart_search_enabled)
+        self.assertTrue(state.include_inactive_suppliers)
 
     @patch("prices.services.product_filters.models.Supplier.objects")
     def test_filter_context_serializes_template_filter_state(
@@ -7455,9 +7520,11 @@ class ProductFilterServiceTests(SimpleTestCase):
         )
 
         supplier_options = [SimpleNamespace(id=1, name="Any Supplier")]
-        mock_supplier_manager.order_by.return_value = supplier_options
-        mock_supplier_manager.filter.return_value = [
-            SimpleNamespace(id=4, name="Supplier Four"),
+        active_supplier_queryset = Mock()
+        active_supplier_queryset.order_by.return_value = supplier_options
+        mock_supplier_manager.filter.side_effect = [
+            active_supplier_queryset,
+            [SimpleNamespace(id=4, name="Supplier Four")],
         ]
         state = SupplierProductFilterState(
             query="oud",
@@ -7467,6 +7534,7 @@ class ProductFilterServiceTests(SimpleTestCase):
             exclude_terms=["tester"],
             currency=models.Currency.RUB,
             supplier_filter_ids=[4, 9],
+            include_inactive_suppliers=False,
             status_filter="inactive",
             smart_search_enabled=True,
         )
@@ -7481,6 +7549,7 @@ class ProductFilterServiceTests(SimpleTestCase):
         self.assertIn(models.Currency.USD, context["currency_options"])
         self.assertEqual(context["supplier_filter"], "4,9")
         self.assertEqual(context["supplier_options"], supplier_options)
+        self.assertFalse(context["include_inactive_suppliers"])
         self.assertEqual(
             context["supplier_filter_names"],
             [
@@ -7493,8 +7562,14 @@ class ProductFilterServiceTests(SimpleTestCase):
         self.assertEqual(context["exclude_terms"], "tester")
         self.assertEqual(context["price_min"], "10")
         self.assertEqual(context["price_max"], "90")
-        mock_supplier_manager.order_by.assert_called_once_with("name")
-        mock_supplier_manager.filter.assert_called_once_with(id__in=[4, 9])
+        active_supplier_queryset.order_by.assert_called_once_with("name")
+        self.assertEqual(
+            mock_supplier_manager.filter.call_args_list,
+            [
+                call(is_active=True),
+                call(id__in=[4, 9]),
+            ],
+        )
 
     def test_apply_filter_state_keeps_list_and_ajax_filter_policy_together(self):
         from prices.services.product_filters import (
@@ -7525,6 +7600,7 @@ class ProductFilterServiceTests(SimpleTestCase):
             exclude_terms=["mini"],
             currency=models.Currency.USD,
             supplier_filter_ids=[4, 7],
+            include_inactive_suppliers=False,
             status_filter="active",
             smart_search_enabled=False,
         )
@@ -7533,9 +7609,47 @@ class ProductFilterServiceTests(SimpleTestCase):
 
         self.assertIs(result, queryset)
         self.assertIn(((), {"supplier_id__in": [4, 7]}), queryset.filter_calls)
+        self.assertIn(((), {"supplier__is_active": True}), queryset.filter_calls)
         self.assertIn(((), {"is_active": True}), queryset.filter_calls)
         self.assertIn(((), {"name__icontains": "tester"}), queryset.exclude_calls)
         self.assertEqual(len(queryset.exclude_calls), 2)
+
+    def test_apply_filter_state_can_include_inactive_suppliers(self):
+        from prices.services.product_filters import (
+            SupplierProductFilterState,
+            apply_supplier_product_filter_state,
+        )
+
+        class FakeQuerySet:
+            def __init__(self):
+                self.filter_calls = []
+
+            def filter(self, *args, **kwargs):
+                self.filter_calls.append((args, kwargs))
+                return self
+
+            def exclude(self, *args, **kwargs):
+                return self
+
+        request = RequestFactory().get("/products/")
+        queryset = FakeQuerySet()
+        state = SupplierProductFilterState(
+            query="",
+            include_tokens=[],
+            inline_exclude_tokens=[],
+            exclude_raw="",
+            exclude_terms=[],
+            currency=models.Currency.USD,
+            supplier_filter_ids=[],
+            include_inactive_suppliers=True,
+            status_filter="all",
+            smart_search_enabled=False,
+        )
+
+        result = apply_supplier_product_filter_state(queryset, state, request)
+
+        self.assertIs(result, queryset)
+        self.assertNotIn(((), {"supplier__is_active": True}), queryset.filter_calls)
 
     def test_build_supplier_product_queryset_for_request_applies_shared_pipeline(self):
         from django.contrib.auth.models import AnonymousUser
@@ -7577,6 +7691,7 @@ class ProductFilterServiceTests(SimpleTestCase):
             exclude_terms=[],
             currency=models.Currency.RUB,
             supplier_filter_ids=[],
+            include_inactive_suppliers=False,
             status_filter="active",
             smart_search_enabled=False,
         )
@@ -7761,7 +7876,7 @@ class OurProductCatalogueListTests(TestCase):
         self.assertContains(response, "box")
         self.assertContains(response, reverse("prices:fragrantica_product_review"))
 
-    def test_fragrantica_products_compares_catalogue_with_supplier_parse(self):
+    def test_fragrantica_products_lists_fragrantica_rows_only(self):
         supplier = models.Supplier.objects.create(name="Antonina")
         supplier_product = models.SupplierProduct.objects.create(
             supplier=supplier,
@@ -7781,20 +7896,32 @@ class OurProductCatalogueListTests(TestCase):
             size_ml="100.00",
             confidence=95,
         )
+        FragranticaProduct.objects.create(
+            brand_name="Montale",
+            normalized_brand_name="montale",
+            name="Vanilla Extasy Source",
+            normalized_name="vanilla extasy source",
+            collection_name="Fragrantica Collection",
+            audience="Women",
+            release_year=2008,
+            source_path="/perfume/Montale/Vanilla-Extasy-1.html",
+        )
 
         response = self.client.get(
             reverse("prices:fragrantica_product_review"),
-            {"brand": self.perfume.brand_id},
+            {"brand": "Montale"},
         )
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Fragrantica Products")
-        self.assertContains(response, "Vanilla Extasy")
-        self.assertContains(response, "Classic")
-        self.assertContains(response, "1 parsed supplier rows")
-        self.assertContains(response, "1 linked supplier rows")
+        self.assertContains(response, "Vanilla Extasy Source")
+        self.assertContains(response, "Fragrantica Collection")
+        self.assertContains(response, "Women")
+        self.assertContains(response, "2008")
+        self.assertNotContains(response, "1 parsed supplier rows")
+        self.assertNotContains(response, "1 linked supplier rows")
 
-    def test_fragrantica_products_shows_supplier_rows_missing_from_catalogue(self):
+    def test_fragrantica_products_does_not_show_supplier_missing_comparison(self):
         supplier = models.Supplier.objects.create(name="Antonina")
         supplier_product = models.SupplierProduct.objects.create(
             supplier=supplier,
@@ -7816,14 +7943,14 @@ class OurProductCatalogueListTests(TestCase):
 
         response = self.client.get(
             reverse("prices:fragrantica_product_review"),
-            {"brand": self.perfume.brand_id},
+            {"brand": "Montale"},
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(
+        self.assertNotContains(
             response, "Supplier products not found in Fragrantica catalogue"
         )
-        self.assertContains(response, "Missing Scent")
+        self.assertNotContains(response, "Missing Scent")
 
     def test_fragrantica_products_shows_staged_source_rows_with_match_action(self):
         FragranticaProduct.objects.create(
@@ -7850,7 +7977,6 @@ class OurProductCatalogueListTests(TestCase):
         response = self.client.get(reverse("prices:fragrantica_product_review"))
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Source truth review")
         self.assertContains(response, "Fragrantica Collection")
         self.assertContains(response, "Women")
         self.assertContains(response, "2008")

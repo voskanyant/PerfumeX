@@ -38,7 +38,7 @@
             </div>
         </div>
 
-        {% include "prices/_product_list_search_filters.html" with class_name="filters-products" search_id="product-live-search" clear_search_id="product-clear-search-btn" search_count_id="product-search-count" drawer_id="product-filters-sidebar-product" drawer_label_id="product-filters-sidebar-label-product" currency_filter_id="product-currency-filter" supplier_search_id="product-supplier-filter-search" supplier_suggest_id="product-supplier-suggest" supplier_chips_id="product-supplier-selected-chips" supplier_options_id="product-supplier-option-source" supplier_filter_id="product-supplier-filter" inactive_switch_id="product-show-inactive-switch" clear_supplier_filter_id="product-clear-supplier-filter-btn" include_supplier_summary="1" include_product_filters="1" always_show_filter_button="1" always_show_filter_drawer="1" %}
+        {% include "prices/_product_list_search_filters.html" with class_name="filters-products" search_id="product-live-search" clear_search_id="product-clear-search-btn" search_count_id="product-search-count" drawer_id="product-filters-sidebar-product" drawer_label_id="product-filters-sidebar-label-product" currency_filter_id="product-currency-filter" supplier_search_id="product-supplier-filter-search" supplier_suggest_id="product-supplier-suggest" supplier_chips_id="product-supplier-selected-chips" supplier_options_id="product-supplier-option-source" supplier_filter_id="product-supplier-filter" inactive_switch_id="product-show-inactive-switch" inactive_suppliers_switch_id="product-show-inactive-suppliers-switch" clear_supplier_filter_id="product-clear-supplier-filter-btn" include_supplier_summary="1" include_product_filters="1" always_show_filter_button="1" always_show_filter_drawer="1" %}
     {% else %}
         <div class="generic-list-header">
             <div>
@@ -79,7 +79,7 @@
             </div>
         </div>
 
-        {% include "prices/_product_list_search_filters.html" with class_name="generic-list-surface" search_id="generic-live-search" clear_search_id="generic-clear-search-btn" search_count_id="generic-search-count" drawer_id="product-filters-sidebar-generic" drawer_label_id="product-filters-sidebar-label-generic" currency_filter_id="generic-currency-filter" supplier_search_id="generic-supplier-filter-search" supplier_suggest_id="generic-supplier-suggest" supplier_chips_id="generic-supplier-selected-chips" supplier_options_id="generic-supplier-option-source" supplier_filter_id="generic-supplier-filter" inactive_switch_id="generic-show-inactive-switch" server_search="1" %}
+        {% include "prices/_product_list_search_filters.html" with class_name="generic-list-surface" search_id="generic-live-search" clear_search_id="generic-clear-search-btn" search_count_id="generic-search-count" drawer_id="product-filters-sidebar-generic" drawer_label_id="product-filters-sidebar-label-generic" currency_filter_id="generic-currency-filter" supplier_search_id="generic-supplier-filter-search" supplier_suggest_id="generic-supplier-suggest" supplier_chips_id="generic-supplier-selected-chips" supplier_options_id="generic-supplier-option-source" supplier_filter_id="generic-supplier-filter" inactive_switch_id="generic-show-inactive-switch" inactive_suppliers_switch_id="generic-show-inactive-suppliers-switch" server_search="1" %}
     {% endif %}
 
             <div class="table-wrap table-scroll-x workspace-table-wrap">
@@ -95,7 +95,7 @@
                             <th scope="col" data-field="{{ field }}">
                                 {% if current_sort == field %}
                                     {% if current_dir == "asc" %}
-                                        <a href="?sort={{ field }}&dir=desc{% if current_q %}&q={{ current_q }}{% endif %}{% if currency_filter %}&currency={{ currency_filter }}{% endif %}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if exclude_terms %}&exclude={{ exclude_terms|urlencode }}{% endif %}{% if smart_search_enabled %}&smart=1{% endif %}{% if price_min %}&price_min={{ price_min|urlencode }}{% endif %}{% if price_max %}&price_max={{ price_max|urlencode }}{% endif %}">
+                                        <a href="?sort={{ field }}&dir=desc{% if current_q %}&q={{ current_q }}{% endif %}{% if currency_filter %}&currency={{ currency_filter }}{% endif %}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if include_inactive_suppliers %}&include_inactive_suppliers=1{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if exclude_terms %}&exclude={{ exclude_terms|urlencode }}{% endif %}{% if smart_search_enabled %}&smart=1{% endif %}{% if price_min %}&price_min={{ price_min|urlencode }}{% endif %}{% if price_max %}&price_max={{ price_max|urlencode }}{% endif %}">
                                             {% if field == "current_price" %}
                                                 Price ({% if currency_filter %}{{ currency_filter|currency_symbol }}{% else %}Original{% endif %}) ▲
                                             {% else %}
@@ -103,7 +103,7 @@
                                             {% endif %}
                                         </a>
                                     {% else %}
-                                        <a href="?sort={{ field }}&dir=asc{% if current_q %}&q={{ current_q }}{% endif %}{% if currency_filter %}&currency={{ currency_filter }}{% endif %}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if exclude_terms %}&exclude={{ exclude_terms|urlencode }}{% endif %}{% if smart_search_enabled %}&smart=1{% endif %}{% if price_min %}&price_min={{ price_min|urlencode }}{% endif %}{% if price_max %}&price_max={{ price_max|urlencode }}{% endif %}">
+                                        <a href="?sort={{ field }}&dir=asc{% if current_q %}&q={{ current_q }}{% endif %}{% if currency_filter %}&currency={{ currency_filter }}{% endif %}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if include_inactive_suppliers %}&include_inactive_suppliers=1{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if exclude_terms %}&exclude={{ exclude_terms|urlencode }}{% endif %}{% if smart_search_enabled %}&smart=1{% endif %}{% if price_min %}&price_min={{ price_min|urlencode }}{% endif %}{% if price_max %}&price_max={{ price_max|urlencode }}{% endif %}">
                                             {% if field == "current_price" %}
                                                 Price ({% if currency_filter %}{{ currency_filter|currency_symbol }}{% else %}Original{% endif %}) ▼
                                             {% else %}
@@ -112,7 +112,7 @@
                                         </a>
                                     {% endif %}
                                 {% else %}
-                                    <a href="?sort={{ field }}&dir=asc{% if current_q %}&q={{ current_q }}{% endif %}{% if currency_filter %}&currency={{ currency_filter }}{% endif %}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if exclude_terms %}&exclude={{ exclude_terms|urlencode }}{% endif %}{% if smart_search_enabled %}&smart=1{% endif %}{% if price_min %}&price_min={{ price_min|urlencode }}{% endif %}{% if price_max %}&price_max={{ price_max|urlencode }}{% endif %}">
+                                    <a href="?sort={{ field }}&dir=asc{% if current_q %}&q={{ current_q }}{% endif %}{% if currency_filter %}&currency={{ currency_filter }}{% endif %}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if include_inactive_suppliers %}&include_inactive_suppliers=1{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if exclude_terms %}&exclude={{ exclude_terms|urlencode }}{% endif %}{% if smart_search_enabled %}&smart=1{% endif %}{% if price_min %}&price_min={{ price_min|urlencode }}{% endif %}{% if price_max %}&price_max={{ price_max|urlencode }}{% endif %}">
                                         {% if field == "current_price" %}
                                             Price ({% if currency_filter %}{{ currency_filter|currency_symbol }}{% else %}Original{% endif %})
                                         {% else %}

@@ -8,6 +8,7 @@ from django.test import SimpleTestCase
 from assistant_linking.services.normalization_views import (
     PARSED_PRODUCT_HIDDEN_FIELDS,
     SUPPLIER_PRODUCT_HIDDEN_FIELDS,
+    attach_unparsed_parse_previews,
     build_bag_queryset,
     build_complete_parsed_id_queryset,
     build_complete_parsed_queryset,
@@ -114,6 +115,8 @@ class NormalizationViewServiceTests(SimpleTestCase):
         product = SimpleNamespace(pk=1)
         context = {"products": [product]}
         parse_saver = MagicMock()
+        preview = SimpleNamespace(display_identity="Preview")
+        parse_preview_builder = MagicMock(return_value=preview)
         supplier_product_model = SimpleNamespace(objects=MagicMock())
 
         returned = refresh_visible_unparsed_context(
@@ -121,13 +124,30 @@ class NormalizationViewServiceTests(SimpleTestCase):
             force_refresh=False,
             supplier_product_model=supplier_product_model,
             parse_saver=parse_saver,
+            parse_preview_builder=parse_preview_builder,
         )
 
         self.assertIs(returned, context)
         self.assertTrue(context["allow_refresh_visible"])
         self.assertEqual(context["products"], [product])
+        self.assertIs(product.parsed_preview, preview)
         parse_saver.assert_not_called()
+        parse_preview_builder.assert_called_once_with(product)
         supplier_product_model.objects.filter.assert_not_called()
+
+    def test_attach_unparsed_parse_previews_adds_non_persistent_preview(self):
+        product = SimpleNamespace(pk=1)
+        preview = SimpleNamespace(display_identity="Boucheron / Quatre / 100ml")
+        parse_preview_builder = MagicMock(return_value=preview)
+
+        returned = attach_unparsed_parse_previews(
+            [product],
+            parse_preview_builder=parse_preview_builder,
+        )
+
+        self.assertEqual(returned, [product])
+        self.assertIs(product.parsed_preview, preview)
+        parse_preview_builder.assert_called_once_with(product)
 
     def test_refresh_visible_unparsed_context_reparses_and_removes_moved_rows(self):
         product_1 = SimpleNamespace(pk=1)
@@ -144,12 +164,15 @@ class NormalizationViewServiceTests(SimpleTestCase):
         manager.filter.return_value = query
         supplier_product_model = SimpleNamespace(objects=manager)
         parse_saver = MagicMock()
+        preview = SimpleNamespace(display_identity="Still unparsed preview")
+        parse_preview_builder = MagicMock(return_value=preview)
 
         returned = refresh_visible_unparsed_context(
             context,
             force_refresh=True,
             supplier_product_model=supplier_product_model,
             parse_saver=parse_saver,
+            parse_preview_builder=parse_preview_builder,
         )
 
         self.assertIs(returned, context)
@@ -163,6 +186,8 @@ class NormalizationViewServiceTests(SimpleTestCase):
         self.assertEqual(context["products"], [product_2])
         self.assertEqual(context["object_list"], [product_2])
         self.assertEqual(page_obj.object_list, [product_2])
+        self.assertIs(product_2.parsed_preview, preview)
+        parse_preview_builder.assert_called_once_with(product_2)
         self.assertEqual(context["refreshed_visible_count"], 2)
         self.assertEqual(context["moved_visible_count"], 1)
 

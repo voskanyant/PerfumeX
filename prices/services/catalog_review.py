@@ -31,10 +31,9 @@ from prices.services.product_visibility import apply_hidden_product_keywords
 
 FRAGRANTICA_REVIEW_STATUSES = {
     "all",
+    "unlinked",
     "linked",
-    "supplier_evidence",
-    "catalog_only",
-    "collection_review",
+    "ignored",
 }
 OUR_PRODUCT_CATALOG_TABS = {"products", "brands", "collections", "concentrations"}
 CATALOG_VARIANT_SEARCH_FIELDS = (
@@ -251,100 +250,94 @@ def build_parsed_supplier_evidence_by_name(
 def build_fragrantica_product_review_context(
     request,
     *,
-    brand_manager=None,
     fragrantica_manager=None,
     perfume_manager=None,
-    parsed_product_manager=None,
     paginator_class=Paginator,
     page_size: int = 50,
 ) -> dict:
-    brand_id = normalize_fragrantica_review_brand_id(request.GET.get("brand") or "")
+    fragrantica_manager = fragrantica_manager or FragranticaProduct.objects
+    selected_brand = (request.GET.get("brand") or "").strip()
     search_query = request.GET.get("q", "").strip()
     status_filter = normalize_fragrantica_review_status(
         request.GET.get("status", "all")
     )
 
-    perfumes = list(
-        build_fragrantica_review_perfume_queryset(
-            brand_id,
-            search_query,
-            perfume_manager=perfume_manager,
-        )
+    base_queryset = fragrantica_manager.select_related(
+        "collection",
+        "matched_perfume",
+        "matched_perfume__brand",
     )
-    brand_ids = {perfume.brand_id for perfume in perfumes}
-    if brand_id:
-        brand_ids.add(int(brand_id))
-    evidence_by_name = (
-        build_parsed_supplier_evidence_by_name(
-            brand_ids,
-            parsed_product_manager=parsed_product_manager,
-        )
-        if brand_ids
-        else {}
-    )
-    catalogue_keys = {
-        (perfume.brand_id, catalogue_review_name_key(perfume.name))
-        for perfume in perfumes
-        if catalogue_review_name_key(perfume.name)
-    }
-
-    rows = []
-    status_counts = defaultdict(int)
-    for perfume in perfumes:
-        evidence = evidence_by_name.get(
-            (perfume.brand_id, catalogue_review_name_key(perfume.name)), []
-        )
-        status_key, status_label = fragrantica_review_row_status(perfume, evidence)
-        status_counts[status_key] += 1
-        if status_filter != "all" and status_filter != status_key:
-            continue
-        rows.append(
-            {
-                "perfume": perfume,
-                "evidence": evidence[:5],
-                "evidence_count": len(evidence),
-                "status_key": status_key,
-                "status_label": status_label,
-                "collection_names": sorted(
-                    {item.collection_name for item in evidence if item.collection_name}
-                ),
-            }
-        )
-
-    missing_supplier_rows = build_missing_supplier_rows(
-        evidence_by_name,
-        catalogue_keys,
+    brands = (
+        base_queryset.values("brand_name")
+        .annotate(perfume_count=Count("id"))
+        .order_by("brand_name")
     )
 
-    paginator = paginator_class(rows, page_size)
+    filtered_queryset = base_queryset
+    if selected_brand:
+        filtered_queryset = filtered_queryset.filter(brand_name__iexact=selected_brand)
+    if search_query:
+        search_filter = (
+            Q(brand_name__icontains=search_query)
+            | Q(name__icontains=search_query)
+            | Q(collection_name__icontains=search_query)
+            | Q(audience__icontains=search_query)
+            | Q(source_path__icontains=search_query)
+            | Q(source_url__icontains=search_query)
+        )
+        if search_query.isdigit():
+            search_filter |= Q(release_year=int(search_query))
+        filtered_queryset = filtered_queryset.filter(search_filter)
+
+    status_counts = dict(
+        filtered_queryset.values("match_status")
+        .annotate(count=Count("id"))
+        .values_list("match_status", "count")
+    )
+    if status_filter != "all":
+        filtered_queryset = filtered_queryset.filter(match_status=status_filter)
+
+    total_count = base_queryset.count()
+    filtered_count = filtered_queryset.count()
+    queryset = filtered_queryset.order_by(
+        "brand_name",
+        "collection_name",
+        "name",
+        "audience",
+        "release_year",
+        "id",
+    )
+    paginator = paginator_class(queryset, page_size)
     page_obj = paginator.get_page(request.GET.get("page"))
+    source_rows = list(page_obj.object_list)
+    candidate_map = build_fragrantica_candidate_map(
+        source_rows,
+        perfume_manager=perfume_manager,
+    )
+    rows = [
+        {
+            "source": row,
+            "candidate": row.matched_perfume
+            or candidate_map.get(fragrantica_identity_key(row.brand_name, row.name)),
+        }
+        for row in source_rows
+    ]
     query_without_page = request.GET.copy()
     query_without_page.pop("page", None)
 
-    brand_manager = brand_manager or CatalogBrand.objects
     return {
-        "brands": brand_manager.annotate(perfume_count=Count("perfumes")).order_by(
-            "name"
-        ),
-        "selected_brand_id": str(brand_id),
+        "brands": brands,
+        "selected_brand": selected_brand,
         "search_query": search_query,
         "status_filter": status_filter,
-        "status_counts": dict(status_counts),
-        "total_count": len(perfumes),
-        "filtered_count": len(rows),
-        "rows": page_obj.object_list,
-        "missing_supplier_rows": missing_supplier_rows[:100],
-        "missing_supplier_count": len(missing_supplier_rows),
+        "status_counts": status_counts,
+        "total_count": total_count,
+        "filtered_count": filtered_count,
+        "rows": rows,
         "page_obj": page_obj,
         "paginator": paginator,
         "is_paginated": paginator.num_pages > 1,
         "query_string": query_without_page.urlencode(),
-        **build_fragrantica_staging_context(
-            request,
-            brand_manager=brand_manager,
-            fragrantica_manager=fragrantica_manager,
-            perfume_manager=perfume_manager,
-        ),
     }
 
 

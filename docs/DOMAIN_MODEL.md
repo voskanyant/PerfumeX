@@ -75,6 +75,7 @@ External catalogue import:
 ## Do not confuse
 
 - Supplier product is not canonical product. It is a supplier offer row.
+- Supplier inactivity is supplier-level visibility. Supplier-product browsers hide rows from inactive suppliers by default unless the inactive supplier filter is enabled; this is distinct from `SupplierProduct.is_active`.
 - `prices.OurProduct` is not `catalog.Perfume`. `OurProduct` is legacy/internal grouping; `catalog.Perfume` is the canonical fragrance identity.
 - Collection names are brand-scoped. Do not merge two collections only because their names match across different brands.
 - `catalog.PerfumeVariant` is not a supplier row. It describes canonical size/package/type variants.

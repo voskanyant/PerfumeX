@@ -28,26 +28,32 @@
     {% endif %}
 </div>
 
-<div class="workspace-block space-top-md">
+<div class="workspace-block">
     <div class="table-wrap table-scroll-x">
     <table class="data-table table-mobile">
         <thead>
             <tr>
                 <th scope="col">Supplier</th>
                 <th scope="col">Product</th>
-                <th scope="col">Brand</th>
-                <th scope="col">SKU</th>
-                <th scope="col" aria-label="Actions"></th>
+                <th scope="col">Parsed</th>
+                <th scope="col">Flags</th>
+                <th scope="col">Confidence</th>
             </tr>
         </thead>
         <tbody>
         {% for product in products %}
             <tr>
                 <td data-label="Supplier">{{ product.supplier }}</td>
-                <td data-label="Product">{{ product.name }}</td>
-                <td data-label="Brand">{{ product.brand|default:"-" }}</td>
-                <td data-label="SKU">{{ product.supplier_sku|default:"-" }}</td>
-                <td data-label="Actions" class="actions"><a class="button ghost" href="{% url 'assistant_linking:normalization_detail' product.pk %}">Open detail</a></td>
+                <td data-label="Product"><a href="{% url 'assistant_linking:normalization_detail' product.pk %}">{{ product.name }}</a></td>
+                <td data-label="Parsed">{{ product.parsed_preview.display_identity|default:"-" }}</td>
+                <td data-label="Flags">
+                    {% if product.parsed_preview.warnings %}
+                        {{ product.parsed_preview.warnings|join:", " }}
+                    {% else %}
+                        unparsed
+                    {% endif %}
+                </td>
+                <td data-label="Confidence">{{ product.parsed_preview.confidence|default:"-" }}</td>
             </tr>
         {% empty %}
             {% url 'prices:supplier_overview' as supplier_overview_url %}
