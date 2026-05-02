@@ -150,6 +150,18 @@ jobs:
             pwd
             git pull origin main
             /opt/perfumex/PerfumeX/.venv/bin/pip install -r requirements.txt
+            if ! command -v redis-server >/dev/null 2>&1; then
+              apt-get update
+              DEBIAN_FRONTEND=noninteractive apt-get install -y redis-server
+            fi
+            if systemctl list-unit-files redis-server.service >/dev/null 2>&1; then
+              systemctl enable --now redis-server
+            elif systemctl list-unit-files redis.service >/dev/null 2>&1; then
+              systemctl enable --now redis
+            else
+              echo "Redis service unit was not found after install"
+              exit 1
+            fi
             while IFS='=' read -r key value || [ -n "$key" ]; do
               key="${key%%[[:space:]]*}"
               case "$key" in

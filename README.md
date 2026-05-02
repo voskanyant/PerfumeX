@@ -120,6 +120,14 @@ Important:
 - Redis when running asynchronous RQ background workers
 - Optional virtual environment at `.venv`
 
+On Ubuntu servers, Redis is an OS service, not a Python requirement:
+
+```bash
+sudo apt-get update
+sudo apt-get install -y redis-server
+sudo systemctl enable --now redis-server
+```
+
 ### Install
 
 ```bash
