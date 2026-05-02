@@ -1391,7 +1391,7 @@ select:focus {
 }
 .our-products-list-head {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(160px, 260px) 42px;
+  grid-template-columns: minmax(0, 1fr) minmax(160px, 260px) minmax(130px, 190px);
   gap: 18px;
   align-items: center;
   min-height: 42px;
@@ -1404,7 +1404,7 @@ select:focus {
   text-transform: uppercase;
 }
 .our-products-list-head span:last-child {
-  text-align: center;
+  text-align: right;
 }
 .our-products-card {
   max-width: 100%;
@@ -1427,11 +1427,20 @@ select:focus {
 }
 .our-products-card-main {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(160px, 260px) 34px;
+  grid-template-columns: minmax(0, 1fr) minmax(160px, 260px) minmax(130px, 190px);
   gap: 18px;
   align-items: center;
   min-height: 70px;
   padding: 15px 18px;
+}
+.our-products-card-main > .layout-inline {
+  min-width: 0;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+.our-products-card-main > .layout-inline .button {
+  max-width: 100%;
+  white-space: nowrap;
 }
 .our-products-card-body {
   min-width: 0;
@@ -1704,7 +1713,16 @@ select:focus {
   padding: 15px 0;
 }
 .fragrantica-source-flags {
+  display: flex;
+  gap: 8px;
+  align-items: center;
   justify-content: flex-end;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+.fragrantica-source-flags .button {
+  max-width: 100%;
+  white-space: nowrap;
 }
 .fragrantica-source-action {
   display: flex;
@@ -1718,7 +1736,7 @@ select:focus {
   margin-top: 2px;
 }
 .fragrantica-product-main {
-  grid-template-columns: minmax(0, 1fr) 38px;
+  grid-template-columns: minmax(0, 1fr) minmax(150px, 190px);
 }
 .fragrantica-product-card .our-products-full-name {
   font-size: 18px;
@@ -2442,9 +2460,13 @@ pre, code {
   }
 
   .our-products-card-main {
-    grid-template-columns: minmax(0, 1fr) 38px;
+    grid-template-columns: minmax(0, 1fr);
     gap: 10px;
     padding: 16px 14px;
+  }
+
+  .fragrantica-product-main {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .fragrantica-source-main {
@@ -2461,6 +2483,13 @@ pre, code {
 
   .fragrantica-source-action {
     justify-content: stretch;
+  }
+
+  .our-products-card-main > .layout-inline,
+  .fragrantica-source-flags {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+    width: 100%;
   }
 
   .fragrantica-source-action .button {
@@ -2490,6 +2519,7 @@ pre, code {
 
   .our-products-edit-button {
     width: 38px;
+    flex: 0 0 38px;
     height: 38px;
     min-width: 38px;
   }
@@ -2506,9 +2536,11 @@ pre, code {
   }
 
   .our-products-row-actions .button,
+  .our-products-card-main > .layout-inline .button,
+  .fragrantica-source-flags .button,
   .catalogue-inline-form .button,
   .our-products-editor-actions .button {
-    flex: 1 1 0;
+    flex: 1 1 auto;
     justify-content: center;
   }
 
