@@ -251,6 +251,7 @@ def build_fragrantica_product_review_context(
     request,
     *,
     brand_manager=None,
+    fragrantica_manager=None,
     perfume_manager=None,
     parsed_product_manager=None,
     paginator_class=Paginator,
@@ -339,6 +340,8 @@ def build_fragrantica_product_review_context(
         "query_string": query_without_page.urlencode(),
         **build_fragrantica_staging_context(
             request,
+            brand_manager=brand_manager,
+            fragrantica_manager=fragrantica_manager,
             perfume_manager=perfume_manager,
         ),
     }
@@ -376,10 +379,12 @@ def build_fragrantica_staging_context(
     request,
     *,
     fragrantica_manager=None,
+    brand_manager=None,
     perfume_manager=None,
     row_limit: int = 25,
 ) -> dict:
     fragrantica_manager = fragrantica_manager or FragranticaProduct.objects
+    brand_manager = brand_manager or CatalogBrand.objects
     queryset = fragrantica_manager.select_related(
         "matched_perfume",
         "matched_perfume__brand",
@@ -401,7 +406,7 @@ def build_fragrantica_staging_context(
             | Q(audience__icontains=search_query)
         )
     if brand_id:
-        brand = CatalogBrand.objects.filter(pk=brand_id).first()
+        brand = first_from_queryset(brand_manager.filter(pk=brand_id))
         if brand:
             queryset = queryset.filter(
                 normalized_brand_name=fragrantica_identity_key(brand.name, "")[0]
@@ -429,6 +434,12 @@ def build_fragrantica_staging_context(
         "fragrantica_staged_count": total_count,
         "fragrantica_staged_limit": row_limit,
     }
+
+
+def first_from_queryset(queryset):
+    if hasattr(queryset, "first"):
+        return queryset.first()
+    return next(iter(queryset), None)
 
 
 def apply_fragrantica_identity_to_perfume(source, perfume) -> list[str]:

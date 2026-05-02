@@ -6423,6 +6423,12 @@ class CatalogReviewServiceTests(SimpleTestCase):
             def __iter__(self):
                 return iter(self.rows)
 
+            def __getitem__(self, item):
+                return self.rows[item]
+
+            def count(self):
+                return len(self.rows)
+
         class FakePaginator:
             def __init__(self, rows, page_size):
                 self.rows = rows
@@ -6461,6 +6467,7 @@ class CatalogReviewServiceTests(SimpleTestCase):
         perfume_rows = FakeQuerySet([linked, with_evidence])
         parsed_rows = FakeQuerySet([matching_evidence, missing_evidence])
         brand_rows = FakeQuerySet([])
+        fragrantica_rows = FakeQuerySet([])
         request = RequestFactory().get(
             "/admin/fragrantica-products/",
             {
@@ -6474,6 +6481,7 @@ class CatalogReviewServiceTests(SimpleTestCase):
         result = build_fragrantica_product_review_context(
             request,
             brand_manager=brand_rows,
+            fragrantica_manager=fragrantica_rows,
             perfume_manager=perfume_rows,
             parsed_product_manager=parsed_rows,
             paginator_class=FakePaginator,
