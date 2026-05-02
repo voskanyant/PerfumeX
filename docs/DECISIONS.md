@@ -110,3 +110,13 @@ Context: Local Fragrantica/catalogue edits live in PostgreSQL and do not move to
 Decision: Deploy code through Git, then promote reviewed Fragrantica catalogue links with explicit export/import JSON commands. The import updates staged Fragrantica rows and reviewed catalogue identity only; it must not replace live supplier products, import history, prices, or snapshots.
 
 Consequences: Do not copy a full local database to live for catalogue edits. Use dry-run import on live before applying reviewed catalogue bundles.
+
+## 2026-05-02 - Production static assets use hashed filenames
+
+Status: Accepted
+
+Context: Browser-cached CSS made deployed pages render with old layout rules even after `collectstatic` copied the updated files.
+
+Decision: Use WhiteNoise compressed manifest static storage so changed CSS/JS files receive content-hashed URLs after deploy.
+
+Consequences: Keep `collectstatic` in the deploy workflow. Do not switch production static files back to stable unhashed filenames unless another cache-busting mechanism replaces it.
