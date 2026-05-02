@@ -70,28 +70,69 @@
                                 <span class="score-badge score-badge--{% if row.source.match_status == 'linked' %}success{% elif row.source.match_status == 'ignored' %}warning{% else %}muted{% endif %}">{{ row.source.get_match_status_display }}</span>
                                 {% if row.source.audience %}<span>{{ row.source.audience }}</span>{% endif %}
                                 {% if row.source.release_year %}<span>{{ row.source.release_year }}</span>{% endif %}
-                                {% if row.candidate %}
-                                    <span>Suggested match: {{ row.candidate.brand.name }} / {{ row.candidate.name }}{% if row.candidate.concentration %} / {{ row.candidate.concentration }}{% endif %}</span>
+                                {% if row.source.matched_perfume %}
+                                    <span>Linked to {{ row.source.matched_perfume.brand.name }} / {{ row.source.matched_perfume.name }}</span>
+                                {% elif row.candidate_choices %}
+                                    <span>{{ row.candidate_choices|length }} suggested local match{{ row.candidate_choices|length|pluralize:"es" }}</span>
                                 {% else %}
-                                    <span>No exact match</span>
+                                    <span>No suggested local match</span>
                                 {% endif %}
                             </div>
+                            {% if row.source.matched_perfume %}
+                                <div class="fragrantica-match-panel fragrantica-match-panel-linked"
+                                     aria-label="Linked Our Products match">
+                                    <div class="fragrantica-match-summary">
+                                        <span class="fragrantica-match-label">Linked match</span>
+                                        <span class="fragrantica-match-name">
+                                            {{ row.source.matched_perfume.brand.name }} / {{ row.source.matched_perfume.name }}{% if row.source.matched_perfume.concentration %} / {{ row.source.matched_perfume.concentration }}{% endif %}
+                                        </span>
+                                    </div>
+                                </div>
+                            {% elif row.candidate_choices %}
+                                <div class="fragrantica-match-panel"
+                                     aria-label="Suggested Our Products matches">
+                                    <div class="fragrantica-match-panel-head">
+                                        <span>Suggested local matches</span>
+                                        <span>Link without leaving this page</span>
+                                    </div>
+                                    {% for choice in row.candidate_choices %}
+                                        <form method="post"
+                                              action="{% url 'prices:fragrantica_product_link' row.source.pk %}"
+                                              class="fragrantica-match-option">
+                                            {% csrf_token %}
+                                            <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                            <input type="hidden" name="perfume_id" value="{{ choice.perfume.pk }}">
+                                            <div class="fragrantica-match-summary">
+                                                <span class="fragrantica-match-name">
+                                                    {{ choice.perfume.brand.name }} / {{ choice.perfume.name }}{% if choice.perfume.concentration %} / {{ choice.perfume.concentration }}{% endif %}
+                                                </span>
+                                                <span class="fragrantica-match-reason">
+                                                    {{ choice.reason }} · Score {{ choice.score }}
+                                                </span>
+                                            </div>
+                                            <button class="button {% if forloop.first %}primary{% else %}secondary{% endif %}"
+                                                    type="submit">Link</button>
+                                        </form>
+                                    {% endfor %}
+                                </div>
+                            {% else %}
+                                <div class="fragrantica-match-panel fragrantica-match-panel-empty"
+                                     aria-label="No suggested Our Products match">
+                                    <div class="fragrantica-match-summary">
+                                        <span class="fragrantica-match-label">No confident local match</span>
+                                        <span class="fragrantica-match-reason">Use catalogue search only when the inline suggestions are empty.</span>
+                                    </div>
+                                    <a class="button secondary"
+                                       href="{% url 'prices:our_product_list' %}?q={{ row.source.name|urlencode }}">Search Our Products</a>
+                                </div>
+                            {% endif %}
                         </div>
                         <div class="fragrantica-source-flags" aria-label="Fragrantica source actions">
                             {% if row.source.source_href %}
                                 <a class="button ghost" href="{{ row.source.source_href }}" target="_blank" rel="noopener">Open Fragrantica</a>
                             {% endif %}
-                            {% if row.candidate and row.source.match_status != 'linked' %}
-                                <form method="post" action="{% url 'prices:fragrantica_product_link' row.source.pk %}" class="fragrantica-source-action">
-                                    {% csrf_token %}
-                                    <input type="hidden" name="next" value="{{ request.get_full_path }}">
-                                    <input type="hidden" name="perfume_id" value="{{ row.candidate.pk }}">
-                                    <button class="button primary" type="submit">Link source</button>
-                                </form>
-                            {% elif row.source.matched_perfume %}
+                            {% if row.source.matched_perfume %}
                                 <a class="button secondary" href="{% url 'prices:our_product_list' %}?q={{ row.source.matched_perfume.name|urlencode }}">Open match</a>
-                            {% else %}
-                                <a class="button secondary" href="{% url 'prices:our_product_list' %}?q={{ row.source.name|urlencode }}">Find match</a>
                             {% endif %}
                         </div>
                     </div>

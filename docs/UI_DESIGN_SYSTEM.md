@@ -187,6 +187,7 @@ Standard responsive structure:
 - Product list tables are specialized with `.products-grid` and `.products-mobile`; extend those only in `prices/list.html`/`products.css`.
 - Our Products catalogue rows in `prices/our_products_catalog.html` are specialized as parsed read-only rows with a pencil-triggered inline editor; do not render every row as visible inputs by default.
 - Fragrantica staged source rows in `prices/fragrantica_products.html` should mirror the Our Products parsed-row structure and keep audience/gender, year, and source link visible.
+- Fragrantica staged source rows should show ranked Our Products candidates inline with same-page link actions; avoid forcing operators to navigate to another catalogue page for normal linking.
 - Catalogue row action columns must reserve enough width for text buttons; do not size text-action columns like icon-only columns. On narrow screens, row actions should wrap to the full row width instead of clipping off canvas.
 - Assistant unparsed normalization rows should mirror parsed queue columns and may show bounded, non-persistent parser previews for the visible page; use explicit parse actions to create saved `ParsedSupplierProduct` rows.
 - Supplier import spreadsheet previews are specialized scrollable tables. Keep `.import-preview-table` headers visible because they are mapping controls; do not add `.table-mobile` there. Generated preview cells should still use scoped headers and `data-label` metadata.

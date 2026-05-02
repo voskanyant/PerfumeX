@@ -167,6 +167,13 @@ class FragranticaMatchCandidate:
     creates_alias: bool = False
 
 
+@dataclass(frozen=True)
+class FragranticaPerfumeCandidate:
+    perfume: CatalogPerfume
+    score: int
+    reason: str
+
+
 def catalog_search_tokens(query: str) -> list[str]:
     tokens = [token for token in re.split(r"\s+", query.strip()) if token]
     return tokens if len(tokens) > 1 else []
@@ -623,19 +630,21 @@ def build_fragrantica_product_review_context(
     paginator = paginator_class(queryset, page_size)
     page_obj = paginator.get_page(request.GET.get("page"))
     source_rows = list(page_obj.object_list)
-    candidate_map = build_fragrantica_candidate_map(
+    candidate_choices = build_fragrantica_candidate_choices(
         source_rows,
         perfume_manager=perfume_manager,
     )
-    rows = [
-        {
-            "source": row,
-            "candidate": row.matched_perfume
-            or candidate_map.get(getattr(row, "id", None))
-            or candidate_map.get(fragrantica_identity_key(row.brand_name, row.name)),
-        }
-        for row in source_rows
-    ]
+    rows = []
+    for row in source_rows:
+        choices = candidate_choices.get(_fragrantica_source_candidate_key(row), [])
+        candidate = row.matched_perfume or (choices[0].perfume if choices else None)
+        rows.append(
+            {
+                "source": row,
+                "candidate": candidate,
+                "candidate_choices": choices,
+            }
+        )
     query_without_page = request.GET.copy()
     query_without_page.pop("page", None)
 
@@ -794,12 +803,20 @@ def _fragrantica_candidate_sort_key(item):
     )
 
 
-def build_fragrantica_candidate_map(
+def _fragrantica_source_candidate_key(source):
+    source_id = getattr(source, "id", None)
+    if source_id is not None:
+        return source_id
+    return fragrantica_identity_key(source.brand_name, source.name)
+
+
+def build_fragrantica_candidate_choices(
     fragrantica_rows,
     *,
     perfume_manager=None,
     brand_alias_manager=None,
     product_alias_manager=None,
+    limit: int = 4,
 ) -> dict:
     perfume_manager = perfume_manager or CatalogPerfume.objects
     product_alias_manager = product_alias_manager or ProductAlias.objects
@@ -825,7 +842,7 @@ def build_fragrantica_candidate_map(
     for alias in aliases:
         aliases_by_brand_id[getattr(alias, "brand_id", None)].append(alias)
 
-    candidate_map: dict[object, CatalogPerfume] = {}
+    candidate_choices: dict[object, list[FragranticaPerfumeCandidate]] = {}
     for source in fragrantica_rows:
         source_brand_ids = _source_brand_ids(source, brand_key_to_ids)
         if not source_brand_ids:
@@ -848,15 +865,45 @@ def build_fragrantica_candidate_map(
                 scored_candidates.append((source, perfume, score, reason))
         if not scored_candidates:
             continue
-        _source, perfume, _score, _reason = sorted(
-            scored_candidates,
-            key=_fragrantica_candidate_sort_key,
-        )[0]
-        source_id = getattr(source, "id", None)
-        if source_id is not None:
-            candidate_map[source_id] = perfume
+        candidate_choices[_fragrantica_source_candidate_key(source)] = [
+            FragranticaPerfumeCandidate(
+                perfume=perfume,
+                score=score,
+                reason=reason,
+            )
+            for _source, perfume, score, reason in sorted(
+                scored_candidates,
+                key=_fragrantica_candidate_sort_key,
+            )[:limit]
+        ]
+    return candidate_choices
+
+
+def build_fragrantica_candidate_map(
+    fragrantica_rows,
+    *,
+    perfume_manager=None,
+    brand_alias_manager=None,
+    product_alias_manager=None,
+) -> dict:
+    fragrantica_rows = list(fragrantica_rows)
+    candidate_choices = build_fragrantica_candidate_choices(
+        fragrantica_rows,
+        perfume_manager=perfume_manager,
+        brand_alias_manager=brand_alias_manager,
+        product_alias_manager=product_alias_manager,
+        limit=1,
+    )
+    candidate_map: dict[object, CatalogPerfume] = {}
+    for source in fragrantica_rows:
+        choices = candidate_choices.get(_fragrantica_source_candidate_key(source), [])
+        if not choices:
+            continue
+        perfume = choices[0].perfume
+        candidate_map[_fragrantica_source_candidate_key(source)] = perfume
         candidate_map.setdefault(
-            fragrantica_identity_key(source.brand_name, source.name), perfume
+            fragrantica_identity_key(source.brand_name, source.name),
+            perfume,
         )
     return candidate_map
 

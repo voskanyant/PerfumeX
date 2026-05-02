@@ -8066,7 +8066,9 @@ class OurProductCatalogueListTests(TestCase):
         self.assertContains(response, "Women")
         self.assertContains(response, "2008")
         self.assertContains(response, "Open Fragrantica")
-        self.assertContains(response, "Suggested match: Montale / Vanilla Extasy")
+        self.assertContains(response, "Suggested local matches")
+        self.assertContains(response, "Link without leaving this page")
+        self.assertContains(response, "Montale / Vanilla Extasy / Eau de Parfum")
         self.assertContains(
             response,
             reverse("prices:fragrantica_product_link", args=[matched_source.pk]),
@@ -8098,8 +8100,9 @@ class OurProductCatalogueListTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(
             response,
-            "Suggested match: Amouage / Beach Hut for Men / Eau de Parfum",
+            "Amouage / Beach Hut for Men / Eau de Parfum",
         )
+        self.assertContains(response, "Same brand and scent after audience words")
         self.assertContains(
             response,
             reverse("prices:fragrantica_product_link", args=[source.pk]),
@@ -8136,7 +8139,8 @@ class OurProductCatalogueListTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Suggested match: Alexandre J. / St Honore")
+        self.assertContains(response, "Alexandre J. / St Honore")
+        self.assertContains(response, "Matched by product alias knowledge")
         self.assertContains(
             response,
             reverse("prices:fragrantica_product_link", args=[source.pk]),
@@ -8171,7 +8175,8 @@ class OurProductCatalogueListTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Suggested match: Alexandre J. / Legacy WB")
+        self.assertContains(response, "Alexandre J. / Legacy WB")
+        self.assertContains(response, "Exact brand and scent match")
         self.assertContains(
             response,
             reverse("prices:fragrantica_product_link", args=[source.pk]),
