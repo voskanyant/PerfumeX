@@ -2252,10 +2252,35 @@ class EmailImportRunServiceTests(SimpleTestCase):
         result = run_manual_email_import_action(
             has_running_func=lambda: False,
             enqueue_func=fail_enqueue,
+            sync_import_func=lambda: (_ for _ in ()).throw(RuntimeError("sync down")),
         )
 
         self.assertEqual(result.message_level, "error")
-        self.assertEqual(result.message, "Failed to start email import: queue down")
+        self.assertEqual(
+            result.message,
+            "Failed to start email import: queue down; synchronous fallback also failed: sync down",
+        )
+
+    def test_run_manual_email_import_action_runs_sync_when_queue_unavailable(self):
+        from prices.services.email_import_runs import run_manual_email_import_action
+
+        calls = []
+
+        def fail_enqueue(**kwargs):
+            raise RuntimeError("queue down")
+
+        result = run_manual_email_import_action(
+            has_running_func=lambda: False,
+            enqueue_func=fail_enqueue,
+            sync_import_func=lambda: calls.append("sync"),
+        )
+
+        self.assertEqual(calls, ["sync"])
+        self.assertEqual(result.message_level, "success")
+        self.assertEqual(
+            result.message,
+            "Email import ran now. Background queue was unavailable, so the scan ran synchronously.",
+        )
 
     def test_run_supplier_board_mailbox_scan_action_reports_busy_without_enqueue(self):
         from prices.services.email_import_runs import (
@@ -2301,10 +2326,39 @@ class EmailImportRunServiceTests(SimpleTestCase):
         result = run_supplier_board_mailbox_scan_action(
             has_running_func=lambda: False,
             enqueue_func=fail_enqueue,
+            sync_import_func=lambda: (_ for _ in ()).throw(RuntimeError("sync down")),
         )
 
         self.assertEqual(result.message_level, "error")
-        self.assertEqual(result.message, "Failed to start mailbox scan: queue down")
+        self.assertEqual(
+            result.message,
+            "Failed to start mailbox scan: queue down; synchronous fallback also failed: sync down",
+        )
+
+    def test_run_supplier_board_mailbox_scan_action_runs_sync_when_queue_unavailable(
+        self,
+    ):
+        from prices.services.email_import_runs import (
+            run_supplier_board_mailbox_scan_action,
+        )
+
+        calls = []
+
+        def fail_enqueue(**kwargs):
+            raise RuntimeError("queue down")
+
+        result = run_supplier_board_mailbox_scan_action(
+            has_running_func=lambda: False,
+            enqueue_func=fail_enqueue,
+            sync_import_func=lambda: calls.append("sync"),
+        )
+
+        self.assertEqual(calls, ["sync"])
+        self.assertEqual(result.message_level, "info")
+        self.assertEqual(
+            result.message,
+            "Mailbox scan ran now. Background queue was unavailable, so the scan ran synchronously.",
+        )
 
     def test_active_email_backfill_suppliers_filters_selected_active_suppliers(self):
         from prices.services.email_import_runs import active_email_backfill_suppliers

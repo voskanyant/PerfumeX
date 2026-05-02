@@ -4,6 +4,8 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date, datetime
 
+from django.core.management import call_command
+from django.db import close_old_connections
 from django.db.models import F
 from django.urls import reverse_lazy
 from django.utils import timezone
@@ -190,11 +192,20 @@ def enqueue_forced_email_import_scan(
     return enqueue_func("import_emails", "--force", description=description)
 
 
+def run_forced_email_import_scan_sync() -> None:
+    close_old_connections()
+    try:
+        call_command("import_emails", "--force")
+    finally:
+        close_old_connections()
+
+
 def run_manual_email_import_action(
     *,
     description: str = "Manual email import",
     has_running_func=None,
     enqueue_func=enqueue_forced_email_import_scan,
+    sync_import_func=run_forced_email_import_scan_sync,
 ) -> EmailImportActionResult:
     has_running = has_running_func or has_running_email_imports
     if has_running():
@@ -202,9 +213,16 @@ def run_manual_email_import_action(
     try:
         enqueue_func(description=description)
     except Exception as exc:
+        try:
+            sync_import_func()
+        except Exception as sync_exc:
+            return EmailImportActionResult(
+                "error",
+                f"Failed to start email import: {exc}; synchronous fallback also failed: {sync_exc}",
+            )
         return EmailImportActionResult(
-            "error",
-            f"Failed to start email import: {exc}",
+            "success",
+            "Email import ran now. Background queue was unavailable, so the scan ran synchronously.",
         )
     return EmailImportActionResult("success", "Email import started.")
 
@@ -213,6 +231,7 @@ def run_supplier_board_mailbox_scan_action(
     *,
     has_running_func=None,
     enqueue_func=enqueue_forced_email_import_scan,
+    sync_import_func=run_forced_email_import_scan_sync,
 ) -> EmailImportActionResult:
     has_running = has_running_func or has_running_email_imports
     if has_running():
@@ -220,9 +239,16 @@ def run_supplier_board_mailbox_scan_action(
     try:
         enqueue_func(description="Supplier board mailbox scan")
     except Exception as exc:
+        try:
+            sync_import_func()
+        except Exception as sync_exc:
+            return EmailImportActionResult(
+                "error",
+                f"Failed to start mailbox scan: {exc}; synchronous fallback also failed: {sync_exc}",
+            )
         return EmailImportActionResult(
-            "error",
-            f"Failed to start mailbox scan: {exc}",
+            "info",
+            "Mailbox scan ran now. Background queue was unavailable, so the scan ran synchronously.",
         )
     return EmailImportActionResult("info", "Mailbox scan started.")
 

@@ -120,3 +120,13 @@ Context: Browser-cached CSS made deployed pages render with old layout rules eve
 Decision: Use WhiteNoise compressed manifest static storage so changed CSS/JS files receive content-hashed URLs after deploy.
 
 Consequences: Keep `collectstatic` in the deploy workflow. Do not switch production static files back to stable unhashed filenames unless another cache-busting mechanism replaces it.
+
+## 2026-05-02 - Manual mailbox scan falls back when Redis is unavailable
+
+Status: Accepted
+
+Context: Production Redis downtime prevented manual mailbox scans from starting through RQ, even though the cron runner can execute `import_emails` directly.
+
+Decision: Manual "run now" mailbox scans should try RQ first, then run `import_emails --force` synchronously if queue dispatch fails.
+
+Consequences: Operators can still trigger a scan during a queue outage. Redis and an RQ worker remain required for normal background job throughput.
