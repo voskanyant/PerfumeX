@@ -45,7 +45,7 @@ Should not own:
 Canonical perfume catalogue data app. It intentionally has models/tests/admin but no current views/forms/templates.
 
 Owns:
-- `Brand`, `Perfume`, `PerfumeVariant`, `Note`, `Accord`, `Source`.
+- `Brand`, brand-scoped `Collection`, `Perfume`, `PerfumeVariant`, `Note`, `Accord`, `Source`.
 - Perfume note/accord through models.
 - `FactClaim` and `AIDraft` records used by assistant research and review.
 - Model behavior and catalogue integrity tests.

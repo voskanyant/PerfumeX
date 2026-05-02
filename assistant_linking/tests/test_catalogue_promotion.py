@@ -85,6 +85,8 @@ class FragranticaCataloguePromotionTests(TestCase):
         self.assertEqual(source.match_status, FragranticaProduct.STATUS_LINKED)
         self.assertEqual(self.perfume.name, "Vanilla Extasy Source")
         self.assertEqual(self.perfume.collection_name, "Fragrantica Collection")
+        self.assertEqual(self.perfume.collection.name, "Fragrantica Collection")
+        self.assertEqual(source.collection, self.perfume.collection)
         self.assertEqual(self.perfume.audience, "Women")
         self.assertEqual(self.perfume.release_year, 2008)
         self.assertEqual(self.perfume.concentration, "Eau de Parfum")

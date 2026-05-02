@@ -11,6 +11,7 @@ from pathlib import Path
 
 from assistant_linking.models import FragranticaProduct
 from assistant_linking.utils.text import normalize_alias_value
+from catalog.models import Brand, get_or_create_collection
 
 
 ALL_FRAGRANCES_SECTION = "All Fragrances"
@@ -333,6 +334,14 @@ def import_brand_catalog(
         normalized_brand = canonical_key(item.brand_name or resolved_brand_name)
         normalized_name = canonical_key(item.name)
         source_path = item.source_path or ""
+        brand = Brand.objects.filter(
+            name__iexact=item.brand_name or resolved_brand_name
+        ).first()
+        collection = (
+            get_or_create_collection(brand, item.collection_name)
+            if brand and item.collection_name
+            else None
+        )
         fragrantica_product = FragranticaProduct.objects.filter(
             normalized_brand_name=normalized_brand,
             normalized_name=normalized_name,
@@ -346,6 +355,7 @@ def import_brand_catalog(
                     normalized_brand_name=normalized_brand,
                     name=item.name,
                     normalized_name=normalized_name,
+                    collection=collection,
                     collection_name=item.collection_name,
                     audience=item.audience,
                     release_year=item.release_year,
@@ -370,6 +380,9 @@ def import_brand_catalog(
             ):
                 fragrantica_product.collection_name = item.collection_name
                 update_fields.append("collection_name")
+            if collection and fragrantica_product.collection_id != collection.id:
+                fragrantica_product.collection = collection
+                update_fields.append("collection")
             if (
                 item.release_year
                 and fragrantica_product.release_year != item.release_year

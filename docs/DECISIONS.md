@@ -130,3 +130,13 @@ Context: Production Redis downtime prevented manual mailbox scans from starting 
 Decision: Manual "run now" mailbox scans should try RQ first, then run `import_emails --force` synchronously if queue dispatch fails.
 
 Consequences: Operators can still trigger a scan during a queue outage. Redis and an RQ worker remain required for normal background job throughput.
+
+## 2026-05-02 - Catalogue collections are brand-scoped
+
+Status: Accepted
+
+Context: Fragrantica catalogue imports include collection/line names, and the same collection name can appear under different brands.
+
+Decision: Store collections as `catalog.Collection` rows scoped to one `catalog.Brand`. Keep existing text fields during the transition, but resolve catalogue perfumes and Fragrantica staging rows to the brand-scoped collection relationship.
+
+Consequences: Matching and import code must compare collections within a brand. Do not treat collection name alone as globally unique.

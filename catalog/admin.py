@@ -11,11 +11,18 @@ class BrandAdmin(admin.ModelAdmin):
     prepopulated_fields = {"slug": ("name",)}
 
 
+@admin.register(models.Collection)
+class CollectionAdmin(admin.ModelAdmin):
+    list_display = ("brand", "name", "is_active", "updated_at")
+    search_fields = ("brand__name", "name", "normalized_name", "slug")
+    list_filter = ("is_active", "brand")
+
+
 @admin.register(models.Perfume)
 class PerfumeAdmin(admin.ModelAdmin):
-    list_display = ("brand", "name", "concentration", "audience", "verification_status", "is_published")
-    search_fields = ("brand__name", "name", "collection_name", "perfumer_name")
-    list_filter = ("verification_status", "is_published", "concentration", "audience")
+    list_display = ("brand", "collection", "name", "concentration", "audience", "verification_status", "is_published")
+    search_fields = ("brand__name", "name", "collection__name", "collection_name", "perfumer_name")
+    list_filter = ("verification_status", "is_published", "concentration", "audience", "collection")
 
 
 @admin.register(models.PerfumeVariant)

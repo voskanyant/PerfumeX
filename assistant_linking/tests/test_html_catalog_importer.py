@@ -14,7 +14,7 @@ from assistant_linking.services.html_catalog_importer import (
     parse_brand_catalog_html,
     parse_brand_catalog_json,
 )
-from catalog.models import Brand, Perfume
+from catalog.models import Brand, Collection, Perfume
 
 
 SAMPLE_HTML = """
@@ -120,6 +120,15 @@ class HtmlCatalogImporterTests(TestCase):
                 collection_name="Collection Extraordinaire",
                 audience="Unisex",
                 release_year=2017,
+            ).exists()
+        )
+        staged = FragranticaProduct.objects.get(normalized_name="bois dore")
+        self.assertEqual(staged.collection.name, "Collection Extraordinaire")
+        self.assertEqual(staged.collection.brand, brand)
+        self.assertTrue(
+            Collection.objects.filter(
+                brand=brand,
+                name="Collection Extraordinaire",
             ).exists()
         )
 

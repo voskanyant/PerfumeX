@@ -10,7 +10,7 @@ from django.utils import timezone
 
 from assistant_linking.models import FragranticaProduct
 from assistant_linking.utils.text import normalize_alias_value
-from catalog.models import Brand, Perfume
+from catalog.models import Brand, Perfume, get_or_create_collection
 from prices.services.catalog_review import apply_fragrantica_identity_to_perfume
 
 
@@ -216,6 +216,9 @@ def _upsert_fragrantica_source(
         return source, True, False
 
     changed_fields = []
+    collection = get_or_create_collection(
+        target_perfume.brand, source_payload.get("collection_name", "")
+    )
     field_names = (
         "brand_name",
         "name",
@@ -232,6 +235,9 @@ def _upsert_fragrantica_source(
         if getattr(source, field_name) != next_value:
             setattr(source, field_name, next_value)
             changed_fields.append(field_name)
+    if collection and source.collection_id != collection.id:
+        source.collection = collection
+        changed_fields.append("collection")
     if source.matched_perfume_id != target_perfume.id:
         source.matched_perfume = target_perfume
         changed_fields.append("matched_perfume")

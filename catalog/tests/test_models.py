@@ -1,6 +1,6 @@
 from django.test import TestCase
 
-from catalog.models import Brand, Perfume, PerfumeVariant
+from catalog.models import Brand, Collection, Perfume, PerfumeVariant
 
 
 class CatalogModelTests(TestCase):
@@ -18,6 +18,22 @@ class CatalogModelTests(TestCase):
         variant = PerfumeVariant.objects.create(perfume=perfume, size_ml="100.00", packaging="box", variant_type="standard")
 
         self.assertEqual(variant.perfume, perfume)
+
+    def test_collection_is_brand_scoped(self):
+        first_brand = Brand.objects.create(name="Brand A")
+        second_brand = Brand.objects.create(name="Brand B")
+        first = Collection.objects.create(brand=first_brand, name="Private Collection")
+        second = Collection.objects.create(brand=second_brand, name="Private Collection")
+
+        self.assertEqual(first.normalized_name, second.normalized_name)
+        self.assertNotEqual(first.brand, second.brand)
+
+    def test_perfume_collection_name_creates_brand_collection(self):
+        brand = Brand.objects.create(name="Amouage")
+        perfume = Perfume.objects.create(brand=brand, name="Lineage", collection_name="Odyssey")
+
+        self.assertEqual(perfume.collection.name, "Odyssey")
+        self.assertEqual(perfume.collection.brand, brand)
 
     def test_variant_sku_is_generated_when_blank(self):
         brand = Brand.objects.create(name="Dolce & Gabbana")

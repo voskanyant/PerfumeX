@@ -20,6 +20,7 @@ from assistant_linking.utils.text import normalize_alias_value
 from catalog.models import Brand as CatalogBrand
 from catalog.models import Perfume as CatalogPerfume
 from catalog.models import PerfumeVariant as CatalogPerfumeVariant
+from catalog.models import get_or_create_collection
 from prices import models
 from prices.services.product_filters import (
     parse_exclude_terms,
@@ -450,6 +451,14 @@ def apply_fragrantica_identity_to_perfume(source, perfume) -> list[str]:
     if source.collection_name and perfume.collection_name != source.collection_name:
         perfume.collection_name = source.collection_name
         changed_fields.append("collection_name")
+    source_collection = getattr(source, "collection", None)
+    if not source_collection and source.collection_name:
+        source_collection = get_or_create_collection(
+            perfume.brand, source.collection_name
+        )
+    if source_collection and perfume.collection_id != source_collection.id:
+        perfume.collection = source_collection
+        changed_fields.append("collection")
     if source.audience and perfume.audience != source.audience:
         perfume.audience = source.audience
         changed_fields.append("audience")

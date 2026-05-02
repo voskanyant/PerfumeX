@@ -3,6 +3,8 @@ from django.db import models
 from django.utils import timezone
 from django.utils.text import slugify
 from decimal import Decimal, InvalidOperation
+import re
+import unicodedata
 
 
 class TimeStampedModel(models.Model):
@@ -22,6 +24,13 @@ def unique_slug(instance, source: str) -> str:
         slug = f"{base}-{counter}"
         counter += 1
     return slug
+
+
+def normalized_catalog_key(value: str) -> str:
+    text = unicodedata.normalize("NFKD", value or "")
+    text = "".join(char for char in text if not unicodedata.combining(char))
+    text = text.replace("&", " and ").lower()
+    return re.sub(r"\s+", " ", re.sub(r"[^\w]+", " ", text)).strip()
 
 
 def compact_decimal_text(value) -> str:
@@ -62,6 +71,62 @@ class Brand(TimeStampedModel):
         return self.name
 
 
+class Collection(TimeStampedModel):
+    brand = models.ForeignKey(Brand, on_delete=models.CASCADE, related_name="collections")
+    name = models.CharField(max_length=180, db_index=True)
+    normalized_name = models.CharField(max_length=220, db_index=True, blank=True)
+    slug = models.SlugField(max_length=240, db_index=True, blank=True)
+    description = models.TextField(blank=True)
+    is_active = models.BooleanField(default=True, db_index=True)
+
+    class Meta:
+        ordering = ("brand__name", "name")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["brand", "normalized_name"],
+                name="uniq_catalog_collection_brand_normalized",
+            ),
+            models.UniqueConstraint(
+                fields=["brand", "slug"], name="uniq_catalog_collection_brand_slug"
+            ),
+        ]
+
+    def save(self, *args, **kwargs):
+        if not self.normalized_name:
+            self.normalized_name = normalized_catalog_key(self.name)
+        if not self.slug:
+            base = slugify(self.name or "") or "collection"
+            slug = base
+            counter = 2
+            while Collection.objects.filter(brand_id=self.brand_id, slug=slug).exclude(pk=self.pk).exists():
+                suffix = f"-{counter}"
+                slug = f"{base[:240 - len(suffix)]}{suffix}"
+                counter += 1
+            self.slug = slug
+        return super().save(*args, **kwargs)
+
+    def __str__(self) -> str:
+        return f"{self.brand} / {self.name}"
+
+
+def get_or_create_collection(brand: Brand, name: str) -> Collection | None:
+    collection_name = (name or "").strip()
+    if not brand or not collection_name:
+        return None
+    normalized_name = normalized_catalog_key(collection_name)
+    if not normalized_name:
+        return None
+    collection, created = Collection.objects.get_or_create(
+        brand=brand,
+        normalized_name=normalized_name,
+        defaults={"name": collection_name, "slug": slugify(collection_name) or "collection"},
+    )
+    if not created and collection.name != collection_name:
+        collection.name = collection_name
+        collection.save(update_fields=["name", "updated_at"])
+    return collection
+
+
 class Perfume(TimeStampedModel):
     VERIFICATION_DRAFT = "draft"
     VERIFICATION_REVIEW = "review"
@@ -79,6 +144,7 @@ class Perfume(TimeStampedModel):
     slug = models.SlugField(max_length=260, unique=True, db_index=True, blank=True)
     concentration = models.CharField(max_length=80, blank=True, db_index=True)
     audience = models.CharField(max_length=80, blank=True, db_index=True)
+    collection = models.ForeignKey(Collection, on_delete=models.SET_NULL, null=True, blank=True, related_name="perfumes", db_index=True)
     collection_name = models.CharField(max_length=180, blank=True, db_index=True)
     release_year = models.PositiveSmallIntegerField(null=True, blank=True, db_index=True)
     perfumer_name = models.CharField(max_length=220, blank=True, db_index=True)
@@ -98,6 +164,10 @@ class Perfume(TimeStampedModel):
         ]
 
     def save(self, *args, **kwargs):
+        if self.collection_id:
+            self.collection_name = self.collection.name
+        elif self.brand_id and self.collection_name:
+            self.collection = get_or_create_collection(self.brand, self.collection_name)
         if not self.slug:
             self.slug = unique_slug(self, f"{self.brand.name} {self.name}")
         return super().save(*args, **kwargs)

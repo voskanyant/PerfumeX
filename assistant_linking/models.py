@@ -7,7 +7,7 @@ from django.core.exceptions import ValidationError
 from django.db import models
 
 from assistant_linking.utils.text import normalize_alias_value
-from catalog.models import compact_decimal_text
+from catalog.models import Brand, compact_decimal_text, get_or_create_collection
 
 
 CONCENTRATION_ALIAS_CACHE_KEY = "assistant_linking:concentration_aliases:v1"
@@ -185,6 +185,7 @@ class FragranticaProduct(TimeStampedModel):
     normalized_brand_name = models.CharField(max_length=255, db_index=True)
     name = models.CharField(max_length=220, db_index=True)
     normalized_name = models.CharField(max_length=255, db_index=True)
+    collection = models.ForeignKey("catalog.Collection", on_delete=models.SET_NULL, null=True, blank=True, related_name="fragrantica_products", db_index=True)
     collection_name = models.CharField(max_length=180, blank=True, db_index=True)
     audience = models.CharField(max_length=80, blank=True, db_index=True)
     release_year = models.PositiveSmallIntegerField(null=True, blank=True, db_index=True)
@@ -220,6 +221,12 @@ class FragranticaProduct(TimeStampedModel):
             self.normalized_brand_name = normalize_alias_value(self.brand_name).replace("&", "and")
         if not self.normalized_name:
             self.normalized_name = normalize_alias_value(self.name).replace("&", "and")
+        if self.collection_id:
+            self.collection_name = self.collection.name
+        elif self.collection_name:
+            brand = Brand.objects.filter(name__iexact=self.brand_name).first()
+            if brand:
+                self.collection = get_or_create_collection(brand, self.collection_name)
         if self.matched_perfume_id and self.match_status == self.STATUS_UNLINKED:
             self.match_status = self.STATUS_LINKED
         return super().save(*args, **kwargs)

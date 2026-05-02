@@ -20,6 +20,7 @@ Related docs: [AGENTS.md](../AGENTS.md), [README.md](../README.md), [docs/REPO_M
 - Stock snapshot - historical stock observation for a supplier product. Model: `prices.StockSnapshot`.
 - Internal product / Our Product - older internal grouping entity used by the price workspace. Model: `prices.OurProduct`.
 - Catalogue brand - canonical perfume brand. Model: `catalog.Brand`.
+- Catalogue collection - brand-scoped perfume line/collection. The same collection name under different brands is a different collection. Model: `catalog.Collection`.
 - Catalogue perfume - canonical fragrance identity: brand, name, concentration, audience, collection, release year, publication/verification fields. Model: `catalog.Perfume`.
 - Catalogue variant - sellable/package variant of a canonical perfume: size, packaging, tester/type, EAN/SKU. Model: `catalog.PerfumeVariant`.
 - Fact claim - reviewable catalogue fact/evidence extracted by research. Model: `catalog.FactClaim`.
@@ -39,7 +40,7 @@ Related docs: [AGENTS.md](../AGENTS.md), [README.md](../README.md), [docs/REPO_M
 - Manual link decision audit - record of replaced manual decisions. Model: `assistant_linking.ManualLinkDecisionAudit`.
 - Link action - undoable bulk/link operation payload. Model: `assistant_linking.LinkAction`.
 - Link suggestion - candidate link from deterministic/mock/OpenAI suggestion engines. Model: `assistant_linking.LinkSuggestion`.
-- Fragrantica product - staged external catalogue row from saved HTML or parsed catalogue JSON/CSV import; source evidence that can be linked to `catalog.Perfume` after staff review. Brand/name/collection/audience/year/source URL may update or support the local catalogue through that reviewed link; concentration and variants remain local catalogue data. Model: `assistant_linking.FragranticaProduct`.
+- Fragrantica product - staged external catalogue row from saved HTML or parsed catalogue JSON/CSV import; source evidence that can be linked to `catalog.Perfume` after staff review. Brand/name/brand-scoped collection/audience/year/source URL may update or support the local catalogue through that reviewed link; concentration and variants remain local catalogue data. Model: `assistant_linking.FragranticaProduct`.
 - Brand watch profile - configured research target for a brand. Model: `assistant_core.BrandWatchProfile`.
 - Source snapshot - captured source/evidence from brand research. Model: `assistant_core.SourceSnapshot`.
 - Detected change - reviewable research delta. Model: `assistant_core.DetectedChange`.
@@ -65,7 +66,7 @@ Normalization and linking:
 External catalogue import:
 1. Parse saved HTML or parsed Fragrantica catalogue JSON/CSV into staged `FragranticaProduct` rows.
 2. Dry-run first and show extracted collections/counts/sample rows.
-3. Stage rows only after operator confirmation.
+3. Stage rows only after operator confirmation; collection names are resolved to brand-scoped `catalog.Collection` rows when the brand exists.
 4. Review staged rows beside local catalogue rows.
 5. Link staged rows to local `catalog.Perfume` records after review; keep local concentration and variants.
 6. Promote reviewed local Fragrantica links to live with the Fragrantica catalogue link export/import commands; do not copy the whole local database over live.
@@ -75,6 +76,7 @@ External catalogue import:
 
 - Supplier product is not canonical product. It is a supplier offer row.
 - `prices.OurProduct` is not `catalog.Perfume`. `OurProduct` is legacy/internal grouping; `catalog.Perfume` is the canonical fragrance identity.
+- Collection names are brand-scoped. Do not merge two collections only because their names match across different brands.
 - `catalog.PerfumeVariant` is not a supplier row. It describes canonical size/package/type variants.
 - `FragranticaProduct` is not a supplier row or variant. It is staged external source evidence; it becomes trusted for local normalization only after staff links/applies it to `catalog.Perfume`.
 - Alias/rule data is preferred over parser code for one-off brand, product, concentration, collection, or garbage corrections.
