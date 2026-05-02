@@ -24,7 +24,11 @@ from django.test import RequestFactory
 from django.urls import reverse
 from django.utils import timezone
 
-from assistant_linking.models import FragranticaProduct, ParsedSupplierProduct
+from assistant_linking.models import (
+    BrandAlias,
+    FragranticaProduct,
+    ParsedSupplierProduct,
+)
 from assistant_linking.models import ProductAlias
 from catalog.models import Brand, Perfume, PerfumeVariant, Source
 from prices import forms, models
@@ -8066,6 +8070,111 @@ class OurProductCatalogueListTests(TestCase):
         self.assertContains(
             response,
             reverse("prices:fragrantica_product_link", args=[matched_source.pk]),
+        )
+
+    def test_fragrantica_products_suggests_audience_synonym_match(self):
+        amouage = Brand.objects.create(name="Amouage")
+        perfume = Perfume.objects.create(
+            brand=amouage,
+            name="Beach Hut for Men",
+            audience="Men",
+            concentration="Eau de Parfum",
+        )
+        source = FragranticaProduct.objects.create(
+            brand_name="Amouage",
+            normalized_brand_name="amouage",
+            name="Beach Hut Man",
+            normalized_name="beach hut man",
+            audience="Men",
+            release_year=2017,
+            source_path="/perfume/Amouage/Beach-Hut-Man-500.html",
+        )
+
+        response = self.client.get(
+            reverse("prices:fragrantica_product_review"),
+            {"brand": "Amouage", "q": "beach hut"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            "Suggested match: Amouage / Beach Hut for Men / Eau de Parfum",
+        )
+        self.assertContains(
+            response,
+            reverse("prices:fragrantica_product_link", args=[source.pk]),
+        )
+        self.assertNotEqual(perfume.pk, self.perfume.pk)
+
+    def test_fragrantica_products_uses_product_alias_knowledge_for_suggestion(self):
+        alexandre = Brand.objects.create(name="Alexandre J.")
+        perfume = Perfume.objects.create(
+            brand=alexandre,
+            name="St Honore",
+            audience="Women",
+            concentration="Eau de Parfum",
+        )
+        ProductAlias.objects.create(
+            perfume=perfume,
+            brand=alexandre,
+            alias_text="Saint Honore",
+            canonical_text="St Honore",
+            active=True,
+        )
+        source = FragranticaProduct.objects.create(
+            brand_name="Alexandre J.",
+            normalized_brand_name="alexandre j.",
+            name="Saint Honore",
+            normalized_name="saint honore",
+            audience="Women",
+            source_path="/perfume/Alexandre-J/Saint-Honore-1.html",
+        )
+
+        response = self.client.get(
+            reverse("prices:fragrantica_product_review"),
+            {"brand": "Alexandre J.", "q": "saint honore"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Suggested match: Alexandre J. / St Honore")
+        self.assertContains(
+            response,
+            reverse("prices:fragrantica_product_link", args=[source.pk]),
+        )
+
+    def test_fragrantica_products_uses_brand_alias_knowledge_for_suggestion(self):
+        alexandre = Brand.objects.create(name="Alexandre J.")
+        Perfume.objects.create(
+            brand=alexandre,
+            name="Legacy WB",
+            audience="Women",
+            concentration="Eau de Parfum",
+        )
+        BrandAlias.objects.create(
+            brand=alexandre,
+            alias_text="Alexandre.J",
+            normalized_alias="alexandre.j",
+            active=True,
+        )
+        source = FragranticaProduct.objects.create(
+            brand_name="Alexandre.J",
+            normalized_brand_name="alexandre.j",
+            name="Legacy WB",
+            normalized_name="legacy wb",
+            audience="Women",
+            source_path="/perfume/Alexandre-J/Legacy-WB-1.html",
+        )
+
+        response = self.client.get(
+            reverse("prices:fragrantica_product_review"),
+            {"brand": "Alexandre.J", "q": "legacy"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Suggested match: Alexandre J. / Legacy WB")
+        self.assertContains(
+            response,
+            reverse("prices:fragrantica_product_link", args=[source.pk]),
         )
 
     def test_staff_can_link_fragrantica_row_to_catalogue_without_changing_concentration(

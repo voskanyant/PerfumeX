@@ -74,7 +74,7 @@ External catalogue import:
 1. Parse saved HTML or parsed Fragrantica catalogue JSON/CSV into staged `FragranticaProduct` rows.
 2. Dry-run first and show extracted collections/counts/sample rows.
 3. Stage rows only after operator confirmation; collection names are resolved to brand-scoped `catalog.Collection` rows when the brand exists.
-4. Review staged rows beside local catalogue rows.
+4. Review staged rows beside local catalogue rows. Suggested matches should use catalogue brand/product aliases, loose punctuation keys, audience synonyms such as `man`/`men` and `woman`/`women`, and fuzzy same-brand scent scoring; do not limit suggestions to exact normalized names.
 5. Link staged rows to local `catalog.Perfume` records after review; keep local concentration and variants.
 6. Promote reviewed local Fragrantica links to live with the Fragrantica catalogue link export/import commands; do not copy the whole local database over live.
 7. Create catalogue facts or aliases only from reviewed/approved work.
