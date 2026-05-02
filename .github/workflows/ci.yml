@@ -187,7 +187,21 @@ jobs:
               export FERNET_KEYS="$SALT_KEY"
             fi
             /opt/perfumex/PerfumeX/.venv/bin/python manage.py migrate
-            /opt/perfumex/PerfumeX/.venv/bin/python manage.py reparse_supplier_products --only-stale
+            for term in \
+              "212 for Woman" \
+              "12 PARFUMEURS" \
+              "AZAY" \
+              "Exclus Edition" \
+              "без цел" \
+              "REFILLABLE" \
+              "Ciel" \
+              "Reflection" \
+              "Guidance 46" \
+              "Legacy WB" \
+              "Ultimate Crystal" \
+              "Limited Ed"; do
+              /opt/perfumex/PerfumeX/.venv/bin/python manage.py reparse_supplier_products --only-stale --name-contains "$term"
+            done
             /opt/perfumex/PerfumeX/.venv/bin/python manage.py refresh_normalization_stats --all-user-scopes
             /opt/perfumex/PerfumeX/.venv/bin/python manage.py collectstatic --noinput
             systemctl restart perfumex

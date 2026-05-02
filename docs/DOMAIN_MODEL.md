@@ -58,7 +58,7 @@ Price import:
 
 Normalization and linking:
 1. Parse `SupplierProduct.name` into `ParsedSupplierProduct`.
-   Parser/KB changes only affect existing saved parses after `PARSER_VERSION` changes and stale unlocked rows are reparsed.
+   Parser/KB changes only affect existing saved parses after `PARSER_VERSION` changes and affected stale unlocked rows are reparsed.
 2. Apply catalogue facts, aliases, concentration aliases, parser rules, and garbage terms.
 3. Surface low-confidence/missing/conflict rows in normalization queues.
 4. Treat complete parse identity as separate from catalogue/link evidence; a clean parse can still need catalogue or link review.
