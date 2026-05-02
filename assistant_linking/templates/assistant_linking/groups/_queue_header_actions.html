@@ -1,0 +1,13 @@
+{% if last_link_action %}
+    <form method="post"
+          action="{% url 'assistant_linking:undo_link_action' last_link_action.pk %}">
+        {% csrf_token %}
+        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+        <button class="button ghost" type="submit" data-undo-link-action>Undo</button>
+    </form>
+{% endif %}
+<button class="button ghost" type="button" data-shortcut-help>Shortcuts</button>
+<form method="post" action="{% url 'assistant_linking:rebuild_groups' %}">
+    {% csrf_token %}
+    <button class="button primary" type="submit">Rebuild groups</button>
+</form>

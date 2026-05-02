@@ -1,13 +1,9 @@
 {% extends "prices/base.html" %}
+{% load static %}
 {% block title %}Unparsed Products{% endblock %}
 {% block content %}
-<div class="page-head">
-    <div>
-        <span class="page-kicker">Normalisation</span>
-        <h1 class="page-title">Unparsed supplier rows</h1>
-    </div>
-    <a class="button ghost" href="{% url 'assistant_linking:normalization_dashboard' %}">Back</a>
-</div>
+{% url 'assistant_linking:normalization_dashboard' as normalization_dashboard_url %}
+{% include "includes/page_header.html" with kicker="Normalisation" title="Unparsed supplier rows" secondary_url=normalization_dashboard_url secondary_label="Back" %}
 
 <div class="workspace-block">
     <form method="get" class="page-actions">
@@ -17,6 +13,7 @@
             value="{{ search_query }}"
             placeholder="{{ search_placeholder }}"
             class="form-field"
+            aria-label="Search unparsed products"
         >
         <button class="button ghost" type="submit">Search</button>
         {% if search_query %}
@@ -33,11 +30,11 @@
     <table class="data-table table-mobile">
         <thead>
             <tr>
-                <th>Supplier</th>
-                <th>Product</th>
-                <th>Brand</th>
-                <th>SKU</th>
-                <th></th>
+                <th scope="col">Supplier</th>
+                <th scope="col">Product</th>
+                <th scope="col">Brand</th>
+                <th scope="col">SKU</th>
+                <th scope="col" aria-label="Actions"></th>
             </tr>
         </thead>
         <tbody>
@@ -50,36 +47,17 @@
                 <td data-label="Actions" class="actions"><a class="button ghost" href="{% url 'assistant_linking:normalization_detail' product.pk %}">Open detail</a></td>
             </tr>
         {% empty %}
-            <tr>
-                <td colspan="5" class="empty-state">
-                    No unparsed rows. <a href="{% url 'prices:supplier_overview' %}">Run an import</a>
-                </td>
-            </tr>
+            {% url 'prices:supplier_overview' as supplier_overview_url %}
+            {% include "includes/table_empty.html" with colspan=5 message="No unparsed rows." cta_url=supplier_overview_url cta_label="Run an import" %}
         {% endfor %}
         </tbody>
     </table>
     </div>
 </div>
 
-{% if page_obj and page_obj.paginator.num_pages > 1 %}
-<nav class="workspace-pagination" aria-label="Pagination">
-    {% if page_obj.has_previous %}
-        <a class="workspace-page-link" href="?{% if search_query %}q={{ search_query|urlencode }}&amp;{% endif %}page={{ page_obj.previous_page_number }}">Previous</a>
-    {% endif %}
-    <span class="workspace-page-status">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
-    {% if page_obj.has_next %}
-        <a class="workspace-page-link" href="?{% if search_query %}q={{ search_query|urlencode }}&amp;{% endif %}page={{ page_obj.next_page_number }}">Next</a>
-    {% endif %}
-</nav>
-{% endif %}
+{% include "includes/pagination.html" with page_obj=page_obj page_param="page" class_name="space-top-md" label="Unparsed rows pagination" jump_id="unparsed-page-jump" %}
 {% endblock %}
 {% block extra_scripts %}
 {{ block.super }}
-<script>
-window.addEventListener("pageshow", function (event) {
-    if (event.persisted) {
-        window.location.reload();
-    }
-});
-</script>
+<script src="{% static 'assistant_linking/js/bfcache-refresh.js' %}"></script>
 {% endblock %}

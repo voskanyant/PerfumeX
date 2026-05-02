@@ -1,0 +1,106 @@
+<div class="search-wrap {{ class_name }}">
+    {% if show_search %}
+        <div class="search-strip">
+            <label for="{{ search_id }}" class="visually-hidden">Search</label>
+            <div class="search-inline-row">
+                <div class="search-input-wrap search-wrap-inner">
+                    <svg class="search-icon" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="7" cy="7" r="5"/><path d="M11 11l3 3"/></svg>
+                    <input id="{{ search_id }}" data-live-search type="text" value="{{ current_q|default:'' }}" placeholder="Search perfume or SKU..." data-sort="{{ current_sort|default:'current_price' }}" data-dir="{{ current_dir|default:'asc' }}"{% if link_detail %} data-detail-base="{{ detail_base_url|default:'' }}"{% endif %}{% if link_detail and server_search %} data-server-search="1"{% endif %} data-search-url="{{ search_url|default:'' }}"{% if show_bulk_delete %} data-bulk="1"{% endif %}{% if show_actions and update_url_name %} data-edit-pattern="{% url update_url_name 0 %}"{% endif %}{% if show_actions and delete_url_name %} data-delete-pattern="{% url delete_url_name 0 %}"{% endif %}{% if show_actions %} data-show-actions="1"{% endif %}>
+                    <button id="{{ clear_search_id }}" data-clear-search-button class="search-clear-text{% if not current_q %} is-hidden{% endif %}" type="button" aria-label="Clear search" title="Clear search">&times;</button>
+                </div>
+                {% if always_show_filter_button or show_currency_filter or supplier_options or status_options %}
+                    <button class="button secondary icon filter-icon-btn" type="button" data-drawer-toggle="product-filters" aria-controls="{{ drawer_id }}" aria-expanded="false" title="Filters" aria-label="Filters">
+                        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
+                        </svg>
+                    </button>
+                {% endif %}
+            </div>
+            {% if include_supplier_summary %}
+                <div class="products-filter-summary">
+                    <span id="{{ search_count_id }}" data-search-count class="muted search-count"></span>
+                    {% if supplier_filter_names %}
+                        <div class="active-supplier-chip" title="Supplier filter is active">
+                            <span>{{ supplier_filter_names|length }} supplier{{ supplier_filter_names|length|pluralize }} selected</span>
+                            <button type="button" id="{{ clear_supplier_filter_id }}" data-clear-supplier-filter-button aria-label="Clear supplier filter">&times;</button>
+                        </div>
+                    {% endif %}
+                </div>
+            {% else %}
+                <span id="{{ search_count_id }}" data-search-count class="muted search-count"></span>
+            {% endif %}
+        </div>
+    {% endif %}
+
+    {% if always_show_filter_drawer or show_currency_filter or supplier_options or status_options %}
+        <aside class="app-drawer app-drawer--end product-filters-drawer" id="{{ drawer_id }}" data-drawer="product-filters" aria-hidden="true" aria-labelledby="{{ drawer_label_id }}">
+            <div class="drawer-header">
+                <h5 class="drawer-title" id="{{ drawer_label_id }}">Filters</h5>
+                <button type="button" class="drawer-close" data-drawer-close aria-label="Close"></button>
+            </div>
+            <div class="drawer-body">
+                <div class="extra-filters-grid">
+                    {% if show_currency_filter %}
+                        <div class="filter-item">
+                            <label for="{{ currency_filter_id }}">Currency</label>
+                            <select id="{{ currency_filter_id }}" data-currency-filter>
+                                <option value="">Original</option>
+                                {% for code in currency_options %}
+                                    <option value="{{ code }}"{% if currency_filter == code %} selected{% endif %}>{{ code }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    {% endif %}
+                    {% if supplier_options %}
+                        <div class="filter-item">
+                            <label for="{{ supplier_search_id }}">Supplier</label>
+                            <div class="supplier-filter-wrap">
+                                <input id="{{ supplier_search_id }}" data-supplier-filter-search type="text" placeholder="Type supplier and press Enter..." autocomplete="off">
+                                <div id="{{ supplier_suggest_id }}" data-supplier-suggest class="supplier-suggest"></div>
+                            </div>
+                            <div id="{{ supplier_chips_id }}" data-supplier-selected-chips class="supplier-selected-chips"></div>
+                            <select id="{{ supplier_options_id }}" data-supplier-option-source hidden>
+                                {% for supplier in supplier_options %}
+                                    <option value="{{ supplier.id }}">{{ supplier.name }}</option>
+                                {% endfor %}
+                            </select>
+                            <input type="hidden" id="{{ supplier_filter_id }}" data-supplier-filter value="{{ supplier_filter }}">
+                        </div>
+                    {% endif %}
+                    {% if status_options %}
+                        <div class="filter-item">
+                            <label for="{{ inactive_switch_id }}">Inactive products</label>
+                            <div class="switch-row inactive-switch-wrap">
+                                <input class="switch-input" id="{{ inactive_switch_id }}" data-show-inactive-switch type="checkbox" role="switch"{% if status_filter != 'active' %} checked{% endif %}>
+                                <label class="switch-label inactive-switch-label" for="{{ inactive_switch_id }}">Show inactive</label>
+                            </div>
+                        </div>
+                    {% endif %}
+                    {% if include_product_filters %}
+                        <div class="filter-item">
+                            <label for="smart-search-switch">Search mode</label>
+                            <div class="switch-row inactive-switch-wrap">
+                                <input class="switch-input" id="smart-search-switch" type="checkbox" role="switch"{% if smart_search_enabled %} checked{% endif %}>
+                                <label class="switch-label inactive-switch-label" for="smart-search-switch">Smart search</label>
+                            </div>
+                        </div>
+                        <div class="filter-item">
+                            <label for="price-min-filter">Min price</label>
+                            <input id="price-min-filter" type="text" value="{{ price_min|default:'' }}" placeholder="e.g. 100">
+                        </div>
+                        <div class="filter-item">
+                            <label for="price-max-filter">Max price</label>
+                            <input id="price-max-filter" type="text" value="{{ price_max|default:'' }}" placeholder="e.g. 500">
+                            <button class="button secondary is-full-width space-top-sm" type="button" id="price-apply-btn">Apply price</button>
+                        </div>
+                        <div class="filter-item">
+                            <label for="exclude-filter">Hidden product keywords</label>
+                            <textarea id="exclude-filter" rows="3" placeholder="One keyword per line (saved globally)">{{ exclude_terms|default:'' }}</textarea>
+                            <button class="button secondary is-full-width space-top-sm" type="button" id="exclude-apply-btn">Save hidden keywords</button>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </aside>
+    {% endif %}
+</div>

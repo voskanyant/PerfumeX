@@ -1,0 +1,395 @@
+from __future__ import annotations
+
+from django.contrib import messages
+from django.shortcuts import redirect, render
+from django.utils.decorators import method_decorator
+from django.views.decorators.cache import never_cache
+from django.views.generic import DetailView, ListView, TemplateView, View
+
+from assistant_linking import models
+from assistant_linking.services.normalization_detail import (
+    accept_catalog_candidate,
+    build_parsed_product_detail_context,
+    lock_supplier_parse,
+    normalization_detail_queryset,
+    reparse_supplier_product,
+    save_brand_alias_for_product,
+    save_garbage_keywords_for_product,
+    save_product_alias_for_product,
+    teach_parse_for_product,
+)
+from assistant_linking.services.normalization_views import (
+    build_bag_queryset,
+    build_complete_parsed_queryset,
+    build_cosmetic_queryset,
+    build_deodorant_queryset,
+    build_garbage_queryset,
+    build_low_confidence_queryset,
+    build_manual_review_queryset,
+    build_missing_brand_queryset,
+    build_missing_concentration_queryset,
+    build_missing_name_queryset,
+    build_missing_size_queryset,
+    build_modifier_conflict_queryset,
+    build_normalization_dashboard_context,
+    build_set_queryset,
+    build_tester_sample_queryset,
+    build_unparsed_queryset,
+    refresh_visible_parsed_context,
+    refresh_visible_unparsed_context,
+)
+from assistant_linking.view_mixins import StaffAssistantMixin
+from prices.models import SupplierProduct
+from prices.services.product_visibility import (
+    get_hidden_product_keywords_for_user,
+)
+
+
+def _hidden_product_keywords(request) -> list[str]:
+    return get_hidden_product_keywords_for_user(request.user)
+
+
+class NormalizationDashboardView(StaffAssistantMixin, TemplateView):
+    template_name = "assistant_linking/normalization/dashboard.html"
+
+    def get_context_data(self, **kwargs):
+        hidden_keywords = _hidden_product_keywords(self.request)
+        return {
+            **super().get_context_data(**kwargs),
+            **build_normalization_dashboard_context(
+                self.request,
+                hidden_keywords=hidden_keywords,
+            ),
+        }
+
+
+class NormalizationSearchMixin:
+    search_param = "q"
+    search_placeholder = "Search supplier, product, brand, or SKU"
+
+    def get_search_query(self):
+        return self.request.GET.get(self.search_param, "").strip()
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["search_query"] = self.get_search_query()
+        context["search_placeholder"] = self.search_placeholder
+        return context
+
+
+@method_decorator(never_cache, name="dispatch")
+class UnparsedListView(NormalizationSearchMixin, StaffAssistantMixin, ListView):
+    model = SupplierProduct
+    template_name = "assistant_linking/normalization/product_list.html"
+    context_object_name = "products"
+    paginate_by = 50
+
+    def get_queryset(self):
+        return build_unparsed_queryset(
+            self.get_search_query(),
+            _hidden_product_keywords(self.request),
+        )
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        return refresh_visible_unparsed_context(context)
+
+
+class LowConfidenceListView(NormalizationSearchMixin, StaffAssistantMixin, ListView):
+    model = models.ParsedSupplierProduct
+    template_name = "assistant_linking/normalization/low_confidence.html"
+    context_object_name = "parses"
+    paginate_by = 50
+
+    def get_queryset(self):
+        return build_low_confidence_queryset(
+            self.get_search_query(),
+            _hidden_product_keywords(self.request),
+        )
+
+
+class NormalizationIssueListView(LowConfidenceListView):
+    template_name = "assistant_linking/normalization/issue_list.html"
+    issue_title = "Normalisation issues"
+
+    def get_context_data(self, **kwargs):
+        return {**super().get_context_data(**kwargs), "issue_title": self.issue_title}
+
+
+class MissingBrandListView(NormalizationIssueListView):
+    issue_title = "Missing brand"
+
+    def get_queryset(self):
+        return build_missing_brand_queryset(
+            self.get_search_query(),
+            _hidden_product_keywords(self.request),
+        )
+
+
+class MissingNameListView(NormalizationIssueListView):
+    issue_title = "Missing product name"
+
+    def get_queryset(self):
+        return build_missing_name_queryset(
+            self.get_search_query(),
+            _hidden_product_keywords(self.request),
+        )
+
+
+class MissingConcentrationListView(NormalizationIssueListView):
+    issue_title = "Missing concentration"
+
+    def get_queryset(self):
+        return build_missing_concentration_queryset(
+            self.get_search_query(),
+            _hidden_product_keywords(self.request),
+        )
+
+
+class MissingSizeListView(NormalizationIssueListView):
+    issue_title = "Missing or ambiguous size"
+
+    def get_queryset(self):
+        return build_missing_size_queryset(
+            self.get_search_query(),
+            _hidden_product_keywords(self.request),
+        )
+
+
+class TesterSampleListView(NormalizationIssueListView):
+    issue_title = "Tester, sample, and travel rows"
+
+    def get_queryset(self):
+        return build_tester_sample_queryset(
+            self.get_search_query(),
+            _hidden_product_keywords(self.request),
+        )
+
+
+class SetListView(NormalizationIssueListView):
+    issue_title = "Set rows"
+
+    def get_queryset(self):
+        return build_set_queryset(
+            self.get_search_query(),
+            _hidden_product_keywords(self.request),
+        )
+
+
+class BagListView(NormalizationIssueListView):
+    issue_title = "Bag rows"
+
+    def get_queryset(self):
+        return build_bag_queryset(
+            self.get_search_query(),
+            _hidden_product_keywords(self.request),
+        )
+
+
+class CosmeticListView(NormalizationIssueListView):
+    issue_title = "Cosmetics rows"
+
+    def get_queryset(self):
+        return build_cosmetic_queryset(
+            self.get_search_query(),
+            _hidden_product_keywords(self.request),
+        )
+
+
+class DeodorantListView(NormalizationIssueListView):
+    issue_title = "Deodorant rows"
+
+    def get_queryset(self):
+        return build_deodorant_queryset(
+            self.get_search_query(),
+            _hidden_product_keywords(self.request),
+        )
+
+
+class ManualReviewListView(NormalizationIssueListView):
+    issue_title = "Manual approval"
+
+    def get_queryset(self):
+        return build_manual_review_queryset(
+            self.get_search_query(),
+            _hidden_product_keywords(self.request),
+        )
+
+
+class ModifierConflictListView(NormalizationIssueListView):
+    issue_title = "Identity modifiers"
+
+    def get_queryset(self):
+        return build_modifier_conflict_queryset(
+            self.get_search_query(),
+            _hidden_product_keywords(self.request),
+        )
+
+
+class ParsedListView(NormalizationIssueListView):
+    issue_title = "Complete parsed products"
+    refresh_param = "refresh"
+
+    def get_queryset(self):
+        return build_complete_parsed_queryset(
+            self.get_search_query(),
+            _hidden_product_keywords(self.request),
+        )
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        return refresh_visible_parsed_context(
+            context,
+            force_refresh=self.request.GET.get(self.refresh_param) == "1",
+        )
+
+
+class GarbageListView(NormalizationIssueListView):
+    issue_title = "Garbage / excluded rows"
+
+    def get_queryset(self):
+        return build_garbage_queryset(
+            self.get_search_query(),
+            _hidden_product_keywords(self.request),
+        )
+
+
+class ParsedProductDetailView(StaffAssistantMixin, DetailView):
+    model = SupplierProduct
+    template_name = "assistant_linking/normalization/detail.html"
+    context_object_name = "product"
+    pk_url_kwarg = "supplier_product_id"
+
+    def get_queryset(self):
+        return normalization_detail_queryset()
+
+    def get_context_data(self, **kwargs):
+        product = self.object
+        return {
+            **super().get_context_data(**kwargs),
+            **build_parsed_product_detail_context(
+                product=product,
+                hidden_keywords=_hidden_product_keywords(self.request),
+                context_overrides=kwargs,
+            ),
+        }
+
+
+def _render_normalization_detail(request, product, **context_overrides):
+    view = ParsedProductDetailView()
+    view.setup(request, supplier_product_id=product.pk)
+    view.object = product
+    context = view.get_context_data(object=product, **context_overrides)
+    return render(request, view.template_name, context)
+
+
+class AcceptCatalogCandidateView(StaffAssistantMixin, View):
+    def post(self, request, supplier_product_id):
+        result = accept_catalog_candidate(
+            supplier_product_id=supplier_product_id,
+            perfume_id=request.POST.get("perfume_id"),
+            variant_id=request.POST.get("variant_id"),
+            alias_scope=request.POST.get("alias_scope", ""),
+            excluded_terms=request.POST.get("excluded_terms", ""),
+            user=request.user,
+        )
+        getattr(messages, result.message_level)(request, result.message)
+        return redirect(
+            "assistant_linking:normalization_detail",
+            supplier_product_id=supplier_product_id,
+        )
+
+
+class ReparseProductView(StaffAssistantMixin, View):
+    def post(self, request, supplier_product_id):
+        result = reparse_supplier_product(
+            supplier_product_id=supplier_product_id,
+            force=request.POST.get("force") == "1",
+        )
+        getattr(messages, result.message_level)(request, result.message)
+        return redirect(
+            "assistant_linking:normalization_detail",
+            supplier_product_id=supplier_product_id,
+        )
+
+
+class ExcludeGarbageKeywordView(StaffAssistantMixin, View):
+    def post(self, request, supplier_product_id):
+        result = save_garbage_keywords_for_product(
+            supplier_product_id=supplier_product_id,
+            keywords_text=request.POST.get("keywords", ""),
+            user=request.user,
+        )
+        getattr(messages, result.message_level)(request, result.message)
+        return redirect(
+            "assistant_linking:normalization_detail",
+            supplier_product_id=supplier_product_id,
+        )
+
+
+class LockParseView(StaffAssistantMixin, View):
+    def post(self, request, supplier_product_id):
+        result = lock_supplier_parse(supplier_product_id=supplier_product_id)
+        getattr(messages, result.message_level)(request, result.message)
+        return redirect(
+            "assistant_linking:normalization_detail",
+            supplier_product_id=supplier_product_id,
+        )
+
+
+class SaveBrandAliasView(StaffAssistantMixin, View):
+    def post(self, request, supplier_product_id):
+        result = save_brand_alias_for_product(
+            supplier_product_id=supplier_product_id,
+            post_data=request.POST,
+        )
+        getattr(messages, result.message_level)(request, result.message)
+        if not result.success:
+            return _render_normalization_detail(
+                request,
+                result.product,
+                **{result.form_context_key: result.form},
+            )
+        return redirect(
+            "assistant_linking:normalization_detail",
+            supplier_product_id=supplier_product_id,
+        )
+
+
+class SaveProductAliasView(StaffAssistantMixin, View):
+    def post(self, request, supplier_product_id):
+        result = save_product_alias_for_product(
+            supplier_product_id=supplier_product_id,
+            post_data=request.POST,
+        )
+        getattr(messages, result.message_level)(request, result.message)
+        if not result.success:
+            return _render_normalization_detail(
+                request,
+                result.product,
+                **{result.form_context_key: result.form},
+            )
+        return redirect(
+            "assistant_linking:normalization_detail",
+            supplier_product_id=supplier_product_id,
+        )
+
+
+class TeachParseView(StaffAssistantMixin, View):
+    def post(self, request, supplier_product_id):
+        result = teach_parse_for_product(
+            supplier_product_id=supplier_product_id,
+            post_data=request.POST,
+            selected_similar_values=request.POST.getlist("selected_similar_ids"),
+        )
+        getattr(messages, result.message_level)(request, result.message)
+        if not result.success:
+            return _render_normalization_detail(
+                request,
+                result.product,
+                **{result.form_context_key: result.form},
+            )
+        return redirect(
+            "assistant_linking:normalization_detail",
+            supplier_product_id=supplier_product_id,
+        )

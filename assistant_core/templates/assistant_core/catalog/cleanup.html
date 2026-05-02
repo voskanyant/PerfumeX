@@ -2,63 +2,88 @@
 {% block title %}Catalogue Cleanup{% endblock %}
 {% block topbar_label %}Assistant{% endblock %}
 {% block content %}
-{% include "prices/components/page_header.html" with kicker="Catalogue" title="Cleanup" meta="Find duplicate-looking records and merge mistakes from imported catalogue files." %}
-{% include "assistant_core/catalog/_nav.html" %}
-
-<div class="page-grid-3">
-    <div class="workspace-block">
-        <h2 class="kpi-link-title">Merge brands</h2>
-        <form id="brand-merge-form" method="post" action="{% url 'assistant_core:catalog_brand_merge' %}#brand-merge-form" class="form-shell">
-            {% csrf_token %}
-            {{ brand_merge_form.as_p }}
-            <button class="button primary" type="submit">Merge brand</button>
-        </form>
+    {% include "includes/page_header.html" with kicker="Catalogue" title="Cleanup" meta="Find duplicate-looking records and merge mistakes from imported catalogue files." %}
+    {% include "assistant_core/catalog/_nav.html" %}
+    <div class="page-grid-3">
+        <div class="workspace-block">
+            <h2 class="kpi-link-title">Merge brands</h2>
+            <form id="brand-merge-form"
+                  method="post"
+                  action="{% url 'assistant_core:catalog_brand_merge' %}#brand-merge-form"
+                  class="form-shell">
+                {% csrf_token %}
+                {{ brand_merge_form.as_p }}
+                <button class="button primary" type="submit">Merge brand</button>
+            </form>
+        </div>
+        <div class="workspace-block">
+            <h2 class="kpi-link-title">Merge perfumes</h2>
+            <form id="perfume-merge-form"
+                  method="post"
+                  action="{% url 'assistant_core:catalog_perfume_merge' %}#perfume-merge-form"
+                  class="form-shell">
+                {% csrf_token %}
+                {{ perfume_merge_form.as_p }}
+                <button class="button primary" type="submit">Merge perfume</button>
+            </form>
+        </div>
+        <div class="workspace-block">
+            <h2 class="kpi-link-title">What merge does</h2>
+            <p>
+                Moves linked variants, aliases, facts, drafts, notes, decisions, suggestions, and supplier catalogue links to the kept record.
+            </p>
+        </div>
     </div>
-    <div class="workspace-block">
-        <h2 class="kpi-link-title">Merge perfumes</h2>
-        <form id="perfume-merge-form" method="post" action="{% url 'assistant_core:catalog_perfume_merge' %}#perfume-merge-form" class="form-shell">
-            {% csrf_token %}
-            {{ perfume_merge_form.as_p }}
-            <button class="button primary" type="submit">Merge perfume</button>
-        </form>
+    <div class="workspace-block space-top-md">
+        <h2 class="kpi-link-title">Possible duplicate brands</h2>
+        <div class="table-wrap table-scroll-x">
+            <table class="table data-table table-mobile">
+                <thead>
+                    <tr>
+                        <th scope="col">Duplicate brand group</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for group in brand_duplicates %}
+                        <tr>
+                            <td data-label="Duplicate brand group">
+                                {% for brand in group %}
+                                    {{ brand.name }}
+                                    {% if not forloop.last %},{% endif %}
+                                {% endfor %}
+                            </td>
+                        </tr>
+                    {% empty %}
+                        {% include "includes/table_empty.html" with colspan=1 message="No exact normalized brand duplicates found." cta_url="#brand-merge-form" cta_label="Merge manually" %}
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
     </div>
-    <div class="workspace-block">
-        <h2 class="kpi-link-title">What merge does</h2>
-        <p>Moves linked variants, aliases, facts, drafts, notes, decisions, suggestions, and supplier catalogue links to the kept record.</p>
+    <div class="workspace-block space-top-md">
+        <h2 class="kpi-link-title">Possible duplicate perfumes</h2>
+        <div class="table-wrap table-scroll-x">
+            <table class="table data-table table-mobile">
+                <thead>
+                    <tr>
+                        <th scope="col">Duplicate perfume group</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for group in perfume_duplicates %}
+                        <tr>
+                            <td data-label="Duplicate perfume group">
+                                {% for perfume in group %}
+                                    {{ perfume }}
+                                    {% if not forloop.last %},{% endif %}
+                                {% endfor %}
+                            </td>
+                        </tr>
+                    {% empty %}
+                        {% include "includes/table_empty.html" with colspan=1 message="No exact normalized perfume duplicates found." cta_url="#perfume-merge-form" cta_label="Merge manually" %}
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
     </div>
-</div>
-
-<div class="workspace-block space-top-md">
-    <h2 class="kpi-link-title">Possible duplicate brands</h2>
-    <div class="table-wrap table-scroll-x">
-        <table class="table data-table">
-            <tbody>
-            {% for group in brand_duplicates %}
-                <tr>
-                    <td>{% for brand in group %}{{ brand.name }}{% if not forloop.last %}, {% endif %}{% endfor %}</td>
-                </tr>
-            {% empty %}
-                {% include "prices/components/table_empty.html" with colspan=1 message="No exact normalized brand duplicates found." cta_url="#brand-merge-form" cta_label="Merge manually" %}
-            {% endfor %}
-            </tbody>
-        </table>
-    </div>
-</div>
-
-<div class="workspace-block space-top-md">
-    <h2 class="kpi-link-title">Possible duplicate perfumes</h2>
-    <div class="table-wrap table-scroll-x">
-        <table class="table data-table">
-            <tbody>
-            {% for group in perfume_duplicates %}
-                <tr>
-                    <td>{% for perfume in group %}{{ perfume }}{% if not forloop.last %}, {% endif %}{% endfor %}</td>
-                </tr>
-            {% empty %}
-                {% include "prices/components/table_empty.html" with colspan=1 message="No exact normalized perfume duplicates found." cta_url="#perfume-merge-form" cta_label="Merge manually" %}
-            {% endfor %}
-            </tbody>
-        </table>
-    </div>
-</div>
 {% endblock %}

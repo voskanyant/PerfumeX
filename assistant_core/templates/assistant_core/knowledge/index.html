@@ -3,7 +3,7 @@
 {% block topbar_label %}Assistant / Knowledge{% endblock %}
 {% block content %}
 {% url 'assistant_core:global_rule_create' as global_rule_url %}
-{% include "prices/components/page_header.html" with kicker="Assistant" title="Knowledge Base" meta="Search and edit assistant rules, notes, aliases, and decisions." primary_url=global_rule_url primary_label="New global rule" actions_template="assistant_core/knowledge/_knowledge_actions.html" %}
+{% include "includes/page_header.html" with kicker="Assistant" title="Knowledge Base" meta="Search and edit assistant rules, notes, aliases, and decisions." primary_url=global_rule_url primary_label="New global rule" actions_template="assistant_core/knowledge/_knowledge_actions.html" %}
 
 <div class="workspace-block">
     <div class="layout-inline gap-sm flex-wrap">
@@ -103,19 +103,19 @@
         <table class="data-table table-mobile">
             <thead>
                 {% if active_section == "global_rules" or active_section == "garbage_keywords" or active_section == "parser_terms" %}
-                    <tr><th>Title</th><th>Kind</th><th>Keyword / Rule</th><th>Confidence</th><th>Status</th><th>Actions</th></tr>
+                    <tr><th scope="col">Title</th><th scope="col">Kind</th><th scope="col">Keyword / Rule</th><th scope="col">Confidence</th><th scope="col">Status</th><th scope="col">Actions</th></tr>
                 {% elif active_section == "supplier_rules" %}
-                    <tr><th>Supplier</th><th>Brand</th><th>Title</th><th>Kind</th><th>Applies to</th><th>Confidence</th><th>Status</th></tr>
+                    <tr><th scope="col">Supplier</th><th scope="col">Brand</th><th scope="col">Title</th><th scope="col">Kind</th><th scope="col">Applies to</th><th scope="col">Confidence</th><th scope="col">Status</th></tr>
                 {% elif active_section == "notes" %}
-                    <tr><th>Category</th><th>Title</th><th>Supplier</th><th>Brand</th><th>Perfume</th><th>Status</th></tr>
+                    <tr><th scope="col">Category</th><th scope="col">Title</th><th scope="col">Supplier</th><th scope="col">Brand</th><th scope="col">Perfume</th><th scope="col">Status</th></tr>
                 {% elif active_section == "product_aliases" %}
-                    <tr><th>Supplier text</th><th>Brand</th><th>Collection</th><th>Correct scent</th><th>Concentration</th><th>Audience</th><th>Blockers</th><th>Scope</th><th>Status</th><th>Actions</th></tr>
+                    <tr><th scope="col">Supplier text</th><th scope="col">Brand</th><th scope="col">Collection</th><th scope="col">Correct scent</th><th scope="col">Concentration</th><th scope="col">Audience</th><th scope="col">Blockers</th><th scope="col">Scope</th><th scope="col">Status</th><th scope="col">Actions</th></tr>
                 {% elif active_section == "concentration_aliases" %}
-                    <tr><th>Supplier text</th><th>Normalized alias</th><th>Correct concentration</th><th>Scope</th><th>Priority</th><th>Matcher</th><th>Status</th><th>Actions</th></tr>
+                    <tr><th scope="col">Supplier text</th><th scope="col">Normalized alias</th><th scope="col">Correct concentration</th><th scope="col">Scope</th><th scope="col">Priority</th><th scope="col">Matcher</th><th scope="col">Status</th><th scope="col">Actions</th></tr>
                 {% elif active_section == "decisions" %}
-                    <tr><th>Supplier product</th><th>Decision</th><th>Perfume</th><th>Variant</th><th>Reason</th><th>Created</th></tr>
+                    <tr><th scope="col">Supplier product</th><th scope="col">Decision</th><th scope="col">Perfume</th><th scope="col">Variant</th><th scope="col">Reason</th><th scope="col">Created</th></tr>
                 {% else %}
-                    <tr><th>Supplier text</th><th>Brand</th><th>Scope</th><th>Priority</th><th>Matcher</th><th>Status</th><th>Actions</th></tr>
+                    <tr><th scope="col">Supplier text</th><th scope="col">Brand</th><th scope="col">Scope</th><th scope="col">Priority</th><th scope="col">Matcher</th><th scope="col">Status</th><th scope="col">Actions</th></tr>
                 {% endif %}
             </thead>
             <tbody>
@@ -166,7 +166,7 @@
                             <td data-label="Actions" class="actions">
                                 <div class="layout-inline gap-sm">
                                     <a class="button ghost" href="{% url 'assistant_core:product_alias_update' item.pk %}">Edit</a>
-                                    <a class="button ghost" href="{% url 'assistant_core:product_alias_delete' item.pk %}">Delete</a>
+                                    <a class="button danger" href="{% url 'assistant_core:product_alias_delete' item.pk %}">Delete</a>
                                 </div>
                             </td>
                         {% elif active_section == "concentration_aliases" %}
@@ -180,7 +180,7 @@
                             <td data-label="Actions" class="actions">
                                 <div class="layout-inline gap-sm">
                                     <a class="button ghost" href="{% url 'assistant_core:concentration_alias_update' item.pk %}">Edit</a>
-                                    <a class="button ghost" href="{% url 'assistant_core:concentration_alias_delete' item.pk %}">Delete</a>
+                                    <a class="button danger" href="{% url 'assistant_core:concentration_alias_delete' item.pk %}">Delete</a>
                                 </div>
                             </td>
                         {% elif active_section == "decisions" %}
@@ -200,22 +200,21 @@
                             <td data-label="Actions" class="actions">
                                 <div class="layout-inline gap-sm">
                                     <a class="button ghost" href="{% url 'assistant_core:brand_alias_update' item.pk %}">Edit</a>
-                                    <a class="button ghost" href="{% url 'assistant_core:brand_alias_delete' item.pk %}">Delete</a>
+                                    <a class="button danger" href="{% url 'assistant_core:brand_alias_delete' item.pk %}">Delete</a>
                                 </div>
                             </td>
                         {% endif %}
                     </tr>
                 {% empty %}
-                    <tr>
-                        <td colspan="9" class="empty-state">
-                            No entries match the current filters. <a href="{% url 'assistant_core:knowledge' %}?section={{ active_section }}">Reset filters</a>
-                        </td>
-                    </tr>
+                    {% url 'assistant_core:knowledge' as knowledge_reset_base_url %}
+                    {% with reset_url=knowledge_reset_base_url|add:"?section="|add:active_section %}
+                        {% include "includes/table_empty.html" with colspan=9 message="No entries match the current filters." cta_url=reset_url cta_label="Reset filters" %}
+                    {% endwith %}
                 {% endfor %}
             </tbody>
         </table>
     </div>
 
-    {% include "prices/components/pagination.html" with page_obj=page_obj class_name="space-top-md" label="Knowledge pagination" jump_id="knowledge-page-jump" %}
+    {% include "includes/pagination.html" with page_obj=page_obj class_name="space-top-md" label="Knowledge pagination" jump_id="knowledge-page-jump" %}
 </div>
 {% endblock %}

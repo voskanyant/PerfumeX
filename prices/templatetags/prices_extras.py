@@ -1,5 +1,7 @@
 from django import template
 from django.template.defaultfilters import stringfilter
+from django.utils.html import format_html
+from django.utils.safestring import mark_safe
 from django.utils import timezone
 import re
 
@@ -31,14 +33,46 @@ def query_without(context, *keys):
     return query.urlencode()
 
 
+def _excluded_query_keys(page_param="page", exclude=""):
+    keys = {page_param or "page"}
+    if isinstance(exclude, str):
+        keys.update(key.strip() for key in exclude.split(",") if key.strip())
+    elif exclude:
+        keys.update(str(key).strip() for key in exclude if str(key).strip())
+    return keys
+
+
 @register.simple_tag(takes_context=True)
-def page_query(context, page_number, page_param="page"):
+def page_query(context, page_number, page_param="page", exclude=""):
     request = context.get("request")
     if not request:
         return ""
     query = request.GET.copy()
+    for key in _excluded_query_keys(page_param, exclude):
+        query.pop(key, None)
     query[page_param or "page"] = page_number
     return query.urlencode()
+
+
+@register.simple_tag(takes_context=True)
+def pagination_hidden_inputs(context, page_param="page", exclude=""):
+    request = context.get("request")
+    if not request:
+        return ""
+    excluded = _excluded_query_keys(page_param, exclude)
+    inputs = []
+    for key, values in request.GET.lists():
+        if key in excluded:
+            continue
+        for value in values:
+            inputs.append(
+                format_html(
+                    '<input type="hidden" name="{}" value="{}">',
+                    key,
+                    value,
+                )
+            )
+    return mark_safe("\n".join(str(input_html) for input_html in inputs))
 
 
 @register.filter

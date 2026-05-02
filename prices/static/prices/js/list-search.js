@@ -1,16 +1,16 @@
 ﻿(function () {
-    var input = document.getElementById("live-search");
-    var countEl = document.getElementById("search-count");
-    var currencyFilter = document.getElementById("currency-filter");
-    var supplierFilter = document.getElementById("supplier-filter");
-    var supplierFilterSearch = document.getElementById("supplier-filter-search");
-    var supplierSuggest = document.getElementById("supplier-suggest");
-    var clearSearchBtn = document.getElementById("clear-search-btn");
-    var supplierOptionSource = document.getElementById("supplier-option-source");
-    var supplierSelectedChips = document.getElementById("supplier-selected-chips");
-    var clearSupplierFilterBtn = document.getElementById("clear-supplier-filter-btn");
+    var input = document.querySelector("[data-live-search]");
+    var countEl = document.querySelector("[data-search-count]");
+    var currencyFilter = document.querySelector("[data-currency-filter]");
+    var supplierFilter = document.querySelector("[data-supplier-filter]");
+    var supplierFilterSearch = document.querySelector("[data-supplier-filter-search]");
+    var supplierSuggest = document.querySelector("[data-supplier-suggest]");
+    var clearSearchBtn = document.querySelector("[data-clear-search-button]");
+    var supplierOptionSource = document.querySelector("[data-supplier-option-source]");
+    var supplierSelectedChips = document.querySelector("[data-supplier-selected-chips]");
+    var clearSupplierFilterBtn = document.querySelector("[data-clear-supplier-filter-button]");
     var statusFilter = document.getElementById("status-filter");
-    var showInactiveSwitch = document.getElementById("show-inactive-switch");
+    var showInactiveSwitch = document.querySelector("[data-show-inactive-switch]");
     var excludeFilter = document.getElementById("exclude-filter");
     var excludeApplyBtn = document.getElementById("exclude-apply-btn");
     var smartSearchSwitch = document.getElementById("smart-search-switch");
@@ -24,7 +24,6 @@
     var activeController = null;
     var requestId = 0;
     var lastRequestSignature = "";
-    var currentAjaxPage = 1;
     var lastAppliedSearch = (input.value || "").trim();
     var supplierOptions = supplierOptionSource
         ? Array.from(supplierOptionSource.options).map(function (opt) {
@@ -169,13 +168,6 @@
         });
     }
 
-    function decorateInputs(container) {
-        if (!container) return;
-        container.querySelectorAll("input[type='checkbox']").forEach(function (el) {
-            el.classList.add("check-input");
-        });
-    }
-
     function getPriceMinValue() {
         return priceMinFilter ? priceMinFilter.value.trim() : "";
     }
@@ -234,7 +226,7 @@
         }
     }
 
-    function updateSearchParamInUrl(query, page) {
+    function updateSearchParamInUrl(_query, _page) {
         if (useServerSearch) return;
         var url = new URL(window.location.href);
         setCommonFilters(url);
@@ -257,10 +249,8 @@
             }
             var start = Math.max(1, page - 2);
             var end = Math.min(totalPages, page + 2);
-            var knownNav = el("nav", "space-top-md");
-            knownNav.setAttribute("aria-label", "Pagination");
-            var knownList = el("ul", "pagination-list");
-            knownNav.appendChild(knownList);
+            var knownList = el("div", "pagination-list");
+            pagination.appendChild(knownList);
             if (data.has_previous) {
                 knownList.appendChild(buildPageItem(data.previous_page, "Previous", false));
             }
@@ -270,17 +260,14 @@
             if (data.has_next) {
                 knownList.appendChild(buildPageItem(data.next_page, "Next", false));
             }
-            knownNav.appendChild(el("div", "muted space-top-sm", "Page " + page + " of " + totalPages));
-            pagination.appendChild(knownNav);
+            pagination.appendChild(el("div", "pagination-summary", "Page " + page + " of " + totalPages));
         } else {
             if (!data.has_previous && !data.has_next) {
                 pagination.style.display = "none";
                 return;
             }
-            var unknownNav = el("nav", "space-top-md");
-            unknownNav.setAttribute("aria-label", "Pagination");
-            var unknownList = el("ul", "pagination-list");
-            unknownNav.appendChild(unknownList);
+            var unknownList = el("div", "pagination-list");
+            pagination.appendChild(unknownList);
             if (data.has_previous) {
                 unknownList.appendChild(buildPageItem(data.previous_page, "Previous", false));
             }
@@ -288,8 +275,7 @@
             if (data.has_next) {
                 unknownList.appendChild(buildPageItem(data.next_page, "Next", false));
             }
-            unknownNav.appendChild(el("div", "muted space-top-sm", "Page " + page));
-            pagination.appendChild(unknownNav);
+            pagination.appendChild(el("div", "pagination-summary", "Page " + page));
         }
         pagination.style.display = "";
         pagination.querySelectorAll("a[data-page]").forEach(function (link) {
@@ -302,16 +288,13 @@
     }
 
     function buildPageItem(pageNumber, label, active) {
-        var item = el("li", active ? "page-item active" : "page-item");
         if (active) {
-            item.appendChild(el("span", "page-link", label));
-            return item;
+            return el("span", "page-link is-active", label);
         }
         var link = el("a", "page-link", label);
         link.href = "#";
         link.dataset.page = String(pageNumber || 1);
-        item.appendChild(link);
-        return item;
+        return link;
     }
 
     function applyLastViewedHighlight() {
@@ -693,10 +676,12 @@
             }
             if (bulkEnabled) {
                 var checkboxCell = el("td", "select-col bulk-col");
+                checkboxCell.dataset.label = "Select";
                 var checkbox = document.createElement("input");
                 checkbox.type = "checkbox";
                 checkbox.name = "product_ids";
                 checkbox.value = String(item.id || "");
+                checkbox.setAttribute("aria-label", "Select product row");
                 checkboxCell.appendChild(checkbox);
                 row.appendChild(checkboxCell);
             }
@@ -705,7 +690,7 @@
             row.appendChild(fieldCell("current_price", "Price", priceStack));
             row.appendChild(fieldCell("supplier", "Supplier", mobileSupplier));
             row.appendChild(fieldCell("last_imported_at", "Last imported", imported));
-            row.appendChild(fieldCell("sparkline", "", buildSparkline(item.sparkline, deltaDirection, deltaPercent), "sparkline-cell"));
+            row.appendChild(fieldCell("sparkline", "Price trend", buildSparkline(item.sparkline, deltaDirection, deltaPercent), "sparkline-cell"));
             if (hasActions) {
                 row.appendChild(buildActionsCell(item.id, editPattern, deletePattern, csrfValue, nextValue));
             }
@@ -841,7 +826,6 @@
             return;
         }
         lastRequestSignature = requestSignature;
-        currentAjaxPage = safePage;
         updateSearchParamInUrl(query, safePage);
         requestId += 1;
         var currentRequestId = requestId;

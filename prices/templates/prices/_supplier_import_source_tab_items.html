@@ -1,0 +1,3 @@
+<a class="tab {% if active_import_source == 'email' %}active{% endif %}" href="{% url 'prices:supplier_import' supplier.pk %}?source=email">Update from email</a>
+<a class="tab {% if active_import_source == 'link' %}active{% endif %}" href="{% url 'prices:supplier_import' supplier.pk %}?source=link">Update from link</a>
+<a class="tab {% if active_import_source == 'file' %}active{% endif %}" href="{% url 'prices:supplier_import' supplier.pk %}?source=file">Price file</a>

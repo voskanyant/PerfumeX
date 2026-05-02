@@ -1,31 +1,34 @@
 {% load prices_extras %}
 {% if page_obj and page_obj.paginator.num_pages > 1 %}
-    <nav class="pagination-shell{% if class_name %} {{ class_name }}{% endif %}" aria-label="{{ label|default:'Pagination' }}">
+    <nav class="pagination-shell{% if class_name %} {{ class_name }}{% endif %}"{% if html_id %} id="{{ html_id }}"{% endif %} aria-label="{{ label|default:'Pagination' }}">
         <div class="pagination-list">
             {% if page_obj.has_previous %}
-                <a class="page-link" href="?{% page_query page_obj.previous_page_number page_param|default:'page' %}">Previous</a>
+                {% if include_boundary_links %}
+                    <a class="page-link" href="?{% page_query 1 page_param|default:'page' exclude_query_params|default:'' %}">First</a>
+                {% endif %}
+                <a class="page-link" href="?{% page_query page_obj.previous_page_number page_param|default:'page' exclude_query_params|default:'' %}">Previous</a>
             {% endif %}
             {% for page_num in page_obj.paginator.page_range %}
                 {% if page_num <= 5 or page_num > page_obj.paginator.num_pages|add:-3 %}
+                    {% if page_num == page_obj.paginator.num_pages|add:-2 and page_obj.paginator.num_pages > 8 %}
+                        <span class="page-link is-disabled" aria-hidden="true">...</span>
+                    {% endif %}
                     {% if page_num == page_obj.number %}
                         <span class="page-link is-active">{{ page_num }}</span>
                     {% else %}
-                        <a class="page-link" href="?{% page_query page_num page_param|default:'page' %}">{{ page_num }}</a>
+                        <a class="page-link" href="?{% page_query page_num page_param|default:'page' exclude_query_params|default:'' %}">{{ page_num }}</a>
                     {% endif %}
                 {% endif %}
             {% endfor %}
             {% if page_obj.has_next %}
-                <a class="page-link" href="?{% page_query page_obj.next_page_number page_param|default:'page' %}">Next</a>
+                <a class="page-link" href="?{% page_query page_obj.next_page_number page_param|default:'page' exclude_query_params|default:'' %}">Next</a>
+                {% if include_boundary_links %}
+                    <a class="page-link" href="?{% page_query page_obj.paginator.num_pages page_param|default:'page' exclude_query_params|default:'' %}">Last</a>
+                {% endif %}
             {% endif %}
         </div>
         <form class="pagination-jump" method="get">
-            {% for key, values in request.GET.lists %}
-                {% if key != page_param|default:"page" %}
-                    {% for value in values %}
-                        <input type="hidden" name="{{ key }}" value="{{ value }}">
-                    {% endfor %}
-                {% endif %}
-            {% endfor %}
+            {% pagination_hidden_inputs page_param|default:"page" exclude_query_params|default:"" %}
             <label for="{{ jump_id|default:'page-jump' }}">Page</label>
             <input id="{{ jump_id|default:'page-jump' }}" type="number" name="{{ page_param|default:'page' }}" min="1" max="{{ page_obj.paginator.num_pages }}" value="{{ page_obj.number }}">
             <button class="button secondary" type="submit">Go</button>

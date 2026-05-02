@@ -1,0 +1,8 @@
+<a class="tab {% if active_tab == 'products' %}active{% endif %}"
+   href="{% url 'prices:our_product_list' %}">Products</a>
+<a class="tab {% if active_tab == 'brands' %}active{% endif %}"
+   href="{% url 'prices:our_product_list' %}?tab=brands">Brands</a>
+<a class="tab {% if active_tab == 'collections' %}active{% endif %}"
+   href="{% url 'prices:our_product_list' %}?tab=collections">Collections</a>
+<a class="tab {% if active_tab == 'concentrations' %}active{% endif %}"
+   href="{% url 'prices:our_product_list' %}?tab=concentrations">Concentrations</a>

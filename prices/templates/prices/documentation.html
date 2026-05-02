@@ -6,9 +6,7 @@
 {% block content %}
     <div class="page-stack">
         <div class="section-card">
-            <span class="page-kicker">Reference</span>
-            <h1 class="page-title">Technical Documentation</h1>
-            <p class="page-subtitle space-bottom-sm">Current project notes for developers, operators, and AI agents.</p>
+            {% include "includes/page_header.html" with kicker="Reference" title="Technical Documentation" subtitle="Current project notes for developers, operators, and AI agents." subtitle_class="space-bottom-sm" %}
             <p class="tone-muted space-bottom-sm">This page is a live summary of the current codebase. The detailed repo handoff lives in <code>README.md</code> and <code>PROJECT_HANDOFF.md</code> at the repository root.</p>
             <ul class="space-bottom-none">
                 <li><code>README.md</code>: setup, routes, stack, operations summary.</li>

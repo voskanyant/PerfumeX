@@ -1,34 +1,45 @@
 {% extends "prices/base.html" %}
 {% block content %}
-<div class="page-head">
-    <div><span class="page-kicker">Research</span><h1 class="page-title">Fact claims</h1></div>
-</div>
-<div class="workspace-block">
-    <table class="data-table">
-        <tbody>
-        {% for claim in claims %}
-            <tr>
-                <td>{{ claim.perfume }}</td>
-                <td>{{ claim.field_name }}</td>
-                <td>{{ claim.status }}</td>
-                <td>
-                    <form method="post" action="{% url 'assistant_core:claim_status' claim.pk 'approved' %}">
-                        {% csrf_token %}
-                        <button class="button ghost">Approve</button>
-                    </form>
-                </td>
-                <td>
-                    <form method="post" action="{% url 'assistant_core:claim_status' claim.pk 'rejected' %}">
-                        {% csrf_token %}
-                        <button class="button ghost">Reject</button>
-                    </form>
-                </td>
-            </tr>
-        {% empty %}
-            {% url 'assistant_core:research_jobs' as research_jobs_url %}
-            {% include "prices/components/table_empty.html" with colspan=5 message="No claims." cta_url=research_jobs_url cta_label="Open research jobs" %}
-        {% endfor %}
-        </tbody>
-    </table>
-</div>
+    {% include "includes/page_header.html" with kicker="Research" title="Fact claims" %}
+    <div class="workspace-block">
+        <div class="table-wrap table-scroll-x">
+            <table class="data-table table-mobile">
+                <thead>
+                    <tr>
+                        <th scope="col">Perfume</th>
+                        <th scope="col">Field</th>
+                        <th scope="col">Status</th>
+                        <th scope="col">Approve</th>
+                        <th scope="col">Reject</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for claim in claims %}
+                        <tr>
+                            <td data-label="Perfume">{{ claim.perfume }}</td>
+                            <td data-label="Field">{{ claim.field_name }}</td>
+                            <td data-label="Status">{{ claim.status }}</td>
+                            <td data-label="Approve" class="actions">
+                                <form method="post"
+                                      action="{% url 'assistant_core:claim_status' claim.pk 'approved' %}">
+                                    {% csrf_token %}
+                                    <button class="button ghost" type="submit">Approve</button>
+                                </form>
+                            </td>
+                            <td data-label="Reject" class="actions">
+                                <form method="post"
+                                      action="{% url 'assistant_core:claim_status' claim.pk 'rejected' %}">
+                                    {% csrf_token %}
+                                    <button class="button ghost" type="submit">Reject</button>
+                                </form>
+                            </td>
+                        </tr>
+                    {% empty %}
+                        {% url 'assistant_core:research_jobs' as research_jobs_url %}
+                        {% include "includes/table_empty.html" with colspan=5 message="No claims." cta_url=research_jobs_url cta_label="Open research jobs" %}
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
 {% endblock %}

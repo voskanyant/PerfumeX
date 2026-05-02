@@ -11,6 +11,7 @@ import io
 from django.utils import timezone
 
 from prices import models
+from prices.services.import_history import get_supplier_latest_price_batch_time
 
 
 @dataclass
@@ -717,15 +718,7 @@ def process_import_file(import_file: models.ImportFile) -> None:
     batch_received = import_file.import_batch.received_at
     batch_created = import_file.import_batch.created_at
     batch_time = batch_received or batch_created or timezone.now()
-    supplier_latest_batch = None
-    for received_at, created_at in models.ImportBatch.objects.filter(
-        supplier=supplier,
-        importfile__status=models.ImportStatus.PROCESSED,
-        importfile__file_kind=models.FileKind.PRICE,
-    ).values_list("received_at", "created_at"):
-        candidate = received_at or created_at
-        if candidate and (supplier_latest_batch is None or candidate > supplier_latest_batch):
-            supplier_latest_batch = candidate
+    supplier_latest_batch = get_supplier_latest_price_batch_time(supplier)
     identity_keys = list(unique_rows.keys())
     existing_products = models.SupplierProduct.objects.filter(
         supplier=supplier, identity_key__in=identity_keys

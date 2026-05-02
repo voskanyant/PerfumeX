@@ -2,7 +2,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "lint:js": "eslint prices/static/prices/js"
+    "lint:js": "eslint prices/static/prices/js assistant_linking/static/assistant_linking/js"
   },
   "devDependencies": {
     "eslint": "^9.36.0"

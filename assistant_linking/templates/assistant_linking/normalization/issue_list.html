@@ -1,13 +1,8 @@
 {% extends "prices/base.html" %}
 {% block title %}{{ issue_title }}{% endblock %}
 {% block content %}
-<div class="page-head">
-    <div>
-        <span class="page-kicker">Normalisation</span>
-        <h1 class="page-title">{{ issue_title }}</h1>
-    </div>
-    <a class="button ghost" href="{% url 'assistant_linking:normalization_dashboard' %}">Back</a>
-</div>
+{% url 'assistant_linking:normalization_dashboard' as normalization_dashboard_url %}
+{% include "includes/page_header.html" with kicker="Normalisation" title=issue_title secondary_url=normalization_dashboard_url secondary_label="Back" %}
 
 <div class="workspace-block">
     <form method="get" class="page-actions">
@@ -17,6 +12,7 @@
             value="{{ search_query }}"
             placeholder="{{ search_placeholder }}"
             class="form-field"
+            aria-label="Search issues"
         >
         <button class="button ghost" type="submit">Search</button>
         {% if search_query %}
@@ -34,7 +30,7 @@
 <div class="workspace-block">
     <div class="table-wrap table-scroll-x">
     <table class="data-table table-mobile">
-        <thead><tr><th>Supplier</th><th>Product</th><th>Parsed</th><th>Flags</th><th>Confidence</th></tr></thead>
+        <thead><tr><th scope="col">Supplier</th><th scope="col">Product</th><th scope="col">Parsed</th><th scope="col">Flags</th><th scope="col">Confidence</th></tr></thead>
         <tbody>
         {% for parsed in parses %}
             <tr>
@@ -45,25 +41,12 @@
                 <td data-label="Confidence">{{ parsed.confidence }}</td>
             </tr>
         {% empty %}
-            <tr>
-                <td colspan="5" class="empty-state">
-                    No rows in this queue. <a href="{% url 'assistant_linking:normalization_dashboard' %}">Back to dashboard</a>
-                </td>
-            </tr>
+            {% url 'assistant_linking:normalization_dashboard' as normalization_dashboard_url %}
+            {% include "includes/table_empty.html" with colspan=5 message="No rows in this queue." cta_url=normalization_dashboard_url cta_label="Back to dashboard" %}
         {% endfor %}
         </tbody>
     </table>
     </div>
 </div>
-{% if page_obj and page_obj.paginator.num_pages > 1 %}
-<nav class="workspace-pagination" aria-label="Pagination">
-    {% if page_obj.has_previous %}
-        <a class="workspace-page-link" href="?{% if search_query %}q={{ search_query|urlencode }}&amp;{% endif %}page={{ page_obj.previous_page_number }}">Previous</a>
-    {% endif %}
-    <span class="workspace-page-status">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
-    {% if page_obj.has_next %}
-        <a class="workspace-page-link" href="?{% if search_query %}q={{ search_query|urlencode }}&amp;{% endif %}page={{ page_obj.next_page_number }}">Next</a>
-    {% endif %}
-</nav>
-{% endif %}
+{% include "includes/pagination.html" with page_obj=page_obj page_param="page" class_name="space-top-md" label="Queue pagination" jump_id="issue-page-jump" exclude_query_params="refresh" %}
 {% endblock %}

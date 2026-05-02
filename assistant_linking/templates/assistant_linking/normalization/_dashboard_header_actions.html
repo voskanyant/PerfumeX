@@ -1,0 +1,6 @@
+<a class="button ghost"
+   href="{% url 'assistant_linking:normalization_dashboard' %}?refresh=1">Refresh stats</a>
+<form method="post" action="{% url 'assistant_linking:rebuild_groups' %}">
+    {% csrf_token %}
+    <button class="button ghost" type="submit">Rebuild groups</button>
+</form>

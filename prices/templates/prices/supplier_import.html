@@ -22,11 +22,7 @@
             </div>
         </div>
 
-        <nav class="tabs supplier-source-tabs" aria-label="Supplier import sources">
-            <a class="tab {% if active_import_source == 'email' %}active{% endif %}" href="{% url 'prices:supplier_import' supplier.pk %}?source=email">Update from email</a>
-            <a class="tab {% if active_import_source == 'link' %}active{% endif %}" href="{% url 'prices:supplier_import' supplier.pk %}?source=link">Update from link</a>
-            <a class="tab {% if active_import_source == 'file' %}active{% endif %}" href="{% url 'prices:supplier_import' supplier.pk %}?source=file">Price file</a>
-        </nav>
+        {% include "includes/tabs.html" with class_name="supplier-source-tabs" label="Supplier import sources" items_template="prices/_supplier_import_source_tab_items.html" %}
 
         <div class="supplier-import-shell">
             <div class="supplier-source-column">
@@ -135,7 +131,7 @@
                                 {% endif %}
                                 <form method="post" action="{% url 'prices:supplier_price_source_delete' supplier.pk source.pk %}">
                                     {% csrf_token %}
-                                    <button class="button ghost" type="submit">Delete</button>
+                                    <button class="button ghost" type="submit" data-confirm="Delete this supplier price source?">Delete</button>
                                 </form>
                             </div>
                         </div>

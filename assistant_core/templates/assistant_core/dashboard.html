@@ -2,46 +2,51 @@
 {% block title %}Assistant{% endblock %}
 {% block topbar_label %}Assistant{% endblock %}
 {% block content %}
-{% include "prices/components/page_header.html" with kicker="Assistant" title="Assistant control room" meta="Staff-only review queues for catalogue, linking, research, and drafts." %}
-<div class="workspace-block">
-    <strong>Safety mode:</strong> no catalogue changes are published automatically. Assistant actions create suggestions only.
-</div>
-<div class="page-grid-3 space-top-md">
-    {% for title, route, count in cards %}
-    <a class="metric-card kpi-link-card" href="{% url route %}">
-        <div class="metric-label">{{ title }}</div>
-        <div class="metric-value">{{ count }}</div>
-        <div class="metric-meta">Open records</div>
-    </a>
-    {% empty %}
-    <div class="empty-state">No assistant queues are configured. <a href="{% url 'assistant_core:knowledge' %}">Open knowledge base</a></div>
-    {% endfor %}
-</div>
-<div class="workspace-block space-top-md">
-    {% url 'assistant_linking:group_queue' as linking_queue_url %}
-    <div class="run-log-summary">
-        <span>Pending approvals: {{ pending_approvals }}</span>
-        <span>Incomplete normalization: {{ normalization_issue_count }}</span>
-        <span>Low-confidence parses: {{ low_confidence }}</span>
+    {% include "includes/page_header.html" with kicker="Assistant" title="Assistant control room" meta="Staff-only review queues for catalogue, linking, research, and drafts." %}
+    <div class="workspace-block">
+        <strong>Safety mode:</strong> no catalogue changes are published automatically. Assistant actions create suggestions only.
     </div>
-    <h3 class="kpi-link-title space-top-sm">Recent manual decisions</h3>
-    <div class="table-wrap table-scroll-x">
-    <table class="table data-table table-mobile">
-        <thead>
-            <tr><th>Supplier product</th><th>Decision</th><th>Created at</th></tr>
-        </thead>
-        <tbody>
-        {% for decision in recent_decisions %}
-            <tr>
-                <td data-label="Supplier product">{{ decision.supplier_product }}</td>
-                <td data-label="Decision">{{ decision.decision_type }}</td>
-                <td data-label="Created at">{{ decision.created_at }}</td>
-            </tr>
+    <div class="page-grid-3 space-top-md">
+        {% for title, route, count in cards %}
+            <a class="metric-card kpi-link-card" href="{% url route %}">
+                <div class="metric-label">{{ title }}</div>
+                <div class="metric-value">{{ count }}</div>
+                <div class="metric-meta">Open records</div>
+            </a>
         {% empty %}
-            {% include "prices/components/table_empty.html" with colspan=3 message="No decisions yet." cta_url=linking_queue_url cta_label="Open linking queue" %}
+            {% url 'assistant_core:knowledge' as knowledge_url %}
+            {% include "includes/empty_state.html" with message="No assistant queues are configured." cta_url=knowledge_url cta_label="Open knowledge base" %}
         {% endfor %}
-        </tbody>
-    </table>
     </div>
-</div>
+    <div class="workspace-block space-top-md">
+        {% url 'assistant_linking:group_queue' as linking_queue_url %}
+        <div class="run-log-summary">
+            <span>Pending approvals: {{ pending_approvals }}</span>
+            <span>Incomplete normalization: {{ normalization_issue_count }}</span>
+            <span>Low-confidence parses: {{ low_confidence }}</span>
+        </div>
+        <h3 class="kpi-link-title space-top-sm">Recent manual decisions</h3>
+        <div class="table-wrap table-scroll-x">
+            <table class="table data-table table-mobile">
+                <thead>
+                    <tr>
+                        <th scope="col">Supplier product</th>
+                        <th scope="col">Decision</th>
+                        <th scope="col">Created at</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for decision in recent_decisions %}
+                        <tr>
+                            <td data-label="Supplier product">{{ decision.supplier_product }}</td>
+                            <td data-label="Decision">{{ decision.decision_type }}</td>
+                            <td data-label="Created at">{{ decision.created_at }}</td>
+                        </tr>
+                    {% empty %}
+                        {% include "includes/table_empty.html" with colspan=3 message="No decisions yet." cta_url=linking_queue_url cta_label="Open linking queue" %}
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
 {% endblock %}

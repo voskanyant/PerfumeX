@@ -1,5 +1,9 @@
 # PerfumeX — Audit Findings & Codex Prompts
 
+## Purpose of this document
+
+Historical audit and prompt reference generated for a specific 2026-04-25 working tree. Do not treat this as current repo memory. Start with [AGENTS.md](AGENTS.md), [README.md](README.md), [docs/REPO_MAP.md](docs/REPO_MAP.md), [docs/CODEX_TASKS.md](docs/CODEX_TASKS.md), and [docs/DECISIONS.md](docs/DECISIONS.md), then verify any prompt here against current code before using it.
+
 Generated 2026-04-25. Four parallel audits ran against the working tree:
 prices app (correctness/UX), assistant apps (correctness/UX), front-end (CSS/JS/templates),
 and infra/security/settings. ~140 distinct findings total.

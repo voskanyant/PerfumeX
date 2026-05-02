@@ -1,0 +1,5 @@
+<form method="post"
+      action="{% url 'assistant_core:brand_manager_run_mock' profile.pk %}">
+    {% csrf_token %}
+    <button class="button primary" type="submit">Run mock scan</button>
+</form>

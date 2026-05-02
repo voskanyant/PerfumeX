@@ -4,15 +4,13 @@
 {% block content %}
     <div class="page-stack">
         <div class="section-card form-shell">
-            <span class="page-kicker">Editor</span>
-            <h1 class="page-title">{{ object_name }}</h1>
-            <p class="page-subtitle space-bottom-none">Update values and save changes to continue.</p>
+            {% include "includes/page_header.html" with kicker="Editor" title=object_name subtitle="Update values and save changes to continue." subtitle_class="space-bottom-none" %}
             <form method="post"{% if form.is_multipart %} enctype="multipart/form-data"{% endif %} class="space-top-md">
                 {% csrf_token %}
                 {{ form.as_p }}
                 <div class="form-actions">
                     <button class="button" type="submit">Save</button>
-                    <a class="button ghost" href="javascript:history.back()">Cancel</a>
+                    <button class="button ghost" type="button" data-history-back data-history-fallback="{% url 'prices:dashboard' %}">Cancel</button>
                 </div>
             </form>
         </div>

@@ -1,4 +1,5 @@
 ﻿{% extends "prices/base.html" %}
+{% load static %}
 
 {% block title %}Currencies{% endblock %}
 {% block body_data %}data-page="currencies"{% endblock %}
@@ -6,7 +7,7 @@
 
 {% block content %}
     <div class="page-stack">
-        {% include "prices/components/page_header.html" with kicker="Rates" title="Currencies" meta="Set exchange rates used for product price conversion." %}
+        {% include "includes/page_header.html" with kicker="Rates" title="Currencies" meta="Set exchange rates used for product price conversion." %}
         <div class="section-card">
             <span class="card-label">Automation</span>
             <h2 class="card-title">CBR Auto Rates</h2>
@@ -71,87 +72,82 @@
                 </form>
                 <div class="table-wrap table-scroll-x space-top-sm">
                     <table class="table space-bottom-none table-mobile">
-                <thead>
-                    <tr>
-                        <th><input type="checkbox" id="rate-select-all"></th>
-                        <th>Date</th>
-                        <th>From</th>
-                        <th>To</th>
-                        <th>Rate</th>
-                        <th>Source</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for rate in rates %}
-                        <tr>
-                            <form id="rate-form-{{ rate.pk }}" method="post" action="{% url 'prices:currency_rate_update' rate.pk %}">
-                                {% csrf_token %}
-                                <input type="hidden" name="page" value="{{ rates_page.number }}">
-                            </form>
-                            <td data-label="Select"><input type="checkbox" name="rate_ids" value="{{ rate.pk }}" form="rate-bulk-delete-form"></td>
-                            <td data-label="Date"><input type="text" name="rate_date" value="{{ rate.rate_date|date:'d/m/Y' }}" placeholder="dd/mm/yyyy" form="rate-form-{{ rate.pk }}"></td>
-                            <td data-label="From">
-                                <select name="from_currency" form="rate-form-{{ rate.pk }}">
-                                    <option value="RUB"{% if rate.from_currency == "RUB" %} selected{% endif %}>RUB</option>
-                                    <option value="USD"{% if rate.from_currency == "USD" %} selected{% endif %}>USD</option>
-                                </select>
-                            </td>
-                            <td data-label="To">
-                                <select name="to_currency" form="rate-form-{{ rate.pk }}">
-                                    <option value="RUB"{% if rate.to_currency == "RUB" %} selected{% endif %}>RUB</option>
-                                    <option value="USD"{% if rate.to_currency == "USD" %} selected{% endif %}>USD</option>
-                                </select>
-                            </td>
-                            <td data-label="Rate"><input type="text" name="rate" value="{{ rate.rate }}" form="rate-form-{{ rate.pk }}"></td>
-                            <td data-label="Source"><input type="text" name="source" value="{{ rate.source }}" form="rate-form-{{ rate.pk }}"></td>
-                            <td class="actions" data-label="Actions">
-                                <div class="layout-inline gap-sm">
-                                    <button class="button secondary" type="submit" form="rate-form-{{ rate.pk }}">Save</button>
-                                    <form method="post" action="{% url 'prices:currency_rate_delete' rate.pk %}">
+                        <thead>
+                            <tr>
+                                <th scope="col" aria-label="Select">
+                                    <input type="checkbox"
+                                           id="rate-select-all"
+                                           aria-label="Select all currency rates">
+                                </th>
+                                <th scope="col">Date</th>
+                                <th scope="col">From</th>
+                                <th scope="col">To</th>
+                                <th scope="col">Rate</th>
+                                <th scope="col">Source</th>
+                                <th scope="col">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for rate in rates %}
+                                <tr>
+                                    <form id="rate-form-{{ rate.pk }}" method="post" action="{% url 'prices:currency_rate_update' rate.pk %}">
                                         {% csrf_token %}
                                         <input type="hidden" name="page" value="{{ rates_page.number }}">
-                                        <button class="button danger icon" type="submit" title="Delete" aria-label="Delete" data-confirm="Delete this currency rate?">
-                                            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                                                <path d="M3 6h18"/>
-                                                <path d="M8 6V4h8v2"/>
-                                                <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
-                                                <path d="M10 11v6"/>
-                                                <path d="M14 11v6"/>
-                                            </svg>
-                                        </button>
                                     </form>
-                                </div>
-                            </td>
-                        </tr>
-                    {% empty %}
-                        <tr>
-                            <td colspan="7" class="empty-state">
-                                No rates yet. Add a manual rate or sync today from CBR.
-                            </td>
-                        </tr>
-                    {% endfor %}
-                </tbody>
+                                    <td data-label="Select">
+                                        <input type="checkbox"
+                                               name="rate_ids"
+                                               value="{{ rate.pk }}"
+                                               form="rate-bulk-delete-form"
+                                               aria-label="Select currency rate">
+                                    </td>
+                                    <td data-label="Date"><input type="text" name="rate_date" value="{{ rate.rate_date|date:'d/m/Y' }}" placeholder="dd/mm/yyyy" form="rate-form-{{ rate.pk }}" aria-label="Rate date"></td>
+                                    <td data-label="From">
+                                        <select name="from_currency" form="rate-form-{{ rate.pk }}">
+                                            <option value="RUB"{% if rate.from_currency == "RUB" %} selected{% endif %}>RUB</option>
+                                            <option value="USD"{% if rate.from_currency == "USD" %} selected{% endif %}>USD</option>
+                                        </select>
+                                    </td>
+                                    <td data-label="To">
+                                        <select name="to_currency" form="rate-form-{{ rate.pk }}">
+                                            <option value="RUB"{% if rate.to_currency == "RUB" %} selected{% endif %}>RUB</option>
+                                            <option value="USD"{% if rate.to_currency == "USD" %} selected{% endif %}>USD</option>
+                                        </select>
+                                    </td>
+                                    <td data-label="Rate"><input type="text" name="rate" value="{{ rate.rate }}" form="rate-form-{{ rate.pk }}" aria-label="Exchange rate"></td>
+                                    <td data-label="Source"><input type="text" name="source" value="{{ rate.source }}" form="rate-form-{{ rate.pk }}" aria-label="Rate source"></td>
+                                    <td class="actions" data-label="Actions">
+                                        <div class="layout-inline gap-sm">
+                                            <button class="button secondary" type="submit" form="rate-form-{{ rate.pk }}">Save</button>
+                                            <form method="post" action="{% url 'prices:currency_rate_delete' rate.pk %}">
+                                                {% csrf_token %}
+                                                <input type="hidden" name="page" value="{{ rates_page.number }}">
+                                                <button class="button danger icon" type="submit" title="Delete" aria-label="Delete" data-confirm="Delete this currency rate?">
+                                                    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                                        <path d="M3 6h18"/>
+                                                        <path d="M8 6V4h8v2"/>
+                                                        <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+                                                        <path d="M10 11v6"/>
+                                                        <path d="M14 11v6"/>
+                                                    </svg>
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </td>
+                                </tr>
+                            {% empty %}
+                                {% include "includes/table_empty.html" with colspan=7 message="No rates yet. Add a manual rate or sync today from CBR." %}
+                            {% endfor %}
+                        </tbody>
                     </table>
                 </div>
-                {% include "prices/components/pagination.html" with page_obj=rates_page class_name="space-top-md" label="Rates pagination" jump_id="rates-page-jump" %}
+                {% include "includes/pagination.html" with page_obj=rates_page class_name="space-top-md" label="Rates pagination" jump_id="rates-page-jump" %}
             {% else %}
-                <div class="empty-state space-top-sm">No rates yet. Add a manual rate or sync today from CBR.</div>
+                {% include "includes/empty_state.html" with class_name="space-top-sm" message="No rates yet. Add a manual rate or sync today from CBR." %}
             {% endif %}
         </div>
     </div>
 {% endblock %}
 {% block extra_scripts %}
-    <script>
-        (function () {
-            var selectAll = document.getElementById("rate-select-all");
-            if (!selectAll) return;
-            var boxes = Array.from(document.querySelectorAll('input[name="rate_ids"]'));
-            selectAll.addEventListener("change", function () {
-                boxes.forEach(function (box) {
-                    box.checked = selectAll.checked;
-                });
-            });
-        })();
-    </script>
+    <script src="{% static 'prices/js/currencies.js' %}"></script>
 {% endblock %}

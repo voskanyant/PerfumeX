@@ -1,5 +1,5 @@
 <tr>
-    <td colspan="{{ colspan|default:1 }}" class="table-empty-cell">
+    <td colspan="{{ colspan|default:1 }}" class="{% if class_name %}{{ class_name }}{% else %}table-empty-cell{% endif %}">
         {{ message|default:"No records found." }}
         {% if cta_url and cta_label %}
             <a href="{{ cta_url }}">{{ cta_label }}</a>

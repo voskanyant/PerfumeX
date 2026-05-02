@@ -49,6 +49,19 @@
         }
     });
 
+    document.querySelectorAll("[data-history-back]").forEach(function (button) {
+        button.addEventListener("click", function () {
+            if (window.history.length > 1) {
+                window.history.back();
+                return;
+            }
+            var fallback = button.getAttribute("data-history-fallback");
+            if (fallback) {
+                window.location.assign(fallback);
+            }
+        });
+    });
+
     document.querySelectorAll(".product-filters-drawer[data-drawer]").forEach(function (drawer) {
         if (drawer.parentElement !== document.body) {
             document.body.appendChild(drawer);

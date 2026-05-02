@@ -2,156 +2,160 @@
 {% block title %}Fragrantica Products{% endblock %}
 {% block topbar_label %}Fragrantica Products{% endblock %}
 {% block content %}
-<div class="page-head">
-    <div>
-        <span class="page-kicker">Catalogue review</span>
-        <h1 class="page-title">Fragrantica Products</h1>
-        <div class="page-meta">{{ filtered_count }} shown from {{ total_count }} catalogue scents</div>
-    </div>
-    <div class="page-actions">
-        <a class="button secondary" href="{% url 'prices:our_product_list' %}">Our Products</a>
-        <a class="button primary" href="{% url 'assistant_core:catalog_import' %}">Import catalogue</a>
-    </div>
-</div>
-
-<div class="workspace-block our-products-catalog fragrantica-catalog">
-    <form method="get" class="fragrantica-filter-bar">
-        <select name="brand">
-            <option value="">All brands</option>
-            {% for brand in brands %}
-                <option value="{{ brand.id }}" {% if selected_brand_id == brand.id|stringformat:"s" %}selected{% endif %}>{{ brand.name }} ({{ brand.perfume_count }})</option>
-            {% endfor %}
-        </select>
-        <input type="text" name="q" value="{{ search_query }}" placeholder="Search scent, collection, concentration">
-        <select name="status">
-            <option value="all" {% if status_filter == "all" %}selected{% endif %}>All statuses</option>
-            <option value="linked" {% if status_filter == "linked" %}selected{% endif %}>Linked</option>
-            <option value="supplier_evidence" {% if status_filter == "supplier_evidence" %}selected{% endif %}>Supplier evidence</option>
-            <option value="collection_review" {% if status_filter == "collection_review" %}selected{% endif %}>Collection review</option>
-            <option value="catalog_only" {% if status_filter == "catalog_only" %}selected{% endif %}>Catalogue only</option>
-        </select>
-        <button class="button ghost" type="submit">Search</button>
-    </form>
-
-    <div class="fragrantica-status-strip">
-        <span>Linked {{ status_counts.linked|default:0 }}</span>
-        <span>Supplier evidence {{ status_counts.supplier_evidence|default:0 }}</span>
-        <span>Collection review {{ status_counts.collection_review|default:0 }}</span>
-        <span>Catalogue only {{ status_counts.catalog_only|default:0 }}</span>
-        <span>Supplier missing {{ missing_supplier_count }}</span>
-    </div>
-
-    <div class="our-products-list fragrantica-products-list" aria-label="Fragrantica catalogue products">
-        {% for row in rows %}
-            <article class="our-products-card fragrantica-product-card">
-                <div class="our-products-card-main fragrantica-product-main">
-                    <div class="our-products-card-body">
-                        <div class="our-products-full-name fragrantica-product-name" aria-label="Fragrantica product identity">
-                            <span class="catalogue-field catalogue-field-brand">
-                                <span class="catalogue-cell-value catalogue-cell-value-strong">{{ row.perfume.brand.name }}</span>
-                            </span>
-                            {% if row.perfume.collection_name %}
-                                <span class="catalogue-field catalogue-field-collection">
-                                    <span class="identity-separator">/</span>
-                                    <span class="catalogue-cell-value">{{ row.perfume.collection_name }}</span>
+    {% include "includes/page_header.html" with kicker="Catalogue review" title="Fragrantica Products" meta_template="prices/_fragrantica_products_header_meta.html" actions_template="prices/_fragrantica_products_header_actions.html" %}
+    <div class="workspace-block our-products-catalog fragrantica-catalog">
+        <form method="get" class="fragrantica-filter-bar">
+            <select name="brand">
+                <option value="">All brands</option>
+                {% for brand in brands %}
+                    <option value="{{ brand.id }}"
+                            {% if selected_brand_id == brand.id|stringformat:"s" %}selected{% endif %}>
+                        {{ brand.name }} ({{ brand.perfume_count }})
+                    </option>
+                {% endfor %}
+            </select>
+            <input type="text"
+                   name="q"
+                   value="{{ search_query }}"
+                   placeholder="Search scent, collection, concentration"
+                   aria-label="Search Fragrantica products">
+            <select name="status">
+                <option value="all" {% if status_filter == "all" %}selected{% endif %}>All statuses</option>
+                <option value="linked" {% if status_filter == "linked" %}selected{% endif %}>Linked</option>
+                <option value="supplier_evidence"
+                        {% if status_filter == "supplier_evidence" %}selected{% endif %}>Supplier evidence</option>
+                <option value="collection_review"
+                        {% if status_filter == "collection_review" %}selected{% endif %}>Collection review</option>
+                <option value="catalog_only"
+                        {% if status_filter == "catalog_only" %}selected{% endif %}>Catalogue only</option>
+            </select>
+            <button class="button ghost" type="submit">Search</button>
+        </form>
+        <div class="fragrantica-status-strip">
+            <span>Linked {{ status_counts.linked|default:0 }}</span>
+            <span>Supplier evidence {{ status_counts.supplier_evidence|default:0 }}</span>
+            <span>Collection review {{ status_counts.collection_review|default:0 }}</span>
+            <span>Catalogue only {{ status_counts.catalog_only|default:0 }}</span>
+            <span>Supplier missing {{ missing_supplier_count }}</span>
+        </div>
+        <div class="our-products-list fragrantica-products-list"
+             aria-label="Fragrantica catalogue products">
+            {% for row in rows %}
+                <article class="our-products-card fragrantica-product-card">
+                    <div class="our-products-card-main fragrantica-product-main">
+                        <div class="our-products-card-body">
+                            <div class="our-products-full-name fragrantica-product-name"
+                                 aria-label="Fragrantica product identity">
+                                <span class="catalogue-field catalogue-field-brand">
+                                    <span class="catalogue-cell-value catalogue-cell-value-strong">{{ row.perfume.brand.name }}</span>
                                 </span>
-                            {% endif %}
-                            <span class="catalogue-field catalogue-field-scent">
-                                <span class="identity-separator">/</span>
-                                <span class="catalogue-cell-value catalogue-cell-value-strong">{{ row.perfume.name }}</span>
-                            </span>
-                            {% if row.perfume.concentration %}
-                                <span class="catalogue-field catalogue-field-concentration">
+                                {% if row.perfume.collection_name %}
+                                    <span class="catalogue-field catalogue-field-collection">
+                                        <span class="identity-separator">/</span>
+                                        <span class="catalogue-cell-value">{{ row.perfume.collection_name }}</span>
+                                    </span>
+                                {% endif %}
+                                <span class="catalogue-field catalogue-field-scent">
                                     <span class="identity-separator">/</span>
-                                    <span class="catalogue-cell-value">{{ row.perfume.concentration }}</span>
+                                    <span class="catalogue-cell-value catalogue-cell-value-strong">{{ row.perfume.name }}</span>
                                 </span>
-                            {% endif %}
-                            {% if row.perfume.audience %}
-                                <span class="catalogue-field catalogue-field-audience">
-                                    <span class="identity-separator">/</span>
-                                    <span class="catalogue-cell-value">{{ row.perfume.audience }}</span>
-                                </span>
-                            {% endif %}
-                            {% if row.perfume.release_year %}
-                                <span class="catalogue-field catalogue-field-year">
-                                    <span class="identity-separator">/</span>
-                                    <span class="catalogue-cell-value">{{ row.perfume.release_year }}</span>
-                                </span>
-                            {% endif %}
+                                {% if row.perfume.concentration %}
+                                    <span class="catalogue-field catalogue-field-concentration">
+                                        <span class="identity-separator">/</span>
+                                        <span class="catalogue-cell-value">{{ row.perfume.concentration }}</span>
+                                    </span>
+                                {% endif %}
+                                {% if row.perfume.audience %}
+                                    <span class="catalogue-field catalogue-field-audience">
+                                        <span class="identity-separator">/</span>
+                                        <span class="catalogue-cell-value">{{ row.perfume.audience }}</span>
+                                    </span>
+                                {% endif %}
+                                {% if row.perfume.release_year %}
+                                    <span class="catalogue-field catalogue-field-year">
+                                        <span class="identity-separator">/</span>
+                                        <span class="catalogue-cell-value">{{ row.perfume.release_year }}</span>
+                                    </span>
+                                {% endif %}
+                            </div>
+                            <div class="fragrantica-product-meta">
+                                <span class="score-badge score-badge--{% if row.status_key == 'linked' %}success{% elif row.status_key == 'collection_review' %}warning{% elif row.status_key == 'supplier_evidence' %}strong{% else %}muted{% endif %}">{{ row.status_label }}</span>
+                                <span>{{ row.perfume.variant_count }} variant{{ row.perfume.variant_count|pluralize }}</span>
+                                <span>{{ row.evidence_count }} parsed supplier rows</span>
+                                {% if row.perfume.linked_supplier_count %}
+                                    <span>{{ row.perfume.linked_supplier_count }} linked supplier rows</span>
+                                {% endif %}
+                                {% if row.collection_names %}<span>Supplier collections: {{ row.collection_names|join:", " }}</span>{% endif %}
+                            </div>
                         </div>
-                        <div class="fragrantica-product-meta">
-                            <span class="score-badge score-badge--{% if row.status_key == 'linked' %}success{% elif row.status_key == 'collection_review' %}warning{% elif row.status_key == 'supplier_evidence' %}strong{% else %}muted{% endif %}">{{ row.status_label }}</span>
-                            <span>{{ row.perfume.variant_count }} variant{{ row.perfume.variant_count|pluralize }}</span>
-                            <span>{{ row.evidence_count }} parsed supplier rows</span>
-                            {% if row.perfume.linked_supplier_count %}
-                                <span>{{ row.perfume.linked_supplier_count }} linked supplier rows</span>
-                            {% endif %}
-                            {% if row.collection_names %}
-                                <span>Supplier collections: {{ row.collection_names|join:", " }}</span>
-                            {% endif %}
-                        </div>
+                        {% if row.evidence %}
+                            <a class="button ghost icon fragrantica-row-link"
+                               href="{% url 'prices:product_detail' row.evidence.0.supplier_product_id %}"
+                               title="Open supplier evidence"
+                               aria-label="Open supplier evidence">
+                                <svg class="icon"
+                                     viewBox="0 0 24 24"
+                                     fill="none"
+                                     stroke="currentColor"
+                                     stroke-width="2"
+                                     stroke-linecap="round"
+                                     stroke-linejoin="round"
+                                     aria-hidden="true">
+                                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                                    <path d="M15 3h6v6" />
+                                    <path d="m10 14 11-11" />
+                                </svg>
+                            </a>
+                        {% endif %}
                     </div>
-                    {% if row.evidence %}
-                        <a class="button ghost icon fragrantica-row-link" href="{% url 'prices:product_detail' row.evidence.0.supplier_product_id %}" title="Open supplier evidence" aria-label="Open supplier evidence">
-                            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
-                                <path d="M15 3h6v6"/>
-                                <path d="m10 14 11-11"/>
-                            </svg>
-                        </a>
-                    {% endif %}
-                </div>
             </article>
         {% empty %}
-            <div class="empty-state">No Fragrantica catalogue rows match these filters.</div>
+            {% include "includes/empty_state.html" with message="No Fragrantica catalogue rows match these filters." %}
         {% endfor %}
     </div>
-
-    {% if is_paginated %}
-        <div class="pagination">
-            {% if page_obj.has_previous %}
-                <a class="button ghost" href="?{{ query_string }}&page={{ page_obj.previous_page_number }}">Previous</a>
-            {% endif %}
-            <span>Page {{ page_obj.number }} of {{ paginator.num_pages }}</span>
-            {% if page_obj.has_next %}
-                <a class="button ghost" href="?{{ query_string }}&page={{ page_obj.next_page_number }}">Next</a>
-            {% endif %}
-        </div>
-    {% endif %}
-</div>
-
-{% if missing_supplier_rows %}
-    <details class="workspace-block fragrantica-missing-block">
-        <summary class="section-head">
-            <span class="page-kicker">Supplier comparison</span>
-            <strong>Supplier products not found in Fragrantica catalogue</strong>
-        </summary>
-        <table class="data-table">
-            <thead>
-                <tr>
-                    <th>Brand</th>
-                    <th>Scent</th>
-                    <th>Collections</th>
-                    <th>Parsed rows</th>
-                    <th>Sample</th>
-                </tr>
-            </thead>
-            <tbody>
-            {% for row in missing_supplier_rows %}
-                <tr>
-                    <td>{{ row.brand }}</td>
-                    <td>{{ row.name }}</td>
-                    <td>{% for collection in row.collections %}<span class="badge">{{ collection }}</span>{% empty %}-{% endfor %}</td>
-                    <td>{{ row.count }}</td>
-                    <td>
-                        {% for item in row.sample %}
-                            <a href="{% url 'prices:product_detail' item.supplier_product_id %}">{{ item.supplier_product.name }}</a>{% if not forloop.last %}<br>{% endif %}
+        {% if is_paginated %}
+            {% include "includes/pagination.html" with page_obj=page_obj page_param="page" label="Fragrantica catalogue pages" jump_id="fragrantica-page-jump" %}
+        {% endif %}
+    </div>
+    {% if missing_supplier_rows %}
+        <details class="workspace-block fragrantica-missing-block">
+            <summary class="section-head">
+                <span class="page-kicker">Supplier comparison</span>
+                <strong>Supplier products not found in Fragrantica catalogue</strong>
+            </summary>
+            <div class="table-wrap table-scroll-x">
+                <table class="data-table table-mobile">
+                    <thead>
+                        <tr>
+                            <th scope="col">Brand</th>
+                            <th scope="col">Scent</th>
+                            <th scope="col">Collections</th>
+                            <th scope="col">Parsed rows</th>
+                            <th scope="col">Sample</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in missing_supplier_rows %}
+                            <tr>
+                                <td data-label="Brand">{{ row.brand }}</td>
+                                <td data-label="Scent">{{ row.name }}</td>
+                                <td data-label="Collections">
+                                    {% for collection in row.collections %}
+                                        <span class="badge">{{ collection }}</span>{% empty %}-
+                                    {% endfor %}
+                                </td>
+                                <td data-label="Parsed rows">{{ row.count }}</td>
+                                <td data-label="Sample">
+                                    {% for item in row.sample %}
+                                        <a href="{% url 'prices:product_detail' item.supplier_product_id %}">{{ item.supplier_product.name }}</a>
+                                        {% if not forloop.last %}<br>{% endif %}
+                                    {% endfor %}
+                                </td>
+                            </tr>
                         {% endfor %}
-                    </td>
-                </tr>
-            {% endfor %}
-            </tbody>
-        </table>
-    </details>
-{% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </details>
+    {% endif %}
 {% endblock %}

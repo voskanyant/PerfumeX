@@ -143,7 +143,7 @@
   transition: opacity var(--transition), max-height var(--transition), margin var(--transition);
 }
 
-#search-count:empty {
+.search-count:empty {
   display: none;
 }
 
@@ -441,7 +441,7 @@ tr[data-delta="up"] {
 }
 
 .search-wrap.is-search-pinned .products-filter-summary,
-.search-wrap.is-search-pinned #search-count {
+.search-wrap.is-search-pinned .search-count {
   opacity: 0;
   max-height: 0;
   margin: 0;

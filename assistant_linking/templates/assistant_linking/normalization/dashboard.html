@@ -2,68 +2,120 @@
 {% block title %}Normalisation{% endblock %}
 {% block topbar_label %}Assistant / Normalisation{% endblock %}
 {% block content %}
-<div class="page-head">
-    <div>
-        <span class="page-kicker">Assistant</span>
-        <h1 class="page-title">Normalisation</h1>
-        {% if hidden_keywords_active %}
-            <p class="page-subtitle space-bottom-none">Global hidden product keywords are active, so ignored rows are excluded from these counts and queues.</p>
-        {% endif %}
-        {% if not stats_available %}
-            <p class="page-subtitle space-bottom-none">Stats snapshot is not generated yet. The queues still open; refresh stats to create saved totals.</p>
-        {% elif stats_stale %}
-            <p class="page-subtitle space-bottom-none">Stats snapshot is stale because parses changed. Refresh stats to update saved totals.</p>
-        {% elif stats_generated_at %}
-            <p class="page-subtitle space-bottom-none">Stats generated {{ stats_generated_at|date:"Y-m-d H:i" }}.</p>
-        {% endif %}
+    {% include "includes/page_header.html" with kicker="Assistant" title="Normalisation" meta_template="assistant_linking/normalization/_dashboard_header_meta.html" actions_template="assistant_linking/normalization/_dashboard_header_actions.html" %}
+    <div class="page-grid-3">
+        <a class="metric-card"
+           href="{% url 'assistant_linking:normalization_unparsed' %}">
+            <div class="metric-label">Unparsed</div>
+            <div class="metric-value">{{ unparsed_count }}</div>
+        </a>
+        <a class="metric-card"
+           href="{% url 'assistant_linking:normalization_low_confidence' %}">
+            <div class="metric-label">Low confidence</div>
+            <div class="metric-value">{{ low_confidence_count }}</div>
+        </a>
+        <a class="metric-card"
+           href="{% url 'assistant_linking:normalization_manual_review' %}">
+            <div class="metric-label">Manual approval</div>
+            <div class="metric-value">{{ manual_review_count }}</div>
+        </a>
+        <a class="metric-card"
+           href="{% url 'assistant_linking:normalization_parsed' %}">
+            <div class="metric-label">Complete parsed</div>
+            <div class="metric-value">{{ parsed_count }}</div>
+        </a>
     </div>
-    <div class="page-actions">
-        <a class="button ghost" href="{% url 'assistant_linking:normalization_dashboard' %}?refresh=1">Refresh stats</a>
-        <form method="post" action="{% url 'assistant_linking:rebuild_groups' %}">{% csrf_token %}<button class="button ghost">Rebuild groups</button></form>
+    <div class="page-grid-3 space-top-md">
+        <a class="metric-card"
+           href="{% url 'assistant_linking:normalization_missing_brand' %}">
+            <div class="metric-label">Missing brand</div>
+            <div class="metric-value">{{ missing_brand_count }}</div>
+        </a>
+        <a class="metric-card"
+           href="{% url 'assistant_linking:normalization_missing_name' %}">
+            <div class="metric-label">Missing scent</div>
+            <div class="metric-value">{{ missing_name_count }}</div>
+        </a>
+        <a class="metric-card"
+           href="{% url 'assistant_linking:normalization_missing_concentration' %}">
+            <div class="metric-label">Missing concentration</div>
+            <div class="metric-value">{{ missing_concentration_count }}</div>
+        </a>
+        <a class="metric-card"
+           href="{% url 'assistant_linking:normalization_missing_size' %}">
+            <div class="metric-label">Missing size</div>
+            <div class="metric-value">{{ missing_size_count }}</div>
+        </a>
     </div>
-</div>
-<div class="page-grid-3">
-    <a class="metric-card" href="{% url 'assistant_linking:normalization_unparsed' %}"><div class="metric-label">Unparsed</div><div class="metric-value">{{ unparsed_count }}</div></a>
-    <a class="metric-card" href="{% url 'assistant_linking:normalization_low_confidence' %}"><div class="metric-label">Low confidence</div><div class="metric-value">{{ low_confidence_count }}</div></a>
-    <a class="metric-card" href="{% url 'assistant_linking:normalization_manual_review' %}"><div class="metric-label">Manual approval</div><div class="metric-value">{{ manual_review_count }}</div></a>
-    <a class="metric-card" href="{% url 'assistant_linking:normalization_parsed' %}"><div class="metric-label">Complete parsed</div><div class="metric-value">{{ parsed_count }}</div></a>
-</div>
-<div class="page-grid-3 space-top-md">
-    <a class="metric-card" href="{% url 'assistant_linking:normalization_missing_brand' %}"><div class="metric-label">Missing brand</div><div class="metric-value">{{ missing_brand_count }}</div></a>
-    <a class="metric-card" href="{% url 'assistant_linking:normalization_missing_name' %}"><div class="metric-label">Missing scent</div><div class="metric-value">{{ missing_name_count }}</div></a>
-    <a class="metric-card" href="{% url 'assistant_linking:normalization_missing_concentration' %}"><div class="metric-label">Missing concentration</div><div class="metric-value">{{ missing_concentration_count }}</div></a>
-    <a class="metric-card" href="{% url 'assistant_linking:normalization_missing_size' %}"><div class="metric-label">Missing size</div><div class="metric-value">{{ missing_size_count }}</div></a>
-</div>
-<div class="page-grid-3 space-top-md">
-    <a class="metric-card" href="{% url 'assistant_linking:normalization_modifiers' %}"><div class="metric-label">Modifiers</div><div class="metric-value">{{ modifier_count }}</div></a>
-    <a class="metric-card" href="{% url 'assistant_linking:normalization_tester_sample' %}"><div class="metric-label">Tester/sample/travel</div><div class="metric-value">{{ tester_sample_count }}</div></a>
-    <a class="metric-card" href="{% url 'assistant_linking:normalization_sets' %}"><div class="metric-label">Sets</div><div class="metric-value">{{ set_count }}</div></a>
-    <a class="metric-card" href="{% url 'assistant_linking:normalization_bags' %}"><div class="metric-label">Bags</div><div class="metric-value">{{ bag_count }}</div></a>
-    <a class="metric-card" href="{% url 'assistant_linking:normalization_cosmetics' %}"><div class="metric-label">Cosmetics</div><div class="metric-value">{{ cosmetic_count }}</div></a>
-    <a class="metric-card" href="{% url 'assistant_linking:normalization_deodorants' %}"><div class="metric-label">Deodorants</div><div class="metric-value">{{ deodorant_count }}</div></a>
-    <a class="metric-card" href="{% url 'assistant_linking:normalization_garbage' %}"><div class="metric-label">Garbage</div><div class="metric-value">{{ garbage_count }}</div></a>
-</div>
-<div class="workspace-block space-top-md">
-    <div class="page-head">
-        <div>
-            <span class="page-kicker">Recent</span>
-            <h2 class="page-title">Latest complete parsed rows</h2>
+    <div class="page-grid-3 space-top-md">
+        <a class="metric-card"
+           href="{% url 'assistant_linking:normalization_modifiers' %}">
+            <div class="metric-label">Modifiers</div>
+            <div class="metric-value">{{ modifier_count }}</div>
+        </a>
+        <a class="metric-card"
+           href="{% url 'assistant_linking:normalization_tester_sample' %}">
+            <div class="metric-label">Tester/sample/travel</div>
+            <div class="metric-value">{{ tester_sample_count }}</div>
+        </a>
+        <a class="metric-card"
+           href="{% url 'assistant_linking:normalization_sets' %}">
+            <div class="metric-label">Sets</div>
+            <div class="metric-value">{{ set_count }}</div>
+        </a>
+        <a class="metric-card"
+           href="{% url 'assistant_linking:normalization_bags' %}">
+            <div class="metric-label">Bags</div>
+            <div class="metric-value">{{ bag_count }}</div>
+        </a>
+        <a class="metric-card"
+           href="{% url 'assistant_linking:normalization_cosmetics' %}">
+            <div class="metric-label">Cosmetics</div>
+            <div class="metric-value">{{ cosmetic_count }}</div>
+        </a>
+        <a class="metric-card"
+           href="{% url 'assistant_linking:normalization_deodorants' %}">
+            <div class="metric-label">Deodorants</div>
+            <div class="metric-value">{{ deodorant_count }}</div>
+        </a>
+        <a class="metric-card"
+           href="{% url 'assistant_linking:normalization_garbage' %}">
+            <div class="metric-label">Garbage</div>
+            <div class="metric-value">{{ garbage_count }}</div>
+        </a>
+    </div>
+    <div class="workspace-block space-top-md">
+        <div class="page-head">
+            <div>
+                <span class="page-kicker">Recent</span>
+                <h2 class="page-title">Latest complete parsed rows</h2>
+            </div>
+            <a class="button ghost"
+               href="{% url 'assistant_linking:normalization_parsed' %}">View complete parsed</a>
         </div>
-        <a class="button ghost" href="{% url 'assistant_linking:normalization_parsed' %}">View complete parsed</a>
-    </div>
-    <table class="data-table table-mobile">
-        <thead><tr><th>Supplier product</th><th>Parsed identity</th><th>Confidence</th></tr></thead>
-        <tbody>
-            {% for parsed in recent %}
+        <table class="data-table table-mobile">
+            <thead>
                 <tr>
-                    <td data-label="Supplier product"><a href="{% url 'assistant_linking:normalization_detail' parsed.supplier_product_id %}">{{ parsed.supplier_product }}</a></td>
-                    <td data-label="Parsed identity">{{ parsed.display_identity }}</td>
-                    <td data-label="Confidence">{{ parsed.confidence }}</td>
+                    <th scope="col">Supplier product</th>
+                    <th scope="col">Parsed identity</th>
+                    <th scope="col">Confidence</th>
                 </tr>
-            {% empty %}
-                <tr><td colspan="3">No parsed rows.</td></tr>
-            {% endfor %}
-        </tbody>
-    </table>
-</div>
+            </thead>
+            <tbody>
+                {% for parsed in recent %}
+                    <tr>
+                        <td data-label="Supplier product">
+                            <a href="{% url 'assistant_linking:normalization_detail' parsed.supplier_product_id %}">{{ parsed.supplier_product }}</a>
+                        </td>
+                        <td data-label="Parsed identity">{{ parsed.display_identity }}</td>
+                        <td data-label="Confidence">{{ parsed.confidence }}</td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="3">No parsed rows.</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
 {% endblock %}

@@ -12,13 +12,8 @@
     <div class="page-stack">
         {% include "prices/_import_tabs.html" %}
 
-        <div class="page-header">
-            <div>
-                <span class="page-kicker">Diagnostics</span>
-                <h1 class="page-title">Detailed Import Logs</h1>
-                <div class="page-meta">Full run diagnostics and batch-level traceability for supplier imports.</div>
-            </div>
-        </div>
+        {% include "includes/page_header.html" with kicker="Diagnostics" title="Detailed Import Logs" meta="Full run diagnostics and batch-level traceability for supplier imports." %}
+        {% url 'prices:supplier_overview' as import_board_url %}
 
         <div class="settings-section">
             <div class="settings-section-header">
@@ -143,38 +138,9 @@
                             </div>
                         {% endfor %}
                     </div>
-                    {% if runs_page.paginator.num_pages > 1 %}
-                        <nav class="pagination-shell settings-row-full" aria-label="Detailed logs pagination">
-                            <div class="pagination-list">
-                                {% if runs_page.has_previous %}
-                                    <a class="page-link" href="?page={{ runs_page.previous_page_number }}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if status_filter %}&run_status={{ status_filter }}{% endif %}{% if batch_status_filter %}&batch_status={{ batch_status_filter }}{% endif %}">Previous</a>
-                                {% endif %}
-                                {% for page_num in runs_page.paginator.page_range %}
-                                    {% if page_num <= 5 or page_num > runs_page.paginator.num_pages|add:-3 %}
-                                        {% if page_num == runs_page.number %}
-                                            <span class="page-link is-active">{{ page_num }}</span>
-                                        {% else %}
-                                            <a class="page-link" href="?page={{ page_num }}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if status_filter %}&run_status={{ status_filter }}{% endif %}{% if batch_status_filter %}&batch_status={{ batch_status_filter }}{% endif %}">{{ page_num }}</a>
-                                        {% endif %}
-                                    {% endif %}
-                                {% endfor %}
-                                {% if runs_page.has_next %}
-                                    <a class="page-link" href="?page={{ runs_page.next_page_number }}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if status_filter %}&run_status={{ status_filter }}{% endif %}{% if batch_status_filter %}&batch_status={{ batch_status_filter }}{% endif %}">Next</a>
-                                {% endif %}
-                            </div>
-                            <form class="pagination-jump" method="get">
-                                <label for="runs-page-jump">Page</label>
-                                <input id="runs-page-jump" type="number" name="page" min="1" max="{{ runs_page.paginator.num_pages }}" value="{{ runs_page.number }}">
-                                {% if supplier_filter %}<input type="hidden" name="supplier" value="{{ supplier_filter }}">{% endif %}
-                                {% if status_filter %}<input type="hidden" name="run_status" value="{{ status_filter }}">{% endif %}
-                                {% if batch_status_filter %}<input type="hidden" name="batch_status" value="{{ batch_status_filter }}">{% endif %}
-                                <button class="button secondary" type="submit">Go</button>
-                            </form>
-                            <div class="pagination-summary">Page {{ runs_page.number }} of {{ runs_page.paginator.num_pages }}</div>
-                        </nav>
-                    {% endif %}
+                    {% include "includes/pagination.html" with page_obj=runs_page page_param="page" class_name="settings-row-full" label="Detailed logs pagination" jump_id="runs-page-jump" exclude_query_params="dpage,bpage" %}
                 {% else %}
-                    <div class="products-empty-state">No run logs yet. <a href="{% url 'prices:supplier_overview' %}">Run an import</a></div>
+                    {% include "includes/empty_state.html" with class_name="products-empty-state" message="No run logs yet." cta_url=import_board_url cta_label="Run an import" %}
                 {% endif %}
             </div>
         </div>
@@ -217,22 +183,9 @@ reason={{ diagnostic.message|default:"-" }}</pre>
                             </div>
                         {% endfor %}
                     </div>
-                    {% if diagnostics_page.paginator.num_pages > 1 %}
-                        <nav class="pagination-shell settings-row-full" aria-label="Attachment diagnostics pagination">
-                            <div class="pagination-list">
-                                {% if diagnostics_page.has_previous %}
-                                    <a class="page-link" href="?dpage={{ diagnostics_page.previous_page_number }}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if decision_filter %}&decision={{ decision_filter }}{% endif %}{% if reason_filter %}&reason={{ reason_filter }}{% endif %}{% if mailbox_filter %}&mailbox={{ mailbox_filter }}{% endif %}{% if filename_filter %}&filename={{ filename_filter }}{% endif %}{% if sender_filter %}&sender={{ sender_filter }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}">Previous</a>
-                                {% endif %}
-                                <span class="page-link is-active">{{ diagnostics_page.number }}</span>
-                                {% if diagnostics_page.has_next %}
-                                    <a class="page-link" href="?dpage={{ diagnostics_page.next_page_number }}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if decision_filter %}&decision={{ decision_filter }}{% endif %}{% if reason_filter %}&reason={{ reason_filter }}{% endif %}{% if mailbox_filter %}&mailbox={{ mailbox_filter }}{% endif %}{% if filename_filter %}&filename={{ filename_filter }}{% endif %}{% if sender_filter %}&sender={{ sender_filter }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}">Next</a>
-                                {% endif %}
-                            </div>
-                            <div class="pagination-summary">Page {{ diagnostics_page.number }} of {{ diagnostics_page.paginator.num_pages }}</div>
-                        </nav>
-                    {% endif %}
+                    {% include "includes/pagination.html" with page_obj=diagnostics_page page_param="dpage" class_name="settings-row-full" label="Attachment diagnostics pagination" jump_id="diagnostics-page-jump" exclude_query_params="page,bpage" %}
                 {% else %}
-                    <div class="products-empty-state">No attachment diagnostics yet. <a href="{% url 'prices:supplier_overview' %}">Run an import</a></div>
+                    {% include "includes/empty_state.html" with class_name="products-empty-state" message="No attachment diagnostics yet." cta_url=import_board_url cta_label="Run an import" %}
                 {% endif %}
             </div>
         </div>
@@ -266,27 +219,9 @@ reason={{ diagnostic.message|default:"-" }}</pre>
                             </div>
                         {% endfor %}
                     </div>
-                    {% if batches_page.paginator.num_pages > 1 %}
-                        <nav class="pagination-shell settings-row-full" aria-label="Batch logs pagination">
-                            <div class="pagination-list">
-                                {% if batches_page.has_previous %}
-                                    <a class="page-link" href="?bpage={{ batches_page.previous_page_number }}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if status_filter %}&run_status={{ status_filter }}{% endif %}{% if batch_status_filter %}&batch_status={{ batch_status_filter }}{% endif %}">Previous</a>
-                                {% endif %}
-                                {% for page_num in batches_page.paginator.page_range %}
-                                    {% if page_num == batches_page.number %}
-                                        <span class="page-link is-active">{{ page_num }}</span>
-                                    {% elif page_num > batches_page.number|add:-3 and page_num < batches_page.number|add:3 %}
-                                        <a class="page-link" href="?bpage={{ page_num }}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if status_filter %}&run_status={{ status_filter }}{% endif %}{% if batch_status_filter %}&batch_status={{ batch_status_filter }}{% endif %}">{{ page_num }}</a>
-                                    {% endif %}
-                                {% endfor %}
-                                {% if batches_page.has_next %}
-                                    <a class="page-link" href="?bpage={{ batches_page.next_page_number }}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if status_filter %}&run_status={{ status_filter }}{% endif %}{% if batch_status_filter %}&batch_status={{ batch_status_filter }}{% endif %}">Next</a>
-                                {% endif %}
-                            </div>
-                        </nav>
-                    {% endif %}
+                    {% include "includes/pagination.html" with page_obj=batches_page page_param="bpage" class_name="settings-row-full" label="Batch logs pagination" jump_id="batches-page-jump" exclude_query_params="page,dpage" %}
                 {% else %}
-                    <div class="products-empty-state">No import batches yet. <a href="{% url 'prices:supplier_overview' %}">Run an import</a></div>
+                    {% include "includes/empty_state.html" with class_name="products-empty-state" message="No import batches yet." cta_url=import_board_url cta_label="Run an import" %}
                 {% endif %}
             </div>
         </div>

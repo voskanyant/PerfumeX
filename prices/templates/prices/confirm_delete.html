@@ -4,14 +4,12 @@
 {% block content %}
     <div class="page-stack">
         <div class="section-card">
-            <span class="page-kicker">Delete</span>
-            <h1 class="page-title">Delete {{ object }}</h1>
-            <p class="page-subtitle space-bottom-none">This action cannot be undone.</p>
+            {% include "includes/page_header.html" with kicker="Delete" title_prefix="Delete " title=object subtitle="This action cannot be undone." subtitle_class="space-bottom-none" %}
             <form method="post" class="space-top-md">
                 {% csrf_token %}
                 <div class="form-actions">
                     <button class="button danger" type="submit" data-confirm="Delete this record? This cannot be undone.">Confirm delete</button>
-                    <a class="button ghost" href="javascript:history.back()">Cancel</a>
+                    <button class="button ghost" type="button" data-history-back data-history-fallback="{% url 'prices:dashboard' %}">Cancel</button>
                 </div>
             </form>
         </div>

@@ -1,5 +1,9 @@
 # Knowledge-base aliases mined from supplier-link xlsx
 
+## Purpose of this document
+
+Historical alias/parser mining reference and prompt set. Use it only for specialized assistant normalization work after reading [AGENTS.md](AGENTS.md), [docs/DOMAIN_MODEL.md](docs/DOMAIN_MODEL.md), [docs/REPO_MAP.md](docs/REPO_MAP.md), [docs/DECISIONS.md](docs/DECISIONS.md), and `assistant_linking/docs/assistant_learning_design.md`. Verify the referenced data files and migrations still exist before acting on any prompt.
+
 Source file: `Номенклатура_поставщиков_для_загрузки_в_новую_базу_1.xlsx`
 (91,691 supplier-product → our-product pairs, generated 2026-04-25).
 

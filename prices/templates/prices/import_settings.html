@@ -13,13 +13,7 @@
     <div class="page-stack">
         {% include "prices/_import_tabs.html" %}
 
-        <div class="page-header">
-            <div>
-                <span class="page-kicker">Settings</span>
-                <h1 class="page-title">Import Settings</h1>
-                <div class="page-meta">Mailbox checks, scheduler controls, and safety limits for automated imports.</div>
-            </div>
-        </div>
+        {% include "includes/page_header.html" with kicker="Settings" title="Import Settings" meta="Mailbox checks, scheduler controls, and safety limits for automated imports." %}
 
         <div class="settings-section">
             <div class="settings-section-header">
@@ -175,7 +169,7 @@
                             <form method="post" class="m-0">
                                 {% csrf_token %}
                                 <input type="hidden" name="action" value="remove_cron">
-                                <button class="button danger" type="submit">Remove scheduler</button>
+                                <button class="button danger" type="submit" data-confirm="Remove the import scheduler?">Remove scheduler</button>
                             </form>
                         </div>
 
@@ -291,40 +285,40 @@
             </div>
             <div class="settings-body settings-body--single">
                 <div class="table-wrap table-scroll-x">
-                    <table class="table space-bottom-none">
+                    <table class="table space-bottom-none table-mobile">
                         <thead>
                             <tr>
-                                <th>Name</th>
-                                <th>Host</th>
-                                <th>Username</th>
-                                <th>Last checked</th>
-                                <th>Status</th>
-                                <th>Actions</th>
+                                <th scope="col">Name</th>
+                                <th scope="col">Host</th>
+                                <th scope="col">Username</th>
+                                <th scope="col">Last checked</th>
+                                <th scope="col">Status</th>
+                                <th scope="col">Actions</th>
                             </tr>
                         </thead>
                         <tbody>
                             {% for mailbox in mailboxes %}
                                 <tr>
-                                    <td>{{ mailbox.name }}</td>
-                                    <td>{{ mailbox.host }}:{{ mailbox.port }}</td>
-                                    <td>{{ mailbox.username }}</td>
-                                    <td>
+                                    <td data-label="Name">{{ mailbox.name }}</td>
+                                    <td data-label="Host">{{ mailbox.host }}:{{ mailbox.port }}</td>
+                                    <td data-label="Username">{{ mailbox.username }}</td>
+                                    <td data-label="Last checked">
                                         {% if mailbox.last_checked_at %}
                                             {{ mailbox.last_checked_at|timezone:"Europe/Moscow"|date:"d/m/Y H:i" }}
                                         {% else %}
                                             -
                                         {% endif %}
                                     </td>
-                                    <td>{% if mailbox.is_active %}active{% else %}inactive{% endif %}</td>
-                                    <td class="layout-row gap-sm">
+                                    <td data-label="Status">{% if mailbox.is_active %}active{% else %}inactive{% endif %}</td>
+                                    <td data-label="Actions" class="actions">
+                                        <div class="layout-row gap-sm">
                                         <a class="button secondary" href="{% url 'prices:mailbox_update' mailbox.pk %}">Edit</a>
                                         <a class="button danger" href="{% url 'prices:mailbox_delete' mailbox.pk %}">Delete</a>
+                                        </div>
                                     </td>
                                 </tr>
                             {% empty %}
-                                <tr>
-                                    <td colspan="6" class="muted">No mailboxes yet.</td>
-                                </tr>
+                                {% include "includes/table_empty.html" with colspan=6 message="No mailboxes yet." %}
                             {% endfor %}
                         </tbody>
                     </table>

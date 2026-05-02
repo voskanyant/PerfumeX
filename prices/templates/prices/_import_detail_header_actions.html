@@ -1,0 +1,5 @@
+<form method="post" action="{% url 'prices:import_delete' object.pk %}">
+    {% csrf_token %}
+    <input type="hidden" name="next" value="{{ back_url }}">
+    <button class="button danger" type="submit" data-confirm="Delete this import batch and all related product/snapshot changes?">Delete batch</button>
+</form>

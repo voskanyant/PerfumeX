@@ -1,35 +1,47 @@
 {% extends "prices/base.html" %}
 {% block content %}
-<div class="page-head">
-    <div><span class="page-kicker">Research</span><h1 class="page-title">AI drafts</h1></div>
-</div>
-<div class="workspace-block">
-    <table class="data-table">
-        <tbody>
-        {% for draft in drafts %}
-            <tr>
-                <td>{{ draft.perfume }}</td>
-                <td>{{ draft.draft_type }}</td>
-                <td>{{ draft.status }}</td>
-                <td>{{ draft.content_json.short_description }}</td>
-                <td>
-                    <form method="post" action="{% url 'assistant_core:draft_status' draft.pk 'approved' %}">
-                        {% csrf_token %}
-                        <button class="button ghost">Approve</button>
-                    </form>
-                </td>
-                <td>
-                    <form method="post" action="{% url 'assistant_core:draft_status' draft.pk 'needs_edits' %}">
-                        {% csrf_token %}
-                        <button class="button ghost">Needs edits</button>
-                    </form>
-                </td>
-            </tr>
-        {% empty %}
-            {% url 'assistant_core:research_jobs' as research_jobs_url %}
-            {% include "prices/components/table_empty.html" with colspan=6 message="No drafts." cta_url=research_jobs_url cta_label="Open research jobs" %}
-        {% endfor %}
-        </tbody>
-    </table>
-</div>
+    {% include "includes/page_header.html" with kicker="Research" title="AI drafts" %}
+    <div class="workspace-block">
+        <div class="table-wrap table-scroll-x">
+            <table class="data-table table-mobile">
+                <thead>
+                    <tr>
+                        <th scope="col">Perfume</th>
+                        <th scope="col">Draft type</th>
+                        <th scope="col">Status</th>
+                        <th scope="col">Description</th>
+                        <th scope="col">Approve</th>
+                        <th scope="col">Needs edits</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for draft in drafts %}
+                        <tr>
+                            <td data-label="Perfume">{{ draft.perfume }}</td>
+                            <td data-label="Draft type">{{ draft.draft_type }}</td>
+                            <td data-label="Status">{{ draft.status }}</td>
+                            <td data-label="Description">{{ draft.content_json.short_description }}</td>
+                            <td data-label="Approve" class="actions">
+                                <form method="post"
+                                      action="{% url 'assistant_core:draft_status' draft.pk 'approved' %}">
+                                    {% csrf_token %}
+                                    <button class="button ghost" type="submit">Approve</button>
+                                </form>
+                            </td>
+                            <td data-label="Needs edits" class="actions">
+                                <form method="post"
+                                      action="{% url 'assistant_core:draft_status' draft.pk 'needs_edits' %}">
+                                    {% csrf_token %}
+                                    <button class="button ghost" type="submit">Needs edits</button>
+                                </form>
+                            </td>
+                        </tr>
+                    {% empty %}
+                        {% url 'assistant_core:research_jobs' as research_jobs_url %}
+                        {% include "includes/table_empty.html" with colspan=6 message="No drafts." cta_url=research_jobs_url cta_label="Open research jobs" %}
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
 {% endblock %}
