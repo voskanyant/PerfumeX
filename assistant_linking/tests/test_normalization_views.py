@@ -110,6 +110,25 @@ class NormalizationViewServiceTests(SimpleTestCase):
             SUPPLIER_PRODUCT_HIDDEN_FIELDS, ("name", "brand", "supplier_sku")
         )
 
+    def test_refresh_visible_unparsed_context_keeps_rows_when_not_forced(self):
+        product = SimpleNamespace(pk=1)
+        context = {"products": [product]}
+        parse_saver = MagicMock()
+        supplier_product_model = SimpleNamespace(objects=MagicMock())
+
+        returned = refresh_visible_unparsed_context(
+            context,
+            force_refresh=False,
+            supplier_product_model=supplier_product_model,
+            parse_saver=parse_saver,
+        )
+
+        self.assertIs(returned, context)
+        self.assertTrue(context["allow_refresh_visible"])
+        self.assertEqual(context["products"], [product])
+        parse_saver.assert_not_called()
+        supplier_product_model.objects.filter.assert_not_called()
+
     def test_refresh_visible_unparsed_context_reparses_and_removes_moved_rows(self):
         product_1 = SimpleNamespace(pk=1)
         product_2 = SimpleNamespace(pk=2)
@@ -128,11 +147,13 @@ class NormalizationViewServiceTests(SimpleTestCase):
 
         returned = refresh_visible_unparsed_context(
             context,
+            force_refresh=True,
             supplier_product_model=supplier_product_model,
             parse_saver=parse_saver,
         )
 
         self.assertIs(returned, context)
+        self.assertTrue(context["allow_refresh_visible"])
         self.assertEqual(parse_saver.call_count, 2)
         manager.filter.assert_called_once_with(
             pk__in=[1, 2],

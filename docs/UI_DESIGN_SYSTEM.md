@@ -185,6 +185,8 @@ Standard responsive structure:
 - Run `python scripts/check_js_table_labels.py` after changing JavaScript that generates table rows or cells.
 - Use `includes/table_empty.html` for table empty rows when possible.
 - Product list tables are specialized with `.products-grid` and `.products-mobile`; extend those only in `prices/list.html`/`products.css`.
+- Our Products catalogue rows in `prices/our_products_catalog.html` are specialized as parsed read-only rows with a pencil-triggered inline editor; do not render every row as visible inputs by default.
+- Fragrantica staged source rows in `prices/fragrantica_products.html` should mirror the Our Products parsed-row structure and keep audience/gender, year, and source link visible.
 - Supplier import spreadsheet previews are specialized scrollable tables. Keep `.import-preview-table` headers visible because they are mapping controls; do not add `.table-mobile` there. Generated preview cells should still use scoped headers and `data-label` metadata.
 - Keep actions in `td.actions` or `td[data-label="Actions"]`.
 

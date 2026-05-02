@@ -1,5 +1,5 @@
 {% extends "prices/base.html" %}
-{% load static %}
+{% load static prices_extras %}
 {% block title %}Unparsed Products{% endblock %}
 {% block content %}
 {% url 'assistant_linking:normalization_dashboard' as normalization_dashboard_url %}
@@ -16,6 +16,9 @@
             aria-label="Search unparsed products"
         >
         <button class="button ghost" type="submit">Search</button>
+        {% if allow_refresh_visible %}
+            <a class="button secondary" href="?{% query_transform refresh=1 %}">Parse visible rows</a>
+        {% endif %}
         {% if search_query %}
             <a class="button ghost" href="{% url 'assistant_linking:normalization_unparsed' %}">Reset</a>
         {% endif %}

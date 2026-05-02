@@ -1,8 +1,19 @@
+from pathlib import Path
+import tempfile
+
 from django.core.management import call_command
 from django.test import TestCase
 
 from assistant_linking.models import FragranticaProduct
-from assistant_linking.services.html_catalog_importer import canonical_key, import_brand_catalog, parse_brand_catalog_html
+from assistant_linking.management.commands.import_brand_catalog_folder import (
+    discover_catalog_files,
+)
+from assistant_linking.services.html_catalog_importer import (
+    canonical_key,
+    import_brand_catalog,
+    parse_brand_catalog_html,
+    parse_brand_catalog_json,
+)
 from catalog.models import Brand, Perfume
 
 
@@ -28,6 +39,39 @@ SAMPLE_HTML = """
 </div>
 """
 
+SAMPLE_PARSED_JSON = """
+{
+  "title": "Aaron Terence Hughes Perfumes And Colognes",
+  "designer": "Aaron Terence Hughes",
+  "url": "https://www.fragrantica.com/designers/Aaron-Terence-Hughes.html",
+  "rows": [
+    {"row_type": "section", "text": "All Fragrances"},
+    {
+      "row_type": "fragrance",
+      "designer": "Aaron Terence Hughes",
+      "section": "All Fragrances",
+      "collection": "",
+      "fragrance_name": "Addicted",
+      "brand": "Aaron Terence Hughes",
+      "year": "2024",
+      "gender": "unisex",
+      "url": "https://www.fragrantica.com/perfume/Aaron-Terence-Hughes/Addicted-92928.html"
+    },
+    {
+      "row_type": "fragrance",
+      "designer": "Aaron Terence Hughes",
+      "section": "Limited Editions",
+      "collection": "",
+      "fragrance_name": "Alpha Man",
+      "brand": "Aaron Terence Hughes",
+      "year": "2020",
+      "gender": "male",
+      "url": "https://www.fragrantica.com/perfume/Aaron-Terence-Hughes/Alpha-Man-115968.html"
+    }
+  ]
+}
+"""
+
 
 class HtmlCatalogImporterTests(TestCase):
     def test_parser_assigns_specific_collection_over_all_fragrances(self):
@@ -36,9 +80,25 @@ class HtmlCatalogImporterTests(TestCase):
 
         self.assertEqual(len(items), 2)
         self.assertEqual(sorted(item.audience for item in items), ["Unisex", "Women"])
-        self.assertEqual(by_name["bois dore"].collection_name, "Collection Extraordinaire")
+        self.assertEqual(
+            by_name["bois dore"].collection_name, "Collection Extraordinaire"
+        )
         self.assertEqual(by_name["bois dore"].release_year, 2017)
         self.assertEqual(by_name["first"].collection_name, "")
+
+    def test_parsed_json_import_preserves_year_gender_and_product_link(self):
+        items = parse_brand_catalog_json(SAMPLE_PARSED_JSON)
+        by_name = {canonical_key(item.name): item for item in items}
+
+        self.assertEqual(len(items), 2)
+        self.assertEqual(by_name["addicted"].audience, "Unisex")
+        self.assertEqual(by_name["addicted"].release_year, 2024)
+        self.assertEqual(
+            by_name["addicted"].source_path,
+            "https://www.fragrantica.com/perfume/Aaron-Terence-Hughes/Addicted-92928.html",
+        )
+        self.assertEqual(by_name["alpha man"].audience, "Men")
+        self.assertEqual(by_name["alpha man"].collection_name, "Limited Editions")
 
     def test_import_stages_fragrantica_products_without_touching_catalogue(self):
         brand = Brand.objects.create(name="Van Cleef & Arpels")
@@ -93,7 +153,55 @@ class HtmlCatalogImporterTests(TestCase):
         items = parse_brand_catalog_html(SAMPLE_HTML)
         self.assertEqual(len(items), 2)
 
-        call_command("import_brand_catalog_html", "assistant_linking/tests/fixtures/brand_catalog_sample.html", verbosity=0)
+        call_command(
+            "import_brand_catalog_html",
+            "assistant_linking/tests/fixtures/brand_catalog_sample.html",
+            verbosity=0,
+        )
 
         self.assertFalse(Brand.objects.filter(name="Van Cleef & Arpels").exists())
         self.assertFalse(FragranticaProduct.objects.exists())
+
+    def test_folder_command_imports_multiple_saved_catalogue_files(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            (root / "brand-a.html").write_text(SAMPLE_HTML, encoding="utf-8")
+            (root / "brand-b.htm").write_text(SAMPLE_HTML, encoding="utf-8")
+            report_path = root / "new-rows.csv"
+
+            call_command(
+                "import_brand_catalog_folder",
+                str(root),
+                "--apply",
+                "--missing-report",
+                str(report_path),
+                verbosity=0,
+            )
+
+            self.assertEqual(FragranticaProduct.objects.count(), 2)
+            self.assertTrue(report_path.exists())
+            self.assertIn(
+                "Van Cleef & Arpels",
+                report_path.read_text(encoding="utf-8"),
+            )
+
+    def test_discover_catalog_files_respects_patterns_and_recursive_flag(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            nested = root / "nested"
+            nested.mkdir()
+            top = root / "top.html"
+            child = nested / "child.html"
+            ignored = root / "ignored.txt"
+            top.write_text("", encoding="utf-8")
+            child.write_text("", encoding="utf-8")
+            ignored.write_text("", encoding="utf-8")
+
+            self.assertEqual(
+                discover_catalog_files(root, patterns=["*.html"], recursive=False),
+                [top],
+            )
+            self.assertEqual(
+                discover_catalog_files(root, patterns=["*.html"], recursive=True),
+                [child, top],
+            )

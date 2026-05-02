@@ -223,9 +223,14 @@ def build_unparsed_queryset(
 def refresh_visible_unparsed_context(
     context,
     *,
+    force_refresh=False,
     supplier_product_model=SupplierProduct,
     parse_saver=save_parse,
 ):
+    context["allow_refresh_visible"] = True
+    if not force_refresh:
+        return context
+
     visible_products = list(context.get("products", []))
     refreshed_count = 0
     if visible_products:

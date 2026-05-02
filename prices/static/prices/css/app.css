@@ -1383,10 +1383,28 @@ select:focus {
   width: 100%;
   max-width: 100%;
   overflow: hidden;
-  border: 1px solid var(--grey-200);
-  border-radius: var(--radius-sm);
+  border-top: 1px solid var(--grey-200);
+  border-bottom: 1px solid var(--grey-200);
+  border-radius: 0;
   background: var(--white);
   box-shadow: none;
+}
+.our-products-list-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(160px, 260px) 42px;
+  gap: 18px;
+  align-items: center;
+  min-height: 42px;
+  padding: 0 18px;
+  border-bottom: 1px solid var(--grey-200);
+  color: var(--grey-500);
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.our-products-list-head span:last-child {
+  text-align: center;
 }
 .our-products-card {
   max-width: 100%;
@@ -1400,8 +1418,8 @@ select:focus {
   background: #fcfcfc;
 }
 .our-products-card.is-editing {
-  background: var(--white);
-  box-shadow: inset 3px 0 0 var(--black);
+  background: #fbfbfb;
+  box-shadow: inset 2px 0 0 var(--black);
 }
 .our-products-card .catalogue-row-form {
   display: block;
@@ -1409,11 +1427,11 @@ select:focus {
 }
 .our-products-card-main {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 34px;
-  gap: 14px;
+  grid-template-columns: minmax(0, 1fr) minmax(160px, 260px) 34px;
+  gap: 18px;
   align-items: center;
-  min-height: 56px;
-  padding: 13px 18px;
+  min-height: 70px;
+  padding: 15px 18px;
 }
 .our-products-card-body {
   min-width: 0;
@@ -1425,27 +1443,12 @@ select:focus {
   gap: 0;
   min-width: 0;
   color: var(--black);
-  font-size: 17px;
-  line-height: 1.4;
-}
-.catalogue-field {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-  max-width: 100%;
-  border-radius: var(--radius-sm);
-  padding: 1px 0;
-}
-.catalogue-field-brand,
-.catalogue-field-scent,
-.catalogue-field-concentration,
-.catalogue-field-size {
-  color: var(--black);
+  font-size: 18px;
+  line-height: 1.45;
 }
 .identity-separator {
   color: var(--black);
-  margin: 0 8px;
+  margin: 0 7px;
 }
 .catalogue-cell-value {
   display: inline-block;
@@ -1465,42 +1468,57 @@ select:focus {
   text-overflow: clip;
   white-space: normal;
 }
-.catalogue-field.is-empty {
-  display: none;
+.our-products-row-flags {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  min-width: 0;
+  flex-wrap: wrap;
 }
-.our-products-card.is-editing .catalogue-field.is-empty {
+.catalogue-chip {
   display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  max-width: 100%;
+  padding: 3px 8px;
+  border: 1px solid var(--grey-200);
+  border-radius: var(--radius-sm);
+  color: var(--grey-700);
+  background: var(--grey-50);
+  font-size: 12px;
+  line-height: 1.2;
+  white-space: nowrap;
 }
-.catalogue-field.is-empty .catalogue-cell-value {
-  color: var(--grey-400);
+.our-products-inline-editor {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(150px, 1fr));
+  gap: 12px;
+  padding: 0 18px 18px;
 }
-.catalogue-field.is-empty .catalogue-cell-value::after {
-  content: "";
-}
-.our-products-card.is-editing [data-editable-cell]:not(.is-field-open) {
-  padding-left: 3px;
-  padding-right: 3px;
-}
-.our-products-card.is-editing [data-editable-cell] {
-  cursor: text;
-}
-.our-products-card.is-editing [data-editable-cell]:hover .catalogue-cell-value {
-  color: var(--black);
-  text-decoration: underline;
-  text-decoration-color: var(--grey-300);
-  text-underline-offset: 4px;
-}
-.our-products-list .catalogue-inline-input {
+.our-products-inline-editor[hidden] {
   display: none !important;
 }
-.our-products-card.is-editing [data-editable-cell].is-field-open .catalogue-cell-value {
-  display: none;
+.catalogue-editor-field {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
 }
-.our-products-card.is-editing [data-editable-cell].is-field-open .catalogue-inline-input:not([type=hidden]) {
-  display: inline-block !important;
+.catalogue-editor-field-wide {
+  grid-column: span 2;
 }
-.our-products-card.is-editing [data-editable-cell].is-field-open {
-  flex: 0 1 240px;
+.catalogue-editor-field span {
+  color: var(--grey-500);
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.our-products-editor-actions {
+  display: flex;
+  align-items: end;
+  justify-content: flex-end;
+  gap: 8px;
 }
 .our-products-list input:not([type=checkbox]):not([type=radio]):not([type=hidden]),
 .our-products-list select,
@@ -1512,22 +1530,8 @@ select:focus {
 }
 .our-products-list input:not([type=checkbox]):not([type=radio]):not([type=hidden]),
 .our-products-list select {
-  max-width: min(100%, 220px);
+  max-width: 100%;
   font-size: 15px;
-}
-.our-products-full-name input:not([type=checkbox]):not([type=radio]):not([type=hidden]) {
-  min-width: min(180px, 100%);
-}
-.catalogue-field-tester select {
-  min-width: 92px;
-}
-.catalogue-field-size input,
-.catalogue-field-tester .catalogue-inline-input,
-.catalogue-field-type .catalogue-inline-input {
-  min-width: 120px;
-}
-.catalogue-flag-cell select {
-  min-width: 0;
 }
 .our-products-row-actions {
   display: flex;
@@ -1558,18 +1562,9 @@ select:focus {
   border-color: var(--grey-300);
   color: var(--black);
 }
-.our-products-edit-button .icon-save {
-  display: none !important;
-}
 .our-products-card.is-editing .our-products-edit-button {
   border-color: var(--black);
   color: var(--black);
-}
-.our-products-card.is-editing .our-products-edit-button .icon-edit {
-  display: none !important;
-}
-.our-products-card.is-editing .our-products-edit-button .icon-save {
-  display: block !important;
 }
 .catalogue-admin-table td {
   vertical-align: middle;
@@ -1680,6 +1675,44 @@ select:focus {
 }
 .fragrantica-catalog .fragrantica-status-strip {
   margin-bottom: 0;
+}
+.fragrantica-source-review {
+  display: grid;
+  gap: 14px;
+  padding: 18px 0 22px;
+  border-top: 1px solid var(--grey-200);
+  border-bottom: 1px solid var(--grey-200);
+}
+.fragrantica-source-list {
+  display: grid;
+  gap: 0;
+  border-top: 1px solid var(--grey-200);
+}
+.fragrantica-source-list-head {
+  grid-template-columns: minmax(0, 1fr) minmax(160px, 260px) minmax(110px, auto);
+  padding: 0;
+}
+.fragrantica-source-card {
+  border-bottom: 1px solid var(--grey-200);
+}
+.fragrantica-source-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(160px, 260px) minmax(110px, auto);
+  gap: 18px;
+  align-items: center;
+  min-height: 72px;
+  padding: 15px 0;
+}
+.fragrantica-source-flags {
+  justify-content: flex-end;
+}
+.fragrantica-source-action {
+  display: flex;
+  justify-content: flex-end;
+}
+.fragrantica-source-link {
+  color: var(--black);
+  text-decoration: none;
 }
 .fragrantica-products-list {
   margin-top: 2px;
@@ -2401,7 +2434,11 @@ pre, code {
   }
 
   .our-products-list {
-    border-radius: var(--radius-md);
+    border-radius: 0;
+  }
+
+  .our-products-list-head {
+    display: none;
   }
 
   .our-products-card-main {
@@ -2410,19 +2447,43 @@ pre, code {
     padding: 16px 14px;
   }
 
+  .fragrantica-source-main {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+    padding: 16px 0;
+  }
+
+  .our-products-row-flags {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+    order: 3;
+  }
+
+  .fragrantica-source-action {
+    justify-content: stretch;
+  }
+
+  .fragrantica-source-action .button {
+    width: 100%;
+    justify-content: center;
+  }
+
   .our-products-full-name {
     gap: 5px 6px;
     font-size: 16px;
   }
 
-  .catalogue-field.is-field-open {
-    flex: 1 1 100%;
-    width: 100%;
+  .our-products-inline-editor {
+    grid-template-columns: 1fr;
+    padding: 0 14px 16px;
+  }
+
+  .catalogue-editor-field-wide {
+    grid-column: auto;
   }
 
   .our-products-list input:not([type=checkbox]):not([type=radio]):not([type=hidden]),
-  .our-products-list select,
-  .our-products-full-name input:not([type=checkbox]):not([type=radio]):not([type=hidden]) {
+  .our-products-list select {
     max-width: 100%;
     width: 100%;
   }
@@ -2434,16 +2495,19 @@ pre, code {
   }
 
   .our-products-row-actions,
-  .catalogue-inline-form {
+  .catalogue-inline-form,
+  .our-products-editor-actions {
     width: 100%;
   }
 
-  .our-products-row-actions {
+  .our-products-row-actions,
+  .our-products-editor-actions {
     justify-content: stretch;
   }
 
   .our-products-row-actions .button,
-  .catalogue-inline-form .button {
+  .catalogue-inline-form .button,
+  .our-products-editor-actions .button {
     flex: 1 1 0;
     justify-content: center;
   }

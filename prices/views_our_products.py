@@ -13,6 +13,7 @@ from .services.catalog_review import (
     build_our_product_detail_context,
     build_our_product_catalog_list_context,
     build_our_product_catalog_variant_queryset,
+    run_fragrantica_catalogue_link_action,
     run_catalog_tab_post_action,
     run_catalog_variant_inline_update_action,
 )
@@ -54,6 +55,17 @@ class FragranticaProductReviewView(LoginRequiredMixin, TemplateView):
             )
         )
         return context
+
+
+class FragranticaProductLinkView(LoginRequiredMixin, View):
+    def post(self, request, pk):
+        result = run_fragrantica_catalogue_link_action(
+            pk,
+            request.POST,
+            host=request.get_host(),
+        )
+        getattr(messages, result.level)(request, result.message)
+        return redirect(result.redirect_url)
 
 
 class OurProductVariantInlineUpdateView(LoginRequiredMixin, View):

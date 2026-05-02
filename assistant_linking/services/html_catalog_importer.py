@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 import html
+import json
 import re
 import unicodedata
 from dataclasses import dataclass, field
@@ -28,6 +29,20 @@ AUDIENCE_TEXT_PATTERNS = (
     ("унисекс", "Unisex"),
     ("unisex", "Unisex"),
 )
+AUDIENCE_BY_GENDER = {
+    "female": "Women",
+    "f": "Women",
+    "women": "Women",
+    "woman": "Women",
+    "for women": "Women",
+    "male": "Men",
+    "m": "Men",
+    "men": "Men",
+    "man": "Men",
+    "for men": "Men",
+    "unisex": "Unisex",
+    "u": "Unisex",
+}
 
 
 def clean_scraped_text(value: str) -> str:
@@ -72,6 +87,15 @@ def audience_from_text(value: str) -> str:
     return ""
 
 
+def audience_from_gender(value: str) -> str:
+    return AUDIENCE_BY_GENDER.get(clean_scraped_text(value).lower(), "")
+
+
+def parse_release_year(value) -> int | None:
+    year_text = clean_scraped_text(str(value or ""))
+    return int(year_text) if re.fullmatch(r"(?:19|20)\d{2}", year_text) else None
+
+
 @dataclass
 class CatalogItem:
     brand_name: str
@@ -91,10 +115,26 @@ class CatalogImportSummary:
     brand_name: str = ""
     source_items: list[CatalogItem] = field(default_factory=list)
     collections: set[str] = field(default_factory=set)
-    existing_fragrantica_products: list[FragranticaProduct] = field(default_factory=list)
+    existing_fragrantica_products: list[FragranticaProduct] = field(
+        default_factory=list
+    )
     missing_items: list[CatalogItem] = field(default_factory=list)
     created_fragrantica_products: list[FragranticaProduct] = field(default_factory=list)
     updated_fragrantica_products: list[FragranticaProduct] = field(default_factory=list)
+
+
+def dedupe_catalog_items(items: list[CatalogItem]) -> list[CatalogItem]:
+    items_by_key: dict[tuple[str, str], CatalogItem] = {}
+    for item in items:
+        if not item.brand_name or not item.name:
+            continue
+        existing = items_by_key.get(item.key)
+        if existing is None or (item.collection_name and not existing.collection_name):
+            items_by_key[item.key] = item
+    return sorted(
+        items_by_key.values(),
+        key=lambda item: (item.brand_name, item.collection_name, item.name),
+    )
 
 
 class FragranticaBrandCatalogParser(HTMLParser):
@@ -153,7 +193,9 @@ class FragranticaBrandCatalogParser(HTMLParser):
                 self._current_item["name"] = clean_scraped_text("".join(self._buffer))
                 self._clear_capture()
             elif self._capture == "brand" and tag == "p":
-                self._current_item["brand_name"] = clean_scraped_text("".join(self._buffer))
+                self._current_item["brand_name"] = clean_scraped_text(
+                    "".join(self._buffer)
+                )
                 self._clear_capture()
             elif self._capture == "year" and tag == "span":
                 self._current_item["year"] = clean_scraped_text("".join(self._buffer))
@@ -176,8 +218,7 @@ class FragranticaBrandCatalogParser(HTMLParser):
         brand_name = raw.get("brand_name", "")
         if not name or not brand_name:
             return
-        year_text = raw.get("year", "")
-        year = int(year_text) if re.fullmatch(r"(?:19|20)\d{2}", year_text) else None
+        year = parse_release_year(raw.get("year", ""))
         collection_name = raw.get("collection_name", "")
         if collection_name == ALL_FRAGRANCES_SECTION:
             collection_name = ""
@@ -198,11 +239,76 @@ def parse_brand_catalog_html(raw_html: str) -> list[CatalogItem]:
     parser = FragranticaBrandCatalogParser()
     parser.feed(raw_html)
     parser.close()
-    return sorted(parser.items_by_key.values(), key=lambda item: (item.brand_name, item.collection_name, item.name))
+    return sorted(
+        parser.items_by_key.values(),
+        key=lambda item: (item.brand_name, item.collection_name, item.name),
+    )
 
 
 def parse_brand_catalog_file(path: str | Path) -> list[CatalogItem]:
-    return parse_brand_catalog_html(Path(path).read_text(encoding="utf-8", errors="replace"))
+    source_path = Path(path)
+    suffix = source_path.suffix.lower()
+    if suffix == ".json":
+        return parse_brand_catalog_json(
+            source_path.read_text(encoding="utf-8", errors="replace")
+        )
+    if suffix == ".csv":
+        return parse_brand_catalog_csv(source_path)
+    return parse_brand_catalog_html(
+        source_path.read_text(encoding="utf-8", errors="replace")
+    )
+
+
+def parse_brand_catalog_json(raw_json: str) -> list[CatalogItem]:
+    payload = json.loads(raw_json)
+    rows = payload.get("rows", []) if isinstance(payload, dict) else []
+    items = []
+    for row in rows:
+        if not isinstance(row, dict) or row.get("row_type") != "fragrance":
+            continue
+        section = clean_scraped_text(row.get("section", ""))
+        collection = clean_scraped_text(row.get("collection", ""))
+        if not collection and section != ALL_FRAGRANCES_SECTION:
+            collection = section
+        items.append(
+            CatalogItem(
+                brand_name=clean_scraped_text(
+                    row.get("brand")
+                    or row.get("designer")
+                    or payload.get("designer", "")
+                ),
+                name=clean_scraped_text(row.get("fragrance_name", "")),
+                collection_name=collection,
+                audience=audience_from_gender(row.get("gender", "")),
+                release_year=parse_release_year(row.get("year")),
+                source_path=clean_scraped_text(row.get("url", "")),
+            )
+        )
+    return dedupe_catalog_items(items)
+
+
+def parse_brand_catalog_csv(path: str | Path) -> list[CatalogItem]:
+    items = []
+    with Path(path).open(newline="", encoding="utf-8-sig", errors="replace") as file:
+        reader = csv.DictReader(file)
+        for row in reader:
+            section = clean_scraped_text(row.get("section", ""))
+            collection = clean_scraped_text(row.get("collection", ""))
+            if not collection and section != ALL_FRAGRANCES_SECTION:
+                collection = section
+            items.append(
+                CatalogItem(
+                    brand_name=clean_scraped_text(
+                        row.get("brand") or row.get("designer", "")
+                    ),
+                    name=clean_scraped_text(row.get("fragrance_name", "")),
+                    collection_name=collection,
+                    audience=audience_from_gender(row.get("gender", "")),
+                    release_year=parse_release_year(row.get("year")),
+                    source_path=clean_scraped_text(row.get("url", "")),
+                )
+            )
+    return dedupe_catalog_items(items)
 
 
 def import_brand_catalog(
@@ -219,7 +325,9 @@ def import_brand_catalog(
         return summary
     resolved_brand_name = clean_scraped_text(brand_name or items[0].brand_name)
     summary.brand_name = resolved_brand_name
-    summary.collections = {item.collection_name for item in items if item.collection_name}
+    summary.collections = {
+        item.collection_name for item in items if item.collection_name
+    }
 
     for item in items:
         normalized_brand = canonical_key(item.brand_name or resolved_brand_name)
@@ -248,16 +356,24 @@ def import_brand_catalog(
         else:
             summary.existing_fragrantica_products.append(fragrantica_product)
             update_fields = []
-            if fragrantica_product.brand_name != (item.brand_name or resolved_brand_name):
+            if fragrantica_product.brand_name != (
+                item.brand_name or resolved_brand_name
+            ):
                 fragrantica_product.brand_name = item.brand_name or resolved_brand_name
                 update_fields.append("brand_name")
             if fragrantica_product.name != item.name:
                 fragrantica_product.name = item.name
                 update_fields.append("name")
-            if item.collection_name and fragrantica_product.collection_name != item.collection_name:
+            if (
+                item.collection_name
+                and fragrantica_product.collection_name != item.collection_name
+            ):
                 fragrantica_product.collection_name = item.collection_name
                 update_fields.append("collection_name")
-            if item.release_year and fragrantica_product.release_year != item.release_year:
+            if (
+                item.release_year
+                and fragrantica_product.release_year != item.release_year
+            ):
                 fragrantica_product.release_year = item.release_year
                 update_fields.append("release_year")
             if item.audience and fragrantica_product.audience != item.audience:
@@ -279,7 +395,9 @@ def import_brand_catalog(
 def write_missing_report(path: str | Path, items: list[CatalogItem]) -> None:
     with Path(path).open("w", newline="", encoding="utf-8") as file:
         writer = csv.writer(file)
-        writer.writerow(["brand", "collection", "name", "audience", "release_year", "source_path"])
+        writer.writerow(
+            ["brand", "collection", "name", "audience", "release_year", "source_path"]
+        )
         for item in items:
             writer.writerow(
                 [

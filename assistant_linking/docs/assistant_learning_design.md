@@ -65,15 +65,20 @@ External catalogue pages should be treated as source data, not as parser code.
 
 The current saved-HTML flow is:
 
-1. Parse the external page into structured rows: brand, collection, fragrance name, audience, release year, source path.
+1. Parse the external page or parsed catalogue export into structured rows: brand, collection, fragrance name, audience/gender, release year, source link.
 2. Dry-run first and show the operator extracted rows, collections, counts, and sample rows before applying anything.
 3. If accepted, stage external rows in `assistant_linking.FragranticaProduct`.
 4. Review staged Fragrantica rows next to local `catalog.Perfume` rows.
-5. Link or merge into `catalog.Perfume` only after review. Our Products remains the source of truth.
-6. Create aliases or parser knowledge only from approved links/merges, not directly from raw HTML import.
-7. Reparse affected supplier rows only after approved knowledge changes.
+5. Link or merge into `catalog.Perfume` only after review. Fragrantica can update brand/name/collection/audience/year through that reviewed link, but local concentration and variants are preserved. Our Products remains the source of truth used by supplier normalization.
+6. Promote reviewed local Fragrantica links to production with the Fragrantica catalogue link export/import commands; Git deploys move code, not local database rows.
+7. Create aliases or parser knowledge only from approved links/merges, not directly from raw HTML import.
+8. Reparse affected supplier rows only after approved knowledge changes.
 
 For Fragrantica-like saved brand pages, see `assistant_linking/docs/html_catalog_import_rules.md`.
+
+For live-sized imports, upload saved brand HTML files or parsed Fragrantica JSON exports to the server and use the
+folder management command. Run it without `--apply` first, then rerun with
+`--apply` only after the counts look right.
 
 ## AI Learning Target
 

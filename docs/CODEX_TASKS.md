@@ -57,6 +57,9 @@ Related docs: [AGENTS.md](../AGENTS.md), [README.md](../README.md), [docs/REPO_M
 - 2026-05-01 - Checks: `python scripts/check_view_exports.py` runs app view-boundary suites; `python scripts/check_view_exports_rules.py` protects the wrapper target list and command shape.
 - 2026-05-01 - Checks: `python scripts/check_ui_partials.py` runs shared UI include/template boundary suites; `python scripts/check_ui_partials_rules.py` protects the wrapper target list and command shape.
 - 2026-05-01 - Checks: `python scripts/check_doc_drift.py` includes management command changes in ownership/domain review warnings, with import/email/rate/link-related commands treated as business-sensitive.
+- 2026-05-02 - Performance: assistant queue/list pages must not run expensive parse/reparse work on normal GET loads against live-sized data; make visible-row refresh actions explicit.
+- 2026-05-02 - Operations: local catalogue/Fragrantica database edits do not deploy through Git. Promote reviewed Fragrantica links with the JSON export/import commands and dry-run on live before `--apply`.
+- 2026-05-02 - Operations: heavy Fragrantica staging imports should run on the server with the folder import command, using parsed JSON exports when available to preserve year, audience/gender, and source URLs. Always dry-run first, then run with `--apply` after checking counts.
 
 ## Repeated mistakes to avoid
 

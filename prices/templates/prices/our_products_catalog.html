@@ -15,65 +15,104 @@
         <button class="button ghost" type="submit">Search</button>
     </form>
     <div class="our-products-list" aria-label="Catalogue products">
+        <div class="our-products-list-head" aria-hidden="true">
+            <span>Parsed</span>
+            <span>Flags</span>
+            <span>Edit</span>
+        </div>
         {% for variant in variants %}
             <article class="our-products-card" data-catalogue-row>
                 <form id="variant-form-{{ variant.pk }}" class="catalogue-row-form" method="post" action="{% url 'prices:our_product_variant_inline_update' variant.pk %}">
                     {% csrf_token %}
                     <input type="hidden" name="next" value="{{ request.get_full_path }}">
-                    <input type="hidden" name="packaging" value="{{ variant.packaging|default_if_none:'' }}">
                     <div class="our-products-card-main">
                         <div class="our-products-card-body">
-                            <div class="our-products-full-name" aria-label="Product identity">
-                                <span class="catalogue-field catalogue-field-brand" data-label="Brand" data-editable-cell>
-                                    <span class="catalogue-cell-value catalogue-cell-value-strong">{{ variant.perfume.brand.name }}</span>
-                                    <input class="catalogue-inline-input" type="text" name="brand_name" value="{{ variant.perfume.brand.name }}" list="catalog-brand-options" placeholder="Brand" aria-label="Brand name" disabled>
-                                </span>
-                                <span class="catalogue-field catalogue-field-collection {% if not variant.perfume.collection_name %}is-empty{% endif %}" data-label="Collection" data-editable-cell>
+                            <div class="our-products-full-name" aria-label="Parsed product">
+                                <span class="catalogue-cell-value catalogue-cell-value-strong">{{ variant.perfume.brand.name }}</span>
+                                {% if variant.perfume.collection_name %}
                                     <span class="identity-separator">/</span>
-                                    <span class="catalogue-cell-value" data-empty-label="Collection">{{ variant.perfume.collection_name|default:"Collection" }}</span>
-                                    <input class="catalogue-inline-input" type="text" name="collection_name" value="{{ variant.perfume.collection_name|default_if_none:'' }}" list="catalog-collection-options" placeholder="Collection" aria-label="Collection name" disabled>
-                                </span>
-                                <span class="catalogue-field catalogue-field-scent" data-label="Scent" data-editable-cell>
+                                    <span class="catalogue-cell-value">{{ variant.perfume.collection_name }}</span>
+                                {% endif %}
+                                <span class="identity-separator">/</span>
+                                <span class="catalogue-cell-value catalogue-cell-value-strong">{{ variant.perfume.name }}</span>
+                                {% if variant.perfume.concentration %}
                                     <span class="identity-separator">/</span>
-                                    <span class="catalogue-cell-value catalogue-cell-value-strong">{{ variant.perfume.name }}</span>
-                                    <input class="catalogue-inline-input" type="text" name="perfume_name" value="{{ variant.perfume.name }}" placeholder="Product name" aria-label="Product name" disabled>
-                                </span>
-                                <span class="catalogue-field catalogue-field-concentration {% if not variant.perfume.concentration %}is-empty{% endif %}" data-label="Concentration" data-editable-cell>
+                                    <span class="catalogue-cell-value">{{ variant.perfume.concentration }}</span>
+                                {% endif %}
+                                {% if variant.display_size %}
                                     <span class="identity-separator">/</span>
-                                    <span class="catalogue-cell-value" data-empty-label="Concentration">{{ variant.perfume.concentration|default:"Concentration" }}</span>
-                                    <input class="catalogue-inline-input" type="text" name="concentration" value="{{ variant.perfume.concentration|default_if_none:'' }}" list="catalog-concentration-options" placeholder="Concentration" aria-label="Concentration" disabled>
-                                </span>
-                                <span class="catalogue-field catalogue-field-size {% if not variant.display_size %}is-empty{% endif %}" data-label="Size" data-editable-cell>
+                                    <span class="catalogue-cell-value">{{ variant.display_size }}</span>
+                                {% endif %}
+                                {% if variant.is_tester %}
                                     <span class="identity-separator">/</span>
-                                    <span class="catalogue-cell-value" data-empty-label="Size">{{ variant.display_size|default:"Size" }}</span>
-                                    <input class="catalogue-inline-input" type="text" name="size_ml" value="{{ variant.display_size|default_if_none:'' }}" placeholder="Size" aria-label="Size" disabled>
-                                </span>
-                                <span class="catalogue-field catalogue-field-tester {% if not variant.is_tester %}is-empty{% endif %}" data-label="Tester" data-editable-cell>
+                                    <span class="catalogue-cell-value">Tester</span>
+                                {% endif %}
+                                {% if variant.packaging and variant.packaging != 'standard' %}
                                     <span class="identity-separator">/</span>
-                                    <span class="catalogue-cell-value" data-empty-label="Tester">{% if variant.is_tester %}Tester{% else %}Tester{% endif %}</span>
-                                    <select class="catalogue-inline-input" name="is_tester" disabled>
-                                        <option value="0"></option>
-                                        <option value="1" {% if variant.is_tester %}selected{% endif %}>Tester</option>
-                                    </select>
-                                </span>
-                                <span class="catalogue-field catalogue-field-type {% if not variant.variant_type or variant.variant_type == 'standard' %}is-empty{% endif %}" data-label="Type" data-editable-cell>
+                                    <span class="catalogue-cell-value">{{ variant.packaging }}</span>
+                                {% endif %}
+                                {% if variant.variant_type and variant.variant_type != 'standard' %}
                                     <span class="identity-separator">/</span>
-                                    <span class="catalogue-cell-value">{{ variant.variant_type|default:"standard" }}</span>
-                                    <input class="catalogue-inline-input" type="text" name="variant_type" value="{{ variant.variant_type|default:'standard' }}" list="catalog-variant-type-options" placeholder="Type" aria-label="Variant type" disabled>
-                                </span>
+                                    <span class="catalogue-cell-value">{{ variant.variant_type }}</span>
+                                {% endif %}
                             </div>
                         </div>
-                        <button class="button ghost icon our-products-edit-button" type="submit" data-row-edit-toggle title="Edit row" aria-label="Edit row">
+                        <div class="our-products-row-flags" aria-label="Flags">
+                            {% if variant.is_tester %}
+                                <span class="catalogue-chip">Tester</span>
+                            {% endif %}
+                            {% if variant.packaging and variant.packaging != 'standard' %}
+                                <span class="catalogue-chip">{{ variant.packaging }}</span>
+                            {% endif %}
+                            <span class="catalogue-chip">{{ variant.variant_type|default:"standard" }}</span>
+                        </div>
+                        <button class="button ghost icon our-products-edit-button" type="button" data-row-edit-toggle title="Edit row" aria-label="Edit row" aria-expanded="false">
                             <svg class="icon icon-edit" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                                 <path d="M12 20h9"/>
                                 <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/>
                             </svg>
-                            <svg class="icon icon-save" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z"/>
-                                <path d="M17 21v-8H7v8"/>
-                                <path d="M7 3v5h8"/>
-                            </svg>
                         </button>
+                    </div>
+                    <div class="our-products-inline-editor" data-row-editor hidden>
+                        <label class="catalogue-editor-field">
+                            <span>Brand</span>
+                            <input class="catalogue-inline-input" type="text" name="brand_name" value="{{ variant.perfume.brand.name }}" list="catalog-brand-options" disabled>
+                        </label>
+                        <label class="catalogue-editor-field">
+                            <span>Collection</span>
+                            <input class="catalogue-inline-input" type="text" name="collection_name" value="{{ variant.perfume.collection_name|default_if_none:'' }}" list="catalog-collection-options" disabled>
+                        </label>
+                        <label class="catalogue-editor-field catalogue-editor-field-wide">
+                            <span>Product</span>
+                            <input class="catalogue-inline-input" type="text" name="perfume_name" value="{{ variant.perfume.name }}" disabled>
+                        </label>
+                        <label class="catalogue-editor-field">
+                            <span>Concentration</span>
+                            <input class="catalogue-inline-input" type="text" name="concentration" value="{{ variant.perfume.concentration|default_if_none:'' }}" list="catalog-concentration-options" disabled>
+                        </label>
+                        <label class="catalogue-editor-field">
+                            <span>Size</span>
+                            <input class="catalogue-inline-input" type="text" name="size_ml" value="{{ variant.display_size|default_if_none:'' }}" disabled>
+                        </label>
+                        <label class="catalogue-editor-field">
+                            <span>Tester</span>
+                            <select class="catalogue-inline-input" name="is_tester" disabled>
+                                <option value="0">No</option>
+                                <option value="1" {% if variant.is_tester %}selected{% endif %}>Tester</option>
+                            </select>
+                        </label>
+                        <label class="catalogue-editor-field">
+                            <span>Packaging</span>
+                            <input class="catalogue-inline-input" type="text" name="packaging" value="{{ variant.packaging|default_if_none:'' }}" placeholder="standard" disabled>
+                        </label>
+                        <label class="catalogue-editor-field">
+                            <span>Type</span>
+                            <input class="catalogue-inline-input" type="text" name="variant_type" value="{{ variant.variant_type|default:'standard' }}" list="catalog-variant-type-options" disabled>
+                        </label>
+                        <div class="our-products-editor-actions">
+                            <button class="button primary" type="submit">Save row</button>
+                            <button class="button ghost" type="button" data-row-edit-cancel>Cancel</button>
+                        </div>
                     </div>
                 </form>
             </article>

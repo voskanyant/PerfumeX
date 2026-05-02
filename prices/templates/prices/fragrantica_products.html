@@ -37,7 +37,76 @@
             <span>Collection review {{ status_counts.collection_review|default:0 }}</span>
             <span>Catalogue only {{ status_counts.catalog_only|default:0 }}</span>
             <span>Supplier missing {{ missing_supplier_count }}</span>
+            <span>Staged Fragrantica {{ fragrantica_staged_count }}</span>
         </div>
+        {% if fragrantica_staged_count %}
+            <section class="fragrantica-source-review" aria-labelledby="fragrantica-source-review-title">
+                <div class="section-head">
+                    <div>
+                        <span class="page-kicker">Source truth review</span>
+                        <h2 class="section-title" id="fragrantica-source-review-title">Fragrantica staged rows</h2>
+                        <p class="page-meta">Link source rows to Our Products. Brand/name/collection/audience/year can update the catalogue; concentration and variants stay local.</p>
+                    </div>
+                    <span class="badge">{{ fragrantica_staged_rows|length }} of {{ fragrantica_staged_count }}</span>
+                </div>
+                <div class="fragrantica-source-list">
+                    <div class="our-products-list-head fragrantica-source-list-head" aria-hidden="true">
+                        <span>Parsed</span>
+                        <span>Flags</span>
+                        <span>Link</span>
+                    </div>
+                    {% for staged in fragrantica_staged_rows %}
+                        <article class="fragrantica-source-card">
+                            <div class="fragrantica-source-main">
+                                <div class="our-products-card-body">
+                                    <div class="our-products-full-name fragrantica-product-name" aria-label="Fragrantica source identity">
+                                        <span class="catalogue-cell-value catalogue-cell-value-strong">{{ staged.source.brand_name }}</span>
+                                        {% if staged.source.collection_name %}
+                                            <span class="identity-separator">/</span>
+                                            <span class="catalogue-cell-value">{{ staged.source.collection_name }}</span>
+                                        {% endif %}
+                                        <span class="identity-separator">/</span>
+                                        <span class="catalogue-cell-value catalogue-cell-value-strong">{{ staged.source.name }}</span>
+                                        {% if staged.source.audience %}
+                                            <span class="identity-separator">/</span>
+                                            <span class="catalogue-cell-value">{{ staged.source.audience }}</span>
+                                        {% endif %}
+                                        {% if staged.source.release_year %}
+                                            <span class="identity-separator">/</span>
+                                            <span class="catalogue-cell-value">{{ staged.source.release_year }}</span>
+                                        {% endif %}
+                                    </div>
+                                    {% if staged.candidate %}
+                                        <div class="fragrantica-product-meta">
+                                            <span>Suggested match: {{ staged.candidate.brand.name }} / {{ staged.candidate.name }}{% if staged.candidate.concentration %} / {{ staged.candidate.concentration }}{% endif %}</span>
+                                        </div>
+                                    {% endif %}
+                                </div>
+                                <div class="our-products-row-flags fragrantica-source-flags" aria-label="Fragrantica source flags">
+                                    <span class="score-badge score-badge--{% if staged.source.match_status == 'linked' %}success{% else %}muted{% endif %}">{{ staged.source.get_match_status_display }}</span>
+                                    {% if staged.source.audience %}<span class="catalogue-chip">{{ staged.source.audience }}</span>{% endif %}
+                                    {% if staged.source.release_year %}<span class="catalogue-chip">{{ staged.source.release_year }}</span>{% endif %}
+                                    {% if staged.source.source_href %}
+                                        <a class="catalogue-chip fragrantica-source-link" href="{{ staged.source.source_href }}" target="_blank" rel="noopener">Open Fragrantica</a>
+                                    {% endif %}
+                                    {% if not staged.candidate %}<span class="catalogue-chip">No exact match</span>{% endif %}
+                                </div>
+                                {% if staged.candidate %}
+                                    <form method="post" action="{% url 'prices:fragrantica_product_link' staged.source.pk %}" class="fragrantica-source-action">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                        <input type="hidden" name="perfume_id" value="{{ staged.candidate.pk }}">
+                                        <button class="button primary" type="submit">Link source</button>
+                                    </form>
+                                {% else %}
+                                    <a class="button secondary" href="{% url 'prices:our_product_list' %}?q={{ staged.source.name|urlencode }}">Find match</a>
+                                {% endif %}
+                            </div>
+                        </article>
+                    {% endfor %}
+                </div>
+            </section>
+        {% endif %}
         <div class="our-products-list fragrantica-products-list"
              aria-label="Fragrantica catalogue products">
             {% for row in rows %}

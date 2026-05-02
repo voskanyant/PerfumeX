@@ -23,7 +23,7 @@ from django.test import RequestFactory
 from django.urls import reverse
 from django.utils import timezone
 
-from assistant_linking.models import ParsedSupplierProduct
+from assistant_linking.models import FragranticaProduct, ParsedSupplierProduct
 from catalog.models import Brand, Perfume, PerfumeVariant
 from prices import forms, models
 from prices.management.commands.import_emails import (
@@ -7762,6 +7762,75 @@ class OurProductCatalogueListTests(TestCase):
             response, "Supplier products not found in Fragrantica catalogue"
         )
         self.assertContains(response, "Missing Scent")
+
+    def test_fragrantica_products_shows_staged_source_rows_with_match_action(self):
+        FragranticaProduct.objects.create(
+            brand_name="Montale",
+            normalized_brand_name="montale",
+            name="Vanilla Extasy Source",
+            normalized_name="vanilla extasy source",
+            collection_name="Fragrantica Collection",
+            audience="Women",
+            release_year=2008,
+            source_path="/perfume/Montale/Vanilla-Extasy-1.html",
+        )
+        matched_source = FragranticaProduct.objects.create(
+            brand_name="Montale",
+            normalized_brand_name="montale",
+            name="Vanilla Extasy",
+            normalized_name="vanilla extasy",
+            collection_name="Fragrantica Collection",
+            audience="Women",
+            release_year=2008,
+            source_path="/perfume/Montale/Vanilla-Extasy-2.html",
+        )
+
+        response = self.client.get(reverse("prices:fragrantica_product_review"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Source truth review")
+        self.assertContains(response, "Fragrantica Collection")
+        self.assertContains(response, "Women")
+        self.assertContains(response, "2008")
+        self.assertContains(response, "Open Fragrantica")
+        self.assertContains(response, "Suggested match: Montale / Vanilla Extasy")
+        self.assertContains(
+            response,
+            reverse("prices:fragrantica_product_link", args=[matched_source.pk]),
+        )
+
+    def test_staff_can_link_fragrantica_row_to_catalogue_without_changing_concentration(
+        self,
+    ):
+        source = FragranticaProduct.objects.create(
+            brand_name="Montale",
+            normalized_brand_name="montale",
+            name="Vanilla Extasy Source",
+            normalized_name="vanilla extasy source",
+            collection_name="Fragrantica Collection",
+            audience="Women",
+            release_year=2008,
+            source_path="/perfume/Montale/Vanilla-Extasy-1.html",
+        )
+
+        response = self.client.post(
+            reverse("prices:fragrantica_product_link", args=[source.pk]),
+            {
+                "perfume_id": self.perfume.pk,
+                "next": reverse("prices:fragrantica_product_review"),
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        source.refresh_from_db()
+        self.perfume.refresh_from_db()
+        self.assertEqual(source.matched_perfume, self.perfume)
+        self.assertEqual(source.match_status, FragranticaProduct.STATUS_LINKED)
+        self.assertEqual(self.perfume.name, "Vanilla Extasy Source")
+        self.assertEqual(self.perfume.collection_name, "Fragrantica Collection")
+        self.assertEqual(self.perfume.audience, "Women")
+        self.assertEqual(self.perfume.release_year, 2008)
+        self.assertEqual(self.perfume.concentration, "Eau de Parfum")
 
     def test_our_products_search_matches_multi_word_scent(self):
         clive = Brand.objects.create(name="Clive Christian")

@@ -80,3 +80,33 @@ Context: Import, email, CBR, and normalization work can outlive a web request an
 Decision: Use RQ with Redis as the background job foundation. Keep management commands directly callable, and dispatch queue-safe work through `prices.services.job_queue`.
 
 Consequences: Production needs Redis and an RQ worker process. Future background work should be added to the queue layer instead of spawning web threads.
+
+## 2026-05-02 - Assistant queues avoid implicit parse work on GET
+
+Status: Accepted
+
+Context: Live-sized restored data made the unparsed normalization queue slow because opening the page reparsed visible rows before rendering.
+
+Decision: Normal assistant queue GET requests should list existing rows only. Expensive parse/reparse refreshes must be explicit operator actions.
+
+Consequences: Keep list pages fast against live data; move broader refresh work to explicit buttons, commands, or background jobs.
+
+## 2026-05-02 - Fragrantica updates catalogue only through reviewed links
+
+Status: Accepted
+
+Context: Fragrantica should guide brand and fragrance identity, while Our Products stores local concentration and sellable variant data used by supplier normalization.
+
+Decision: Treat staged Fragrantica rows as external source truth for brand/name/collection/audience/year only after staff links a row to a local `catalog.Perfume`. Preserve local concentration and variants during that apply step.
+
+Consequences: Supplier normalization should continue reading local catalogue data. Fragrantica import/review work should create or update local catalogue facts through auditable link/apply actions, not by silently replacing catalogue rows.
+
+## 2026-05-02 - Promote reviewed catalogue data separately from code
+
+Status: Accepted
+
+Context: Local Fragrantica/catalogue edits live in PostgreSQL and do not move to production through Git deploys.
+
+Decision: Deploy code through Git, then promote reviewed Fragrantica catalogue links with explicit export/import JSON commands. The import updates staged Fragrantica rows and reviewed catalogue identity only; it must not replace live supplier products, import history, prices, or snapshots.
+
+Consequences: Do not copy a full local database to live for catalogue edits. Use dry-run import on live before applying reviewed catalogue bundles.

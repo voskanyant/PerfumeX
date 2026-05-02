@@ -83,6 +83,7 @@ class UnparsedListView(NormalizationSearchMixin, StaffAssistantMixin, ListView):
     template_name = "assistant_linking/normalization/product_list.html"
     context_object_name = "products"
     paginate_by = 50
+    refresh_param = "refresh"
 
     def get_queryset(self):
         return build_unparsed_queryset(
@@ -92,7 +93,10 @@ class UnparsedListView(NormalizationSearchMixin, StaffAssistantMixin, ListView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        return refresh_visible_unparsed_context(context)
+        return refresh_visible_unparsed_context(
+            context,
+            force_refresh=self.request.GET.get(self.refresh_param) == "1",
+        )
 
 
 class LowConfidenceListView(NormalizationSearchMixin, StaffAssistantMixin, ListView):
