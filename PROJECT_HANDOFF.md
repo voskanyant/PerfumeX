@@ -1,5 +1,9 @@
 # Project Handoff
 
+## Purpose of this document
+
+Specialized maintainer/operator reference for operational flows, risks, and playbooks. It is useful background, but [README.md](README.md) remains the human entry point and [AGENTS.md](AGENTS.md) remains the AI-agent entry point. For current app ownership and concise repo memory, prefer [docs/REPO_MAP.md](docs/REPO_MAP.md), [docs/DOMAIN_MODEL.md](docs/DOMAIN_MODEL.md), [docs/WORKING_RULES.md](docs/WORKING_RULES.md), and [docs/DRIFT_CHECKLIST.md](docs/DRIFT_CHECKLIST.md).
+
 This document is the maintainer handoff for PerfumeX. It is written for the next developer or operator who needs to understand how the system is put together, how data moves through it, where the operational risks are, and what to touch carefully.
 
 ## 1. Project Summary
@@ -15,7 +19,7 @@ The application is responsible for:
 - exposing a staff-only admin workspace for import operations
 - exposing a logged-in viewer catalog for non-staff users
 
-The codebase is small in repository breadth, but dense in one application. Most meaningful logic lives in the `prices` app.
+The codebase is small in repository breadth, but dense in a few applications. `prices` is still the largest operational app; current ownership is summarized in [docs/REPO_MAP.md](docs/REPO_MAP.md).
 
 ## 2. Architecture At A Glance
 
@@ -470,7 +474,7 @@ Expected behavior:
 
 GitHub Actions workflow:
 
-- file: [.github/workflows/deploy.yml](.github/workflows/deploy.yml)
+- file: [.github/workflows/ci.yml](.github/workflows/ci.yml)
 - trigger: push to `main`
 - action: SSH deploy
 
@@ -661,7 +665,7 @@ These are the main things the next maintainer should know before making big chan
 
 ### 1. Single-app density
 
-Almost everything is in `prices`.
+Many operational flows still concentrate in `prices`, especially `prices/views.py`.
 
 Impact:
 
@@ -679,9 +683,9 @@ Impact:
 - harder to observe than a queue worker
 - easy to lose progress on deploy or crash
 
-### 3. Minimal tests
+### 3. Focused tests
 
-[prices/tests.py](prices/tests.py) is effectively empty.
+[prices/tests.py](prices/tests.py), `assistant_core/tests/`, `assistant_linking/tests/`, and `catalog/tests/` now cover focused behavior, but import parsing, search, linking, and high-risk cross-app flows still need more regression coverage.
 
 Impact:
 
@@ -763,7 +767,7 @@ If there is time for infrastructure work, these are the highest-value upgrades:
 - [prices/services/email_importer.py](prices/services/email_importer.py)
 - [prices/services/cbr_rates.py](prices/services/cbr_rates.py)
 - [prices/templates/prices/documentation.html](prices/templates/prices/documentation.html)
-- [.github/workflows/deploy.yml](.github/workflows/deploy.yml)
+- [.github/workflows/ci.yml](.github/workflows/ci.yml)
 
 ## 19. Final Notes
 

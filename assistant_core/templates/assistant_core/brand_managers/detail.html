@@ -2,46 +2,50 @@
 {% block title %}{{ profile.brand.name }} Watch{% endblock %}
 {% block topbar_label %}Assistant / Brand Manager{% endblock %}
 {% block content %}
-{% url 'assistant_core:brand_manager_list' as brand_managers_url %}
-{% include "prices/_breadcrumbs.html" with parent_label="Brand Managers" parent_url=brand_managers_url current_label=profile.brand.name %}
-<div class="page-head">
-    <div>
-        <span class="page-kicker">Brand Manager</span>
-        <h1 class="page-title">{{ profile.brand.name }}</h1>
-        <div class="page-meta">{{ profile.official_url }}</div>
+    {% url 'assistant_core:brand_manager_list' as brand_managers_url %}
+    {% include "prices/_breadcrumbs.html" with parent_label="Brand Managers" parent_url=brand_managers_url current_label=profile.brand.name %}
+    {% include "includes/page_header.html" with kicker="Brand Manager" title=profile.brand.name meta=profile.official_url actions_template="assistant_core/brand_managers/_detail_header_actions.html" %}
+    <div class="workspace-block">
+        <h2 class="kpi-link-title">Detected changes</h2>
+        <div class="table-wrap table-scroll-x">
+            <table class="data-table table-mobile">
+                <thead>
+                    <tr>
+                        <th scope="col">Change</th>
+                        <th scope="col">Field</th>
+                        <th scope="col">Confidence</th>
+                        <th scope="col">Status</th>
+                        <th scope="col">Approve</th>
+                        <th scope="col">Reject</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for change in profile.detected_changes.all %}
+                        <tr>
+                            <td data-label="Change">{{ change.change_type }}</td>
+                            <td data-label="Field">{{ change.field_name }}</td>
+                            <td data-label="Confidence">{{ change.confidence }}</td>
+                            <td data-label="Status">{{ change.status }}</td>
+                            <td data-label="Approve" class="actions">
+                                <form method="post"
+                                      action="{% url 'assistant_core:detected_change_status' change.pk 'approved' %}">
+                                    {% csrf_token %}
+                                    <button class="button ghost" type="submit">Approve</button>
+                                </form>
+                            </td>
+                            <td data-label="Reject" class="actions">
+                                <form method="post"
+                                      action="{% url 'assistant_core:detected_change_status' change.pk 'rejected' %}">
+                                    {% csrf_token %}
+                                    <button class="button ghost" type="submit">Reject</button>
+                                </form>
+                            </td>
+                        </tr>
+                    {% empty %}
+                        {% include "includes/table_empty.html" with colspan=6 message="No detected changes." cta_url=brand_managers_url cta_label="Back to profiles" %}
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
     </div>
-    <form method="post" action="{% url 'assistant_core:brand_manager_run_mock' profile.pk %}">
-        {% csrf_token %}
-        <button class="button primary">Run mock scan</button>
-    </form>
-</div>
-<div class="workspace-block">
-    <h2 class="kpi-link-title">Detected changes</h2>
-    <table class="data-table">
-        <tbody>
-        {% for change in profile.detected_changes.all %}
-            <tr>
-                <td>{{ change.change_type }}</td>
-                <td>{{ change.field_name }}</td>
-                <td>{{ change.confidence }}</td>
-                <td>{{ change.status }}</td>
-                <td>
-                    <form method="post" action="{% url 'assistant_core:detected_change_status' change.pk 'approved' %}">
-                        {% csrf_token %}
-                        <button class="button ghost">Approve</button>
-                    </form>
-                </td>
-                <td>
-                    <form method="post" action="{% url 'assistant_core:detected_change_status' change.pk 'rejected' %}">
-                        {% csrf_token %}
-                        <button class="button ghost">Reject</button>
-                    </form>
-                </td>
-            </tr>
-        {% empty %}
-            {% include "prices/components/table_empty.html" with colspan=6 message="No detected changes." cta_url=brand_managers_url cta_label="Back to profiles" %}
-        {% endfor %}
-        </tbody>
-    </table>
-</div>
 {% endblock %}

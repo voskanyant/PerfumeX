@@ -2,30 +2,41 @@
 {% block title %}Edit Catalogue{% endblock %}
 {% block topbar_label %}Assistant{% endblock %}
 {% block content %}
-{% include "prices/components/page_header.html" with kicker="Catalogue" title="Edit catalogue record" %}
-{% include "assistant_core/catalog/_nav.html" %}
-<div class="workspace-block form-shell">
-    <form method="post">
-        {% csrf_token %}
-        {{ form.as_p }}
-        <datalist id="catalog-concentration-options">
-            {% for value in concentrations %}<option value="{{ value }}"></option>{% endfor %}
-            <option value="Eau de Parfum"></option><option value="Eau de Toilette"></option><option value="Parfum"></option><option value="Extrait de Parfum"></option>
-        </datalist>
-        <datalist id="catalog-audience-options">
-            {% for value in audiences %}<option value="{{ value }}"></option>{% endfor %}
-            <option value="men"></option><option value="women"></option><option value="unisex"></option>
-        </datalist>
-        <datalist id="catalog-packaging-options">
-            {% for value in packagings %}<option value="{{ value }}"></option>{% endfor %}
-            <option value="standard"></option><option value="no_box"></option><option value="tester"></option>
-        </datalist>
-        <datalist id="catalog-variant-type-options">
-            {% for value in variant_types %}<option value="{{ value }}"></option>{% endfor %}
-            <option value="standard"></option><option value="sample"></option><option value="travel"></option><option value="set"></option>
-        </datalist>
-        <button class="button primary" type="submit">Save</button>
-        <a class="button ghost" href="{% url 'assistant_core:catalog_perfumes' %}">Cancel</a>
-    </form>
-</div>
+    {% include "includes/page_header.html" with kicker="Catalogue" title="Edit catalogue record" %}
+    {% include "assistant_core/catalog/_nav.html" %}
+    <div class="workspace-block form-shell">
+        <form method="post">
+            {% csrf_token %}
+            {{ form.as_p }}
+            <datalist id="catalog-concentration-options">
+                {% for value in concentrations %}<option value="{{ value }}"></option>{% endfor %}
+                <option value="Eau de Parfum"></option>
+                <option value="Eau de Toilette"></option>
+                <option value="Parfum"></option>
+                <option value="Extrait de Parfum"></option>
+            </datalist>
+            <datalist id="catalog-audience-options">
+                {% for value in audiences %}<option value="{{ value }}"></option>{% endfor %}
+                <option value="men"></option>
+                <option value="women"></option>
+                <option value="unisex"></option>
+            </datalist>
+            <datalist id="catalog-packaging-options">
+                {% for value in packagings %}<option value="{{ value }}"></option>{% endfor %}
+                <option value="standard"></option>
+                <option value="no_box"></option>
+                <option value="tester"></option>
+            </datalist>
+            <datalist id="catalog-variant-type-options">
+                {% for value in variant_types %}<option value="{{ value }}"></option>{% endfor %}
+                <option value="standard"></option>
+                <option value="sample"></option>
+                <option value="travel"></option>
+                <option value="set"></option>
+            </datalist>
+            <button class="button primary" type="submit">Save</button>
+            <a class="button ghost"
+               href="{% url 'assistant_core:catalog_perfumes' %}">Cancel</a>
+        </form>
+    </div>
 {% endblock %}

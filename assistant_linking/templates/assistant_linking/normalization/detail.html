@@ -1,338 +1,381 @@
 {% extends "prices/base.html" %}
+{% load static %}
 {% block title %}Parsed Product{% endblock %}
 {% block content %}
-<div class="page-head">
-    <div>
-        <span class="page-kicker">Normalisation</span>
-        <h1 class="page-title">{{ product.name }}</h1>
-        <div class="page-meta">{{ product.supplier }} &middot; {{ product.supplier_sku }}</div>
+    {% include "includes/page_header.html" with kicker="Normalisation" title=product.name meta_template="assistant_linking/normalization/_detail_header_meta.html" actions_template="assistant_linking/normalization/_detail_header_actions.html" %}
+    {% url 'assistant_linking:normalization_dashboard' as normalization_dashboard_url %}
+    {% include "prices/_breadcrumbs.html" with parent_label="Normalisation" parent_url=normalization_dashboard_url current_label=product.name %}
+    <div class="page-grid-3">
+        <div class="workspace-block">
+            <h2 class="kpi-link-title">Supplier row</h2>
+            <p>{{ product.name }}</p>
+            <p>{{ product.current_price }} {{ product.currency }}</p>
+            <p>{{ product.is_active|yesno:"active,inactive" }}</p>
+        </div>
+        <div class="workspace-block">
+            <h2 class="kpi-link-title">Supplier parsed fields</h2>
+            <p>Normalized: {{ parsed.display_identity }}</p>
+            <p>Category: {{ parsed.product_category_label }}</p>
+            {% if parsed.product_subcategory_label %}<p>Subcategory: {{ parsed.product_subcategory_label }}</p>{% endif %}
+            <p>Brand: {{ parsed.display_brand }}</p>
+            <p>Name: {{ parsed.display_product_name }}</p>
+            {% if parsed.release_year %}<p>Year: {{ parsed.release_year }}</p>{% endif %}
+            <p>{{ parsed.concentration }} &middot; {{ parsed.display_size }} &middot; {{ parsed.supplier_gender_hint }}</p>
+            <p>Type: {{ parsed.display_variant_type }} &middot; Packaging: {{ parsed.display_packaging }}</p>
+            <p>Confidence {{ parsed.confidence }}</p>
+        </div>
+        <div class="workspace-block">
+            <h2 class="kpi-link-title">Warnings</h2>
+            {% for warning in parsed.warnings %}
+                <div class="flash flash--warning">{{ warning }}</div>
+            {% empty %}
+                <p>No warnings.</p>
+            {% endfor %}
+            {% if suggested_catalog_candidate %}
+                {% with conflict_warning="Catalogue match suggests "|add:suggested_catalog_candidate.perfume.concentration|add:". Supplier text parsed as "|add:parsed.concentration|add:"." %}
+                    {% if conflict_warning not in parsed.warnings %}
+                        <div class="flash flash--warning">{{ conflict_warning }}</div>
+                    {% endif %}
+                {% endwith %}
+            {% endif %}
+        </div>
     </div>
-    <div class="page-actions">
-        <form method="post" action="{% url 'assistant_linking:normalization_reparse' product.pk %}">
+    <div class="workspace-block space-top-md">
+        <div class="page-head">
+            <div>
+                <span class="page-kicker">Garbage exclusion</span>
+                <h2 class="kpi-link-title">
+                    {% if is_garbage %}
+                        This row is excluded from normalisation
+                    {% else %}
+                        Exclude non-product rows by keyword
+                    {% endif %}
+                </h2>
+                <p class="page-meta">
+                    Use this for blotters, bags, marketing materials, candles, or other supplier rows that should not be matched as perfumes.
+                </p>
+            </div>
+            <a class="button ghost"
+               href="{% url 'assistant_core:knowledge' %}?section=garbage_keywords">Manage keywords</a>
+        </div>
+        <form method="post"
+              action="{% url 'assistant_linking:normalization_exclude_garbage' product.pk %}"
+              class="layout-inline gap-sm flex-wrap">
             {% csrf_token %}
-            <button class="button ghost" type="submit" data-confirm="Reparse this supplier row?">Reparse</button>
+            <input type="text"
+                   name="keywords"
+                   placeholder="Keyword, for example: Блотеры"
+                   aria-label="Garbage keyword"
+                   value="">
+            <button class="button primary" type="submit">Add garbage keyword</button>
         </form>
-        <form method="post" action="{% url 'assistant_linking:normalization_reparse' product.pk %}">
-            {% csrf_token %}
-            <input type="hidden" name="force" value="1">
-            <button class="button ghost" type="submit" data-confirm="Force reparse this supplier row and overwrite parser output?">Force reparse</button>
-        </form>
-        <form method="post" action="{% url 'assistant_linking:normalization_lock' product.pk %}">
-            {% csrf_token %}
-            <button class="button ghost">Lock parse</button>
-        </form>
-        <a class="button primary" href="{% url 'assistant_linking:product_workbench' product.pk %}">Open linking workbench</a>
-    </div>
-</div>
-{% url 'assistant_linking:normalization_dashboard' as normalization_dashboard_url %}
-{% include "prices/_breadcrumbs.html" with parent_label="Normalisation" parent_url=normalization_dashboard_url current_label=product.name %}
-
-<div class="page-grid-3">
-    <div class="workspace-block">
-        <h2 class="kpi-link-title">Supplier row</h2>
-        <p>{{ product.name }}</p>
-        <p>{{ product.current_price }} {{ product.currency }}</p>
-        <p>{{ product.is_active|yesno:"active,inactive" }}</p>
-    </div>
-    <div class="workspace-block">
-        <h2 class="kpi-link-title">Supplier parsed fields</h2>
-        <p>Normalized: {{ parsed.display_identity }}</p>
-        <p>Category: {{ parsed.product_category_label }}</p>
-        {% if parsed.product_subcategory_label %}<p>Subcategory: {{ parsed.product_subcategory_label }}</p>{% endif %}
-        <p>Brand: {{ parsed.display_brand }}</p>
-        <p>Name: {{ parsed.display_product_name }}</p>
-        {% if parsed.release_year %}<p>Year: {{ parsed.release_year }}</p>{% endif %}
-        <p>{{ parsed.concentration }} &middot; {{ parsed.display_size }} &middot; {{ parsed.supplier_gender_hint }}</p>
-        <p>Type: {{ parsed.display_variant_type }} &middot; Packaging: {{ parsed.display_packaging }}</p>
-        <p>Confidence {{ parsed.confidence }}</p>
-    </div>
-    <div class="workspace-block">
-        <h2 class="kpi-link-title">Warnings</h2>
-        {% for warning in parsed.warnings %}
-            <div class="flash flash--warning">{{ warning }}</div>
-        {% empty %}
-            <p>No warnings.</p>
-        {% endfor %}
-        {% if suggested_catalog_candidate %}
-            {% with conflict_warning="Catalogue match suggests "|add:suggested_catalog_candidate.perfume.concentration|add:". Supplier text parsed as "|add:parsed.concentration|add:"." %}
-                {% if conflict_warning not in parsed.warnings %}
-                    <div class="flash flash--warning">{{ conflict_warning }}</div>
-                {% endif %}
-            {% endwith %}
+        {% if is_garbage %}
+            <div class="flash flash--warning space-top-sm">
+                Catalogue candidates are hidden because this row matched a garbage keyword.
+            </div>
         {% endif %}
     </div>
-</div>
-
-<div class="workspace-block space-top-md">
-    <div class="page-head">
-        <div>
-            <span class="page-kicker">Garbage exclusion</span>
-            <h2 class="kpi-link-title">{% if is_garbage %}This row is excluded from normalisation{% else %}Exclude non-product rows by keyword{% endif %}</h2>
-            <p class="page-meta">Use this for blotters, bags, marketing materials, candles, or other supplier rows that should not be matched as perfumes.</p>
-        </div>
-        <a class="button ghost" href="{% url 'assistant_core:knowledge' %}?section=garbage_keywords">Manage keywords</a>
-    </div>
-    <form method="post" action="{% url 'assistant_linking:normalization_exclude_garbage' product.pk %}" class="layout-inline gap-sm flex-wrap">
-        {% csrf_token %}
-        <input type="text" name="keywords" placeholder="Keyword, for example: Блотеры" value="">
-        <button class="button primary" type="submit">Add garbage keyword</button>
-    </form>
-    {% if is_garbage %}
-        <div class="flash flash--warning space-top-sm">Catalogue candidates are hidden because this row matched a garbage keyword.</div>
-    {% endif %}
-</div>
-
-<div class="workspace-block space-top-md">
-    <h2 class="kpi-link-title">Catalogue candidates</h2>
-    <table class="data-table">
-        <thead>
-            <tr><th>Candidate</th><th>Variant</th><th>Score</th><th>Why</th><th>Conflicts</th><th></th></tr>
-        </thead>
-        <tbody>
-        {% for candidate in catalog_candidates %}
-            <tr>
-                <td>{{ candidate.perfume.brand.name }} / {{ candidate.perfume.name }}{% if candidate.perfume.concentration %} / {{ candidate.perfume.concentration }}{% endif %}</td>
-                <td>{{ candidate.variant|default:"" }}</td>
-                <td>{{ candidate.score }}</td>
-                <td>{{ candidate.reasons|join:", " }}</td>
-                <td>{{ candidate.conflicts|join:", " }}</td>
-                <td>
-                    <form method="post" action="{% url 'assistant_linking:normalization_accept_candidate' product.pk %}">
-                        {% csrf_token %}
-                        <input type="hidden" name="perfume_id" value="{{ candidate.perfume.pk }}">
-                        {% if candidate.variant %}<input type="hidden" name="variant_id" value="{{ candidate.variant.pk }}">{% endif %}
-                        <input type="hidden" name="excluded_terms" value="{{ teach_form.product_excluded_terms.value|default:'' }}">
-                        <button class="button ghost" type="submit">Accept</button>
-                    </form>
-                </td>
-            </tr>
-        {% empty %}
-            <tr>
-                <td colspan="6" class="empty-state">
-                    No catalogue candidates yet. <a href="{% url 'assistant_core:catalog_import' %}">Import catalogue records</a>
-                </td>
-            </tr>
-        {% endfor %}
-        </tbody>
-    </table>
-</div>
-
-<div class="workspace-block space-top-md">
-    <h2 class="kpi-link-title">Teach this product</h2>
-    <form id="teach-form" method="post" action="{% url 'assistant_linking:normalization_teach' product.pk %}#teach-form" class="form-shell">
-        {% csrf_token %}
-        {{ teach_form.non_field_errors }}
-        <div class="table-wrap">
-            <table class="data-table">
+    <div class="workspace-block space-top-md">
+        <h2 class="kpi-link-title">Catalogue candidates</h2>
+        <div class="table-wrap table-scroll-x">
+            <table class="data-table table-mobile">
                 <thead>
                     <tr>
-                        <th>Field</th>
-                        <th>How supplier writes it</th>
-                        <th>Correct normalized value</th>
+                        <th scope="col">Candidate</th>
+                        <th scope="col">Variant</th>
+                        <th scope="col">Score</th>
+                        <th scope="col">Why</th>
+                        <th scope="col">Conflicts</th>
+                        <th scope="col">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
-                    <tr>
-                        <td>Brand</td>
-                        <td>
-                            {{ teach_form.supplier_brand_text }}
-                            {% if teach_form.supplier_brand_text.errors %}<div class="field-errors" id="id_supplier_brand_text_errors">{{ teach_form.supplier_brand_text.errors }}</div>{% endif %}
-                        </td>
-                        <td>
-                            {{ teach_form.brand_name }}
-                            {% if teach_form.brand_name.errors %}<div class="field-errors" id="id_brand_name_errors">{{ teach_form.brand_name.errors }}</div>{% endif %}
-                        </td>
-                    </tr>
-                    <tr>
-                        <td>Scent name</td>
-                        <td>
-                            {{ teach_form.supplier_product_text }}
-                            {% if teach_form.supplier_product_text.errors %}<div class="field-errors" id="id_supplier_product_text_errors">{{ teach_form.supplier_product_text.errors }}</div>{% endif %}
-                        </td>
-                        <td>
-                            {{ teach_form.product_name }}
-                            {% if teach_form.product_name.errors %}<div class="field-errors" id="id_product_name_errors">{{ teach_form.product_name.errors }}</div>{% endif %}
-                        </td>
-                    </tr>
-                    <tr>
-                        <td>Blockers</td>
-                        <td colspan="2">
-                            {{ teach_form.product_excluded_terms }}
-                            {% if teach_form.product_excluded_terms.errors %}<div class="field-errors" id="id_product_excluded_terms_errors">{{ teach_form.product_excluded_terms.errors }}</div>{% endif %}
-                        </td>
-                    </tr>
-                    <tr>
-                        <td>Concentration</td>
-                        <td>
-                            {{ teach_form.supplier_concentration_text }}
-                            {% if teach_form.supplier_concentration_text.errors %}<div class="field-errors" id="id_supplier_concentration_text_errors">{{ teach_form.supplier_concentration_text.errors }}</div>{% endif %}
-                        </td>
-                        <td>
-                            {{ teach_form.concentration }}
-                            {% if teach_form.concentration.errors %}<div class="field-errors" id="id_concentration_errors">{{ teach_form.concentration.errors }}</div>{% endif %}
-                        </td>
-                    </tr>
-                    <tr>
-                        <td>Size</td>
-                        <td>
-                            {{ teach_form.supplier_size_text }}
-                            {% if teach_form.supplier_size_text.errors %}<div class="field-errors" id="id_supplier_size_text_errors">{{ teach_form.supplier_size_text.errors }}</div>{% endif %}
-                        </td>
-                        <td>
-                            {{ teach_form.size_ml }}
-                            {% if teach_form.size_ml.errors %}<div class="field-errors" id="id_size_ml_errors">{{ teach_form.size_ml.errors }}</div>{% endif %}
-                        </td>
-                    </tr>
-                    <tr>
-                        <td>Audience</td>
-                        <td>
-                            {{ teach_form.supplier_audience_text }}
-                            {% if teach_form.supplier_audience_text.errors %}<div class="field-errors" id="id_supplier_audience_text_errors">{{ teach_form.supplier_audience_text.errors }}</div>{% endif %}
-                        </td>
-                        <td>
-                            {{ teach_form.audience }}
-                            {% if teach_form.audience.errors %}<div class="field-errors" id="id_audience_errors">{{ teach_form.audience.errors }}</div>{% endif %}
-                        </td>
-                    </tr>
-                    <tr>
-                        <td>Product type</td>
-                        <td>
-                            {{ teach_form.supplier_type_text }}
-                            {% if teach_form.supplier_type_text.errors %}<div class="field-errors" id="id_supplier_type_text_errors">{{ teach_form.supplier_type_text.errors }}</div>{% endif %}
-                        </td>
-                        <td>
-                            {{ teach_form.variant_type }}
-                            {% if teach_form.variant_type.errors %}<div class="field-errors" id="id_variant_type_errors">{{ teach_form.variant_type.errors }}</div>{% endif %}
-                        </td>
-                    </tr>
-                    <tr>
-                        <td>Packaging</td>
-                        <td>
-                            {{ teach_form.supplier_packaging_text }}
-                            {% if teach_form.supplier_packaging_text.errors %}<div class="field-errors" id="id_supplier_packaging_text_errors">{{ teach_form.supplier_packaging_text.errors }}</div>{% endif %}
-                        </td>
-                        <td>
-                            {{ teach_form.packaging }}
-                            {% if teach_form.packaging.errors %}<div class="field-errors" id="id_packaging_errors">{{ teach_form.packaging.errors }}</div>{% endif %}
-                        </td>
-                    </tr>
+                    {% for candidate in catalog_candidates %}
+                        <tr>
+                            <td data-label="Candidate">
+                                {{ candidate.perfume.brand.name }} / {{ candidate.perfume.name }}
+                                {% if candidate.perfume.concentration %}/ {{ candidate.perfume.concentration }}{% endif %}
+                            </td>
+                            <td data-label="Variant">{{ candidate.variant|default:"" }}</td>
+                            <td data-label="Score">{{ candidate.score }}</td>
+                            <td data-label="Why">{{ candidate.reasons|join:", " }}</td>
+                            <td data-label="Conflicts">{{ candidate.conflicts|join:", " }}</td>
+                            <td data-label="Actions" class="actions">
+                                <form method="post"
+                                      action="{% url 'assistant_linking:normalization_accept_candidate' product.pk %}">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="perfume_id" value="{{ candidate.perfume.pk }}">
+                                    {% if candidate.variant %}<input type="hidden" name="variant_id" value="{{ candidate.variant.pk }}">{% endif %}
+                                    <input type="hidden"
+                                           name="excluded_terms"
+                                           value="{{ teach_form.product_excluded_terms.value|default:'' }}">
+                                    <button class="button ghost" type="submit">Accept</button>
+                                </form>
+                            </td>
+                        </tr>
+                    {% empty %}
+                        {% url 'assistant_core:catalog_import' as catalog_import_url %}
+                        {% include "includes/table_empty.html" with colspan=6 message="No catalogue candidates yet." cta_url=catalog_import_url cta_label="Import catalogue records" %}
+                    {% endfor %}
                 </tbody>
             </table>
         </div>
-        <datalist id="catalog-brand-options">
-            {% for brand in catalog_brands %}
-                <option value="{{ brand.name }}"></option>
-            {% endfor %}
-        </datalist>
-        <datalist id="catalog-perfume-options">
-            {% for perfume in catalog_perfumes %}
-                <option value="{{ perfume.name }}" label="{{ perfume.brand.name }}{% if perfume.concentration %} / {{ perfume.concentration }}{% endif %}"></option>
-            {% endfor %}
-        </datalist>
-        <datalist id="catalog-packaging-options">
-            {% for value in catalog_packagings %}
-                <option value="{{ value }}"></option>
-            {% endfor %}
-            <option value="standard"></option>
-            <option value="no_box"></option>
-            <option value="tester"></option>
-        </datalist>
-        <datalist id="catalog-variant-type-options">
-            {% for value in catalog_variant_types %}
-                <option value="{{ value }}"></option>
-            {% endfor %}
-            <option value="standard"></option>
-            <option value="sample"></option>
-            <option value="travel"></option>
-            <option value="set"></option>
-        </datalist>
-        <div class="page-grid-3 space-top-md">
-            <p>
-                {{ teach_form.alias_scope.label_tag }}{{ teach_form.alias_scope }}
-                {% if teach_form.alias_scope.errors %}<div class="field-errors" id="id_alias_scope_errors">{{ teach_form.alias_scope.errors }}</div>{% endif %}
-            </p>
-            <p>
-                <label>{{ teach_form.lock_parse }} Lock this corrected parse</label>
-                <label>{{ teach_form.reparse_similar }} Apply teaching to selected preview rows now</label>
-            </p>
-        </div>
-        <div class="flash flash--warning">
-            Rule preview: {{ rule_impact.count }} other rows match these supplier texts. {{ rule_impact.risky }} examples contain typed blockers.
-        </div>
-        {% if rule_impact.examples %}
-            <table class="data-table">
-                <thead>
-                    <tr>
-                        <th>
-                            <input type="checkbox" id="select-all-preview-rows">
-                        </th>
-                        <th>Supplier</th>
-                        <th>Product</th>
-                        <th>Status</th>
-                    </tr>
-                </thead>
-                <tbody>
-                {% for example in rule_impact.examples %}
-                    <tr>
-                        <td>
-                            <input
-                                type="checkbox"
-                                name="selected_similar_ids"
-                                value="{{ example.product.pk }}"
-                                class="preview-row-checkbox"
-                            >
-                        </td>
-                        <td>{{ example.product.supplier }}</td>
-                        <td><a href="{% url 'assistant_linking:normalization_detail' example.product.pk %}">{{ example.product.name }}</a></td>
-                        <td>{% if example.blocked %}blocked by term{% else %}would be affected{% endif %}</td>
-                    </tr>
-                {% empty %}
-                    <tr>
-                        <td colspan="4" class="empty-state">
-                            No preview rows matched this teaching rule.
-                        </td>
-                    </tr>
+    </div>
+    <div class="workspace-block space-top-md">
+        <h2 class="kpi-link-title">Teach this product</h2>
+        <form id="teach-form"
+              method="post"
+              action="{% url 'assistant_linking:normalization_teach' product.pk %}#teach-form"
+              class="form-shell">
+            {% csrf_token %}
+            {{ teach_form.non_field_errors }}
+            <div class="table-wrap table-scroll-x">
+                <table class="data-table table-mobile">
+                    <thead>
+                        <tr>
+                            <th scope="col">Field</th>
+                            <th scope="col">How supplier writes it</th>
+                            <th scope="col">Correct normalized value</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td data-label="Field">Brand</td>
+                            <td data-label="How supplier writes it">
+                                {{ teach_form.supplier_brand_text }}
+                                {% if teach_form.supplier_brand_text.errors %}
+                                    <div class="field-errors" id="id_supplier_brand_text_errors">{{ teach_form.supplier_brand_text.errors }}</div>
+                                {% endif %}
+                            </td>
+                            <td data-label="Correct normalized value">
+                                {{ teach_form.brand_name }}
+                                {% if teach_form.brand_name.errors %}
+                                    <div class="field-errors" id="id_brand_name_errors">{{ teach_form.brand_name.errors }}</div>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        <tr>
+                            <td data-label="Field">Scent name</td>
+                            <td data-label="How supplier writes it">
+                                {{ teach_form.supplier_product_text }}
+                                {% if teach_form.supplier_product_text.errors %}
+                                    <div class="field-errors" id="id_supplier_product_text_errors">{{ teach_form.supplier_product_text.errors }}</div>
+                                {% endif %}
+                            </td>
+                            <td data-label="Correct normalized value">
+                                {{ teach_form.product_name }}
+                                {% if teach_form.product_name.errors %}
+                                    <div class="field-errors" id="id_product_name_errors">{{ teach_form.product_name.errors }}</div>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        <tr>
+                            <td data-label="Field">Blockers</td>
+                            <td data-label="How supplier writes it" colspan="2">
+                                {{ teach_form.product_excluded_terms }}
+                                {% if teach_form.product_excluded_terms.errors %}
+                                    <div class="field-errors" id="id_product_excluded_terms_errors">{{ teach_form.product_excluded_terms.errors }}</div>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        <tr>
+                            <td data-label="Field">Concentration</td>
+                            <td data-label="How supplier writes it">
+                                {{ teach_form.supplier_concentration_text }}
+                                {% if teach_form.supplier_concentration_text.errors %}
+                                    <div class="field-errors" id="id_supplier_concentration_text_errors">
+                                        {{ teach_form.supplier_concentration_text.errors }}
+                                    </div>
+                                {% endif %}
+                            </td>
+                            <td data-label="Correct normalized value">
+                                {{ teach_form.concentration }}
+                                {% if teach_form.concentration.errors %}
+                                    <div class="field-errors" id="id_concentration_errors">{{ teach_form.concentration.errors }}</div>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        <tr>
+                            <td data-label="Field">Size</td>
+                            <td data-label="How supplier writes it">
+                                {{ teach_form.supplier_size_text }}
+                                {% if teach_form.supplier_size_text.errors %}
+                                    <div class="field-errors" id="id_supplier_size_text_errors">{{ teach_form.supplier_size_text.errors }}</div>
+                                {% endif %}
+                            </td>
+                            <td data-label="Correct normalized value">
+                                {{ teach_form.size_ml }}
+                                {% if teach_form.size_ml.errors %}
+                                    <div class="field-errors" id="id_size_ml_errors">{{ teach_form.size_ml.errors }}</div>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        <tr>
+                            <td data-label="Field">Audience</td>
+                            <td data-label="How supplier writes it">
+                                {{ teach_form.supplier_audience_text }}
+                                {% if teach_form.supplier_audience_text.errors %}
+                                    <div class="field-errors" id="id_supplier_audience_text_errors">{{ teach_form.supplier_audience_text.errors }}</div>
+                                {% endif %}
+                            </td>
+                            <td data-label="Correct normalized value">
+                                {{ teach_form.audience }}
+                                {% if teach_form.audience.errors %}
+                                    <div class="field-errors" id="id_audience_errors">{{ teach_form.audience.errors }}</div>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        <tr>
+                            <td data-label="Field">Product type</td>
+                            <td data-label="How supplier writes it">
+                                {{ teach_form.supplier_type_text }}
+                                {% if teach_form.supplier_type_text.errors %}
+                                    <div class="field-errors" id="id_supplier_type_text_errors">{{ teach_form.supplier_type_text.errors }}</div>
+                                {% endif %}
+                            </td>
+                            <td data-label="Correct normalized value">
+                                {{ teach_form.variant_type }}
+                                {% if teach_form.variant_type.errors %}
+                                    <div class="field-errors" id="id_variant_type_errors">{{ teach_form.variant_type.errors }}</div>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        <tr>
+                            <td data-label="Field">Packaging</td>
+                            <td data-label="How supplier writes it">
+                                {{ teach_form.supplier_packaging_text }}
+                                {% if teach_form.supplier_packaging_text.errors %}
+                                    <div class="field-errors" id="id_supplier_packaging_text_errors">{{ teach_form.supplier_packaging_text.errors }}</div>
+                                {% endif %}
+                            </td>
+                            <td data-label="Correct normalized value">
+                                {{ teach_form.packaging }}
+                                {% if teach_form.packaging.errors %}
+                                    <div class="field-errors" id="id_packaging_errors">{{ teach_form.packaging.errors }}</div>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <datalist id="catalog-brand-options">
+                {% for brand in catalog_brands %}<option value="{{ brand.name }}"></option>{% endfor %}
+            </datalist>
+            <datalist id="catalog-perfume-options">
+                {% for perfume in catalog_perfumes %}
+                    <option value="{{ perfume.name }}"
+                            label="{{ perfume.brand.name }}{% if perfume.concentration %} / {{ perfume.concentration }}{% endif %}">
+                    </option>
                 {% endfor %}
+            </datalist>
+            <datalist id="catalog-packaging-options">
+                {% for value in catalog_packagings %}<option value="{{ value }}"></option>{% endfor %}
+                <option value="standard"></option>
+                <option value="no_box"></option>
+                <option value="tester"></option>
+            </datalist>
+            <datalist id="catalog-variant-type-options">
+                {% for value in catalog_variant_types %}<option value="{{ value }}"></option>{% endfor %}
+                <option value="standard"></option>
+                <option value="sample"></option>
+                <option value="travel"></option>
+                <option value="set"></option>
+            </datalist>
+            <div class="page-grid-3 space-top-md">
+                <p>
+                    {{ teach_form.alias_scope.label_tag }}{{ teach_form.alias_scope }}
+                    {% if teach_form.alias_scope.errors %}
+                        <div class="field-errors" id="id_alias_scope_errors">{{ teach_form.alias_scope.errors }}</div>
+                    {% endif %}
+                </p>
+                <p>
+                    <label>{{ teach_form.lock_parse }} Lock this corrected parse</label>
+                    <label>{{ teach_form.reparse_similar }} Apply teaching to selected preview rows now</label>
+                </p>
+            </div>
+            <div class="flash flash--warning">
+                Rule preview: {{ rule_impact.count }} other rows match these supplier texts. {{ rule_impact.risky }} examples contain typed blockers.
+            </div>
+            {% if rule_impact.examples %}
+                <div class="table-wrap table-scroll-x">
+                    <table class="data-table table-mobile">
+                        <thead>
+                            <tr>
+                                <th scope="col" aria-label="Select">
+                                    <input type="checkbox"
+                                           id="select-all-preview-rows"
+                                           aria-label="Select all preview rows">
+                                </th>
+                                <th scope="col">Supplier</th>
+                                <th scope="col">Product</th>
+                                <th scope="col">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for example in rule_impact.examples %}
+                                <tr>
+                                    <td data-label="Select">
+                                        <input type="checkbox"
+                                               name="selected_similar_ids"
+                                               value="{{ example.product.pk }}"
+                                               class="preview-row-checkbox"
+                                               aria-label="Select preview row">
+                                    </td>
+                                    <td data-label="Supplier">{{ example.product.supplier }}</td>
+                                    <td data-label="Product">
+                                        <a href="{% url 'assistant_linking:normalization_detail' example.product.pk %}">{{ example.product.name }}</a>
+                                    </td>
+                                    <td data-label="Status">
+                                        {% if example.blocked %}
+                                            blocked by term
+                                        {% else %}
+                                            would be affected
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            {% empty %}
+                                {% include "includes/table_empty.html" with colspan=4 message="No preview rows matched this teaching rule." %}
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                <p class="page-meta">
+                    Tick only the rows you want reparsed right now. Saving the teaching still saves the alias rule itself.
+                </p>
+            {% endif %}
+            <button class="button primary" type="submit">Save teaching</button>
+        </form>
+    </div>
+    <div class="workspace-block space-top-md">
+        <h2 class="kpi-link-title">Similar supplier rows</h2>
+        <div class="table-wrap table-scroll-x">
+            <table class="data-table table-mobile">
+                <thead>
+                    <tr>
+                        <th scope="col">Supplier</th>
+                        <th scope="col">Product</th>
+                        <th scope="col">Active</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in similar_rows %}
+                        <tr>
+                            <td data-label="Supplier">{{ row.supplier }}</td>
+                            <td data-label="Product">
+                                <a href="{% url 'assistant_linking:normalization_detail' row.pk %}">{{ row.name }}</a>
+                            </td>
+                            <td data-label="Active">{{ row.is_active|yesno:"active,inactive" }}</td>
+                        </tr>
+                    {% empty %}
+                        {% url 'assistant_linking:normalization_dashboard' as normalization_dashboard_url %}
+                        {% include "includes/table_empty.html" with colspan=3 message="No similar supplier rows found." cta_url=normalization_dashboard_url cta_label="Back to dashboard" %}
+                    {% endfor %}
                 </tbody>
             </table>
-            <p class="page-meta">Tick only the rows you want reparsed right now. Saving the teaching still saves the alias rule itself.</p>
-        {% endif %}
-        <button class="button primary" type="submit">Save teaching</button>
-    </form>
-</div>
-
-<div class="workspace-block space-top-md">
-    <h2 class="kpi-link-title">Similar supplier rows</h2>
-    <table class="data-table">
-        <tbody>
-        {% for row in similar_rows %}
-            <tr>
-                <td>{{ row.supplier }}</td>
-                <td><a href="{% url 'assistant_linking:normalization_detail' row.pk %}">{{ row.name }}</a></td>
-                <td>{{ row.is_active|yesno:"active,inactive" }}</td>
-            </tr>
-        {% empty %}
-            <tr>
-                <td colspan="3" class="empty-state">
-                    No similar supplier rows found. <a href="{% url 'assistant_linking:normalization_dashboard' %}">Back to dashboard</a>
-                </td>
-            </tr>
-        {% endfor %}
-        </tbody>
-    </table>
-</div>
-<script>
-document.addEventListener("DOMContentLoaded", function () {
-    var master = document.getElementById("select-all-preview-rows");
-    if (!master) {
-        return;
-    }
-    var boxes = Array.prototype.slice.call(document.querySelectorAll(".preview-row-checkbox"));
-    master.addEventListener("change", function () {
-        boxes.forEach(function (box) {
-            box.checked = master.checked;
-        });
-    });
-});
-</script>
+        </div>
+    </div>
+{% endblock %}
+{% block extra_scripts %}
+    {{ block.super }}
+    <script src="{% static 'assistant_linking/js/normalization-detail.js' %}"></script>
 {% endblock %}

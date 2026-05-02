@@ -9,20 +9,7 @@
     <div class="page-stack">
         {% include "prices/_breadcrumbs.html" with parent_label="Import logs" parent_url=back_url current_label=object.pk %}
         <div class="section-card">
-            <div class="layout-row layout-row--wrap items-start justify-between gap-md">
-                <div>
-                    <span class="page-kicker">Batch</span>
-                    <h1 class="page-title">Import #{{ object.pk }}</h1>
-                    <p class="page-subtitle space-bottom-none">Same details as Import Log row, with full batch metadata.</p>
-                </div>
-                <div class="form-actions">
-                    <form method="post" action="{% url 'prices:import_delete' object.pk %}">
-                        {% csrf_token %}
-                        <input type="hidden" name="next" value="{{ back_url }}">
-                        <button class="button danger" type="submit" data-confirm="Delete this import batch and all related product/snapshot changes?">Delete batch</button>
-                    </form>
-                </div>
-            </div>
+            {% include "includes/page_header.html" with class_name="space-bottom-none" kicker="Batch" title_prefix="Import #" title=object.pk subtitle="Same details as Import Log row, with full batch metadata." subtitle_class="space-bottom-none" actions_template="prices/_import_detail_header_actions.html" %}
         </div>
 
         <div class="section-card">
@@ -30,36 +17,36 @@
             <h2 class="card-title">Import log details</h2>
             <div class="table-wrap table-scroll-x space-top-md">
                 <table class="table space-bottom-none table-mobile">
-                <thead>
-                    <tr>
-                        <th>Received at</th>
-                        <th>Updated at</th>
-                        <th>Supplier</th>
-                        <th>Status</th>
-                        <th>Mailbox</th>
-                        <th>Message ID</th>
-                        <th>Error</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td data-label="Received at">{{ received_at_display|timezone:"Europe/Moscow"|date:"d/m/Y H:i" }}</td>
-                        <td data-label="Updated at">{{ updated_at_display|timezone:"Europe/Moscow"|date:"d/m/Y H:i" }}</td>
-                        <td data-label="Supplier">{{ object.supplier.name }}</td>
-                        <td data-label="Status">{{ object.status }}</td>
-                        <td data-label="Mailbox">
-                            {% if object.mailbox %}
-                                {{ object.mailbox.name }}
-                            {% elif object.message_id %}
-                                Unknown mailbox
-                            {% else %}
-                                Manual upload / Backfill
-                            {% endif %}
-                        </td>
-                        <td data-label="Message ID" class="word-break-all">{{ object.message_id|default:"-" }}</td>
-                        <td data-label="Error">{{ object.error_message|default:"-" }}</td>
-                    </tr>
-                </tbody>
+                    <thead>
+                        <tr>
+                            <th scope="col">Received at</th>
+                            <th scope="col">Updated at</th>
+                            <th scope="col">Supplier</th>
+                            <th scope="col">Status</th>
+                            <th scope="col">Mailbox</th>
+                            <th scope="col">Message ID</th>
+                            <th scope="col">Error</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td data-label="Received at">{{ received_at_display|timezone:"Europe/Moscow"|date:"d/m/Y H:i" }}</td>
+                            <td data-label="Updated at">{{ updated_at_display|timezone:"Europe/Moscow"|date:"d/m/Y H:i" }}</td>
+                            <td data-label="Supplier">{{ object.supplier.name }}</td>
+                            <td data-label="Status">{{ object.status }}</td>
+                            <td data-label="Mailbox">
+                                {% if object.mailbox %}
+                                    {{ object.mailbox.name }}
+                                {% elif object.message_id %}
+                                    Unknown mailbox
+                                {% else %}
+                                    Manual upload / Backfill
+                                {% endif %}
+                            </td>
+                            <td data-label="Message ID" class="word-break-all">{{ object.message_id|default:"-" }}</td>
+                            <td data-label="Error">{{ object.error_message|default:"-" }}</td>
+                        </tr>
+                    </tbody>
                 </table>
             </div>
         </div>
@@ -67,45 +54,40 @@
         <div class="section-card">
             <span class="card-label">Payload</span>
             <h2 class="card-title">Files</h2>
+            {% url 'prices:supplier_overview' as import_board_url %}
             {% if import_files %}
                 <div class="table-wrap table-scroll-x space-top-md">
                     <table class="table space-bottom-none table-mobile">
-                    <thead>
-                        <tr>
-                            <th>Kind</th>
-                            <th>Filename</th>
-                            <th>Status</th>
-                            <th>Storage</th>
-                            <th>Processed at</th>
-                            <th>Mapping</th>
-                            <th>Error</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for f in import_files %}
+                        <thead>
                             <tr>
-                                <td data-label="Kind">{{ f.file_kind }}</td>
-                                <td data-label="Filename">{{ f.filename }}</td>
-                                <td data-label="Status">{{ f.status }}</td>
-                                <td data-label="Storage">{{ f.storage_type }}{% if f.quarantine_until %} until {{ f.quarantine_until|timezone:"Europe/Moscow"|date:"d/m/Y" }}{% endif %}</td>
-                                <td data-label="Processed at">{{ f.processed_at|timezone:"Europe/Moscow"|date:"d/m/Y H:i" }}</td>
-                                <td data-label="Mapping">{{ f.mapping|default:"-" }}</td>
-                                <td data-label="Error">{{ f.error_message|default:"-" }}</td>
+                                <th scope="col">Kind</th>
+                                <th scope="col">Filename</th>
+                                <th scope="col">Status</th>
+                                <th scope="col">Storage</th>
+                                <th scope="col">Processed at</th>
+                                <th scope="col">Mapping</th>
+                                <th scope="col">Error</th>
                             </tr>
-                        {% empty %}
-                            <tr>
-                                <td colspan="7" class="empty-state">
-                                    No files in this import. <a href="{% url 'prices:supplier_overview' %}">Run an import</a>
-                                </td>
-                            </tr>
-                        {% endfor %}
-                    </tbody>
+                        </thead>
+                        <tbody>
+                            {% for f in import_files %}
+                                <tr>
+                                    <td data-label="Kind">{{ f.file_kind }}</td>
+                                    <td data-label="Filename">{{ f.filename }}</td>
+                                    <td data-label="Status">{{ f.status }}</td>
+                                    <td data-label="Storage">{{ f.storage_type }}{% if f.quarantine_until %} until {{ f.quarantine_until|timezone:"Europe/Moscow"|date:"d/m/Y" }}{% endif %}</td>
+                                    <td data-label="Processed at">{{ f.processed_at|timezone:"Europe/Moscow"|date:"d/m/Y H:i" }}</td>
+                                    <td data-label="Mapping">{{ f.mapping|default:"-" }}</td>
+                                    <td data-label="Error">{{ f.error_message|default:"-" }}</td>
+                                </tr>
+                            {% empty %}
+                                {% include "includes/table_empty.html" with colspan=7 message="No files in this import." cta_url=import_board_url cta_label="Run an import" %}
+                            {% endfor %}
+                        </tbody>
                     </table>
                 </div>
             {% else %}
-                <div class="empty-state space-top-md">
-                    No files in this import. <a href="{% url 'prices:supplier_overview' %}">Run an import</a>
-                </div>
+                {% include "includes/empty_state.html" with class_name="space-top-md" message="No files in this import." cta_url=import_board_url cta_label="Run an import" %}
             {% endif %}
         </div>
     </div>

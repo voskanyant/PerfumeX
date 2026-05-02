@@ -1,23 +1,33 @@
 {% extends "prices/base.html" %}
 {% block content %}
-<div class="page-head">
-    <div><span class="page-kicker">Assistant</span><h1 class="page-title">Research jobs</h1></div>
-</div>
-<div class="workspace-block">
-    <table class="data-table">
-        <tbody>
-        {% for job in jobs %}
-            <tr>
-                <td><a href="{% url 'assistant_core:research_job_detail' job.pk %}">{{ job.job_type }}</a></td>
-                <td>{{ job.status }}</td>
-                <td>{{ job.result_summary }}</td>
-                <td>{{ job.created_at }}</td>
-            </tr>
-        {% empty %}
-            {% url 'assistant_core:dashboard' as assistant_dashboard_url %}
-            {% include "prices/components/table_empty.html" with colspan=4 message="No jobs." cta_url=assistant_dashboard_url cta_label="Open assistant dashboard" %}
-        {% endfor %}
-        </tbody>
-    </table>
-</div>
+    {% include "includes/page_header.html" with kicker="Assistant" title="Research jobs" %}
+    <div class="workspace-block">
+        <div class="table-wrap table-scroll-x">
+            <table class="data-table table-mobile">
+                <thead>
+                    <tr>
+                        <th scope="col">Job</th>
+                        <th scope="col">Status</th>
+                        <th scope="col">Summary</th>
+                        <th scope="col">Created</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for job in jobs %}
+                        <tr>
+                            <td data-label="Job">
+                                <a href="{% url 'assistant_core:research_job_detail' job.pk %}">{{ job.job_type }}</a>
+                            </td>
+                            <td data-label="Status">{{ job.status }}</td>
+                            <td data-label="Summary">{{ job.result_summary }}</td>
+                            <td data-label="Created">{{ job.created_at }}</td>
+                        </tr>
+                    {% empty %}
+                        {% url 'assistant_core:dashboard' as assistant_dashboard_url %}
+                        {% include "includes/table_empty.html" with colspan=4 message="No jobs." cta_url=assistant_dashboard_url cta_label="Open assistant dashboard" %}
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
 {% endblock %}

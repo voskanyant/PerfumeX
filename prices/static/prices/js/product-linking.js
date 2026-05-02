@@ -10,6 +10,13 @@
     var autoSuggestBtn = document.getElementById("auto-suggest-btn");
     var autoSuggestHint = document.getElementById("auto-suggest-hint");
 
+    function clearNode(node) {
+        if (!node) return;
+        while (node.firstChild) {
+            node.removeChild(node.firstChild);
+        }
+    }
+
     function setTarget(type, id) {
         targetOur.value = "";
         targetSupplier.value = "";
@@ -36,7 +43,7 @@
         try {
             var unicodeTokens = text.match(/[\p{L}\p{N}]+/gu);
             if (unicodeTokens) return unicodeTokens;
-        } catch (err) {
+        } catch {
             // Ignore and fall back.
         }
         return text
@@ -47,7 +54,7 @@
     }
 
     function renderKeywords(name) {
-        keywordPanel.innerHTML = "";
+        clearNode(keywordPanel);
         if (!name) return;
         var tokens = tokenize(name);
         var seen = new Set();
@@ -89,6 +96,56 @@
         return "score-badge score-badge--muted";
     }
 
+    function renderEmptyRow(target, message) {
+        var row = document.createElement("tr");
+        var cell = document.createElement("td");
+        cell.colSpan = 3;
+        cell.className = "table-empty-cell";
+        cell.textContent = message;
+        row.appendChild(cell);
+        target.appendChild(row);
+    }
+
+    function appendTextWithMeta(cell, label, meta) {
+        cell.appendChild(document.createTextNode(label || ""));
+        if (meta) {
+            var detail = document.createElement("div");
+            detail.className = "text-small tone-muted";
+            detail.textContent = meta;
+            cell.appendChild(detail);
+        }
+    }
+
+    function renderMatchRow(target, type, item, label, metaLabel, meta) {
+        var row = document.createElement("tr");
+        var selectCell = document.createElement("td");
+        selectCell.setAttribute("data-label", "Select");
+        var input = document.createElement("input");
+        input.type = "checkbox";
+        input.setAttribute("data-target-select", type + ":" + item.id);
+        input.setAttribute("aria-label", "Select " + metaLabel);
+        input.addEventListener("change", function () {
+            setTarget(type, item.id);
+        });
+        selectCell.appendChild(input);
+
+        var nameCell = document.createElement("td");
+        nameCell.setAttribute("data-label", metaLabel);
+        appendTextWithMeta(nameCell, label, meta || "");
+
+        var scoreCell = document.createElement("td");
+        scoreCell.setAttribute("data-label", "Score");
+        var badge = document.createElement("span");
+        badge.className = scoreBadge(item.score || 0);
+        badge.textContent = (item.score || 0) + "%";
+        scoreCell.appendChild(badge);
+
+        row.appendChild(selectCell);
+        row.appendChild(nameCell);
+        row.appendChild(scoreCell);
+        target.appendChild(row);
+    }
+
     function searchMatches(autoMode) {
         var query = buildQuery();
         if (!query && !autoMode) return;
@@ -103,46 +160,36 @@
         fetch(url)
             .then(function (res) { return res.json(); })
             .then(function (data) {
-                ourResults.innerHTML = "";
-                supplierResults.innerHTML = "";
+                clearNode(ourResults);
+                clearNode(supplierResults);
                 if (autoSuggestHint) {
                     autoSuggestHint.textContent = autoMode ? "Auto ranked by name/brand/size." : "";
                 }
                 if (!data.our_products.length) {
-                    ourResults.innerHTML = "<tr><td colspan='3' class='muted'>No matches yet.</td></tr>";
+                    renderEmptyRow(ourResults, "No matches yet.");
                 } else {
                     data.our_products.forEach(function (item) {
-                        var row = document.createElement("tr");
                         var label = item.name;
                         if (item.brand) label += " | " + item.brand;
                         if (item.size) label += " | " + item.size;
-                        row.innerHTML = "<td data-label='Select'><input type='checkbox' data-target-select='our:" + item.id + "'></td>" +
-                            "<td data-label='Our products'>" + label + "<div class='text-small tone-muted'>" + (item.reason || "") + "</div></td>" +
-                            "<td data-label='Score'><span class='" + scoreBadge(item.score || 0) + "'>" + (item.score || 0) + "%</span></td>";
-                        row.querySelector("input").addEventListener("change", function () {
-                            setTarget("our", item.id);
-                        });
-                        ourResults.appendChild(row);
+                        renderMatchRow(ourResults, "our", item, label, "Our products", item.reason || "");
                     });
                 }
                 if (!data.supplier_products.length) {
-                    supplierResults.innerHTML = "<tr><td colspan='3' class='muted'>No matches yet.</td></tr>";
+                    renderEmptyRow(supplierResults, "No matches yet.");
                 } else {
                     data.supplier_products.forEach(function (item) {
-                        var row = document.createElement("tr");
-                        row.innerHTML = "<td data-label='Select'><input type='checkbox' data-target-select='supplier:" + item.id + "'></td>" +
-                            "<td data-label='Supplier products'>" + item.name + "<div class='text-small tone-muted'>" + (item.supplier || "") + " " + (item.sku || "") + " | " + (item.reason || "") + "</div></td>" +
-                            "<td data-label='Score'><span class='" + scoreBadge(item.score || 0) + "'>" + (item.score || 0) + "%</span></td>";
-                        row.querySelector("input").addEventListener("change", function () {
-                            setTarget("supplier", item.id);
-                        });
-                        supplierResults.appendChild(row);
+                        var meta = [item.supplier || "", item.sku || ""].filter(Boolean).join(" ");
+                        if (item.reason) {
+                            meta = meta ? meta + " | " + item.reason : item.reason;
+                        }
+                        renderMatchRow(supplierResults, "supplier", item, item.name, "Supplier products", meta);
                     });
                 }
             });
     }
 
-    document.querySelectorAll("#supplier-products-table tbody tr").forEach(function (row) {
+    document.querySelectorAll("#supplier-products-table tbody tr.row-selectable").forEach(function (row) {
         row.addEventListener("click", function () {
             if (selectedRow) selectedRow.classList.remove("is-selected-row");
             selectedRow = row;

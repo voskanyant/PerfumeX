@@ -1,0 +1,9 @@
+<div class="empty-state{% if class_name %} {{ class_name }}{% endif %}">
+    {% if title %}<div class="empty-state-title">{{ title }}</div>{% endif %}
+    <div class="empty-state-copy">{{ message|default:"No records found." }}</div>
+    {% if cta_url and cta_label %}
+        <div class="space-top-sm">
+            <a class="button ghost" href="{{ cta_url }}">{{ cta_label }}</a>
+        </div>
+    {% endif %}
+</div>

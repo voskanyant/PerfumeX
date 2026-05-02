@@ -6,9 +6,7 @@
 {% block content %}
     <div class="page-stack">
         <div class="section-card form-shell">
-            <span class="page-kicker">Import</span>
-            <h1 class="page-title">Import Prices</h1>
-            <p class="page-subtitle space-bottom-none">Choose supplier and upload the price list.</p>
+            {% include "includes/page_header.html" with kicker="Import" title="Import Prices" subtitle="Choose supplier and upload the price list." subtitle_class="space-bottom-none" %}
             <form method="post" enctype="multipart/form-data" class="space-top-md">
                 {% csrf_token %}
                 <fieldset class="import-wizard-fieldset">

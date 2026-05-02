@@ -2,40 +2,57 @@
 {% block title %}Assistant Catalogue Perfumes{% endblock %}
 {% block topbar_label %}Assistant{% endblock %}
 {% block content %}
-{% url 'assistant_core:catalog_perfume_create' as create_url %}
-{% include "prices/components/page_header.html" with kicker="Catalogue" title="Perfumes" meta="Canonical scent records used by normalisation and linking." primary_url=create_url primary_label="Add perfume" %}
-{% include "assistant_core/catalog/_nav.html" %}
-<div class="workspace-block">
-    <form method="get" class="search-wrap">
-        <input type="text" name="q" value="{{ request.GET.q }}" placeholder="Search brand, scent, collection, concentration...">
-        <button class="button ghost" type="submit">Search</button>
-    </form>
-    <div class="table-wrap table-scroll-x">
-        <table class="table data-table">
-            <thead><tr><th>Brand</th><th>Scent</th><th>Collection / subname</th><th>Concentration</th><th>Audience</th><th>Variants</th><th>Status</th><th>Actions</th></tr></thead>
-            <tbody>
-            {% for perfume in perfumes %}
-                <tr>
-                    <td>{{ perfume.brand.name }}</td>
-                    <td>{{ perfume.name }}</td>
-                    <td>{{ perfume.collection_name }}</td>
-                    <td>{{ perfume.concentration }}</td>
-                    <td>{{ perfume.audience }}</td>
-                    <td>{{ perfume.variant_count }}</td>
-                    <td>{{ perfume.verification_status }}</td>
-                    <td class="actions">
-                        <div class="layout-inline gap-sm">
-                            <a class="button ghost" href="{% url 'assistant_core:catalog_perfume_update' perfume.pk %}">Edit</a>
-                            <a class="button ghost" href="{% url 'assistant_core:catalog_perfume_delete' perfume.pk %}">Delete</a>
-                        </div>
-                    </td>
-                </tr>
-            {% empty %}
-                {% include "prices/components/table_empty.html" with colspan=8 message="No perfumes yet." cta_url=create_url cta_label="Add perfume" %}
-            {% endfor %}
-            </tbody>
-        </table>
+    {% url 'assistant_core:catalog_perfume_create' as create_url %}
+    {% include "includes/page_header.html" with kicker="Catalogue" title="Perfumes" meta="Canonical scent records used by normalisation and linking." primary_url=create_url primary_label="Add perfume" %}
+    {% include "assistant_core/catalog/_nav.html" %}
+    <div class="workspace-block">
+        <form method="get" class="search-wrap">
+            <input type="text"
+                   name="q"
+                   value="{{ request.GET.q }}"
+                   placeholder="Search brand, scent, collection, concentration..."
+                   aria-label="Search perfumes">
+            <button class="button ghost" type="submit">Search</button>
+        </form>
+        <div class="table-wrap table-scroll-x">
+            <table class="table data-table table-mobile">
+                <thead>
+                    <tr>
+                        <th scope="col">Brand</th>
+                        <th scope="col">Scent</th>
+                        <th scope="col">Collection / subname</th>
+                        <th scope="col">Concentration</th>
+                        <th scope="col">Audience</th>
+                        <th scope="col">Variants</th>
+                        <th scope="col">Status</th>
+                        <th scope="col">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for perfume in perfumes %}
+                        <tr>
+                            <td data-label="Brand">{{ perfume.brand.name }}</td>
+                            <td data-label="Scent">{{ perfume.name }}</td>
+                            <td data-label="Collection / subname">{{ perfume.collection_name }}</td>
+                            <td data-label="Concentration">{{ perfume.concentration }}</td>
+                            <td data-label="Audience">{{ perfume.audience }}</td>
+                            <td data-label="Variants">{{ perfume.variant_count }}</td>
+                            <td data-label="Status">{{ perfume.verification_status }}</td>
+                            <td data-label="Actions" class="actions">
+                                <div class="layout-inline gap-sm">
+                                    <a class="button ghost"
+                                       href="{% url 'assistant_core:catalog_perfume_update' perfume.pk %}">Edit</a>
+                                    <a class="button danger"
+                                       href="{% url 'assistant_core:catalog_perfume_delete' perfume.pk %}">Delete</a>
+                                </div>
+                            </td>
+                        </tr>
+                    {% empty %}
+                        {% include "includes/table_empty.html" with colspan=8 message="No perfumes yet." cta_url=create_url cta_label="Add perfume" %}
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% include "includes/pagination.html" with page_obj=page_obj class_name="space-top-md" label="Perfume pagination" jump_id="perfume-page-jump" %}
     </div>
-    {% include "prices/components/pagination.html" with page_obj=page_obj class_name="space-top-md" label="Perfume pagination" jump_id="perfume-page-jump" %}
-</div>
 {% endblock %}

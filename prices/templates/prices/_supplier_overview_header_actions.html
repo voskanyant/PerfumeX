@@ -1,0 +1,22 @@
+{% if user.is_staff %}
+    <a class="button secondary" href="{% url 'prices:import_settings' %}">Import settings</a>
+    <form action="{% url 'prices:supplier_reimport_all_prices' %}"
+          method="post"
+          class="layout-inline">
+        {% csrf_token %}
+        <button class="button secondary"
+                type="submit"
+                data-confirm="Reimport all prices for all suppliers?">Reimport all prices</button>
+    </form>
+{% endif %}
+<form action="{% url 'prices:supplier_import_email_all' %}"
+      method="post"
+      class="layout-inline"
+      data-email-update-all-form>
+    {% csrf_token %}
+    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+    <button class="button"
+            type="submit"
+            data-email-update-all
+            {% if any_running %}disabled{% endif %}>Scan mailboxes now</button>
+</form>

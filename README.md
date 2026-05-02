@@ -1,8 +1,32 @@
 # PerfumeX
 
+## Purpose of this document
+
+Primary human entry point for PerfumeX setup, operation, routes, and high-level behavior. AI/Codex contributors should start with [AGENTS.md](AGENTS.md) and then use the focused docs listed below.
+
+## Documentation hierarchy
+
+- Human entry point: [README.md](README.md).
+- AI-agent entry point: [AGENTS.md](AGENTS.md).
+- Current architecture and file ownership: [docs/REPO_MAP.md](docs/REPO_MAP.md).
+- Business/domain terms and distinctions: [docs/DOMAIN_MODEL.md](docs/DOMAIN_MODEL.md).
+- UI/template/static rules: [docs/UI_DESIGN_SYSTEM.md](docs/UI_DESIGN_SYSTEM.md).
+- Active agent priorities, risks, and lessons: [docs/CODEX_TASKS.md](docs/CODEX_TASKS.md).
+- Durable decisions: [docs/DECISIONS.md](docs/DECISIONS.md).
+- Safe-change workflow: [docs/WORKING_RULES.md](docs/WORKING_RULES.md).
+- Final review checklist: [docs/DRIFT_CHECKLIST.md](docs/DRIFT_CHECKLIST.md).
+- Maintainer/operator deep reference: [PROJECT_HANDOFF.md](PROJECT_HANDOFF.md).
+- Historical audit prompt reference: [AUDIT_AND_CODEX_PROMPTS.md](AUDIT_AND_CODEX_PROMPTS.md).
+- Historical alias/parser prompt reference: [KB_ALIASES_AND_CODEX_PROMPTS.md](KB_ALIASES_AND_CODEX_PROMPTS.md).
+- Contribution checks: [CONTRIBUTING.md](CONTRIBUTING.md).
+
+`README.md` and `AGENTS.md` are primary. The focused `docs/*.md` files are current repo memory. Old audit, prompt, and handoff docs are specialized references unless a task explicitly points to them.
+
 PerfumeX is a Django 5 application for ingesting supplier price lists, normalizing supplier catalogs, tracking historical prices, linking supplier products to internal products, and exposing both a staff-facing admin workspace and a login-protected viewer catalog.
 
-This repository currently uses one main Django app, `prices`, for nearly all domain logic.
+The `prices` app remains the main operational app for suppliers, imports, and price views. Canonical catalogue data and assistant workflows now live in separate Django apps: `catalog`, `assistant_core`, and `assistant_linking`.
+
+For AI/Codex contributors, start with [AGENTS.md](AGENTS.md) and the focused repository map in [docs/REPO_MAP.md](docs/REPO_MAP.md). This README remains the main entry point for human setup and operations.
 
 ## Stack
 
@@ -93,6 +117,7 @@ Important:
 
 - Python 3.13-compatible environment
 - PostgreSQL running locally
+- Redis when running asynchronous RQ background workers
 - Optional virtual environment at `.venv`
 
 ### Install
@@ -117,6 +142,10 @@ The application expects these variables:
 - `DEBUG`
 - `ALLOWED_HOSTS`
 - `CSRF_TRUSTED_ORIGINS`
+- `REDIS_URL` (defaults to `redis://127.0.0.1:6379/0`)
+- `RQ_DEFAULT_QUEUE` (defaults to `perfumex`)
+- `RQ_JOB_TIMEOUT_SECONDS` (defaults to `3600`)
+- `PERFUMEX_RQ_SYNC` (defaults to `DEBUG`; set false in worker-backed environments)
 
 ### Local run shortcut
 
@@ -135,7 +164,10 @@ python manage.py migrate
 python manage.py collectstatic --noinput
 python manage.py check
 python manage.py import_emails --force
+python manage.py run_rq_worker
 ```
+
+Local/debug environments can set `PERFUMEX_RQ_SYNC=1` to execute queued management-command jobs synchronously. Production-style environments should run Redis plus at least one `python manage.py run_rq_worker` process.
 
 ## High-Level Data Model
 
@@ -186,12 +218,14 @@ The most important audit chain is:
 - `python manage.py import_supplier_folder`
 - `python manage.py reorganize_import_files`
 - `python manage.py repair_supplier_price_imports`
+- `python manage.py sync_cbr_rates --date YYYY-MM-DD`
+- `python manage.py run_rq_worker`
 
 See [PROJECT_HANDOFF.md](PROJECT_HANDOFF.md) for what each command does and when to use it.
 
 ## Deployment
 
-Deployment is defined in `.github/workflows/deploy.yml`.
+Deployment is defined in `.github/workflows/ci.yml`.
 
 Current behavior on push to `main`:
 
@@ -214,22 +248,28 @@ Server paths assumed by the workflow:
 
 ```text
 perfumex/   Django project settings and root URLs
-prices/     Main application: models, views, services, forms, templates, static
+prices/     Main operational app: suppliers, imports, prices, viewer/admin UI
+catalog/    Canonical catalogue facts: brands, perfumes, variants, claims, drafts
+assistant_core/      Assistant dashboard, knowledge, rules, catalogue admin, research
+assistant_linking/   Parsing, aliases, normalization queues, matching/linking
+docs/       Short agent-maintained repository docs
 scripts/    Utility scripts
 media/      Uploaded import files
-.github/    Deployment workflow
+.github/    CI and deployment workflow
 ```
 
 ## Current Constraints
 
-- Almost all business logic lives in one Django app: `prices`.
+- Much operational business logic still lives in `prices`, while canonical catalogue and assistant/linking logic are split into `catalog`, `assistant_core`, and `assistant_linking`.
 - Background UI actions use Python threads from the web process instead of a job queue.
-- Automated test coverage is effectively absent; `prices/tests.py` is only a stub.
+- Automated test coverage exists but is still focused; broaden it when changing shared behavior or high-risk import/linking flows.
 - Local run helper uses `--noreload`, so stale processes can make changes appear missing until restart.
 
 ## Recommended Starting Points
 
-- Read [PROJECT_HANDOFF.md](PROJECT_HANDOFF.md) first.
+- For human setup, read this README first.
+- For AI-agent work, read [AGENTS.md](AGENTS.md) first.
+- Use [PROJECT_HANDOFF.md](PROJECT_HANDOFF.md) as a deep maintainer/operator reference.
 - Then inspect:
   - [perfumex/settings.py](perfumex/settings.py)
   - [perfumex/urls.py](perfumex/urls.py)

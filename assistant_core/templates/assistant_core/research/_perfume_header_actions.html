@@ -1,0 +1,5 @@
+<form method="post"
+      action="{% url 'assistant_core:generate_draft' perfume.pk %}">
+    {% csrf_token %}
+    <button class="button primary" type="submit">Generate draft</button>
+</form>

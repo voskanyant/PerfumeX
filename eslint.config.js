@@ -1,6 +1,9 @@
 export default [
   {
-    files: ["prices/static/prices/js/**/*.js"],
+    files: [
+      "prices/static/prices/js/**/*.js",
+      "assistant_linking/static/assistant_linking/js/**/*.js"
+    ],
     languageOptions: {
       ecmaVersion: 2021,
       sourceType: "script",

@@ -27,109 +27,18 @@
                     </button>
                     <div class="bulk-actions-inline" id="bulk-actions-inline">
                         <button class="button secondary" type="button" id="bulk-change-btn">Bulk change</button>
-<button class="button danger" type="button" id="bulk-delete-btn" data-confirm="Delete selected records?">Delete selected</button>
+                        <button class="button danger"
+                                type="button"
+                                id="product-bulk-delete-btn"
+                                data-bulk-delete-button
+                                data-confirm="Delete selected records?">Delete selected</button>
                         <button class="button ghost" type="button" id="bulk-mode-cancel">Cancel</button>
                     </div>
                 {% endif %}
             </div>
         </div>
 
-        <div class="search-wrap filters-products">
-            {% if show_search %}
-                <div class="search-strip">
-                    <label for="live-search" class="visually-hidden">Search</label>
-                    <div class="search-inline-row">
-                        <div class="search-input-wrap search-wrap-inner">
-                            <svg class="search-icon" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="7" cy="7" r="5"/><path d="M11 11l3 3"/></svg>
-                            <input id="live-search" type="text" value="{{ current_q|default:'' }}" placeholder="Search perfume or SKU..." data-sort="{{ current_sort|default:'current_price' }}" data-dir="{{ current_dir|default:'asc' }}"{% if link_detail %} data-detail-base="{{ detail_base_url|default:'' }}"{% endif %} data-search-url="{{ search_url|default:'' }}"{% if show_bulk_delete %} data-bulk="1"{% endif %}{% if show_actions and update_url_name %} data-edit-pattern="{% url update_url_name 0 %}"{% endif %}{% if show_actions and delete_url_name %} data-delete-pattern="{% url delete_url_name 0 %}"{% endif %}{% if show_actions %} data-show-actions="1"{% endif %}>
-                            <button id="clear-search-btn" class="search-clear-text{% if not current_q %} is-hidden{% endif %}" type="button" aria-label="Clear search" title="Clear search">&times;</button>
-                        </div>
-                        <button class="button secondary icon filter-icon-btn" type="button" data-drawer-toggle="product-filters" aria-controls="product-filters-sidebar" aria-expanded="false" title="Filters" aria-label="Filters">
-                            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                                <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
-                            </svg>
-                        </button>
-                    </div>
-                    <div class="products-filter-summary">
-                        <span id="search-count" class="muted search-count"></span>
-                        {% if supplier_filter_names %}
-                            <div class="active-supplier-chip" title="Supplier filter is active">
-                                <span>{{ supplier_filter_names|length }} supplier{{ supplier_filter_names|length|pluralize }} selected</span>
-                                <button type="button" id="clear-supplier-filter-btn" aria-label="Clear supplier filter">&times;</button>
-                            </div>
-                        {% endif %}
-                    </div>
-                </div>
-            {% endif %}
-
-            <aside class="app-drawer app-drawer--end product-filters-drawer" id="product-filters-sidebar" data-drawer="product-filters" aria-hidden="true" aria-labelledby="product-filters-sidebar-label">
-                <div class="drawer-header">
-                    <h5 class="drawer-title" id="product-filters-sidebar-label">Filters</h5>
-                    <button type="button" class="drawer-close" data-drawer-close aria-label="Close"></button>
-                </div>
-                <div class="drawer-body">
-                    <div class="extra-filters-grid">
-                        {% if show_currency_filter %}
-                            <div class="filter-item">
-                                <label for="currency-filter">Currency</label>
-                                <select id="currency-filter">
-                                    <option value="">Original</option>
-                                    {% for code in currency_options %}
-                                        <option value="{{ code }}"{% if currency_filter == code %} selected{% endif %}>{{ code }}</option>
-                                    {% endfor %}
-                                </select>
-                            </div>
-                        {% endif %}
-                        {% if supplier_options %}
-                            <div class="filter-item">
-                                <label for="supplier-filter-search">Supplier</label>
-                                <div class="supplier-filter-wrap">
-                                    <input id="supplier-filter-search" type="text" placeholder="Type supplier and press Enter..." autocomplete="off">
-                                    <div id="supplier-suggest" class="supplier-suggest"></div>
-                                </div>
-                                <div id="supplier-selected-chips" class="supplier-selected-chips"></div>
-                                <select id="supplier-option-source" hidden>
-                                    {% for supplier in supplier_options %}
-                                        <option value="{{ supplier.id }}">{{ supplier.name }}</option>
-                                    {% endfor %}
-                                </select>
-                                <input type="hidden" id="supplier-filter" value="{{ supplier_filter }}">
-                            </div>
-                        {% endif %}
-                        {% if status_options %}
-                            <div class="filter-item">
-                                <label for="show-inactive-switch">Inactive products</label>
-                                <div class="switch-row inactive-switch-wrap">
-                                    <input class="switch-input" id="show-inactive-switch" type="checkbox" role="switch"{% if status_filter != 'active' %} checked{% endif %}>
-                                    <label class="switch-label inactive-switch-label" for="show-inactive-switch">Show inactive</label>
-                                </div>
-                            </div>
-                        {% endif %}
-                        <div class="filter-item">
-                            <label for="smart-search-switch">Search mode</label>
-                            <div class="switch-row inactive-switch-wrap">
-                                <input class="switch-input" id="smart-search-switch" type="checkbox" role="switch"{% if smart_search_enabled %} checked{% endif %}>
-                                <label class="switch-label inactive-switch-label" for="smart-search-switch">Smart search</label>
-                            </div>
-                        </div>
-                        <div class="filter-item">
-                            <label for="price-min-filter">Min price</label>
-                            <input id="price-min-filter" type="text" value="{{ price_min|default:'' }}" placeholder="e.g. 100">
-                        </div>
-                        <div class="filter-item">
-                            <label for="price-max-filter">Max price</label>
-                            <input id="price-max-filter" type="text" value="{{ price_max|default:'' }}" placeholder="e.g. 500">
-                            <button class="button secondary is-full-width space-top-sm" type="button" id="price-apply-btn">Apply price</button>
-                        </div>
-                        <div class="filter-item">
-                            <label for="exclude-filter">Hidden product keywords</label>
-                            <textarea id="exclude-filter" rows="3" placeholder="One keyword per line (saved globally)">{{ exclude_terms|default:'' }}</textarea>
-                            <button class="button secondary is-full-width space-top-sm" type="button" id="exclude-apply-btn">Save hidden keywords</button>
-                        </div>
-                    </div>
-                </div>
-            </aside>
-        </div>
+        {% include "prices/_product_list_search_filters.html" with class_name="filters-products" search_id="product-live-search" clear_search_id="product-clear-search-btn" search_count_id="product-search-count" drawer_id="product-filters-sidebar-product" drawer_label_id="product-filters-sidebar-label-product" currency_filter_id="product-currency-filter" supplier_search_id="product-supplier-filter-search" supplier_suggest_id="product-supplier-suggest" supplier_chips_id="product-supplier-selected-chips" supplier_options_id="product-supplier-option-source" supplier_filter_id="product-supplier-filter" inactive_switch_id="product-show-inactive-switch" clear_supplier_filter_id="product-clear-supplier-filter-btn" include_supplier_summary="1" include_product_filters="1" always_show_filter_button="1" always_show_filter_drawer="1" %}
     {% else %}
         <div class="generic-list-header">
             <div>
@@ -146,93 +55,31 @@
                 {% if show_cleanup %}
                     <form action="{% url 'prices:product_cleanup' %}" method="post">
                         {% csrf_token %}
-<button class="button secondary" type="submit" data-confirm="Delete orphan products?">Delete orphan products</button>
+                        <button class="button secondary"
+                                type="submit"
+                                data-confirm="Delete orphan products?">Delete orphan products</button>
                     </form>
                     <form action="{% url 'prices:product_cleanup_inactive' %}" method="post">
                         {% csrf_token %}
                         {% if supplier_filter %}
                             <input type="hidden" name="supplier" value="{{ supplier_filter }}">
                         {% endif %}
-<button class="button secondary" type="submit" data-confirm="Delete inactive products?">Delete inactive products</button>
+                        <button class="button secondary"
+                                type="submit"
+                                data-confirm="Delete inactive products?">Delete inactive products</button>
                     </form>
                 {% endif %}
                 {% if show_bulk_delete %}
-<button class="button danger" type="button" id="bulk-delete-btn" data-confirm="Delete selected records?">Delete selected</button>
+                    <button class="button danger"
+                            type="button"
+                            id="generic-bulk-delete-btn"
+                            data-bulk-delete-button
+                            data-confirm="Delete selected records?">Delete selected</button>
                 {% endif %}
             </div>
         </div>
 
-        <div class="search-wrap generic-list-surface">
-            {% if show_search %}
-                <div class="search-strip">
-                    <label for="live-search" class="visually-hidden">Search</label>
-                    <div class="search-inline-row">
-                        <div class="search-input-wrap search-wrap-inner">
-                            <svg class="search-icon" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="7" cy="7" r="5"/><path d="M11 11l3 3"/></svg>
-                            <input id="live-search" type="text" value="{{ current_q|default:'' }}" placeholder="Search perfume or SKU..." data-sort="{{ current_sort|default:'current_price' }}" data-dir="{{ current_dir|default:'asc' }}"{% if link_detail %} data-detail-base="{{ detail_base_url|default:'' }}" data-server-search="1"{% endif %} data-search-url="{{ search_url|default:'' }}"{% if show_bulk_delete %} data-bulk="1"{% endif %}{% if show_actions and update_url_name %} data-edit-pattern="{% url update_url_name 0 %}"{% endif %}{% if show_actions and delete_url_name %} data-delete-pattern="{% url delete_url_name 0 %}"{% endif %}{% if show_actions %} data-show-actions="1"{% endif %}>
-                            <button id="clear-search-btn" class="search-clear-text{% if not current_q %} is-hidden{% endif %}" type="button" aria-label="Clear search" title="Clear search">&times;</button>
-                        </div>
-                        {% if show_currency_filter or supplier_options or status_options %}
-                            <button class="button secondary icon filter-icon-btn" type="button" data-drawer-toggle="product-filters" aria-controls="product-filters-sidebar" aria-expanded="false" title="Filters" aria-label="Filters">
-                                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                                    <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
-                                </svg>
-                            </button>
-                        {% endif %}
-                    </div>
-                    <span id="search-count" class="muted search-count"></span>
-                </div>
-            {% endif %}
-
-            {% if show_currency_filter or supplier_options or status_options %}
-                <aside class="app-drawer app-drawer--end product-filters-drawer" id="product-filters-sidebar" data-drawer="product-filters" aria-hidden="true" aria-labelledby="product-filters-sidebar-label">
-                    <div class="drawer-header">
-                        <h5 class="drawer-title" id="product-filters-sidebar-label">Filters</h5>
-                        <button type="button" class="drawer-close" data-drawer-close aria-label="Close"></button>
-                    </div>
-                    <div class="drawer-body">
-                        <div class="extra-filters-grid">
-                            {% if show_currency_filter %}
-                                <div class="filter-item">
-                                    <label for="currency-filter">Currency</label>
-                                    <select id="currency-filter">
-                                        <option value="">Original</option>
-                                        {% for code in currency_options %}
-                                            <option value="{{ code }}"{% if currency_filter == code %} selected{% endif %}>{{ code }}</option>
-                                        {% endfor %}
-                                    </select>
-                                </div>
-                            {% endif %}
-                            {% if supplier_options %}
-                                <div class="filter-item">
-                                    <label for="supplier-filter-search">Supplier</label>
-                                    <div class="supplier-filter-wrap">
-                                        <input id="supplier-filter-search" type="text" placeholder="Type supplier and press Enter..." autocomplete="off">
-                                        <div id="supplier-suggest" class="supplier-suggest"></div>
-                                    </div>
-                                    <div id="supplier-selected-chips" class="supplier-selected-chips"></div>
-                                    <select id="supplier-option-source" hidden>
-                                        {% for supplier in supplier_options %}
-                                            <option value="{{ supplier.id }}">{{ supplier.name }}</option>
-                                        {% endfor %}
-                                    </select>
-                                    <input type="hidden" id="supplier-filter" value="{{ supplier_filter }}">
-                                </div>
-                            {% endif %}
-                            {% if status_options %}
-                                <div class="filter-item">
-                                    <label for="show-inactive-switch">Inactive products</label>
-                                    <div class="switch-row inactive-switch-wrap">
-                                        <input class="switch-input" id="show-inactive-switch" type="checkbox" role="switch"{% if status_filter != 'active' %} checked{% endif %}>
-                                        <label class="switch-label inactive-switch-label" for="show-inactive-switch">Show inactive</label>
-                                    </div>
-                                </div>
-                            {% endif %}
-                        </div>
-                    </div>
-                </aside>
-            {% endif %}
-        </div>
+        {% include "prices/_product_list_search_filters.html" with class_name="generic-list-surface" search_id="generic-live-search" clear_search_id="generic-clear-search-btn" search_count_id="generic-search-count" drawer_id="product-filters-sidebar-generic" drawer_label_id="product-filters-sidebar-label-generic" currency_filter_id="generic-currency-filter" supplier_search_id="generic-supplier-filter-search" supplier_suggest_id="generic-supplier-suggest" supplier_chips_id="generic-supplier-selected-chips" supplier_options_id="generic-supplier-option-source" supplier_filter_id="generic-supplier-filter" inactive_switch_id="generic-show-inactive-switch" server_search="1" %}
     {% endif %}
 
             <div class="table-wrap table-scroll-x workspace-table-wrap">
@@ -240,10 +87,12 @@
                 <thead>
                     <tr>
                         {% if show_bulk_delete %}
-                            <th class="select-col bulk-col"><input type="checkbox" id="product-select-all"></th>
+                            <th scope="col" class="select-col bulk-col" aria-label="Select">
+                                <input type="checkbox" id="product-select-all" aria-label="Select all products">
+                            </th>
                         {% endif %}
                         {% for field in list_display %}
-                            <th data-field="{{ field }}">
+                            <th scope="col" data-field="{{ field }}">
                                 {% if current_sort == field %}
                                     {% if current_dir == "asc" %}
                                         <a href="?sort={{ field }}&dir=desc{% if current_q %}&q={{ current_q }}{% endif %}{% if currency_filter %}&currency={{ currency_filter }}{% endif %}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if exclude_terms %}&exclude={{ exclude_terms|urlencode }}{% endif %}{% if smart_search_enabled %}&smart=1{% endif %}{% if price_min %}&price_min={{ price_min|urlencode }}{% endif %}{% if price_max %}&price_max={{ price_max|urlencode }}{% endif %}">
@@ -273,9 +122,9 @@
                                 {% endif %}
                             </th>
                         {% endfor %}
-                        <th data-field="sparkline"></th>
+                        <th scope="col" data-field="sparkline" aria-label="Price trend"></th>
                         {% if show_actions %}
-                            <th>Actions</th>
+                            <th scope="col">Actions</th>
                         {% endif %}
                     </tr>
                 </thead>
@@ -293,7 +142,12 @@
                             {% endifchanged %}
                             <tr data-product-id="{{ obj.pk }}"{% if not obj.is_active %} class="inactive-product-row"{% endif %}{% if obj.price_delta_direction %} data-delta="{{ obj.price_delta_direction }}"{% endif %}>
                                 {% if show_bulk_delete %}
-                                    <td class="select-col bulk-col"><input type="checkbox" name="product_ids" value="{{ obj.pk }}"></td>
+                                    <td class="select-col bulk-col" data-label="Select">
+                                        <input type="checkbox"
+                                               name="product_ids"
+                                               value="{{ obj.pk }}"
+                                               aria-label="Select product row">
+                                    </td>
                                 {% endif %}
                                 {% for field in list_display %}
                                     {% if field == "last_imported_at" %}
@@ -366,7 +220,7 @@
                                         </td>
                                     {% endif %}
                                 {% endfor %}
-                                <td data-field="sparkline" class="sparkline-cell">{{ obj.sparkline_svg }}</td>
+                                <td data-field="sparkline" class="sparkline-cell" data-label="History">{{ obj.sparkline_svg }}</td>
                             {% if show_actions %}
                                 <td class="actions" data-label="Actions">
                                     {% if show_action_menu %}
@@ -381,7 +235,9 @@
                                                         <form method="post" action="{% url delete_url_name obj.pk %}">
                                                             {% csrf_token %}
                                                             <input type="hidden" name="next" value="{{ request.get_full_path }}">
-<button class="button danger" type="submit" data-confirm="Delete this record?">Delete</button>
+                                                            <button class="button danger"
+                                                                    type="submit"
+                                                                    data-confirm="Delete this record?">Delete</button>
                                                         </form>
                                                     {% endif %}
                                                 </div>
@@ -398,7 +254,9 @@
                                                         <form method="post" action="{% url delete_url_name obj.pk %}">
                                                             {% csrf_token %}
                                                             <input type="hidden" name="next" value="{{ request.get_full_path }}">
-<button class="button danger" type="submit" data-confirm="Delete this record?">Delete</button>
+                                                            <button class="button danger"
+                                                                    type="submit"
+                                                                    data-confirm="Delete this record?">Delete</button>
                                                         </form>
                                                     {% endif %}
                                                 </div>
@@ -413,7 +271,9 @@
                                                 <form method="post" action="{% url delete_url_name obj.pk %}" class="m-0">
                                                     {% csrf_token %}
                                                     <input type="hidden" name="next" value="{{ request.get_full_path }}">
-<button class="button danger" type="submit" data-confirm="Delete this record?">Delete</button>
+                                                    <button class="button danger"
+                                                            type="submit"
+                                                            data-confirm="Delete this record?">Delete</button>
                                                 </form>
                                             {% endif %}
                                         </div>
@@ -423,9 +283,19 @@
                         </tr>
                         {% endfor %}
                     {% else %}
-                        <tr>
-                            <td colspan="{% if show_bulk_delete %}{% if show_actions %}{{ list_display|length|add:'3' }}{% else %}{{ list_display|length|add:'2' }}{% endif %}{% else %}{% if show_actions %}{{ list_display|length|add:'2' }}{% else %}{{ list_display|length|add:'1' }}{% endif %}{% endif %}" class="products-empty-state">No records yet.</td>
-                        </tr>
+                        {% if show_bulk_delete %}
+                            {% if show_actions %}
+                                {% include "includes/table_empty.html" with colspan=list_display|length|add:'3' class_name="products-empty-state" message="No records yet." %}
+                            {% else %}
+                                {% include "includes/table_empty.html" with colspan=list_display|length|add:'2' class_name="products-empty-state" message="No records yet." %}
+                            {% endif %}
+                        {% else %}
+                            {% if show_actions %}
+                                {% include "includes/table_empty.html" with colspan=list_display|length|add:'2' class_name="products-empty-state" message="No records yet." %}
+                            {% else %}
+                                {% include "includes/table_empty.html" with colspan=list_display|length|add:'1' class_name="products-empty-state" message="No records yet." %}
+                            {% endif %}
+                        {% endif %}
                     {% endif %}
                 </tbody>
                 </table>
@@ -437,131 +307,13 @@
                 </form>
             {% endif %}
             {% if is_paginated %}
-                <nav class="workspace-pagination" aria-label="Pagination" id="pagination-controls">
-                    <div class="pagination-shell">
-                    <ul class="pagination-list">
-                        {% if page_obj.has_previous %}
-                            <li class="page-item">
-                                <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if current_sort %}&sort={{ current_sort }}{% endif %}{% if current_dir %}&dir={{ current_dir }}{% endif %}{% if current_q %}&q={{ current_q }}{% endif %}{% if currency_filter %}&currency={{ currency_filter }}{% endif %}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if exclude_terms %}&exclude={{ exclude_terms|urlencode }}{% endif %}{% if smart_search_enabled %}&smart=1{% endif %}{% if price_min %}&price_min={{ price_min|urlencode }}{% endif %}{% if price_max %}&price_max={{ price_max|urlencode }}{% endif %}">Previous</a>
-                            </li>
-                        {% endif %}
-                        {% for page_num in page_obj.paginator.page_range %}
-                            {% if page_num <= 5 or page_num > page_obj.paginator.num_pages|add:-3 %}
-                                {% if forloop.counter == 6 and page_obj.paginator.num_pages > 8 %}
-                                    <li class="page-item disabled"><span class="page-link">…</span></li>
-                                {% endif %}
-                                {% if page_num == page_obj.number %}
-                                    <li class="page-item active"><span class="page-link">{{ page_num }}</span></li>
-                                {% else %}
-                                    <li class="page-item">
-                                        <a class="page-link" href="?page={{ page_num }}{% if current_sort %}&sort={{ current_sort }}{% endif %}{% if current_dir %}&dir={{ current_dir }}{% endif %}{% if current_q %}&q={{ current_q }}{% endif %}{% if currency_filter %}&currency={{ currency_filter }}{% endif %}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if exclude_terms %}&exclude={{ exclude_terms|urlencode }}{% endif %}{% if smart_search_enabled %}&smart=1{% endif %}{% if price_min %}&price_min={{ price_min|urlencode }}{% endif %}{% if price_max %}&price_max={{ price_max|urlencode }}{% endif %}">{{ page_num }}</a>
-                                    </li>
-                                {% endif %}
-                            {% endif %}
-                        {% endfor %}
-                        {% if page_obj.has_next %}
-                            <li class="page-item">
-                                <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if current_sort %}&sort={{ current_sort }}{% endif %}{% if current_dir %}&dir={{ current_dir }}{% endif %}{% if current_q %}&q={{ current_q }}{% endif %}{% if currency_filter %}&currency={{ currency_filter }}{% endif %}{% if supplier_filter %}&supplier={{ supplier_filter }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if exclude_terms %}&exclude={{ exclude_terms|urlencode }}{% endif %}{% if smart_search_enabled %}&smart=1{% endif %}{% if price_min %}&price_min={{ price_min|urlencode }}{% endif %}{% if price_max %}&price_max={{ price_max|urlencode }}{% endif %}">Next</a>
-                            </li>
-                        {% endif %}
-                    </ul>
-                    <form class="pagination-jump" method="get">
-                        <label for="page-jump-input">Page</label>
-                        <input id="page-jump-input" type="number" name="page" min="1" max="{{ page_obj.paginator.num_pages }}" value="{{ page_obj.number }}">
-                        {% if current_sort %}<input type="hidden" name="sort" value="{{ current_sort }}">{% endif %}
-                        {% if current_dir %}<input type="hidden" name="dir" value="{{ current_dir }}">{% endif %}
-                        {% if current_q %}<input type="hidden" name="q" value="{{ current_q }}">{% endif %}
-                        {% if currency_filter %}<input type="hidden" name="currency" value="{{ currency_filter }}">{% endif %}
-                        {% if supplier_filter %}<input type="hidden" name="supplier" value="{{ supplier_filter }}">{% endif %}
-                        {% if status_filter %}<input type="hidden" name="status" value="{{ status_filter }}">{% endif %}
-                        {% if exclude_terms %}<input type="hidden" name="exclude" value="{{ exclude_terms }}">{% endif %}
-                        {% if smart_search_enabled %}<input type="hidden" name="smart" value="1">{% endif %}
-                        {% if price_min %}<input type="hidden" name="price_min" value="{{ price_min }}">{% endif %}
-                        {% if price_max %}<input type="hidden" name="price_max" value="{{ price_max }}">{% endif %}
-                        <button class="button secondary" type="submit">Go</button>
-                    </form>
-                    <div class="pagination-summary">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</div>
-                    </div>
-                </nav>
+                {% include "includes/pagination.html" with page_obj=page_obj page_param="page" html_id="pagination-controls" class_name="workspace-pagination" label="Pagination" jump_id="page-jump-input" %}
             {% endif %}
     </div>
     {% if show_search %}
         <script src="{% static 'prices/js/list-search.js' %}"></script>
     {% endif %}
     {% if show_bulk_delete %}
-        <script>
-            (function () {
-                var selectAll = document.getElementById("product-select-all");
-                var bulkButton = document.getElementById("bulk-delete-btn");
-                var bulkForm = document.getElementById("bulk-delete-form");
-                if (selectAll) {
-                    selectAll.addEventListener("change", function () {
-                        var checked = selectAll.checked;
-                        document.querySelectorAll("input[name='product_ids']").forEach(function (box) {
-                            box.checked = checked;
-                        });
-                    });
-                }
-                if (bulkButton && bulkForm) {
-                    bulkButton.addEventListener("click", function () {
-                        bulkForm.querySelectorAll("input[name='product_ids']").forEach(function (el) {
-                            el.remove();
-                        });
-                        var selected = Array.from(document.querySelectorAll("input[name='product_ids']:checked"));
-                        if (!selected.length) return;
-                        if (!window.confirm(bulkButton.getAttribute("data-confirm") || "Delete selected records?")) return;
-                        selected.forEach(function (box) {
-                            var input = document.createElement("input");
-                            input.type = "hidden";
-                            input.name = "product_ids";
-                            input.value = box.value;
-                            bulkForm.appendChild(input);
-                        });
-                        bulkForm.submit();
-                    });
-                }
-            })();
-        </script>
-    {% endif %}
-    {% if show_bulk_delete and list_title == 'Suppliers Products' or show_bulk_delete and list_title == 'Supplier Products' %}
-        <script>
-            (function () {
-                var root = document.getElementById("supplier-bulk-root");
-                var toggleBtn = document.getElementById("bulk-mode-toggle");
-                var cancelBtn = document.getElementById("bulk-mode-cancel");
-                var bulkChangeBtn = document.getElementById("bulk-change-btn");
-                var selectAll = document.getElementById("product-select-all");
-                if (!root || !toggleBtn) return;
-
-                function setBulkMode(enabled) {
-                    root.classList.toggle("bulk-mode-on", enabled);
-                    root.classList.toggle("bulk-mode-off", !enabled);
-                    if (!enabled) {
-                        if (selectAll) {
-                            selectAll.checked = false;
-                        }
-                        document.querySelectorAll("input[name='product_ids']").forEach(function (box) {
-                            box.checked = false;
-                        });
-                    }
-                }
-
-                toggleBtn.addEventListener("click", function () {
-                    setBulkMode(!root.classList.contains("bulk-mode-on"));
-                });
-
-                if (bulkChangeBtn) {
-                    bulkChangeBtn.addEventListener("click", function () {
-                        setBulkMode(true);
-                    });
-                }
-
-                if (cancelBtn) {
-                    cancelBtn.addEventListener("click", function () {
-                        setBulkMode(false);
-                    });
-                }
-            })();
-        </script>
+        <script src="{% static 'prices/js/list-bulk.js' %}"></script>
     {% endif %}
 {% endblock %}

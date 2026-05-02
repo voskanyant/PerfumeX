@@ -232,6 +232,11 @@ OPENAI_MODEL_SUGGESTION = os.getenv("OPENAI_MODEL_SUGGESTION", "gpt-5.4-mini")
 OPENAI_MODEL_RESEARCH = os.getenv("OPENAI_MODEL_RESEARCH", "gpt-5.4")
 OPENAI_MODEL_WRITER = os.getenv("OPENAI_MODEL_WRITER", "gpt-5.4-mini")
 
+REDIS_URL = os.getenv("REDIS_URL", "redis://127.0.0.1:6379/0")
+RQ_DEFAULT_QUEUE = os.getenv("RQ_DEFAULT_QUEUE", "perfumex")
+RQ_JOB_TIMEOUT_SECONDS = int(os.getenv("RQ_JOB_TIMEOUT_SECONDS", "3600"))
+PERFUMEX_RQ_SYNC = env_bool("PERFUMEX_RQ_SYNC", DEBUG)
+
 LOG_DIR = BASE_DIR / "logs"
 LOG_DIR.mkdir(parents=True, exist_ok=True)
 

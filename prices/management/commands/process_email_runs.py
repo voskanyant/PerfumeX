@@ -7,9 +7,9 @@ from django.db import close_old_connections
 from django.utils import timezone
 
 from prices import models
-from prices.management.commands.import_emails import _get_supplier_latest_batch_time
 from prices.services.email_importer import run_import
 from prices.services.email_import_lock import acquire_email_import_worker_lock
+from prices.services.import_history import get_supplier_latest_processed_price_import_time
 
 
 class Command(BaseCommand):
@@ -129,7 +129,7 @@ class Command(BaseCommand):
                             dedupe_day_window=3,
                         )
                     else:
-                        latest_batch = _get_supplier_latest_batch_time(supplier)
+                        latest_batch = get_supplier_latest_processed_price_import_time(supplier)
                         if latest_batch and timezone.is_naive(latest_batch):
                             latest_batch = timezone.make_aware(latest_batch)
                         if latest_batch:

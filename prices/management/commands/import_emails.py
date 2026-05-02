@@ -9,23 +9,13 @@ from prices.services.email_importer import run_import
 from prices.services.cbr_rates import upsert_cbr_markup_rates
 from prices.services.importer import process_import_file
 from prices.services.email_import_lock import acquire_email_import_worker_lock
+from prices.services.import_history import get_supplier_latest_processed_price_import_time
 
 
 INTERVAL_EARLY_GRACE_SECONDS = 90
 
 
-def _get_supplier_latest_batch_time(supplier: models.Supplier):
-    latest = None
-    batches = models.ImportBatch.objects.filter(
-        supplier=supplier,
-        importfile__status=models.ImportStatus.PROCESSED,
-        importfile__file_kind=models.FileKind.PRICE,
-    ).values_list("importfile__processed_at", "received_at", "created_at")
-    for processed_at, received_at, created_at in batches:
-        candidate = processed_at or created_at or received_at
-        if candidate and (latest is None or candidate > latest):
-            latest = candidate
-    return latest
+_get_supplier_latest_batch_time = get_supplier_latest_processed_price_import_time
 
 
 def _should_skip_recent_run(settings_obj: models.ImportSettings, now=None) -> bool:

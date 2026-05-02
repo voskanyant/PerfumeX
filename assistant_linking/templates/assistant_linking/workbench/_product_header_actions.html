@@ -1,0 +1,13 @@
+{% if last_link_action %}
+    <form method="post"
+          action="{% url 'assistant_linking:undo_link_action' last_link_action.pk %}">
+        {% csrf_token %}
+        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+        <button class="button ghost" type="submit" data-undo-link-action>Undo</button>
+    </form>
+{% endif %}
+<form method="post"
+      action="{% url 'assistant_linking:generate_suggestions' product.pk %}">
+    {% csrf_token %}
+    <button class="button primary" type="submit">Generate suggestions</button>
+</form>

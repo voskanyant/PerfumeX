@@ -10,13 +10,22 @@
 
     if (!fileInput || !supplierId) return;
 
-    function escapeHtml(value) {
-        return String(value || "")
-            .replace(/&/g, "&amp;")
-            .replace(/</g, "&lt;")
-            .replace(/>/g, "&gt;")
-            .replace(/"/g, "&quot;")
-            .replace(/'/g, "&#039;");
+    function clearNode(node) {
+        if (!node) return;
+        while (node.firstChild) {
+            node.removeChild(node.firstChild);
+        }
+    }
+
+    function el(tagName, className, text) {
+        var node = document.createElement(tagName);
+        if (className) {
+            node.className = className;
+        }
+        if (text !== undefined && text !== null) {
+            node.textContent = String(text);
+        }
+        return node;
     }
 
     function getCookie(name) {
@@ -73,28 +82,62 @@
         return selected;
     }
 
+    function columnLabel(displayIndex) {
+        return "Column " + displayIndex;
+    }
+
+    function renderPreviewMessage(label, message) {
+        clearNode(preview);
+        var wrap = el("div", "supplier-preview-empty");
+        wrap.appendChild(el("span", "card-label", label));
+        wrap.appendChild(el("p", "", message));
+        preview.appendChild(wrap);
+    }
+
+    function renderSheetOptions(sheetNames) {
+        clearNode(sheetSelect);
+        sheetNames.forEach(function (name, index) {
+            var option = el("option", "", name);
+            option.value = String(index);
+            sheetSelect.appendChild(option);
+        });
+    }
+
     function renderTable(rows, maxCols, colOffset) {
         if (!rows.length) {
-            preview.innerHTML = "<div class='supplier-preview-empty'><span class='card-label'>No rows</span><p>No preview rows were detected in this sheet.</p></div>";
+            renderPreviewMessage("No rows", "No preview rows were detected in this sheet.");
             return;
         }
         var selected = selectedColumns();
-        var header = "<tr>";
+        clearNode(preview);
+        var table = el("table", "data-table import-preview-table space-bottom-none");
+        var thead = document.createElement("thead");
+        var headerRow = document.createElement("tr");
         for (var i = 1; i <= maxCols; i++) {
             var displayIndex = i + (colOffset || 0);
             var selectedClass = selected.indexOf(String(i)) !== -1 ? " is-selected" : "";
-            header += "<th data-col='" + i + "' class='preview-th" + selectedClass + "'>" + displayIndex + "</th>";
+            var th = el("th", "preview-th" + selectedClass, displayIndex);
+            th.setAttribute("scope", "col");
+            th.dataset.col = String(i);
+            th.title = columnLabel(displayIndex);
+            headerRow.appendChild(th);
         }
-        header += "</tr>";
-        var body = rows.map(function (row) {
-            var cells = "";
+        thead.appendChild(headerRow);
+        table.appendChild(thead);
+        var tbody = document.createElement("tbody");
+        rows.forEach(function (row) {
+            var tr = document.createElement("tr");
             for (var i = 0; i < maxCols; i++) {
                 var val = row[i] || "";
-                cells += "<td class='preview-td' title='" + escapeHtml(val) + "'>" + escapeHtml(val) + "</td>";
+                var cell = el("td", "preview-td", val);
+                cell.title = String(val);
+                cell.setAttribute("data-label", columnLabel(i + 1 + (colOffset || 0)));
+                tr.appendChild(cell);
             }
-            return "<tr>" + cells + "</tr>";
-        }).join("");
-        preview.innerHTML = "<table class='data-table import-preview-table space-bottom-none'>" + header + body + "</table>";
+            tbody.appendChild(tr);
+        });
+        table.appendChild(tbody);
+        preview.appendChild(table);
         preview.querySelectorAll("th[data-col]").forEach(function (th) {
             th.addEventListener("click", function () {
                 var col = th.getAttribute("data-col");
@@ -110,7 +153,7 @@
 
     function loadPreview(sheetIndex) {
         if (!fileInput.files.length) return;
-        preview.innerHTML = "<div class='supplier-preview-empty'><span class='card-label'>Loading</span><p>Reading spreadsheet preview...</p></div>";
+        renderPreviewMessage("Loading", "Reading spreadsheet preview...");
         var formData = new FormData();
         formData.append("file", fileInput.files[0]);
         if (sheetIndex !== null && sheetIndex !== undefined) {
@@ -127,20 +170,18 @@
         }).then(function (res) { return res.json(); })
           .then(function (data) {
               if (data.error) {
-                  preview.innerHTML = "<div class='supplier-preview-empty'><span class='card-label'>Preview error</span><p>" + escapeHtml(data.error) + "</p></div>";
+                  renderPreviewMessage("Preview error", data.error);
                   return;
               }
               if (data.sheet_names && data.sheet_names.length) {
                   if (sheetRow) {
                       sheetRow.classList.remove("is-hidden");
                   }
-                  sheetSelect.innerHTML = data.sheet_names.map(function (name, index) {
-                      return "<option value='" + index + "'>" + name + "</option>";
-                  }).join("");
+                  renderSheetOptions(data.sheet_names);
               }
               renderTable(data.rows || [], data.max_cols || 0, data.col_offset || 0);
           }).catch(function () {
-              preview.innerHTML = "<div class='supplier-preview-empty'><span class='card-label'>Preview error</span><p>Could not load the mapping preview.</p></div>";
+              renderPreviewMessage("Preview error", "Could not load the mapping preview.");
           });
     }
 

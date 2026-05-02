@@ -10,19 +10,7 @@
         {% url 'prices:supplier_list' as supplier_list_url %}
         {% include "prices/_breadcrumbs.html" with parent_label="Suppliers" parent_url=supplier_list_url current_label=object.name %}
         <div class="section-card">
-            <div class="layout-row layout-row--wrap items-start justify-between gap-md">
-                <div>
-                    <span class="page-kicker">Supplier</span>
-                    <h1 class="page-title">{{ object.name|fix_text }}</h1>
-                    <p class="page-subtitle space-bottom-none">Supplier profile and mappings.</p>
-                </div>
-                <a class="button secondary icon" href="{% url 'prices:supplier_update' object.pk %}" title="Edit supplier" aria-label="Edit supplier">
-                    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                        <path d="M12 20h9"/>
-                        <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/>
-                    </svg>
-                </a>
-            </div>
+            {% include "includes/page_header.html" with class_name="space-bottom-none" kicker="Supplier" title=object.name|fix_text subtitle="Supplier profile and mappings." subtitle_class="space-bottom-none" actions_template="prices/_supplier_detail_header_actions.html" %}
             <div class="surface-grid space-top-sm">
                 <div class="surface-meta">
                     <div class="label">Code</div>

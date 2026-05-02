@@ -1,32 +1,17 @@
 {% extends "prices/base.html" %}
+{% load static %}
 {% block title %}Our Products{% endblock %}
 {% block topbar_label %}Our Products{% endblock %}
 {% block content %}
-<div class="page-head">
-    <div>
-        <span class="page-kicker">Catalogue</span>
-        <h1 class="page-title">Our Products</h1>
-        <div class="page-meta">Total {{ total_count }} catalogue variants</div>
-    </div>
-    <div class="page-actions">
-        <a class="button secondary" href="{% url 'prices:fragrantica_product_review' %}">Fragrantica Products</a>
-        <a class="button secondary" href="{% url 'assistant_core:catalog_import' %}">Import Excel</a>
-        <a class="button primary" href="{% url 'assistant_core:catalog_perfume_create' %}">Add new</a>
-    </div>
-</div>
+{% include "includes/page_header.html" with kicker="Catalogue" title="Our Products" meta_template="prices/_our_products_catalog_header_meta.html" actions_template="prices/_our_products_catalog_header_actions.html" %}
 
 <div class="workspace-block our-products-catalog">
-    <nav class="tabs catalogue-tabs" aria-label="Catalogue management tabs">
-        <a class="tab {% if active_tab == 'products' %}active{% endif %}" href="{% url 'prices:our_product_list' %}">Products</a>
-        <a class="tab {% if active_tab == 'brands' %}active{% endif %}" href="{% url 'prices:our_product_list' %}?tab=brands">Brands</a>
-        <a class="tab {% if active_tab == 'collections' %}active{% endif %}" href="{% url 'prices:our_product_list' %}?tab=collections">Collections</a>
-        <a class="tab {% if active_tab == 'concentrations' %}active{% endif %}" href="{% url 'prices:our_product_list' %}?tab=concentrations">Concentrations</a>
-    </nav>
+    {% include "includes/tabs.html" with class_name="catalogue-tabs" label="Catalogue management tabs" items_template="prices/_our_products_catalog_tab_items.html" %}
 
     {% if active_tab == 'products' %}
     <form method="get" class="search-wrap">
         <input type="hidden" name="tab" value="products">
-        <input type="text" name="q" value="{{ search_query }}" placeholder="Search brand, scent, size, packaging...">
+        <input type="text" name="q" value="{{ search_query }}" placeholder="Search brand, scent, size, packaging..." aria-label="Search catalogue products">
         <button class="button ghost" type="submit">Search</button>
     </form>
     <div class="our-products-list" aria-label="Catalogue products">
@@ -41,27 +26,27 @@
                             <div class="our-products-full-name" aria-label="Product identity">
                                 <span class="catalogue-field catalogue-field-brand" data-label="Brand" data-editable-cell>
                                     <span class="catalogue-cell-value catalogue-cell-value-strong">{{ variant.perfume.brand.name }}</span>
-                                    <input class="catalogue-inline-input" type="text" name="brand_name" value="{{ variant.perfume.brand.name }}" list="catalog-brand-options" placeholder="Brand" disabled>
+                                    <input class="catalogue-inline-input" type="text" name="brand_name" value="{{ variant.perfume.brand.name }}" list="catalog-brand-options" placeholder="Brand" aria-label="Brand name" disabled>
                                 </span>
                                 <span class="catalogue-field catalogue-field-collection {% if not variant.perfume.collection_name %}is-empty{% endif %}" data-label="Collection" data-editable-cell>
                                     <span class="identity-separator">/</span>
                                     <span class="catalogue-cell-value" data-empty-label="Collection">{{ variant.perfume.collection_name|default:"Collection" }}</span>
-                                    <input class="catalogue-inline-input" type="text" name="collection_name" value="{{ variant.perfume.collection_name|default_if_none:'' }}" list="catalog-collection-options" placeholder="Collection" disabled>
+                                    <input class="catalogue-inline-input" type="text" name="collection_name" value="{{ variant.perfume.collection_name|default_if_none:'' }}" list="catalog-collection-options" placeholder="Collection" aria-label="Collection name" disabled>
                                 </span>
                                 <span class="catalogue-field catalogue-field-scent" data-label="Scent" data-editable-cell>
                                     <span class="identity-separator">/</span>
                                     <span class="catalogue-cell-value catalogue-cell-value-strong">{{ variant.perfume.name }}</span>
-                                    <input class="catalogue-inline-input" type="text" name="perfume_name" value="{{ variant.perfume.name }}" placeholder="Product name" disabled>
+                                    <input class="catalogue-inline-input" type="text" name="perfume_name" value="{{ variant.perfume.name }}" placeholder="Product name" aria-label="Product name" disabled>
                                 </span>
                                 <span class="catalogue-field catalogue-field-concentration {% if not variant.perfume.concentration %}is-empty{% endif %}" data-label="Concentration" data-editable-cell>
                                     <span class="identity-separator">/</span>
                                     <span class="catalogue-cell-value" data-empty-label="Concentration">{{ variant.perfume.concentration|default:"Concentration" }}</span>
-                                    <input class="catalogue-inline-input" type="text" name="concentration" value="{{ variant.perfume.concentration|default_if_none:'' }}" list="catalog-concentration-options" placeholder="Concentration" disabled>
+                                    <input class="catalogue-inline-input" type="text" name="concentration" value="{{ variant.perfume.concentration|default_if_none:'' }}" list="catalog-concentration-options" placeholder="Concentration" aria-label="Concentration" disabled>
                                 </span>
                                 <span class="catalogue-field catalogue-field-size {% if not variant.display_size %}is-empty{% endif %}" data-label="Size" data-editable-cell>
                                     <span class="identity-separator">/</span>
                                     <span class="catalogue-cell-value" data-empty-label="Size">{{ variant.display_size|default:"Size" }}</span>
-                                    <input class="catalogue-inline-input" type="text" name="size_ml" value="{{ variant.display_size|default_if_none:'' }}" placeholder="Size" disabled>
+                                    <input class="catalogue-inline-input" type="text" name="size_ml" value="{{ variant.display_size|default_if_none:'' }}" placeholder="Size" aria-label="Size" disabled>
                                 </span>
                                 <span class="catalogue-field catalogue-field-tester {% if not variant.is_tester %}is-empty{% endif %}" data-label="Tester" data-editable-cell>
                                     <span class="identity-separator">/</span>
@@ -74,7 +59,7 @@
                                 <span class="catalogue-field catalogue-field-type {% if not variant.variant_type or variant.variant_type == 'standard' %}is-empty{% endif %}" data-label="Type" data-editable-cell>
                                     <span class="identity-separator">/</span>
                                     <span class="catalogue-cell-value">{{ variant.variant_type|default:"standard" }}</span>
-                                    <input class="catalogue-inline-input" type="text" name="variant_type" value="{{ variant.variant_type|default:'standard' }}" list="catalog-variant-type-options" placeholder="Type" disabled>
+                                    <input class="catalogue-inline-input" type="text" name="variant_type" value="{{ variant.variant_type|default:'standard' }}" list="catalog-variant-type-options" placeholder="Type" aria-label="Variant type" disabled>
                                 </span>
                             </div>
                         </div>
@@ -93,9 +78,8 @@
                 </form>
             </article>
         {% empty %}
-            <div class="empty-state">
-                No catalogue products yet. <a href="{% url 'assistant_core:catalog_import' %}">Import Excel</a>
-            </div>
+            {% url 'assistant_core:catalog_import' as catalog_import_url %}
+            {% include "includes/empty_state.html" with message="No catalogue products yet." cta_url=catalog_import_url cta_label="Import Excel" %}
         {% endfor %}
     </div>
     <datalist id="catalog-brand-options">
@@ -132,31 +116,23 @@
     </datalist>
 
     {% if is_paginated %}
-        <div class="pagination">
-            {% if page_obj.has_previous %}
-                <a class="button ghost" href="?tab=products&q={{ search_query|urlencode }}&page={{ page_obj.previous_page_number }}">Previous</a>
-            {% endif %}
-            <span>Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
-            {% if page_obj.has_next %}
-                <a class="button ghost" href="?tab=products&q={{ search_query|urlencode }}&page={{ page_obj.next_page_number }}">Next</a>
-            {% endif %}
-        </div>
+        {% include "includes/pagination.html" with page_obj=page_obj page_param="page" label="Catalogue product pages" jump_id="catalogue-product-page-jump" %}
     {% endif %}
     {% elif active_tab == 'brands' %}
         <form method="post" class="catalogue-add-row">
             {% csrf_token %}
             <input type="hidden" name="tab" value="brands">
             <input type="hidden" name="action" value="add_brand">
-            <input type="text" name="name" placeholder="New brand name">
+            <input type="text" name="name" placeholder="New brand name" aria-label="New brand name">
             <button class="button primary" type="submit">Add brand</button>
         </form>
         <div class="table-wrap table-scroll-x our-products-table-wrap">
         <table class="data-table table-mobile catalogue-admin-table our-products-admin-table">
             <thead>
                 <tr>
-                    <th>Brand</th>
-                    <th>Products</th>
-                    <th>Actions</th>
+                    <th scope="col">Brand</th>
+                    <th scope="col">Products</th>
+                    <th scope="col">Actions</th>
                 </tr>
             </thead>
             <tbody>
@@ -170,12 +146,12 @@
                             <input type="hidden" name="tab" value="brands">
                             <input type="hidden" name="action" value="delete_brand">
                             <input type="hidden" name="brand_id" value="{{ brand.id }}">
-                            <button class="button danger" type="submit">Delete</button>
+                            <button class="button danger" type="submit" data-confirm="Delete this brand from the legacy catalogue review list?">Delete</button>
                         </form>
                     </td>
-                </tr>
+            </tr>
             {% empty %}
-                <tr><td colspan="3" class="empty-state">No brands yet.</td></tr>
+                {% include "includes/table_empty.html" with colspan=3 message="No brands yet." %}
             {% endfor %}
             </tbody>
         </table>
@@ -185,10 +161,10 @@
         <table class="data-table table-mobile catalogue-admin-table our-products-admin-table">
             <thead>
                 <tr>
-                    <th>Collection</th>
-                    <th>Products</th>
-                    <th>Rename</th>
-                    <th>Actions</th>
+                    <th scope="col">Collection</th>
+                    <th scope="col">Products</th>
+                    <th scope="col">Rename</th>
+                    <th scope="col">Actions</th>
                 </tr>
             </thead>
             <tbody>
@@ -202,7 +178,7 @@
                             <input type="hidden" name="tab" value="collections">
                             <input type="hidden" name="action" value="rename_collection">
                             <input type="hidden" name="old_value" value="{{ row.collection_name }}">
-                            <input type="text" name="new_value" value="{{ row.collection_name }}">
+                            <input type="text" name="new_value" value="{{ row.collection_name }}" aria-label="New collection name">
                             <button class="button ghost" type="submit">Save</button>
                         </form>
                     </td>
@@ -212,12 +188,12 @@
                             <input type="hidden" name="tab" value="collections">
                             <input type="hidden" name="action" value="clear_collection">
                             <input type="hidden" name="old_value" value="{{ row.collection_name }}">
-                            <button class="button danger" type="submit">Clear</button>
+                            <button class="button danger" type="submit" data-confirm="Clear this collection value from matching legacy catalogue rows?">Clear</button>
                         </form>
                     </td>
-                </tr>
+            </tr>
             {% empty %}
-                <tr><td colspan="4" class="empty-state">No collections yet.</td></tr>
+                {% include "includes/table_empty.html" with colspan=4 message="No collections yet." %}
             {% endfor %}
             </tbody>
         </table>
@@ -227,10 +203,10 @@
         <table class="data-table table-mobile catalogue-admin-table our-products-admin-table">
             <thead>
                 <tr>
-                    <th>Concentration</th>
-                    <th>Products</th>
-                    <th>Rename</th>
-                    <th>Actions</th>
+                    <th scope="col">Concentration</th>
+                    <th scope="col">Products</th>
+                    <th scope="col">Rename</th>
+                    <th scope="col">Actions</th>
                 </tr>
             </thead>
             <tbody>
@@ -244,7 +220,7 @@
                             <input type="hidden" name="tab" value="concentrations">
                             <input type="hidden" name="action" value="rename_concentration">
                             <input type="hidden" name="old_value" value="{{ row.concentration }}">
-                            <input type="text" name="new_value" value="{{ row.concentration }}">
+                            <input type="text" name="new_value" value="{{ row.concentration }}" aria-label="New concentration name">
                             <button class="button ghost" type="submit">Save</button>
                         </form>
                     </td>
@@ -254,12 +230,12 @@
                             <input type="hidden" name="tab" value="concentrations">
                             <input type="hidden" name="action" value="clear_concentration">
                             <input type="hidden" name="old_value" value="{{ row.concentration }}">
-                            <button class="button danger" type="submit">Clear</button>
+                            <button class="button danger" type="submit" data-confirm="Clear this concentration value from matching legacy catalogue rows?">Clear</button>
                         </form>
                     </td>
-                </tr>
+            </tr>
             {% empty %}
-                <tr><td colspan="4" class="empty-state">No concentrations yet.</td></tr>
+                {% include "includes/table_empty.html" with colspan=4 message="No concentrations yet." %}
             {% endfor %}
             </tbody>
         </table>
@@ -269,89 +245,5 @@
 {% endblock %}
 {% block extra_scripts %}
 {{ block.super }}
-<script>
-(function () {
-    function setRowEditing(row, isEditing) {
-        row.classList.toggle("is-editing", isEditing);
-        row.querySelectorAll("[data-editable-cell]").forEach(function (cell) {
-            cell.classList.remove("is-field-open");
-        });
-        var button = row.querySelector("[data-row-edit-toggle]");
-        if (button) {
-            button.title = isEditing ? "Save row" : "Edit row";
-            button.setAttribute("aria-label", isEditing ? "Save row" : "Edit row");
-        }
-    }
-
-    function openCellField(cell) {
-        var row = cell.closest("[data-catalogue-row]");
-        if (!row) return;
-        if (!row.classList.contains("is-editing")) {
-            setRowEditing(row, true);
-        }
-        var field = cell.querySelector(".catalogue-inline-input:not([type='hidden'])");
-        if (!field) return;
-        row.querySelectorAll("[data-editable-cell].is-field-open").forEach(function (openCell) {
-            if (openCell !== cell) {
-                openCell.classList.remove("is-field-open");
-            }
-        });
-        field.disabled = false;
-        cell.classList.add("is-field-open");
-        field.focus();
-        if (typeof field.select === "function") {
-            field.select();
-        }
-    }
-
-    function enableRowFields(row) {
-        row.querySelectorAll(".catalogue-inline-input").forEach(function (field) {
-            field.disabled = false;
-        });
-    }
-
-    document.querySelectorAll("[data-catalogue-row]").forEach(function (row) {
-        var form = row.querySelector(".catalogue-row-form");
-        row.querySelectorAll("[data-editable-cell]").forEach(function (cell) {
-            cell.addEventListener("click", function () {
-                if (!window.matchMedia("(max-width: 767px)").matches) return;
-                openCellField(cell);
-            });
-            cell.addEventListener("dblclick", function (event) {
-                event.preventDefault();
-                openCellField(cell);
-            });
-            cell.querySelectorAll(".catalogue-inline-input").forEach(function (field) {
-                field.addEventListener("keydown", function (event) {
-                    if (event.key === "Escape") {
-                        event.preventDefault();
-                        cell.classList.remove("is-field-open");
-                        field.blur();
-                    }
-                    if (event.key === "Enter" && field.tagName !== "SELECT") {
-                        event.preventDefault();
-                        enableRowFields(row);
-                        if (form) form.requestSubmit();
-                    }
-                });
-            });
-        });
-        if (form) {
-            form.addEventListener("submit", function () {
-                enableRowFields(row);
-            });
-        }
-        var button = row.querySelector("[data-row-edit-toggle]");
-        if (!button) return;
-        button.addEventListener("click", function (event) {
-            if (!row.classList.contains("is-editing")) {
-                event.preventDefault();
-                setRowEditing(row, true);
-                return;
-            }
-            enableRowFields(row);
-        });
-    });
-})();
-</script>
+<script src="{% static 'prices/js/our-products-catalog.js' %}"></script>
 {% endblock %}

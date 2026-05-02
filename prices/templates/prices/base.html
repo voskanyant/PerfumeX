@@ -147,16 +147,7 @@
     <div class="auth-shell">
 {% endif %}
 
-{% if messages %}
-    <div class="flash-stack">
-        {% for message in messages %}
-            <div class="flash flash--{{ message.tags|default:'info' }}">
-                <span class="flash-body">{{ message }}</span>
-                <button type="button" class="flash-close" aria-label="Dismiss">&times;</button>
-            </div>
-        {% endfor %}
-    </div>
-{% endif %}
+{% include "includes/messages.html" %}
 {% block content %}{% endblock %}
 
 {% if user.is_authenticated %}
