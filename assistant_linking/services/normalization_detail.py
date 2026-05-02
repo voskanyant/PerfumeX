@@ -16,7 +16,7 @@ from assistant_linking.services.catalog_matcher import (
 from assistant_linking.services.garbage import GARBAGE_MODIFIER
 from assistant_linking.services.garbage import clear_garbage_keyword_cache
 from assistant_linking.services.garbage import normalize_garbage_keyword
-from assistant_linking.services.normalizer import save_parse
+from assistant_linking.services.normalizer import parse_supplier_product, save_parse
 from assistant_linking.services.smart_search import normalize_query
 from catalog.models import Brand, Perfume, PerfumeVariant, compact_decimal_text
 from prices.models import SupplierProduct
@@ -232,12 +232,22 @@ def build_catalog_reference_context(
     }
 
 
+def get_saved_or_preview_parse(
+    product,
+    *,
+    parse_preview_builder=parse_supplier_product,
+):
+    existing = getattr(product, "assistant_parse", None)
+    return existing or parse_preview_builder(product)
+
+
 def build_parsed_product_detail_context(
     *,
     product,
     hidden_keywords: list[str],
     context_overrides=None,
-    parse_saver=save_parse,
+    parse_builder=get_saved_or_preview_parse,
+    parse_saver=None,
     candidate_builder=candidate_matches,
     similar_rows_builder=similar_supplier_rows,
     rule_impact_builder=rule_impact,
@@ -246,7 +256,8 @@ def build_parsed_product_detail_context(
     catalog_reference_builder=build_catalog_reference_context,
 ):
     context_overrides = context_overrides or {}
-    parsed = parse_saver(product)
+    parsed = parse_saver(product) if parse_saver is not None else parse_builder(product)
+    parsed_is_saved = isinstance(parsed, models.ParsedSupplierProduct)
     canonical_perfume = product.catalog_perfume
     canonical_variant = product.catalog_variant
     is_garbage = GARBAGE_MODIFIER in (parsed.modifiers or [])
@@ -278,6 +289,7 @@ def build_parsed_product_detail_context(
     )
     return {
         "parsed": parsed,
+        "parsed_is_saved": parsed_is_saved,
         "teach_form": context_overrides.get("teach_form")
         or teaching_form_class(initial=teach_initial),
         "brand_alias_form": context_overrides.get("brand_alias_form"),

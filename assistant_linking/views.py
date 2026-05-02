@@ -29,6 +29,7 @@ from assistant_linking.views_normalization import (
     NormalizationDashboardView as NormalizationDashboardView,
     NormalizationIssueListView as NormalizationIssueListView,
     NormalizationSearchMixin as NormalizationSearchMixin,
+    ParseUnparsedProductsView as ParseUnparsedProductsView,
     ParsedListView as ParsedListView,
     ParsedProductDetailView as ParsedProductDetailView,
     ReparseProductView as ReparseProductView,

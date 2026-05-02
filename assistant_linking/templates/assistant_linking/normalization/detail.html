@@ -14,6 +14,9 @@
         </div>
         <div class="workspace-block">
             <h2 class="kpi-link-title">Supplier parsed fields</h2>
+            {% if not parsed_is_saved %}
+                <p class="page-meta">Preview only. Use Reparse to save this row into the normalisation queues.</p>
+            {% endif %}
             <p>Normalized: {{ parsed.display_identity }}</p>
             <p>Category: {{ parsed.product_category_label }}</p>
             {% if parsed.product_subcategory_label %}<p>Subcategory: {{ parsed.product_subcategory_label }}</p>{% endif %}

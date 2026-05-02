@@ -191,7 +191,22 @@ DECODED_TERMS = ("decoded", "dec", "декод", "декодированный")
 GRAY_BOX_TERMS = ("gray box", "grey box", "серый бокс", "серый короб", "серая коробка")
 GRAY_BOX_COLOR_TERMS = ("серый", "серая", "сер", "gray", "grey")
 GENDER_TERMS = tuple(alias for alias, _display, _group in DEFAULT_AUDIENCE_ALIASES)
-NAME_AUDIENCE_TERMS = ("pour femme", "femme", "donna", "for her", "her", "pour homme", "homme", "uomo", "man")
+NAME_AUDIENCE_TERMS = (
+    "pour femme",
+    "femme",
+    "donna",
+    "for woman",
+    "for women",
+    "for her",
+    "her",
+    "pour homme",
+    "homme",
+    "uomo",
+    "for man",
+    "for men",
+    "for him",
+    "man",
+)
 NAME_BEARING_MODIFIER_PHRASES = ("eau fraiche", "eau fraicheur")
 AUDIENCE_NAME_SUFFIXES = {
     "women": ("woman", "women", "lady", "for woman", "for women", "for her", "her", "pour femme", "femme"),
@@ -230,6 +245,10 @@ class ParseResult:
         if self.normalized_brand:
             return str(self.normalized_brand)
         return self.detected_brand_text
+
+    @property
+    def normalized_brand_id(self) -> int | None:
+        return self.normalized_brand.pk if self.normalized_brand else None
 
     @property
     def display_size(self) -> str:
@@ -544,10 +563,32 @@ def _safe_regex_sub(pattern: str, replacement: str, text: str, alias=None) -> st
         return text
 
 
-def _strip_known_terms(text: str, terms: list[str]) -> str:
+def _phrase_spans(text: str, phrases: tuple[str, ...] | list[str]) -> list[tuple[int, int]]:
+    spans: list[tuple[int, int]] = []
+    for phrase in phrases:
+        normalized_phrase = normalize_text(phrase)
+        if not normalized_phrase:
+            continue
+        spans.extend(match.span() for match in re.finditer(_phrase_pattern(normalized_phrase), text))
+    return spans
+
+
+def _strip_known_terms(
+    text: str,
+    terms: list[str],
+    *,
+    preserve_phrases: tuple[str, ...] | list[str] = (),
+) -> str:
     remaining = text
     for term in [normalize_text(term) for term in terms if term]:
-        remaining = re.sub(_phrase_pattern(term), " ", remaining)
+        preserved_spans = _phrase_spans(remaining, preserve_phrases)
+
+        def replace(match):
+            if any(match.start() >= span_start and match.end() <= span_end for span_start, span_end in preserved_spans):
+                return match.group(0)
+            return " "
+
+        remaining = re.sub(_phrase_pattern(term), replace, remaining)
     return re.sub(r"\s+", " ", remaining).strip()
 
 
@@ -585,7 +626,14 @@ def _remaining_after_alias_prefix(text: str, alias_text: str) -> str:
 
 def _product_name_from_alias_match_context(text: str, alias_text: str, canonical_text: str) -> str:
     normalized_alias = normalize_text(alias_text)
-    if normalize_text(canonical_text) not in {normalize_text(term) for term in NAME_AUDIENCE_TERMS}:
+    name_bearing_audience_terms = {
+        normalize_text(term)
+        for term in [
+            *NAME_AUDIENCE_TERMS,
+            *(suffix for suffixes in AUDIENCE_NAME_SUFFIXES.values() for suffix in suffixes),
+        ]
+    }
+    if normalize_text(canonical_text) not in name_bearing_audience_terms:
         return canonical_text
     match = re.search(rf"^(?P<prefix>.*?)\b{re.escape(normalized_alias)}\b(?P<suffix>.*)$", text)
     if not match:
@@ -691,6 +739,24 @@ def _catalog_base_keys_without_trailing_audience(result: ParseResult) -> set[str
     return base_keys
 
 
+def _catalog_keys_with_equivalent_trailing_audience(result: ParseResult) -> set[str]:
+    audience_suffixes = AUDIENCE_NAME_SUFFIXES.get(audience_group(result.supplier_gender_hint), ())
+    if not audience_suffixes:
+        return set()
+    normalized_name = normalize_text(result.product_name_text)
+    keys: set[str] = set()
+    for suffix in audience_suffixes:
+        normalized_suffix = normalize_text(suffix)
+        match = re.match(rf"^(?P<base>.+)\s+{re.escape(normalized_suffix)}$", normalized_name)
+        if not match:
+            continue
+        base_key = _catalog_scent_key(match.group("base"))
+        if len(base_key) < 2:
+            continue
+        keys.update(f"{base_key}{_catalog_scent_key(other)}" for other in audience_suffixes if other)
+    return {key for key in keys if len(key) >= 3}
+
+
 def _catalog_has_audience_named_sibling(perfumes: list[Perfume], base_key: str, result: ParseResult) -> bool:
     suffix_keys = {
         _catalog_scent_key(suffix)
@@ -744,6 +810,17 @@ def _canonicalize_product_name_from_catalog(result: ParseResult) -> str:
     }
     if len(names) == 1:
         return names.pop()
+
+    equivalent_audience_keys = _catalog_keys_with_equivalent_trailing_audience(result)
+    if equivalent_audience_keys:
+        names = {
+            perfume.name
+            for perfume in perfumes
+            if _catalog_perfume_matches_parse_context(perfume, result)
+            and _catalog_scent_key(perfume.name) in equivalent_audience_keys
+        }
+        if len(names) == 1:
+            return names.pop()
 
     base_keys = _catalog_base_keys_without_trailing_audience(result)
     if base_keys:
@@ -1393,6 +1470,7 @@ def parse_supplier_product(product: SupplierProduct) -> ParseResult:
             *_audience_terms_to_strip(audience_aliases),
             *product_alias_non_name_terms,
         ],
+        preserve_phrases=NAME_AUDIENCE_TERMS,
     )
     raw_product_alias_match_text = _strip_known_terms(text, product_alias_non_name_terms)
     product_aliases = ProductAlias.objects.filter(active=True).order_by("supplier_id", "priority", "-alias_text")
@@ -1479,6 +1557,7 @@ def parse_supplier_product(product: SupplierProduct) -> ParseResult:
                 *NO_BOX_TERMS,
                 *WOODBOX_TERMS,
             ],
+            preserve_phrases=NAME_AUDIENCE_TERMS,
         )
         result.product_name_text = _clean_product_name_text(remaining)
 

@@ -5,6 +5,7 @@ from collections import defaultdict
 from collections.abc import Iterable
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
+from difflib import SequenceMatcher
 from urllib.parse import urlencode
 
 from django.core.paginator import Paginator
@@ -14,11 +15,13 @@ from django.shortcuts import get_object_or_404
 from django.urls import reverse, reverse_lazy
 from django.utils.http import url_has_allowed_host_and_scheme
 
-from assistant_linking.models import ParsedSupplierProduct
 from assistant_linking.models import FragranticaProduct
+from assistant_linking.models import ParsedSupplierProduct
+from assistant_linking.models import ProductAlias
 from assistant_linking.utils.text import normalize_alias_value
 from catalog.models import Brand as CatalogBrand
 from catalog.models import Perfume as CatalogPerfume
+from catalog.models import Source as CatalogSource
 from catalog.models import PerfumeVariant as CatalogPerfumeVariant
 from catalog.models import get_or_create_collection
 from prices import models
@@ -47,6 +50,64 @@ CATALOG_VARIANT_SEARCH_FIELDS = (
     "sku",
     "ean",
 )
+AUDIENCE_NAME_TERMS = {
+    "dame",
+    "donna",
+    "f",
+    "female",
+    "femme",
+    "for her",
+    "for him",
+    "for man",
+    "for men",
+    "for woman",
+    "for women",
+    "her",
+    "him",
+    "homme",
+    "lady",
+    "m",
+    "male",
+    "man",
+    "men",
+    "pour femme",
+    "pour homme",
+    "uomo",
+    "w",
+    "woman",
+    "women",
+}
+AUDIENCE_GROUP_TERMS = {
+    "women": {
+        "dame",
+        "donna",
+        "f",
+        "female",
+        "femme",
+        "for her",
+        "for woman",
+        "for women",
+        "her",
+        "lady",
+        "pour femme",
+        "w",
+        "woman",
+        "women",
+    },
+    "men": {
+        "for him",
+        "for man",
+        "for men",
+        "him",
+        "homme",
+        "m",
+        "male",
+        "man",
+        "men",
+        "pour homme",
+        "uomo",
+    },
+}
 
 
 @dataclass(frozen=True)
@@ -94,6 +155,15 @@ class FragranticaCatalogueLinkResult:
     level: str
     message: str
     redirect_url: str
+
+
+@dataclass(frozen=True)
+class FragranticaMatchCandidate:
+    source: FragranticaProduct
+    match_type: str
+    score: int
+    reason: str
+    creates_alias: bool = False
 
 
 def catalog_search_tokens(query: str) -> list[str]:
@@ -177,7 +247,11 @@ def build_our_product_catalog_list_context(
         .order_by("variant_type")
     )
 
+    visible_variants = list(variants)
+    attach_fragrantica_candidates_to_variants(visible_variants)
+
     return {
+        "variants": visible_variants,
         "total_count": total_count,
         "search_query": request.GET.get("q", "").strip(),
         "active_tab": normalize_our_product_catalog_tab(request.GET.get("tab")),
@@ -188,6 +262,223 @@ def build_our_product_catalog_list_context(
         "concentration_rows": concentration_rows,
         "variant_type_rows": variant_type_rows,
     }
+
+
+def normalized_fragrance_key(value: str) -> str:
+    return normalize_alias_value(value or "").replace("&", "and")
+
+
+def _contains_audience_term(name_key: str, term: str) -> bool:
+    return bool(re.search(rf"(^|\s){re.escape(term)}($|\s)", name_key))
+
+
+def audience_group_from_text(*values: str) -> str:
+    haystack = normalized_fragrance_key(" ".join(value for value in values if value))
+    for group, terms in AUDIENCE_GROUP_TERMS.items():
+        if any(_contains_audience_term(haystack, term) for term in terms):
+            return group
+    return ""
+
+
+def fragrance_name_without_audience(value: str) -> str:
+    text = normalized_fragrance_key(value)
+    for term in sorted(AUDIENCE_NAME_TERMS, key=len, reverse=True):
+        text = re.sub(rf"(^|\s){re.escape(term)}($|\s)", " ", text)
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def fragrantica_source_is_available_for_perfume(source, perfume) -> bool:
+    matched_perfume_id = getattr(source, "matched_perfume_id", None)
+    if matched_perfume_id is None and getattr(source, "matched_perfume", None):
+        matched_perfume_id = source.matched_perfume.id
+    return not matched_perfume_id or matched_perfume_id == perfume.id
+
+
+def _candidate_sort_key(candidate: FragranticaMatchCandidate):
+    return (
+        -candidate.score,
+        candidate.source.match_status != FragranticaProduct.STATUS_LINKED,
+        candidate.source.brand_name,
+        candidate.source.name,
+        candidate.source.id,
+    )
+
+
+def add_fragrantica_candidate(
+    candidates: dict[int, FragranticaMatchCandidate],
+    source,
+    *,
+    match_type: str,
+    score: int,
+    reason: str,
+    creates_alias: bool,
+) -> None:
+    existing = candidates.get(source.id)
+    candidate = FragranticaMatchCandidate(
+        source=source,
+        match_type=match_type,
+        score=score,
+        reason=reason,
+        creates_alias=creates_alias,
+    )
+    if not existing or _candidate_sort_key(candidate) < _candidate_sort_key(existing):
+        candidates[source.id] = candidate
+
+
+def build_fragrantica_candidates_for_perfume(
+    perfume,
+    sources,
+    aliases,
+    *,
+    limit: int = 3,
+) -> list[FragranticaMatchCandidate]:
+    brand_key = normalized_fragrance_key(perfume.brand.name)
+    name_key = normalized_fragrance_key(perfume.name)
+    name_base = fragrance_name_without_audience(perfume.name)
+    audience_group = audience_group_from_text(perfume.audience, perfume.name)
+    candidates: dict[int, FragranticaMatchCandidate] = {}
+
+    for source in sources:
+        if source.normalized_brand_name != brand_key:
+            continue
+        if not fragrantica_source_is_available_for_perfume(source, perfume):
+            continue
+        source_name_key = source.normalized_name or normalized_fragrance_key(
+            source.name
+        )
+        creates_alias = source_name_key != name_key
+        if source_name_key == name_key:
+            add_fragrantica_candidate(
+                candidates,
+                source,
+                match_type="exact",
+                score=100,
+                reason="Exact brand and scent match",
+                creates_alias=False,
+            )
+            continue
+
+        source_base = fragrance_name_without_audience(source.name)
+        source_audience_group = audience_group_from_text(source.audience, source.name)
+        audience_compatible = (
+            not audience_group
+            or not source_audience_group
+            or audience_group == source_audience_group
+        )
+        if (
+            name_base
+            and source_base
+            and name_base == source_base
+            and audience_compatible
+        ):
+            add_fragrantica_candidate(
+                candidates,
+                source,
+                match_type="name hint",
+                score=92,
+                reason="Same brand and scent after audience words",
+                creates_alias=creates_alias,
+            )
+            continue
+
+        ratio = SequenceMatcher(None, name_key, source_name_key).ratio()
+        base_ratio = (
+            SequenceMatcher(None, name_base, source_base).ratio()
+            if name_base and source_base
+            else 0
+        )
+        best_ratio = max(ratio, base_ratio)
+        if audience_compatible and best_ratio >= 0.82:
+            add_fragrantica_candidate(
+                candidates,
+                source,
+                match_type="fuzzy",
+                score=int(best_ratio * 100),
+                reason="Similar same-brand scent name",
+                creates_alias=creates_alias,
+            )
+
+    for alias in aliases:
+        alias_brand_id = getattr(alias, "brand_id", None)
+        if alias_brand_id and alias_brand_id != perfume.brand_id:
+            continue
+        alias_perfume_id = getattr(alias, "perfume_id", None)
+        alias_key = normalized_fragrance_key(alias.alias_text)
+        canonical_key = normalized_fragrance_key(alias.canonical_text)
+        if not alias_key or not canonical_key:
+            continue
+        if alias_perfume_id and alias_perfume_id != perfume.id:
+            continue
+        expected_source_keys = set()
+        if canonical_key == name_key or alias_perfume_id == perfume.id:
+            expected_source_keys.add(alias_key)
+        if alias_key == name_key:
+            expected_source_keys.add(canonical_key)
+        for source in sources:
+            if source.normalized_brand_name != brand_key:
+                continue
+            if not fragrantica_source_is_available_for_perfume(source, perfume):
+                continue
+            source_name_key = source.normalized_name or normalized_fragrance_key(
+                source.name
+            )
+            if source_name_key in expected_source_keys:
+                add_fragrantica_candidate(
+                    candidates,
+                    source,
+                    match_type="alias",
+                    score=96,
+                    reason="Matched by product alias knowledge",
+                    creates_alias=source_name_key != name_key,
+                )
+
+    return sorted(candidates.values(), key=_candidate_sort_key)[:limit]
+
+
+def attach_fragrantica_candidates_to_variants(
+    variants,
+    *,
+    fragrantica_manager=None,
+    product_alias_manager=None,
+) -> list:
+    variants = list(variants)
+    perfumes = {
+        variant.perfume_id: variant.perfume
+        for variant in variants
+        if getattr(variant, "perfume_id", None) and getattr(variant, "perfume", None)
+    }
+    if not perfumes:
+        return variants
+
+    brand_keys = {
+        normalized_fragrance_key(perfume.brand.name)
+        for perfume in perfumes.values()
+        if getattr(perfume, "brand", None)
+    }
+    brand_ids = {perfume.brand_id for perfume in perfumes.values() if perfume.brand_id}
+    fragrantica_manager = fragrantica_manager or FragranticaProduct.objects
+    product_alias_manager = product_alias_manager or ProductAlias.objects
+    source_rows = list(
+        fragrantica_manager.select_related("matched_perfume")
+        .filter(normalized_brand_name__in=brand_keys)
+        .order_by("match_status", "brand_name", "name", "id")
+    )
+    alias_rows = list(
+        product_alias_manager.filter(active=True)
+        .filter(Q(brand_id__in=brand_ids) | Q(brand__isnull=True))
+        .order_by("priority", "alias_text")
+    )
+    candidate_map = {
+        perfume_id: build_fragrantica_candidates_for_perfume(
+            perfume,
+            source_rows,
+            alias_rows,
+        )
+        for perfume_id, perfume in perfumes.items()
+    }
+    for variant in variants:
+        variant.fragrantica_candidates = candidate_map.get(variant.perfume_id, [])
+    return variants
 
 
 def normalize_fragrantica_review_brand_id(value: str | None) -> str:
@@ -464,6 +755,81 @@ def apply_fragrantica_identity_to_perfume(source, perfume) -> list[str]:
     return changed_fields
 
 
+def build_fragrantica_identity_perfume_group(perfume, *, perfume_manager=None):
+    perfume_manager = perfume_manager or CatalogPerfume.objects
+    name_key = normalized_fragrance_key(perfume.name)
+    group = []
+    for candidate in perfume_manager.filter(brand=perfume.brand).select_related(
+        "brand"
+    ):
+        if normalized_fragrance_key(candidate.name) == name_key:
+            group.append(candidate)
+    return group or [perfume]
+
+
+def upsert_fragrantica_catalog_source(source, perfume) -> bool:
+    source_url = source.source_href
+    if not source_url:
+        return False
+    catalog_source, created = CatalogSource.objects.get_or_create(
+        perfume=perfume,
+        url=source_url,
+        defaults={
+            "title": f"Fragrantica: {source.brand_name} / {source.name}",
+            "source_type": CatalogSource.SOURCE_COMMUNITY,
+            "source_domain": source.source_domain or "fragrantica.com",
+            "priority_rank": 30,
+            "reliability": CatalogSource.RELIABILITY_MEDIUM,
+        },
+    )
+    update_fields = []
+    if not created:
+        desired_values = {
+            "title": f"Fragrantica: {source.brand_name} / {source.name}",
+            "source_type": CatalogSource.SOURCE_COMMUNITY,
+            "source_domain": source.source_domain or "fragrantica.com",
+            "priority_rank": 30,
+            "reliability": CatalogSource.RELIABILITY_MEDIUM,
+        }
+        for field, value in desired_values.items():
+            if getattr(catalog_source, field) != value:
+                setattr(catalog_source, field, value)
+                update_fields.append(field)
+        if update_fields:
+            catalog_source.save(update_fields=[*update_fields, "last_checked_at"])
+    return True
+
+
+def create_fragrantica_product_alias_if_needed(source, perfume, old_name: str) -> bool:
+    alias_text = (old_name or "").strip()
+    canonical_text = (source.name or "").strip()
+    if not alias_text or not canonical_text:
+        return False
+    if normalized_fragrance_key(alias_text) == normalized_fragrance_key(canonical_text):
+        return False
+    existing = ProductAlias.objects.filter(
+        brand=perfume.brand,
+        alias_text__iexact=alias_text,
+        canonical_text__iexact=canonical_text,
+        active=True,
+    ).first()
+    if existing:
+        if not existing.perfume_id:
+            existing.perfume = perfume
+            existing.save(update_fields=["perfume", "updated_at"])
+        return False
+    ProductAlias.objects.create(
+        perfume=perfume,
+        brand=perfume.brand,
+        alias_text=alias_text,
+        canonical_text=canonical_text,
+        collection_name=source.collection_name,
+        audience=source.audience,
+        priority=50,
+    )
+    return True
+
+
 def run_fragrantica_catalogue_link_action(
     source_id,
     post_data,
@@ -501,20 +867,52 @@ def run_fragrantica_catalogue_link_action(
             redirect_url,
         )
     perfume = perfume_getter(perfume_id)
+    old_name = perfume.name
+    create_alias = post_data.get("create_alias") == "1"
+    apply_identity_group = post_data.get("apply_identity_group") == "1"
+    perfume_group = (
+        build_fragrantica_identity_perfume_group(perfume)
+        if apply_identity_group
+        else [perfume]
+    )
     source.matched_perfume = perfume
     source.match_status = FragranticaProduct.STATUS_LINKED
     source.save(update_fields=["matched_perfume", "match_status", "updated_at"])
-    changed_fields = apply_fragrantica_identity_to_perfume(source, perfume)
+    changed_field_names = set()
+    source_count = 0
+    for group_perfume in perfume_group:
+        changed_fields = apply_fragrantica_identity_to_perfume(source, group_perfume)
+        changed_field_names.update(
+            field for field in changed_fields if field != "updated_at"
+        )
+        if upsert_fragrantica_catalog_source(source, group_perfume):
+            source_count += 1
+    alias_created = (
+        create_fragrantica_product_alias_if_needed(source, perfume, old_name)
+        if create_alias
+        else False
+    )
     preserved_note = " Concentration and variants were preserved."
     changed_note = (
-        f" Updated catalogue fields: {', '.join(changed_fields[:-1])}."
-        if changed_fields
+        f" Updated catalogue fields: {', '.join(sorted(changed_field_names))}."
+        if changed_field_names
         else " Catalogue identity already matched."
     )
+    group_note = (
+        f" Applied to {len(perfume_group)} concentration rows."
+        if len(perfume_group) > 1
+        else ""
+    )
+    source_note = (
+        f" Added Fragrantica source link to {source_count} row(s)."
+        if source_count
+        else ""
+    )
+    alias_note = " Saved old local name as a product alias." if alias_created else ""
     return FragranticaCatalogueLinkResult(
         "success",
         f"Linked Fragrantica row to {perfume.brand.name} / {perfume.name}."
-        f"{changed_note}{preserved_note}",
+        f"{changed_note}{group_note}{source_note}{alias_note}{preserved_note}",
         redirect_url,
     )
 

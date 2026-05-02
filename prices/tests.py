@@ -25,7 +25,8 @@ from django.urls import reverse
 from django.utils import timezone
 
 from assistant_linking.models import FragranticaProduct, ParsedSupplierProduct
-from catalog.models import Brand, Perfume, PerfumeVariant
+from assistant_linking.models import ProductAlias
+from catalog.models import Brand, Perfume, PerfumeVariant, Source
 from prices import forms, models
 from prices.management.commands.import_emails import (
     _get_supplier_latest_batch_time,
@@ -121,6 +122,16 @@ class FrontendHardeningTests(TestCase):
         self.assertIn("&lt;img src=x onerror=alert(1)&gt;", html)
         self.assertNotIn(payload, html)
 
+    def test_supplier_list_labels_inactive_supplier_rows(self):
+        models.Supplier.objects.create(name="Active Supplier", is_active=True)
+        models.Supplier.objects.create(name="Inactive Supplier", is_active=False)
+
+        response = self.client.get(reverse("prices:supplier_list"), secure=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Inactive suppliers")
+        self.assertNotContains(response, "Inactive products")
+
     def test_product_filter_supplier_fixture_escapes_img_payload(self):
         payload = "<img src=x onerror=alert(1)>"
         supplier = models.Supplier.objects.create(name=payload)
@@ -136,6 +147,40 @@ class FrontendHardeningTests(TestCase):
         html = response.content.decode()
         self.assertIn("&lt;img src=x onerror=alert(1)&gt;", html)
         self.assertNotIn(payload, html)
+
+    def test_supplier_product_page_hides_inactive_supplier_products_by_default(self):
+        active_supplier = models.Supplier.objects.create(name="Active Supplier")
+        inactive_supplier = models.Supplier.objects.create(
+            name="Inactive Supplier",
+            is_active=False,
+        )
+        models.SupplierProduct.objects.create(
+            supplier=active_supplier,
+            name="Visible Active Supplier Product",
+        )
+        models.SupplierProduct.objects.create(
+            supplier=inactive_supplier,
+            name="Hidden Inactive Supplier Product",
+        )
+
+        response = self.client.get(reverse("prices:product_list"), secure=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Visible Active Supplier Product")
+        self.assertNotContains(response, "Hidden Inactive Supplier Product")
+        self.assertContains(response, "Inactive products")
+        self.assertContains(response, "Show inactive product rows")
+        self.assertContains(response, "Products from inactive suppliers")
+        self.assertContains(response, "Show inactive supplier products")
+
+        response = self.client.get(
+            reverse("prices:product_list"),
+            {"include_inactive_suppliers": "1"},
+            secure=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Hidden Inactive Supplier Product")
 
     def test_supplier_import_page_renders_server_side_tabs(self):
         supplier = models.Supplier.objects.create(
@@ -6729,6 +6774,21 @@ class CatalogReviewServiceTests(SimpleTestCase):
         self.assertEqual(normalize_fragrantica_review_status("unexpected"), "all")
         self.assertEqual(normalize_fragrantica_review_status(""), "all")
 
+    def test_fragrance_name_without_audience_removes_gender_words(self):
+        from prices.services.catalog_review import (
+            audience_group_from_text,
+            fragrance_name_without_audience,
+        )
+
+        self.assertEqual(
+            fragrance_name_without_audience("Light Blue Woman"), "light blue"
+        )
+        self.assertEqual(
+            fragrance_name_without_audience("Light Blue pour Femme"), "light blue"
+        )
+        self.assertEqual(audience_group_from_text("Light Blue Femme"), "women")
+        self.assertEqual(audience_group_from_text("Light Blue Homme"), "men")
+
     def test_fragrantica_review_row_status_detects_collection_conflicts_first(self):
         from prices.services.catalog_review import fragrantica_review_row_status
 
@@ -7876,6 +7936,27 @@ class OurProductCatalogueListTests(TestCase):
         self.assertContains(response, "box")
         self.assertContains(response, reverse("prices:fragrantica_product_review"))
 
+    def test_our_products_page_suggests_fragrantica_name_hint_match(self):
+        self.perfume.name = "Vanilla Extasy Women"
+        self.perfume.save(update_fields=["name", "updated_at"])
+        FragranticaProduct.objects.create(
+            brand_name="Montale",
+            normalized_brand_name="montale",
+            name="Vanilla Extasy pour Femme",
+            normalized_name="vanilla extasy pour femme",
+            collection_name="Fragrantica Collection",
+            audience="Women",
+            release_year=2008,
+            source_path="/perfume/Montale/Vanilla-Extasy-1.html",
+        )
+
+        response = self.client.get(reverse("prices:our_product_list"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "name hint")
+        self.assertContains(response, "Fragrantica Collection")
+        self.assertContains(response, "Link Fragrantica")
+
     def test_fragrantica_products_lists_fragrantica_rows_only(self):
         supplier = models.Supplier.objects.create(name="Antonina")
         supplier_product = models.SupplierProduct.objects.create(
@@ -8019,6 +8100,60 @@ class OurProductCatalogueListTests(TestCase):
         self.assertEqual(self.perfume.audience, "Women")
         self.assertEqual(self.perfume.release_year, 2008)
         self.assertEqual(self.perfume.concentration, "Eau de Parfum")
+
+    def test_staff_can_link_from_our_products_and_save_alias_for_old_name(self):
+        self.perfume.name = "Vanilla Extasy Women"
+        self.perfume.save(update_fields=["name", "updated_at"])
+        other_concentration = Perfume.objects.create(
+            brand=self.perfume.brand,
+            name="Vanilla Extasy Women",
+            concentration="Eau de Toilette",
+        )
+        source = FragranticaProduct.objects.create(
+            brand_name="Montale",
+            normalized_brand_name="montale",
+            name="Vanilla Extasy pour Femme",
+            normalized_name="vanilla extasy pour femme",
+            collection_name="Fragrantica Collection",
+            audience="Women",
+            release_year=2008,
+            source_path="/perfume/Montale/Vanilla-Extasy-1.html",
+        )
+
+        response = self.client.post(
+            reverse("prices:fragrantica_product_link", args=[source.pk]),
+            {
+                "perfume_id": self.perfume.pk,
+                "next": reverse("prices:our_product_list"),
+                "create_alias": "1",
+                "apply_identity_group": "1",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        source.refresh_from_db()
+        self.perfume.refresh_from_db()
+        other_concentration.refresh_from_db()
+        self.assertEqual(source.matched_perfume, self.perfume)
+        self.assertEqual(self.perfume.name, "Vanilla Extasy pour Femme")
+        self.assertEqual(other_concentration.name, "Vanilla Extasy pour Femme")
+        self.assertEqual(self.perfume.concentration, "Eau de Parfum")
+        self.assertEqual(other_concentration.concentration, "Eau de Toilette")
+        self.assertTrue(
+            ProductAlias.objects.filter(
+                brand=self.perfume.brand,
+                alias_text="Vanilla Extasy Women",
+                canonical_text="Vanilla Extasy pour Femme",
+                active=True,
+            ).exists()
+        )
+        self.assertEqual(
+            Source.objects.filter(
+                perfume=self.perfume,
+                url="https://www.fragrantica.com/perfume/Montale/Vanilla-Extasy-1.html",
+            ).count(),
+            1,
+        )
 
     def test_our_products_search_matches_multi_word_scent(self):
         clive = Brand.objects.create(name="Clive Christian")

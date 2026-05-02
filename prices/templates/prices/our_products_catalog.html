@@ -65,13 +65,48 @@
                                 <span class="catalogue-chip">{{ variant.packaging }}</span>
                             {% endif %}
                             <span class="catalogue-chip">{{ variant.variant_type|default:"standard" }}</span>
+                            {% for candidate in variant.fragrantica_candidates|slice:":1" %}
+                                <span class="catalogue-chip">{{ candidate.match_type }} {{ candidate.score }}</span>
+                                {% if candidate.source.collection_name %}
+                                    <span class="catalogue-chip">{{ candidate.source.collection_name }}</span>
+                                {% endif %}
+                                {% if candidate.source.audience %}
+                                    <span class="catalogue-chip">{{ candidate.source.audience }}</span>
+                                {% endif %}
+                                {% if candidate.source.release_year %}
+                                    <span class="catalogue-chip">{{ candidate.source.release_year }}</span>
+                                {% endif %}
+                            {% empty %}
+                                <span class="catalogue-chip">No Fragrantica</span>
+                            {% endfor %}
                         </div>
-                        <button class="button ghost icon our-products-edit-button" type="button" data-row-edit-toggle title="Edit row" aria-label="Edit row" aria-expanded="false">
-                            <svg class="icon icon-edit" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                                <path d="M12 20h9"/>
-                                <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/>
-                            </svg>
-                        </button>
+                        <div class="layout-inline gap-sm">
+                            {% for candidate in variant.fragrantica_candidates|slice:":1" %}
+                                {% if candidate.source.match_status == "linked" %}
+                                    <a class="button secondary"
+                                       href="{% url 'prices:fragrantica_product_review' %}?q={{ candidate.source.name|urlencode }}">Linked</a>
+                                {% else %}
+                                    <input type="hidden" name="perfume_id" value="{{ variant.perfume.pk }}">
+                                    <input type="hidden" name="create_alias" value="{% if candidate.creates_alias %}1{% else %}0{% endif %}">
+                                    <input type="hidden" name="apply_identity_group" value="1">
+                                    <button class="button secondary"
+                                            type="submit"
+                                            formaction="{% url 'prices:fragrantica_product_link' candidate.source.pk %}"
+                                            title="{{ candidate.reason }}">
+                                        Link Fragrantica
+                                    </button>
+                                {% endif %}
+                            {% empty %}
+                                <a class="button ghost"
+                                   href="{% url 'prices:fragrantica_product_review' %}?brand={{ variant.perfume.brand.name|urlencode }}&q={{ variant.perfume.name|urlencode }}">Find match</a>
+                            {% endfor %}
+                            <button class="button ghost icon our-products-edit-button" type="button" data-row-edit-toggle title="Edit row" aria-label="Edit row" aria-expanded="false">
+                                <svg class="icon icon-edit" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                    <path d="M12 20h9"/>
+                                    <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/>
+                                </svg>
+                            </button>
+                        </div>
                     </div>
                     <div class="our-products-inline-editor" data-row-editor hidden>
                         <label class="catalogue-editor-field">

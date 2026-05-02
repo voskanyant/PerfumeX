@@ -4,12 +4,18 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.views.generic import DetailView
 
 from prices import forms, models
-from prices.view_base import BaseCreateView, BaseDeleteView, BaseListView, BaseUpdateView
+from prices.view_base import (
+    BaseCreateView,
+    BaseDeleteView,
+    BaseListView,
+    BaseUpdateView,
+)
 
 
 class SupplierListView(BaseListView):
     model = models.Supplier
     ordering = ("name",)
+    inactive_divider_label = "Inactive suppliers"
     list_display = (
         "name",
         "code",

@@ -140,3 +140,13 @@ Context: Fragrantica catalogue imports include collection/line names, and the sa
 Decision: Store collections as `catalog.Collection` rows scoped to one `catalog.Brand`. Keep existing text fields during the transition, but resolve catalogue perfumes and Fragrantica staging rows to the brand-scoped collection relationship.
 
 Consequences: Matching and import code must compare collections within a brand. Do not treat collection name alone as globally unique.
+
+## 2026-05-02 - Saved parses define normalization queue state
+
+Status: Accepted
+
+Context: Unparsed rows can appear well normalized when the parser preview is good, but they remain unparsed until a `ParsedSupplierProduct` is saved.
+
+Decision: Treat `SupplierProduct.assistant_parse` as the queue boundary. A row leaves Unparsed only when an explicit parse job/action saves a `ParsedSupplierProduct`; visible-page previews are allowed only as non-persistent display.
+
+Consequences: Add bulk parse actions or background jobs for backlog processing. Do not let detail-page GETs or preview rendering silently move rows between queues. Keep matching/link evidence as a separate review layer from basic parse completeness.

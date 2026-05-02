@@ -46,6 +46,7 @@ class BaseListView(LoginRequiredMixin, ListView):
     show_create = True
     show_actions = True
     show_action_menu = True
+    inactive_divider_label = "Inactive records"
 
     def get_ordering(self):
         sort_field = self.request.GET.get("sort")
@@ -73,6 +74,7 @@ class BaseListView(LoginRequiredMixin, ListView):
         context["show_actions"] = self.show_actions
         context["show_action_menu"] = self.show_action_menu
         context["show_search"] = getattr(self, "show_search", False)
+        context["inactive_divider_label"] = self.inactive_divider_label
         return context
 
 

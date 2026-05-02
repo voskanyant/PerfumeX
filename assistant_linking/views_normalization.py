@@ -35,6 +35,7 @@ from assistant_linking.services.normalization_views import (
     build_set_queryset,
     build_tester_sample_queryset,
     build_unparsed_queryset,
+    dispatch_parse_unparsed_products,
     refresh_visible_parsed_context,
     refresh_visible_unparsed_context,
 )
@@ -246,6 +247,13 @@ class ParsedListView(NormalizationIssueListView):
             context,
             force_refresh=self.request.GET.get(self.refresh_param) == "1",
         )
+
+
+class ParseUnparsedProductsView(StaffAssistantMixin, View):
+    def post(self, request):
+        result = dispatch_parse_unparsed_products()
+        getattr(messages, result.message_level)(request, result.message)
+        return redirect("assistant_linking:normalization_unparsed")
 
 
 class GarbageListView(NormalizationIssueListView):

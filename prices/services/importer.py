@@ -766,6 +766,7 @@ def process_import_file(import_file: models.ImportFile) -> None:
                 or existing.current_price != parsed.price
                 or existing.currency != parsed.currency
             )
+            parse_identity_changed = existing.name != parsed.name
             seen_changed = (
                 existing.last_import_batch_id != import_file.import_batch_id
                 or not existing.is_active
@@ -782,6 +783,8 @@ def process_import_file(import_file: models.ImportFile) -> None:
                         existing.name = parsed.name
                         existing.current_price = parsed.price
                         existing.currency = parsed.currency
+                    if parse_identity_changed:
+                        existing.updated_at = now
                     existing.last_imported_at = now
                     existing.last_import_batch = import_file.import_batch
                     if is_latest_batch:
@@ -800,6 +803,7 @@ def process_import_file(import_file: models.ImportFile) -> None:
                 "name",
                 "current_price",
                 "currency",
+                "updated_at",
                 "last_imported_at",
                 "last_import_batch",
                 "is_active",

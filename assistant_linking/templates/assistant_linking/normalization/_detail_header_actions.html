@@ -13,10 +13,12 @@
             type="submit"
             data-confirm="Force reparse this supplier row and overwrite parser output?">Force reparse</button>
 </form>
-<form method="post"
-      action="{% url 'assistant_linking:normalization_lock' product.pk %}">
-    {% csrf_token %}
-    <button class="button ghost" type="submit">Lock parse</button>
-</form>
+{% if parsed_is_saved %}
+    <form method="post"
+          action="{% url 'assistant_linking:normalization_lock' product.pk %}">
+        {% csrf_token %}
+        <button class="button ghost" type="submit">Lock parse</button>
+    </form>
+{% endif %}
 <a class="button primary"
    href="{% url 'assistant_linking:product_workbench' product.pk %}">Open linking workbench</a>

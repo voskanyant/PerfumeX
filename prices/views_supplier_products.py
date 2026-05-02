@@ -79,6 +79,7 @@ class SupplierProductSearchView(LoginRequiredMixin, View):
 class SupplierProductListView(BaseListView):
     model = models.SupplierProduct
     paginate_by = 100
+    inactive_divider_label = "Inactive products"
     list_display = (
         "supplier_sku",
         "name",

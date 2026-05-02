@@ -5,13 +5,15 @@ from contextlib import nullcontext
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
-from django.test import SimpleTestCase
+from django.test import SimpleTestCase, TestCase
 
+from assistant_linking.models import ParsedSupplierProduct
 from assistant_linking.services.normalization_detail import (
     accept_catalog_candidate,
     apply_teaching_to_parsed,
     build_parsed_product_detail_context,
     build_teach_initial,
+    get_saved_or_preview_parse,
     lock_supplier_parse,
     manual_decision_snapshot,
     reparse_supplier_product,
@@ -22,6 +24,7 @@ from assistant_linking.services.normalization_detail import (
     suggested_catalog_candidate,
     teach_parse_for_product,
 )
+from prices.models import Supplier, SupplierProduct
 
 
 class FakeTeachingForm:
@@ -287,6 +290,19 @@ class NormalizationDetailServiceTests(SimpleTestCase):
                 ["tester"],
             ),
         )
+
+    def test_get_saved_or_preview_parse_prefers_existing_saved_parse(self):
+        existing = SimpleNamespace(id=7)
+        product = SimpleNamespace(assistant_parse=existing)
+        preview_builder = MagicMock()
+
+        returned = get_saved_or_preview_parse(
+            product,
+            parse_preview_builder=preview_builder,
+        )
+
+        self.assertIs(returned, existing)
+        preview_builder.assert_not_called()
 
     def test_accept_catalog_candidate_updates_parse_link_aliases_and_suggestion(self):
         supplier = SimpleNamespace(id=11)
@@ -683,3 +699,29 @@ class NormalizationDetailServiceTests(SimpleTestCase):
         self.assertEqual(parsed.product_name_text, "Vanilla Extasy")
         self.assertEqual(parsed.variant_type, "tester")
         parsed.save.assert_called_once()
+
+
+class NormalizationDetailDatabaseTests(TestCase):
+    def test_detail_context_does_not_save_parse_for_unparsed_product(self):
+        supplier = Supplier.objects.create(name="Supplier", code="supplier")
+        product = SupplierProduct.objects.create(
+            supplier=supplier,
+            identity_key="armani-vert-malachite",
+            name="Armani VERT MALACHITE (U) 100ml EDP TECTEP",
+        )
+
+        context = build_parsed_product_detail_context(
+            product=product,
+            hidden_keywords=[],
+            candidate_builder=lambda _parsed: [],
+            similar_rows_builder=lambda *_args, **_kwargs: [],
+            rule_impact_builder=lambda *_args, **_kwargs: {"count": 0, "risky": 0},
+            alias_finder=lambda _parsed, _product: None,
+            teaching_form_class=FakeTeachingForm,
+            catalog_reference_builder=lambda: {},
+        )
+
+        self.assertFalse(context["parsed_is_saved"])
+        self.assertFalse(
+            ParsedSupplierProduct.objects.filter(supplier_product=product).exists()
+        )

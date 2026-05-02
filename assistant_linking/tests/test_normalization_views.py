@@ -17,9 +17,11 @@ from assistant_linking.services.normalization_views import (
     build_missing_brand_queryset,
     build_normalization_dashboard_context,
     build_unparsed_queryset,
+    dispatch_parse_unparsed_products,
     refresh_visible_parsed_context,
     refresh_visible_unparsed_context,
 )
+from prices.services.job_queue import JobDispatchResult
 
 
 class FakeRecentQuery:
@@ -190,6 +192,36 @@ class NormalizationViewServiceTests(SimpleTestCase):
         parse_preview_builder.assert_called_once_with(product_2)
         self.assertEqual(context["refreshed_visible_count"], 2)
         self.assertEqual(context["moved_visible_count"], 1)
+
+    def test_dispatch_parse_unparsed_products_runs_management_command(self):
+        dispatcher = MagicMock(
+            return_value=JobDispatchResult(
+                job_id="",
+                queue_name="perfumex",
+                status="finished",
+                queued=False,
+                description="Parse unparsed supplier products",
+            )
+        )
+
+        result = dispatch_parse_unparsed_products(dispatcher=dispatcher)
+
+        self.assertTrue(result.success)
+        self.assertEqual(result.message_level, "success")
+        dispatcher.assert_called_once_with(
+            "reparse_supplier_products",
+            only_unparsed=True,
+            description="Parse unparsed supplier products",
+        )
+
+    def test_dispatch_parse_unparsed_products_reports_queue_failure(self):
+        dispatcher = MagicMock(side_effect=RuntimeError("Redis unavailable"))
+
+        result = dispatch_parse_unparsed_products(dispatcher=dispatcher)
+
+        self.assertFalse(result.success)
+        self.assertEqual(result.message_level, "error")
+        self.assertIn("Redis unavailable", result.message)
 
     def test_build_low_confidence_queryset_applies_visibility_filters_and_order(self):
         result = object()

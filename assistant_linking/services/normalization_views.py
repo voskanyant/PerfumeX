@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from django.db.models import Q
 
 from assistant_linking import models
@@ -13,6 +15,7 @@ from assistant_linking.services.normalization_stats import (
 )
 from assistant_linking.services.normalizer import parse_supplier_product, save_parse
 from prices.models import SupplierProduct
+from prices.services.job_queue import enqueue_management_command
 from prices.services.product_visibility import apply_hidden_product_keywords
 
 
@@ -27,6 +30,13 @@ COMPLETE_PARSED_ORDER = (
     "supplier_product__supplier__name",
     "supplier_product__name",
 )
+
+
+@dataclass(frozen=True)
+class ParseUnparsedProductsResult:
+    success: bool
+    message_level: str
+    message: str
 
 
 def normalization_dashboard_stats(
@@ -273,6 +283,39 @@ def refresh_visible_unparsed_context(
     context["refreshed_visible_count"] = refreshed_count
     context["moved_visible_count"] = refreshed_count - len(visible_products)
     return context
+
+
+def dispatch_parse_unparsed_products(
+    *,
+    dispatcher=enqueue_management_command,
+) -> ParseUnparsedProductsResult:
+    try:
+        result = dispatcher(
+            "reparse_supplier_products",
+            only_unparsed=True,
+            description="Parse unparsed supplier products",
+        )
+    except Exception as exc:
+        return ParseUnparsedProductsResult(
+            success=False,
+            message_level="error",
+            message=f"Could not start unparsed product parsing: {exc}",
+        )
+
+    if result.queued:
+        return ParseUnparsedProductsResult(
+            success=True,
+            message_level="success",
+            message=(
+                "Unparsed product parsing was queued. Refresh stats after the job "
+                "finishes to update dashboard counts."
+            ),
+        )
+    return ParseUnparsedProductsResult(
+        success=True,
+        message_level="success",
+        message="Unparsed product parsing completed. Refresh stats to update dashboard counts.",
+    )
 
 
 def build_low_confidence_queryset(

@@ -135,7 +135,7 @@
                                 {% if not obj.is_active and not forloop.first %}
                                     <tr class="inactive-divider-row">
                                         <td colspan="{% if show_bulk_delete %}{% if show_actions %}{{ list_display|length|add:'3' }}{% else %}{{ list_display|length|add:'2' }}{% endif %}{% else %}{% if show_actions %}{{ list_display|length|add:'2' }}{% else %}{{ list_display|length|add:'1' }}{% endif %}{% endif %}">
-                                            Inactive products
+                                            {{ inactive_divider_label|default:"Inactive records" }}
                                         </td>
                                     </tr>
                                 {% endif %}

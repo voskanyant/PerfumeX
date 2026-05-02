@@ -701,6 +701,33 @@ class NormalizerTests(TestCase):
         self.assertEqual(parsed.supplier_gender_hint, "Pour Femme")
         self.assertEqual(parsed.product_name_text, "light blue pour femme")
 
+    def test_for_woman_suffix_canonicalizes_to_catalogue_scent_name(self):
+        brand = Brand.objects.create(name="Carolina Herrera")
+        BrandAlias.objects.create(brand=brand, alias_text="Carolina Herrera", normalized_alias="carolina herrera")
+        brand.perfumes.create(name="212 Woman", concentration="Eau de Toilette", audience="Woman")
+        ProductAlias.objects.create(
+            brand=brand,
+            alias_text="Woman",
+            canonical_text="Woman",
+            concentration="Eau de Toilette",
+            priority=50,
+            active=True,
+        )
+        product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="carolina-herrera-212-woman",
+            name="Carolina Herrera 212 for Woman Eau de Toilette 30ml",
+        )
+
+        parsed = parse_supplier_product(product)
+
+        self.assertEqual(parsed.normalized_brand, brand)
+        self.assertEqual(parsed.supplier_gender_hint, "Woman")
+        self.assertEqual(parsed.product_name_text, "212 Woman")
+        self.assertEqual(parsed.concentration, "Eau de Toilette")
+        self.assertEqual(parsed.size_ml, Decimal("30.00"))
+        self.assertEqual(parsed.display_identity, "Carolina Herrera / 212 Woman / Eau de Toilette / 30ml")
+
     def test_name_bearing_audience_alias_preserves_preceding_scent_words(self):
         brand = Brand.objects.create(name="Versace")
         BrandAlias.objects.create(brand=brand, alias_text="VERSACE", normalized_alias="versace")

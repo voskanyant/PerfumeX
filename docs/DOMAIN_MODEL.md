@@ -33,6 +33,7 @@ Related docs: [AGENTS.md](../AGENTS.md), [README.md](../README.md), [docs/REPO_M
 - Supplier rule - supplier-scoped assistant rule. Model: `assistant_core.SupplierRule`.
 - Knowledge note - operator-authored assistant note. Model: `assistant_core.KnowledgeNote`.
 - Parsed supplier product - deterministic parse output for one supplier product: brand, scent/name, collection, concentration, size, packaging/type, warnings, confidence, parser version, and human lock. Model: `assistant_linking.ParsedSupplierProduct`.
+- Unparsed supplier product - a `SupplierProduct` with no saved `ParsedSupplierProduct` row yet. Temporary parser previews do not move a row out of Unparsed; only saved parses do.
 - Normalization stats snapshot - cached counts for parser queues and issue categories. Model: `assistant_linking.NormalizationStatsSnapshot`.
 - Match group - grouped parsed products that appear to refer to the same catalogue item/variant. Model: `assistant_linking.MatchGroup`.
 - Match group item - supplier product membership in a match group. Model: `assistant_linking.MatchGroupItem`.
@@ -59,9 +60,10 @@ Normalization and linking:
 1. Parse `SupplierProduct.name` into `ParsedSupplierProduct`.
 2. Apply catalogue facts, aliases, concentration aliases, parser rules, and garbage terms.
 3. Surface low-confidence/missing/conflict rows in normalization queues.
-4. Build `MatchGroup` records for likely same-product rows.
-5. Staff approve/reject/link through manual decisions or bulk actions.
-6. Persist links to `SupplierProduct.catalog_perfume` and optional `catalog_variant`; audit decisions.
+4. Treat complete parse identity as separate from catalogue/link evidence; a clean parse can still need catalogue or link review.
+5. Build `MatchGroup` records for likely same-product rows.
+6. Staff approve/reject/link through manual decisions or bulk actions.
+7. Persist links to `SupplierProduct.catalog_perfume` and optional `catalog_variant`; audit decisions.
 
 External catalogue import:
 1. Parse saved HTML or parsed Fragrantica catalogue JSON/CSV into staged `FragranticaProduct` rows.
