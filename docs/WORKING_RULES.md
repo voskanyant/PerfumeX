@@ -31,6 +31,10 @@ Add or update tests when:
 
 For documentation-only changes, a full test run is usually unnecessary. Run a lightweight check such as `git diff --check` when practical.
 
+Before pushing to `main` or triggering deploy, run `make deploy-gate`. It mirrors the GitHub CI jobs that must pass before deploy. `make local-smoke` is only a fast iteration guard and is not enough for a main/deploy push.
+
+If `make deploy-gate` cannot run because local dependencies or PostgreSQL are missing, stop and report the blocker instead of pushing to `main`.
+
 ## Model changes
 
 Do not change models when:

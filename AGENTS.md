@@ -161,6 +161,14 @@ python manage.py test
 make ci
 ```
 
+Before pushing to `main` or triggering deploy, run the GitHub-equivalent gate:
+
+```bash
+make deploy-gate
+```
+
+`make local-smoke` is a fast iteration guard, not a deploy gate.
+
 Targeted checks:
 
 ```bash

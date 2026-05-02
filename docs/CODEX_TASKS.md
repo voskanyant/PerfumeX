@@ -61,6 +61,7 @@ Related docs: [AGENTS.md](../AGENTS.md), [README.md](../README.md), [docs/REPO_M
 - 2026-05-02 - Operations: local catalogue/Fragrantica database edits do not deploy through Git. Promote reviewed Fragrantica links with the JSON export/import commands and dry-run on live before `--apply`.
 - 2026-05-02 - Operations: heavy Fragrantica staging imports should run on the server with the folder import command, using parsed JSON exports when available to preserve year, audience/gender, and source URLs. Always dry-run first, then run with `--apply` after checking counts.
 - 2026-05-02 - Assistant normalization: Unparsed means no saved `ParsedSupplierProduct`; temporary parser previews may help operators inspect visible rows but must not move rows between queues. Use explicit parse jobs/actions to create saved parses, then handle catalogue/link evidence separately.
+- 2026-05-02 - Deploy checks: `make local-smoke` is not enough before pushing to `main`. Run `make deploy-gate`, which mirrors GitHub CI, and stop if it cannot complete.
 
 ## Repeated mistakes to avoid
 

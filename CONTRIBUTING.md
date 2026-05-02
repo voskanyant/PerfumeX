@@ -4,15 +4,21 @@
 
 Short checklist for local contribution checks. For setup and operations, use [README.md](README.md). For AI-agent work, use [AGENTS.md](AGENTS.md), [docs/WORKING_RULES.md](docs/WORKING_RULES.md), and [docs/DRIFT_CHECKLIST.md](docs/DRIFT_CHECKLIST.md).
 
-Run the same checks locally before pushing:
+Before pushing to `main` or triggering deploy, run the GitHub-equivalent deploy gate:
 
 ```bash
 pip install -r requirements-dev.txt
 npm install
-make ci
+make deploy-gate
 ```
 
-`make ci` expects PostgreSQL to be reachable through the `POSTGRES_*` environment variables. The defaults match a local database on `127.0.0.1:5432`; override them when needed.
+`make deploy-gate` mirrors the GitHub CI jobs required before deploy. It expects PostgreSQL to be reachable through the `POSTGRES_*` environment variables. The defaults match a local database on `127.0.0.1:5432`; override them when needed.
+
+For normal branch work that is not deploying, run:
+
+```bash
+make ci
+```
 
 For a faster local guard while iterating, run:
 
