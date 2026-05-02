@@ -579,6 +579,48 @@ class NormalizerTests(TestCase):
             "Afnan / Tribute Blue Exlusive / Eau de Parfum / 100ml / Dented",
         )
 
+    def test_no_cellophane_and_damaged_wrap_terms_are_dented_packaging(self):
+        brand = Brand.objects.create(name="Armani")
+        BrandAlias.objects.create(brand=brand, alias_text="Armani", normalized_alias="armani")
+        brand.perfumes.create(name="Code", concentration="Eau de Parfum", audience="Men")
+        terms = (
+            "\u0431\u0435\u0437 \u0446\u0435\u043b",
+            "\u0431\u0435\u0437 \u0446\u0435\u043b\u043e\u0444\u043d\u0430",
+            "\u043f\u043e\u0432\u0440\u0435\u0436\u0434\u0435\u043d\u0440 \u0441\u043b\u044e\u0434\u0430",
+        )
+        for term in terms:
+            GlobalRule.objects.update_or_create(
+                rule_kind="parser_dented_packaging_term",
+                scope_type="global",
+                rule_text=term,
+                defaults={
+                    "title": f"Dented packaging term: {term}",
+                    "priority": 40,
+                    "approved": True,
+                    "active": True,
+                },
+            )
+        cache.clear()
+
+        for index, term in enumerate(terms, start=1):
+            with self.subTest(term=term):
+                product = SupplierProduct.objects.create(
+                    supplier=self.supplier,
+                    identity_key=f"armani-code-dented-wrap-{index}",
+                    name=f"Armani Code (M) 15ml EDP ({term})",
+                )
+
+                parsed = parse_supplier_product(product)
+
+                self.assertEqual(parsed.normalized_brand, brand)
+                self.assertEqual(parsed.product_name_text, "Code")
+                self.assertEqual(parsed.supplier_gender_hint, "Men")
+                self.assertEqual(parsed.concentration, "Eau de Parfum")
+                self.assertEqual(parsed.size_ml, Decimal("15.00"))
+                self.assertEqual(parsed.packaging, "dented")
+                self.assertNotIn(term, parsed.product_name_text.lower())
+                self.assertEqual(parsed.display_identity, "Armani / Code / Eau de Parfum / 15ml / Dented")
+
     def test_display_identity_title_cases_scent_but_keeps_joiners_lowercase(self):
         product = SupplierProduct.objects.create(
             supplier=self.supplier,
@@ -727,6 +769,199 @@ class NormalizerTests(TestCase):
         self.assertEqual(parsed.concentration, "Eau de Toilette")
         self.assertEqual(parsed.size_ml, Decimal("30.00"))
         self.assertEqual(parsed.display_identity, "Carolina Herrera / 212 Woman / Eau de Toilette / 30ml")
+
+    def test_mixed_script_cyrillic_lookalike_keeps_latin_scent_name_and_audience_catalogue_match(self):
+        brand = Brand.objects.create(name="Amouage")
+        BrandAlias.objects.create(brand=brand, alias_text="AMOUAGE", normalized_alias="amouage")
+        brand.perfumes.create(name="Ciel for Men", concentration="Eau de Parfum", audience="Men")
+        brand.perfumes.create(name="Ciel for Woman", concentration="Eau de Parfum", audience="Woman")
+        product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="amouage-ciel-cyrillic-c",
+            name="AMOUAGE \u0421iel (L) 50ml EDP (\u041e\u041c\u0410\u041d)",
+        )
+
+        parsed = parse_supplier_product(product)
+
+        self.assertEqual(parsed.normalized_brand, brand)
+        self.assertEqual(parsed.product_name_text, "Ciel for Woman")
+        self.assertEqual(parsed.concentration, "Eau de Parfum")
+        self.assertEqual(parsed.size_ml, Decimal("50.00"))
+        self.assertEqual(parsed.supplier_gender_hint, "Woman")
+        self.assertEqual(parsed.display_identity, "Amouage / Ciel for Woman / Eau de Parfum / 50ml")
+
+    def test_supplier_packaging_abbreviations_do_not_leave_c_in_reflection_name(self):
+        brand = Brand.objects.create(name="Amouage")
+        BrandAlias.objects.create(brand=brand, alias_text="AMOUAGE", normalized_alias="amouage")
+        brand.perfumes.create(name="Reflection for Men", concentration="Eau de Parfum", audience="Men")
+        brand.perfumes.create(name="Reflection for Woman", concentration="Eau de Parfum", audience="Woman")
+        GlobalRule.objects.update_or_create(
+            rule_kind="parser_with_cap_packaging_term",
+            scope_type="global",
+            rule_text="c \u0444\u0438\u0440\u043c. \u043a\u0440\u044b\u0448",
+            defaults={
+                "title": "With-cap packaging term: c firm krysh",
+                "priority": 45,
+                "approved": True,
+                "active": True,
+            },
+        )
+        GlobalRule.objects.update_or_create(
+            rule_kind="parser_old_design_packaging_term",
+            scope_type="global",
+            rule_text="\u0441\u0442.\u0434\u0438",
+            defaults={
+                "title": "Old-design packaging term: st.di",
+                "priority": 45,
+                "approved": True,
+                "active": True,
+            },
+        )
+        cache.clear()
+        product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="amouage-reflection-men-cap-old-design",
+            name="AMOUAGE Reflection (M) 100ml EDP TECTEP(c \u0444\u0438\u0440\u043c. \u043a\u0440\u044b\u0448) \u0441\u0442.\u0434\u0438",
+        )
+
+        parsed = parse_supplier_product(product)
+
+        self.assertEqual(parsed.normalized_brand, brand)
+        self.assertEqual(parsed.product_name_text, "Reflection for Men")
+        self.assertEqual(parsed.concentration, "Eau de Parfum")
+        self.assertEqual(parsed.size_ml, Decimal("100.00"))
+        self.assertEqual(parsed.supplier_gender_hint, "Men")
+        self.assertTrue(parsed.is_tester)
+        self.assertEqual(parsed.packaging, "old_design with_cap")
+        self.assertNotIn(" c", parsed.product_name_text.lower())
+        self.assertEqual(
+            parsed.display_identity,
+            "Amouage / Reflection for Men / Eau de Parfum / 100ml / Tester / Old Design With Cap",
+        )
+
+    def test_short_with_cap_abbreviation_does_not_leave_c_in_guidance_name(self):
+        brand = Brand.objects.create(name="Amouage")
+        BrandAlias.objects.create(brand=brand, alias_text="AMOUAGE", normalized_alias="amouage")
+        brand.perfumes.create(name="Guidance 46", concentration="Extrait de Parfum", audience="Woman")
+        product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="amouage-guidance-46-short-cap-decoded",
+            name="AMOUAGE Guidance 46 (L) 100ml EDP TECTEP( c \u0444\u0438\u0440\u043c. \u043a\u0440) dec",
+        )
+
+        parsed = parse_supplier_product(product)
+
+        self.assertEqual(parsed.normalized_brand, brand)
+        self.assertEqual(parsed.product_name_text, "Guidance 46")
+        self.assertEqual(parsed.concentration, "Eau de Parfum")
+        self.assertEqual(parsed.size_ml, Decimal("100.00"))
+        self.assertEqual(parsed.supplier_gender_hint, "Woman")
+        self.assertTrue(parsed.is_tester)
+        self.assertEqual(parsed.variant_type, "decoded")
+        self.assertEqual(parsed.packaging, "with_cap")
+        self.assertEqual(
+            parsed.display_identity,
+            "Amouage / Guidance 46 / Eau de Parfum / 100ml / Decoded / With Cap",
+        )
+
+    def test_limited_ed_abbreviation_uses_catalogue_audience_name_before_edition_suffix(self):
+        brand = Brand.objects.create(name="Amouage")
+        BrandAlias.objects.create(brand=brand, alias_text="AMOUAGE", normalized_alias="amouage")
+        brand.perfumes.create(name="Reflection for Men", concentration="Eau de Parfum", audience="Men")
+        brand.perfumes.create(name="Reflection for Woman", concentration="Eau de Parfum", audience="Woman")
+        GlobalRule.objects.update_or_create(
+            rule_kind="regex_preprocess",
+            scope_type="global",
+            rule_text=r"\blimited\s+ed\.?\b => limited edition",
+            defaults={
+                "title": "Normalize Limited Ed supplier abbreviation",
+                "priority": 20,
+                "approved": True,
+                "active": True,
+            },
+        )
+        cache.clear()
+        product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="amouage-reflection-men-limited-ed",
+            name="AMOUAGE Reflection (M) 100ml EDP Limited Ed.(\u0441\u0442.\u0434\u0438\u0437\u0430\u0439\u043d)",
+        )
+
+        parsed = parse_supplier_product(product)
+
+        self.assertEqual(parsed.normalized_brand, brand)
+        self.assertEqual(parsed.product_name_text, "Reflection for Men Limited Edition")
+        self.assertEqual(parsed.concentration, "Eau de Parfum")
+        self.assertEqual(parsed.size_ml, Decimal("100.00"))
+        self.assertEqual(parsed.supplier_gender_hint, "Men")
+        self.assertEqual(parsed.packaging, "old_design")
+        self.assertEqual(
+            parsed.display_identity,
+            "Amouage / Reflection for Men Limited Edition / Eau de Parfum / 100ml / Old Design",
+        )
+
+    def test_francais_brand_alias_is_not_kept_in_12_parfumeurs_scent_name(self):
+        brand = Brand.objects.create(name="12 Parfumeurs")
+        BrandAlias.objects.create(
+            brand=brand,
+            alias_text="12 parfumeurs francais",
+            normalized_alias="12 parfumeurs francais",
+            priority=20,
+        )
+        brand.perfumes.create(name="Azay-Le-Rideau", concentration="Extrait de Parfum")
+        product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="12-parfumeurs-azay",
+            name="12 PARFUMEURS FRANCAIS AZAY- LE- RIDEAU 100ml parfume",
+        )
+
+        parsed = parse_supplier_product(product)
+
+        self.assertEqual(parsed.normalized_brand, brand)
+        self.assertEqual(parsed.detected_brand_text, "12 parfumeurs francais")
+        self.assertEqual(parsed.product_name_text, "Azay-Le-Rideau")
+        self.assertEqual(parsed.concentration, "Extrait de Parfum")
+        self.assertEqual(parsed.size_ml, Decimal("100.00"))
+        self.assertEqual(parsed.display_identity, "12 Parfumeurs / Azay-Le-Rideau / Extrait de Parfum / 100ml")
+
+    def test_exclus_edition_typo_normalizes_to_catalogue_exclusive_edition(self):
+        brand = Brand.objects.create(name="Armani")
+        BrandAlias.objects.create(brand=brand, alias_text="Armani", normalized_alias="armani")
+        brand.perfumes.create(name="My Way Exclusive Edition", concentration="Eau de Parfum")
+        ProductAlias.objects.create(
+            brand=brand,
+            alias_text="My Way Exclusive Edition",
+            canonical_text="My Way Exclusive Edition",
+            concentration="Eau de Parfum",
+            priority=50,
+            active=True,
+        )
+        GlobalRule.objects.update_or_create(
+            rule_kind="regex_preprocess",
+            scope_type="global",
+            rule_text=r"\bexclus\s+edition\b => exclusive edition",
+            defaults={
+                "title": "Normalize Exclus Edition supplier typo",
+                "priority": 20,
+                "approved": True,
+                "active": True,
+            },
+        )
+        cache.clear()
+        product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="armani-my-way-exclus-edition",
+            name="Armani My Way (L) 50ml EDP  Exclus Edition",
+        )
+
+        parsed = parse_supplier_product(product)
+
+        self.assertEqual(parsed.normalized_brand, brand)
+        self.assertEqual(parsed.product_name_text, "My Way Exclusive Edition")
+        self.assertEqual(parsed.concentration, "Eau de Parfum")
+        self.assertEqual(parsed.size_ml, Decimal("50.00"))
+        self.assertEqual(parsed.supplier_gender_hint, "Woman")
+        self.assertEqual(parsed.display_identity, "Armani / My Way Exclusive Edition / Eau de Parfum / 50ml")
 
     def test_name_bearing_audience_alias_preserves_preceding_scent_words(self):
         brand = Brand.objects.create(name="Versace")
@@ -950,6 +1185,89 @@ class NormalizerTests(TestCase):
         self.assertEqual(
             parsed.display_identity,
             "Alexandre J. / The Art Deco Collector / The Majestic Amber / Eau de Parfum / 100ml",
+        )
+
+    def test_alexandre_j_legacy_wb_supplier_ultimate_prefix_is_not_collection(self):
+        brand = Brand.objects.create(name="Alexandre J.")
+        BrandAlias.objects.create(
+            brand=brand,
+            alias_text="ALEXANDRE. J",
+            normalized_alias="alexandre. j",
+            priority=20,
+        )
+        ProductAlias.objects.create(
+            brand=brand,
+            alias_text="ultimate legacy wb",
+            canonical_text="Legacy WB",
+            priority=25,
+        )
+        ProductAlias.objects.create(
+            brand=brand,
+            alias_text="legacy wb",
+            canonical_text="Legacy WB",
+            priority=30,
+        )
+        product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="alexandre-j-legacy-wb",
+            name="ALEXANDRE. J Ultimate Legacy WB (L) 100\u043c\u043b EDP",
+        )
+
+        parsed = save_parse(product, force=True)
+
+        self.assertEqual(parsed.normalized_brand, brand)
+        self.assertEqual(parsed.collection_name, "")
+        self.assertEqual(parsed.product_name_text, "Legacy WB")
+        self.assertEqual(parsed.concentration, "Eau de Parfum")
+        self.assertEqual(parsed.size_ml, Decimal("100.00"))
+        self.assertEqual(parsed.supplier_gender_hint, "Woman")
+        self.assertEqual(parsed.display_identity, "Alexandre J. / Legacy WB / Eau de Parfum / 100ml")
+
+    def test_alexandre_j_ultimate_crystal_saint_honore_uses_ultimate_collection_and_st_name(self):
+        brand = Brand.objects.create(name="Alexandre J.")
+        BrandAlias.objects.create(
+            brand=brand,
+            alias_text="ALEXANDRE. J",
+            normalized_alias="alexandre. j",
+            priority=20,
+        )
+        ProductAlias.objects.create(
+            brand=brand,
+            alias_text="ultimate crystal saint honore",
+            canonical_text="St Honore",
+            collection_name="Ultimate Collection",
+            priority=20,
+        )
+        ProductAlias.objects.create(
+            brand=brand,
+            alias_text="ultimate crystal",
+            canonical_text="",
+            collection_name="Ultimate Collection",
+            priority=25,
+        )
+        ProductAlias.objects.create(
+            brand=brand,
+            alias_text="saint honore",
+            canonical_text="St Honore",
+            priority=30,
+        )
+        product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="alexandre-j-ultimate-crystal-saint-honore",
+            name="ALEXANDRE. J Ultimate Crystal Saint Honore (L) 45\u043c\u043b EDP",
+        )
+
+        parsed = save_parse(product, force=True)
+
+        self.assertEqual(parsed.normalized_brand, brand)
+        self.assertEqual(parsed.collection_name, "Ultimate Collection")
+        self.assertEqual(parsed.product_name_text, "St Honore")
+        self.assertEqual(parsed.concentration, "Eau de Parfum")
+        self.assertEqual(parsed.size_ml, Decimal("45.00"))
+        self.assertEqual(parsed.supplier_gender_hint, "Woman")
+        self.assertEqual(
+            parsed.display_identity,
+            "Alexandre J. / Ultimate Collection / St Honore / Eau de Parfum / 45ml",
         )
 
     def test_collection_prefix_alias_behavior_is_global(self):
@@ -1719,6 +2037,45 @@ class NormalizerTests(TestCase):
         parsed = parse_supplier_product(product)
 
         self.assertIn("refill", parsed.modifiers)
+        self.assertEqual(parsed.display_variant_type, "Refill")
+        self.assertNotIn("refill detected", parsed.warnings)
+
+    def test_refillable_supplier_note_is_packaging_not_refill_type(self):
+        brand = Brand.objects.create(name="Armani")
+        BrandAlias.objects.create(brand=brand, alias_text="Armani", normalized_alias="armani")
+        brand.perfumes.create(name="Acqua di Gio", concentration="Extrait de Parfum", audience="Men")
+        GlobalRule.objects.update_or_create(
+            rule_kind="parser_refillable_packaging_term",
+            scope_type="global",
+            rule_text="refillable",
+            defaults={
+                "title": "Refillable packaging term: refillable",
+                "priority": 50,
+                "approved": True,
+                "active": True,
+            },
+        )
+        cache.clear()
+        product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="armani-acqua-di-gio-refillable",
+            name="Armani Acqua di Gio (M) 75ml PARFUM REFILLABLE",
+        )
+
+        parsed = parse_supplier_product(product)
+
+        self.assertEqual(parsed.normalized_brand, brand)
+        self.assertEqual(parsed.product_name_text, "Acqua di Gio")
+        self.assertEqual(parsed.concentration, "Extrait de Parfum")
+        self.assertEqual(parsed.size_ml, Decimal("75.00"))
+        self.assertEqual(parsed.supplier_gender_hint, "Men")
+        self.assertNotIn("refill", parsed.modifiers)
+        self.assertEqual(parsed.display_variant_type, "Standard")
+        self.assertEqual(parsed.packaging, "refillable")
+        self.assertEqual(parsed.display_packaging, "Refillable")
+        self.assertNotIn("refillable", parsed.product_name_text.lower())
+        self.assertNotIn("refill detected", parsed.warnings)
+        self.assertEqual(parsed.display_identity, "Armani / Acqua di Gio / Extrait de Parfum / 75ml / Refillable")
 
     def test_damage_terms_route_to_garbage_but_decode_does_not(self):
         damaged = SupplierProduct.objects.create(

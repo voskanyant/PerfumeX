@@ -34,7 +34,7 @@ from assistant_linking.services.parser_rules import (
     get_regex_preprocess_rules,
     get_variant_type_alias_rules,
 )
-from assistant_linking.utils.text import normalize_alias_value
+from assistant_linking.utils.text import normalize_alias_value, normalize_mixed_script_latin_lookalikes
 from catalog.models import Brand, Perfume, compact_decimal_text
 from prices.models import SupplierProduct
 
@@ -142,8 +142,10 @@ OLD_DESIGN_PACKAGING_TERMS = (
     "старый дизайн",
     "ст дизайн",
     "ст. дизайн",
+    "ст.дизайн",
     "ст диз",
     "ст. диз",
+    "ст.диз",
     "ст д",
     "ст.д",
 )
@@ -156,12 +158,18 @@ WITH_CAP_PACKAGING_TERMS = (
     "с фирм. крышкой",
     "с фирм.крышкой",
     "с фирм.крыш.",
+    "с фирм кр",
+    "с фирм. кр",
+    "с фирм.кр",
     "с фир.крыш.",
     "с фирменной крышкой",
     "c фирм крышкой",
     "c фирм. крышкой",
     "c фирм.крышкой",
     "c фирм.крыш.",
+    "c фирм кр",
+    "c фирм. кр",
+    "c фирм.кр",
     "c фир.крыш.",
     "фирм крыш",
     "фирм. крыш",
@@ -187,6 +195,7 @@ DENTED_PACKAGING_TERMS = (
     "помята",
     "помят",
 )
+REFILLABLE_PACKAGING_TERMS = ("refillable",)
 DECODED_TERMS = ("decoded", "dec", "декод", "декодированный")
 GRAY_BOX_TERMS = ("gray box", "grey box", "серый бокс", "серый короб", "серая коробка")
 GRAY_BOX_COLOR_TERMS = ("серый", "серая", "сер", "gray", "grey")
@@ -213,6 +222,7 @@ AUDIENCE_NAME_SUFFIXES = {
     "men": ("man", "men", "for man", "for men", "for him", "pour homme", "homme"),
 }
 TRAILING_MARKETING_GARBAGE_TERMS = ("new", "exclusive", "exlusive")
+NAME_EXTENSION_SUFFIXES = ("limited edition",)
 REFILL_MODIFIER = "refill"
 MINI_MODIFIER = "mini"
 
@@ -284,6 +294,8 @@ class ParseResult:
             return "Travel"
         if self.is_set or self.variant_type == "set":
             return "Set"
+        if REFILL_MODIFIER in (self.modifiers or []):
+            return "Refill"
         return display_label(self.variant_type, default="Standard")
 
     @property
@@ -344,7 +356,8 @@ class ParseResult:
 
 
 def normalize_text(value: str) -> str:
-    text = unicodedata.normalize("NFKC", value or "").lower()
+    text = unicodedata.normalize("NFKC", value or "")
+    text = normalize_mixed_script_latin_lookalikes(text).lower()
     for pattern, replacement in get_regex_preprocess_rules():
         text = _safe_regex_sub(pattern, replacement, text)
     text = re.sub(r"(?<=[a-z])(?=[а-яё])|(?<=[а-яё])(?=[a-z])", " ", text)
@@ -451,6 +464,22 @@ def _refill_terms() -> tuple[str, ...]:
     return _kb_terms("parser_refill_term", ())
 
 
+def _dented_packaging_terms() -> tuple[str, ...]:
+    return _kb_terms("parser_dented_packaging_term", DENTED_PACKAGING_TERMS)
+
+
+def _refillable_packaging_terms() -> tuple[str, ...]:
+    return _kb_terms("parser_refillable_packaging_term", REFILLABLE_PACKAGING_TERMS)
+
+
+def _with_cap_packaging_terms() -> tuple[str, ...]:
+    return _kb_terms("parser_with_cap_packaging_term", WITH_CAP_PACKAGING_TERMS)
+
+
+def _old_design_packaging_terms() -> tuple[str, ...]:
+    return _kb_terms("parser_old_design_packaging_term", OLD_DESIGN_PACKAGING_TERMS)
+
+
 def _decoded_terms() -> tuple[str, ...]:
     return _kb_terms("parser_decoded_term", DECODED_TERMS)
 
@@ -472,9 +501,10 @@ def _structured_packaging_terms() -> tuple[str, ...]:
         *NO_BOX_TERMS,
         *WOODBOX_TERMS,
         *NEW_DESIGN_PACKAGING_TERMS,
-        *OLD_DESIGN_PACKAGING_TERMS,
-        *WITH_CAP_PACKAGING_TERMS,
-        *DENTED_PACKAGING_TERMS,
+        *_old_design_packaging_terms(),
+        *_with_cap_packaging_terms(),
+        *_dented_packaging_terms(),
+        *_refillable_packaging_terms(),
         *GRAY_BOX_TERMS,
         *GRAY_BOX_COLOR_TERMS,
     )
@@ -789,6 +819,52 @@ def _catalog_base_keys_without_trailing_marketing_garbage(result: ParseResult) -
     return base_keys
 
 
+def _catalog_name_without_trailing_audience_key(value: str) -> str:
+    normalized_name = normalize_text(value)
+    suffixes = [suffix for suffix_group in AUDIENCE_NAME_SUFFIXES.values() for suffix in suffix_group]
+    for suffix in sorted(suffixes, key=len, reverse=True):
+        normalized_suffix = normalize_text(suffix)
+        match = re.match(rf"^(?P<base>.+)\s+{re.escape(normalized_suffix)}$", normalized_name)
+        if match:
+            return _catalog_scent_key(match.group("base"))
+    return _catalog_scent_key(value)
+
+
+def _catalog_name_matches_audience_hint(value: str, result: ParseResult) -> bool:
+    suffixes = AUDIENCE_NAME_SUFFIXES.get(audience_group(result.supplier_gender_hint), ())
+    if not suffixes:
+        return False
+    normalized_name = normalize_text(value)
+    return any(
+        re.search(rf"\s+{re.escape(normalize_text(suffix))}$", normalized_name)
+        for suffix in sorted(suffixes, key=len, reverse=True)
+    )
+
+
+def _catalog_name_with_audience_before_name_extension(result: ParseResult, perfumes: list[Perfume]) -> str:
+    if not result.supplier_gender_hint:
+        return result.product_name_text
+    normalized_name = normalize_text(result.product_name_text)
+    for suffix in NAME_EXTENSION_SUFFIXES:
+        normalized_suffix = normalize_text(suffix)
+        match = re.match(rf"^(?P<base>.+)\s+{re.escape(normalized_suffix)}$", normalized_name)
+        if not match:
+            continue
+        base_key = _catalog_scent_key(match.group("base"))
+        if len(base_key) < 3:
+            continue
+        candidates = {
+            f"{perfume.name} {display_title(suffix)}"
+            for perfume in perfumes
+            if _catalog_perfume_matches_non_audience_context(perfume, result)
+            and _catalog_name_matches_audience_hint(perfume.name, result)
+            and _catalog_name_without_trailing_audience_key(perfume.name) == base_key
+        }
+        if len(candidates) == 1:
+            return candidates.pop()
+    return result.product_name_text
+
+
 def _canonicalize_product_name_from_catalog(result: ParseResult) -> str:
     if not result.normalized_brand or not result.normalized_brand.id or not result.product_name_text:
         return result.product_name_text
@@ -859,6 +935,10 @@ def _canonicalize_product_name_from_catalog(result: ParseResult) -> str:
     }
     if len(names) == 1:
         return names.pop()
+
+    name_with_audience_extension = _catalog_name_with_audience_before_name_extension(result, perfumes)
+    if name_with_audience_extension != result.product_name_text:
+        return name_with_audience_extension
     return result.product_name_text
 
 
@@ -1030,23 +1110,29 @@ def _extract_packaging_descriptor(text: str) -> tuple[str, list[str]]:
             terms.append(normalized)
             add_packaging("new_design")
 
-    for term in OLD_DESIGN_PACKAGING_TERMS:
+    for term in _old_design_packaging_terms():
         normalized = normalize_text(term)
         if _contains_phrase(text, normalized):
             terms.append(normalized)
             add_packaging("old_design")
 
-    for term in WITH_CAP_PACKAGING_TERMS:
+    for term in _with_cap_packaging_terms():
         normalized = normalize_text(term)
         if _contains_phrase(text, normalized):
             terms.append(normalized)
             add_packaging("with_cap")
 
-    for term in DENTED_PACKAGING_TERMS:
+    for term in _dented_packaging_terms():
         normalized = normalize_text(term)
         if _contains_phrase(text, normalized):
             terms.append(normalized)
             add_packaging("dented")
+
+    for term in _refillable_packaging_terms():
+        normalized = normalize_text(term)
+        if _contains_phrase(text, normalized):
+            terms.append(normalized)
+            add_packaging("refillable")
 
     for term in [*NO_BOX_TERMS, *WOODBOX_TERMS, *GRAY_BOX_TERMS]:
         normalized = normalize_text(term)
@@ -1588,7 +1674,7 @@ def parse_supplier_product(product: SupplierProduct) -> ParseResult:
     if not is_non_perfume and not result.supplier_gender_hint:
         result.warnings.append("gender missing")
     for modifier in result.modifiers:
-        if modifier in {BAG_MODIFIER, COSMETIC_PUDRE_MODIFIER, DEODORANT_MODIFIER}:
+        if modifier in {BAG_MODIFIER, COSMETIC_PUDRE_MODIFIER, DEODORANT_MODIFIER, REFILL_MODIFIER}:
             continue
         result.warnings.append(f"{modifier} detected")
 

@@ -68,6 +68,30 @@ PARSER_RULE_KIND_OPTIONS = (
         "example": "refill",
     },
     {
+        "key": "parser_refillable_packaging_term",
+        "label": "Refillable packaging term",
+        "description": "Marks refillable-bottle supplier notes as packaging/comment metadata, not refill product type.",
+        "example": "refillable",
+    },
+    {
+        "key": "parser_with_cap_packaging_term",
+        "label": "With-cap packaging term",
+        "description": "Marks supplier cap/lid notes as packaging metadata and removes them from the scent name.",
+        "example": "c \u0444\u0438\u0440\u043c. \u043a\u0440\u044b\u0448",
+    },
+    {
+        "key": "parser_old_design_packaging_term",
+        "label": "Old-design packaging term",
+        "description": "Marks old-design supplier notes as packaging metadata and removes them from the scent name.",
+        "example": "\u0441\u0442.\u0434\u0438",
+    },
+    {
+        "key": "parser_dented_packaging_term",
+        "label": "Dented packaging term",
+        "description": "Marks damaged/no-cellophane packaging and removes the marker from the scent name.",
+        "example": "без целлофана",
+    },
+    {
         "key": "parser_decoded_term",
         "label": "Decoded term",
         "description": "Marks decoded rows without treating the marker as part of the scent name.",

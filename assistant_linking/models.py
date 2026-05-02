@@ -350,6 +350,8 @@ class ParsedSupplierProduct(TimeStampedModel):
             return "Travel"
         if self.is_set or self.variant_type == "set":
             return "Set"
+        if "refill" in (self.modifiers or []):
+            return "Refill"
         return display_label(self.variant_type, default="Standard")
 
     @property
