@@ -5,7 +5,7 @@ from django.core.management import call_command
 from django.test import TestCase
 from django.urls import reverse
 
-from assistant_linking.models import MANUAL_REVIEW_MODIFIER, BrandAlias, ParsedSupplierProduct, ProductAlias
+from assistant_linking.models import BrandAlias, ParsedSupplierProduct, ProductAlias
 from assistant_linking.services.catalog_matcher import rule_impact
 from assistant_linking.services.normalizer import save_parse
 from catalog.models import Brand, Perfume, PerfumeVariant
@@ -17,7 +17,9 @@ User = get_user_model()
 
 class TeachParseTests(TestCase):
     def setUp(self):
-        self.user = User.objects.create_user(username="staff", password="pass", is_staff=True)
+        self.user = User.objects.create_user(
+            username="staff", password="pass", is_staff=True
+        )
         self.client.force_login(self.user)
         self.supplier = Supplier.objects.create(name="Supplier", code="sup")
         self.product = SupplierProduct.objects.create(
@@ -67,8 +69,18 @@ class TeachParseTests(TestCase):
         self.assertEqual(parsed.raw_size_text, "100ml")
         self.assertEqual(parsed.variant_type, "standard")
         self.assertTrue(parsed.locked_by_human)
-        self.assertTrue(BrandAlias.objects.filter(brand=brand, alias_text="montale", supplier__isnull=True).exists())
-        self.assertTrue(ProductAlias.objects.filter(brand=brand, alias_text="vanilla extasy", canonical_text="Vanilla Extasy").exists())
+        self.assertTrue(
+            BrandAlias.objects.filter(
+                brand=brand, alias_text="montale", supplier__isnull=True
+            ).exists()
+        )
+        self.assertTrue(
+            ProductAlias.objects.filter(
+                brand=brand,
+                alias_text="vanilla extasy",
+                canonical_text="Vanilla Extasy",
+            ).exists()
+        )
 
     def test_teaching_alias_can_block_identity_modifiers(self):
         response = self.client.post(
@@ -96,7 +108,9 @@ class TeachParseTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 302)
-        alias = ProductAlias.objects.get(alias_text="light blue", canonical_text="Light Blue")
+        alias = ProductAlias.objects.get(
+            alias_text="light blue", canonical_text="Light Blue"
+        )
         self.assertEqual(alias.excluded_terms, "intense, love in capri")
 
         parsed = save_parse(self.intense_product, force=True)
@@ -105,7 +119,9 @@ class TeachParseTests(TestCase):
 
     def test_teaching_page_preserves_existing_manual_blockers(self):
         brand = Brand.objects.create(name="Montale")
-        BrandAlias.objects.create(brand=brand, alias_text="montale", normalized_alias="montale")
+        BrandAlias.objects.create(
+            brand=brand, alias_text="montale", normalized_alias="montale"
+        )
         ProductAlias.objects.create(
             brand=brand,
             alias_text="vanilla extasy",
@@ -115,7 +131,9 @@ class TeachParseTests(TestCase):
         )
         save_parse(self.product, force=True)
 
-        response = self.client.get(reverse("assistant_linking:normalization_detail", args=[self.product.id]))
+        response = self.client.get(
+            reverse("assistant_linking:normalization_detail", args=[self.product.id])
+        )
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "intense, tester")
@@ -180,8 +198,12 @@ class TeachParseTests(TestCase):
     def test_product_aliases_are_limited_to_detected_brand(self):
         dolce = Brand.objects.create(name="Dolce & Gabbana")
         montale = Brand.objects.create(name="Montale")
-        BrandAlias.objects.create(brand=dolce, alias_text="dolce gabanna", normalized_alias="dolce gabanna")
-        BrandAlias.objects.create(brand=montale, alias_text="montale", normalized_alias="montale")
+        BrandAlias.objects.create(
+            brand=dolce, alias_text="dolce gabanna", normalized_alias="dolce gabanna"
+        )
+        BrandAlias.objects.create(
+            brand=montale, alias_text="montale", normalized_alias="montale"
+        )
         ProductAlias.objects.create(
             brand=dolce,
             alias_text="light blue",
@@ -202,11 +224,18 @@ class TeachParseTests(TestCase):
 
     def test_staff_can_accept_catalog_candidate_from_normalization(self):
         brand = Brand.objects.create(name="Montale")
-        perfume = Perfume.objects.create(brand=brand, name="Vanilla Extasy", concentration="Eau de Parfum")
-        variant = PerfumeVariant.objects.create(perfume=perfume, size_ml="100", variant_type="standard")
+        perfume = Perfume.objects.create(
+            brand=brand, name="Vanilla Extasy", concentration="Eau de Parfum"
+        )
+        variant = PerfumeVariant.objects.create(
+            perfume=perfume, size_ml="100", variant_type="standard"
+        )
 
         response = self.client.post(
-            reverse("assistant_linking:normalization_accept_candidate", args=[self.product.id]),
+            reverse(
+                "assistant_linking:normalization_accept_candidate",
+                args=[self.product.id],
+            ),
             {"perfume_id": perfume.id, "variant_id": variant.id},
         )
 
@@ -221,8 +250,12 @@ class TeachParseTests(TestCase):
 
     def test_catalog_link_does_not_override_explicit_supplier_concentration(self):
         brand = Brand.objects.create(name="12 Parfumeurs")
-        perfume = Perfume.objects.create(brand=brand, name="Malmaison", concentration="Extrait de Parfum")
-        variant = PerfumeVariant.objects.create(perfume=perfume, size_ml="100", variant_type="standard")
+        perfume = Perfume.objects.create(
+            brand=brand, name="Malmaison", concentration="Extrait de Parfum"
+        )
+        variant = PerfumeVariant.objects.create(
+            perfume=perfume, size_ml="100", variant_type="standard"
+        )
         BrandAlias.objects.create(
             brand=brand,
             alias_text="12 parfumeurs",
@@ -245,8 +278,12 @@ class TeachParseTests(TestCase):
 
     def test_catalog_link_does_not_invent_missing_supplier_concentration(self):
         brand = Brand.objects.create(name="12 Parfumeurs")
-        perfume = Perfume.objects.create(brand=brand, name="Malmaison", concentration="Extrait de Parfum")
-        variant = PerfumeVariant.objects.create(perfume=perfume, size_ml="100", variant_type="standard")
+        perfume = Perfume.objects.create(
+            brand=brand, name="Malmaison", concentration="Extrait de Parfum"
+        )
+        variant = PerfumeVariant.objects.create(
+            perfume=perfume, size_ml="100", variant_type="standard"
+        )
         BrandAlias.objects.create(
             brand=brand,
             alias_text="12 parfumeurs",
@@ -270,8 +307,12 @@ class TeachParseTests(TestCase):
 
     def test_normalization_detail_prefills_teaching_from_catalog_link(self):
         brand = Brand.objects.create(name="12 Parfumeurs")
-        perfume = Perfume.objects.create(brand=brand, name="Malmaison", concentration="Extrait de Parfum")
-        variant = PerfumeVariant.objects.create(perfume=perfume, size_ml="100", variant_type="standard")
+        perfume = Perfume.objects.create(
+            brand=brand, name="Malmaison", concentration="Extrait de Parfum"
+        )
+        variant = PerfumeVariant.objects.create(
+            perfume=perfume, size_ml="100", variant_type="standard"
+        )
         product = SupplierProduct.objects.create(
             supplier=self.supplier,
             identity_key="malmaison-detail",
@@ -280,7 +321,9 @@ class TeachParseTests(TestCase):
             catalog_variant=variant,
         )
 
-        response = self.client.get(reverse("assistant_linking:normalization_detail", args=[product.id]))
+        response = self.client.get(
+            reverse("assistant_linking:normalization_detail", args=[product.id])
+        )
 
         self.assertEqual(response.status_code, 200)
         form = response.context["teach_form"]
@@ -291,8 +334,12 @@ class TeachParseTests(TestCase):
 
     def test_normalization_detail_prefills_teaching_from_strong_catalog_conflict(self):
         brand = Brand.objects.create(name="12 Parfumeurs")
-        perfume = Perfume.objects.create(brand=brand, name="Malmaison", concentration="Extrait de Parfum")
-        PerfumeVariant.objects.create(perfume=perfume, size_ml="100", variant_type="standard")
+        perfume = Perfume.objects.create(
+            brand=brand, name="Malmaison", concentration="Extrait de Parfum"
+        )
+        PerfumeVariant.objects.create(
+            perfume=perfume, size_ml="100", variant_type="standard"
+        )
         BrandAlias.objects.create(
             brand=brand,
             alias_text="12 parfumeurs",
@@ -304,26 +351,23 @@ class TeachParseTests(TestCase):
             name="12 Parfumeurs Malmaison 100ml EDP",
         )
 
-        response = self.client.get(reverse("assistant_linking:normalization_detail", args=[product.id]))
+        response = self.client.get(
+            reverse("assistant_linking:normalization_detail", args=[product.id])
+        )
 
         self.assertEqual(response.status_code, 200)
         parsed = response.context["parsed"]
         form = response.context["teach_form"]
         self.assertEqual(parsed.concentration, "Eau de Parfum")
-        self.assertIn(MANUAL_REVIEW_MODIFIER, parsed.modifiers)
+        self.assertFalse(
+            ParsedSupplierProduct.objects.filter(supplier_product=product).exists()
+        )
+        self.assertEqual(
+            response.context["suggested_catalog_candidate"].perfume,
+            perfume,
+        )
         self.assertEqual(form["concentration"].value(), "Extrait de Parfum")
         self.assertContains(response, "Catalogue match suggests Extrait de Parfum")
-
-        parsed_response = self.client.get(reverse("assistant_linking:normalization_parsed"))
-        manual_response = self.client.get(reverse("assistant_linking:normalization_manual_review"))
-        dashboard_response = self.client.get(reverse("assistant_linking:normalization_dashboard"), {"refresh": "1"})
-
-        parsed_product_ids = {item.supplier_product_id for item in parsed_response.context["parses"]}
-        manual_product_ids = {item.supplier_product_id for item in manual_response.context["parses"]}
-        self.assertNotIn(product.id, parsed_product_ids)
-        self.assertIn(product.id, manual_product_ids)
-        self.assertEqual(dashboard_response.context["manual_review_count"], 1)
-        self.assertEqual(dashboard_response.context["parsed_count"], 0)
 
     def test_missing_brand_list_uses_saved_parse_rows(self):
         product = SupplierProduct.objects.create(
@@ -341,10 +385,14 @@ class TeachParseTests(TestCase):
             normalized_alias="100 bon",
         )
 
-        response = self.client.get(reverse("assistant_linking:normalization_missing_brand"))
+        response = self.client.get(
+            reverse("assistant_linking:normalization_missing_brand")
+        )
 
         self.assertEqual(response.status_code, 200)
-        parse_product_ids = [item.supplier_product_id for item in response.context["parses"]]
+        parse_product_ids = [
+            item.supplier_product_id for item in response.context["parses"]
+        ]
         self.assertIn(product.id, parse_product_ids)
         stale_parse.refresh_from_db()
         self.assertIsNone(stale_parse.normalized_brand)
@@ -381,7 +429,9 @@ class TeachParseTests(TestCase):
 
     def test_parsed_products_page_does_not_reparse_stale_rows(self):
         brand = Brand.objects.create(name="Fendi")
-        BrandAlias.objects.create(brand=brand, alias_text="Fendi", normalized_alias="fendi")
+        BrandAlias.objects.create(
+            brand=brand, alias_text="Fendi", normalized_alias="fendi"
+        )
         product = SupplierProduct.objects.create(
             supplier=self.supplier,
             identity_key="parsed-stale-fendi",
@@ -400,7 +450,9 @@ class TeachParseTests(TestCase):
         response = self.client.get(reverse("assistant_linking:normalization_parsed"))
 
         self.assertEqual(response.status_code, 200)
-        parse_product_ids = {item.supplier_product_id for item in response.context["parses"]}
+        parse_product_ids = {
+            item.supplier_product_id for item in response.context["parses"]
+        }
         self.assertNotIn(product.id, parse_product_ids)
         stale_parse.refresh_from_db()
         self.assertIsNone(stale_parse.normalized_brand)
@@ -409,7 +461,9 @@ class TeachParseTests(TestCase):
         self.assertIsNone(stale_parse.size_ml)
         self.assertEqual(stale_parse.parser_version, "deterministic-old")
 
-    def test_parsed_products_page_does_not_auto_refresh_stale_visible_saved_parse_rows(self):
+    def test_parsed_products_page_does_not_auto_refresh_stale_visible_saved_parse_rows(
+        self,
+    ):
         brand = Brand.objects.create(name="Van Cleef & Arpels")
         BrandAlias.objects.create(
             brand=brand,
@@ -513,7 +567,9 @@ class TeachParseTests(TestCase):
             parser_version="deterministic-old",
         )
 
-        response = self.client.get(reverse("assistant_linking:normalization_parsed"), {"refresh": "1"})
+        response = self.client.get(
+            reverse("assistant_linking:normalization_parsed"), {"refresh": "1"}
+        )
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "1 visible row reparsed.")
@@ -526,7 +582,9 @@ class TeachParseTests(TestCase):
 
     def test_reparse_supplier_products_command_refreshes_stale_rows(self):
         brand = Brand.objects.create(name="Fendi")
-        BrandAlias.objects.create(brand=brand, alias_text="Fendi", normalized_alias="fendi")
+        BrandAlias.objects.create(
+            brand=brand, alias_text="Fendi", normalized_alias="fendi"
+        )
         product = SupplierProduct.objects.create(
             supplier=self.supplier,
             identity_key="parsed-stale-fendi-command",
@@ -546,15 +604,21 @@ class TeachParseTests(TestCase):
 
         stale_parse.refresh_from_db()
         self.assertEqual(stale_parse.normalized_brand, brand)
-        self.assertEqual(stale_parse.product_name_text, "fan di fendi pour homme assoluto")
+        self.assertEqual(
+            stale_parse.product_name_text, "fan di fendi pour homme assoluto"
+        )
         self.assertEqual(stale_parse.concentration, "Eau de Toilette")
         self.assertEqual(stale_parse.size_ml, Decimal("100.00"))
 
     def test_reparse_supplier_products_command_can_scope_by_name(self):
         fendi = Brand.objects.create(name="Fendi")
         kenzo = Brand.objects.create(name="Kenzo")
-        BrandAlias.objects.create(brand=fendi, alias_text="Fendi", normalized_alias="fendi")
-        BrandAlias.objects.create(brand=kenzo, alias_text="Kenzo", normalized_alias="kenzo")
+        BrandAlias.objects.create(
+            brand=fendi, alias_text="Fendi", normalized_alias="fendi"
+        )
+        BrandAlias.objects.create(
+            brand=kenzo, alias_text="Kenzo", normalized_alias="kenzo"
+        )
         fendi_product = SupplierProduct.objects.create(
             supplier=self.supplier,
             identity_key="parsed-stale-fendi-scoped",
@@ -580,7 +644,9 @@ class TeachParseTests(TestCase):
             parser_version="deterministic-old",
         )
 
-        call_command("reparse_supplier_products", "--name-contains", "FENDI", verbosity=0)
+        call_command(
+            "reparse_supplier_products", "--name-contains", "FENDI", verbosity=0
+        )
 
         fendi_parse.refresh_from_db()
         kenzo_parse.refresh_from_db()
@@ -608,7 +674,9 @@ class TeachParseTests(TestCase):
         )
 
         first = self.client.get(reverse("assistant_linking:normalization_dashboard"))
-        refresh = self.client.get(reverse("assistant_linking:normalization_dashboard"), {"refresh": "1"})
+        refresh = self.client.get(
+            reverse("assistant_linking:normalization_dashboard"), {"refresh": "1"}
+        )
         cached = self.client.get(reverse("assistant_linking:normalization_dashboard"))
 
         self.assertEqual(first.status_code, 200)
@@ -674,7 +742,9 @@ class TeachParseTests(TestCase):
         response = self.client.get(reverse("assistant_linking:normalization_parsed"))
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "100 Bon / Ambre Sensuel / Eau de Toilette / 50ml / Tester")
+        self.assertContains(
+            response, "100 Bon / Ambre Sensuel / Eau de Toilette / 50ml / Tester"
+        )
 
     def test_normalization_detail_capitalizes_tester_type(self):
         brand = Brand.objects.create(name="100 Bon")
@@ -690,12 +760,17 @@ class TeachParseTests(TestCase):
         )
         save_parse(product)
 
-        response = self.client.get(reverse("assistant_linking:normalization_detail", args=[product.id]))
+        response = self.client.get(
+            reverse("assistant_linking:normalization_detail", args=[product.id])
+        )
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Type: Tester")
         self.assertContains(response, "Name: Ambre Sensuel")
-        self.assertContains(response, "Normalized: 100 Bon / Ambre Sensuel / Eau de Toilette / 50ml / Tester")
+        self.assertContains(
+            response,
+            "Normalized: 100 Bon / Ambre Sensuel / Eau de Toilette / 50ml / Tester",
+        )
         self.assertNotContains(response, "50ml ml")
 
     def test_parsed_products_page_requires_complete_parse_fields(self):
@@ -731,7 +806,9 @@ class TeachParseTests(TestCase):
         response = self.client.get(reverse("assistant_linking:normalization_parsed"))
 
         self.assertEqual(response.status_code, 200)
-        parse_product_ids = {item.supplier_product_id for item in response.context["parses"]}
+        parse_product_ids = {
+            item.supplier_product_id for item in response.context["parses"]
+        }
         self.assertIn(complete.id, parse_product_ids)
         self.assertNotIn(missing_size.id, parse_product_ids)
         self.assertNotIn(missing_concentration.id, parse_product_ids)
@@ -757,16 +834,22 @@ class TeachParseTests(TestCase):
         set_parse = save_parse(set_product)
         save_parse(regular_product)
 
-        parsed_response = self.client.get(reverse("assistant_linking:normalization_parsed"))
+        parsed_response = self.client.get(
+            reverse("assistant_linking:normalization_parsed")
+        )
         set_response = self.client.get(reverse("assistant_linking:normalization_sets"))
 
         self.assertTrue(set_parse.is_set)
         self.assertEqual(parsed_response.status_code, 200)
-        parsed_product_ids = {item.supplier_product_id for item in parsed_response.context["parses"]}
+        parsed_product_ids = {
+            item.supplier_product_id for item in parsed_response.context["parses"]
+        }
         self.assertNotIn(set_product.id, parsed_product_ids)
         self.assertIn(regular_product.id, parsed_product_ids)
         self.assertEqual(set_response.status_code, 200)
-        set_product_ids = {item.supplier_product_id for item in set_response.context["parses"]}
+        set_product_ids = {
+            item.supplier_product_id for item in set_response.context["parses"]
+        }
         self.assertIn(set_product.id, set_product_ids)
         self.assertNotIn(regular_product.id, set_product_ids)
 
@@ -790,19 +873,32 @@ class TeachParseTests(TestCase):
         bag_parse = save_parse(bag_product)
         save_parse(perfume_product)
 
-        parsed_response = self.client.get(reverse("assistant_linking:normalization_parsed"))
-        missing_concentration_response = self.client.get(reverse("assistant_linking:normalization_missing_concentration"))
+        parsed_response = self.client.get(
+            reverse("assistant_linking:normalization_parsed")
+        )
+        missing_concentration_response = self.client.get(
+            reverse("assistant_linking:normalization_missing_concentration")
+        )
         bag_response = self.client.get(reverse("assistant_linking:normalization_bags"))
-        dashboard_response = self.client.get(reverse("assistant_linking:normalization_dashboard"), {"refresh": "1"})
+        dashboard_response = self.client.get(
+            reverse("assistant_linking:normalization_dashboard"), {"refresh": "1"}
+        )
 
         self.assertEqual(bag_parse.product_category_label, "Bags")
         self.assertEqual(parsed_response.status_code, 200)
-        parsed_product_ids = {item.supplier_product_id for item in parsed_response.context["parses"]}
+        parsed_product_ids = {
+            item.supplier_product_id for item in parsed_response.context["parses"]
+        }
         self.assertNotIn(bag_product.id, parsed_product_ids)
         self.assertIn(perfume_product.id, parsed_product_ids)
-        missing_product_ids = {item.supplier_product_id for item in missing_concentration_response.context["parses"]}
+        missing_product_ids = {
+            item.supplier_product_id
+            for item in missing_concentration_response.context["parses"]
+        }
         self.assertNotIn(bag_product.id, missing_product_ids)
-        bag_product_ids = {item.supplier_product_id for item in bag_response.context["parses"]}
+        bag_product_ids = {
+            item.supplier_product_id for item in bag_response.context["parses"]
+        }
         self.assertIn(bag_product.id, bag_product_ids)
         self.assertNotIn(perfume_product.id, bag_product_ids)
         self.assertEqual(dashboard_response.context["bag_count"], 1)
@@ -828,22 +924,39 @@ class TeachParseTests(TestCase):
         cosmetic_parse = save_parse(cosmetic_product)
         save_parse(perfume_product)
 
-        parsed_response = self.client.get(reverse("assistant_linking:normalization_parsed"))
-        missing_concentration_response = self.client.get(reverse("assistant_linking:normalization_missing_concentration"))
-        cosmetic_response = self.client.get(reverse("assistant_linking:normalization_cosmetics"))
-        detail_response = self.client.get(
-            reverse("assistant_linking:normalization_detail", args=[cosmetic_product.id])
+        parsed_response = self.client.get(
+            reverse("assistant_linking:normalization_parsed")
         )
-        dashboard_response = self.client.get(reverse("assistant_linking:normalization_dashboard"), {"refresh": "1"})
+        missing_concentration_response = self.client.get(
+            reverse("assistant_linking:normalization_missing_concentration")
+        )
+        cosmetic_response = self.client.get(
+            reverse("assistant_linking:normalization_cosmetics")
+        )
+        detail_response = self.client.get(
+            reverse(
+                "assistant_linking:normalization_detail", args=[cosmetic_product.id]
+            )
+        )
+        dashboard_response = self.client.get(
+            reverse("assistant_linking:normalization_dashboard"), {"refresh": "1"}
+        )
 
         self.assertEqual(cosmetic_parse.product_category_label, "Cosmetics")
         self.assertEqual(cosmetic_parse.product_subcategory_label, "Poudre")
-        parsed_product_ids = {item.supplier_product_id for item in parsed_response.context["parses"]}
+        parsed_product_ids = {
+            item.supplier_product_id for item in parsed_response.context["parses"]
+        }
         self.assertNotIn(cosmetic_product.id, parsed_product_ids)
         self.assertIn(perfume_product.id, parsed_product_ids)
-        missing_product_ids = {item.supplier_product_id for item in missing_concentration_response.context["parses"]}
+        missing_product_ids = {
+            item.supplier_product_id
+            for item in missing_concentration_response.context["parses"]
+        }
         self.assertNotIn(cosmetic_product.id, missing_product_ids)
-        cosmetic_product_ids = {item.supplier_product_id for item in cosmetic_response.context["parses"]}
+        cosmetic_product_ids = {
+            item.supplier_product_id for item in cosmetic_response.context["parses"]
+        }
         self.assertIn(cosmetic_product.id, cosmetic_product_ids)
         self.assertNotIn(perfume_product.id, cosmetic_product_ids)
         self.assertContains(detail_response, "Category: Cosmetics")
@@ -871,21 +984,38 @@ class TeachParseTests(TestCase):
         deodorant_parse = save_parse(deodorant_product)
         save_parse(perfume_product)
 
-        parsed_response = self.client.get(reverse("assistant_linking:normalization_parsed"))
-        missing_concentration_response = self.client.get(reverse("assistant_linking:normalization_missing_concentration"))
-        deodorant_response = self.client.get(reverse("assistant_linking:normalization_deodorants"))
-        detail_response = self.client.get(
-            reverse("assistant_linking:normalization_detail", args=[deodorant_product.id])
+        parsed_response = self.client.get(
+            reverse("assistant_linking:normalization_parsed")
         )
-        dashboard_response = self.client.get(reverse("assistant_linking:normalization_dashboard"), {"refresh": "1"})
+        missing_concentration_response = self.client.get(
+            reverse("assistant_linking:normalization_missing_concentration")
+        )
+        deodorant_response = self.client.get(
+            reverse("assistant_linking:normalization_deodorants")
+        )
+        detail_response = self.client.get(
+            reverse(
+                "assistant_linking:normalization_detail", args=[deodorant_product.id]
+            )
+        )
+        dashboard_response = self.client.get(
+            reverse("assistant_linking:normalization_dashboard"), {"refresh": "1"}
+        )
 
         self.assertEqual(deodorant_parse.product_category_label, "Deodorants")
-        parsed_product_ids = {item.supplier_product_id for item in parsed_response.context["parses"]}
+        parsed_product_ids = {
+            item.supplier_product_id for item in parsed_response.context["parses"]
+        }
         self.assertNotIn(deodorant_product.id, parsed_product_ids)
         self.assertIn(perfume_product.id, parsed_product_ids)
-        missing_product_ids = {item.supplier_product_id for item in missing_concentration_response.context["parses"]}
+        missing_product_ids = {
+            item.supplier_product_id
+            for item in missing_concentration_response.context["parses"]
+        }
         self.assertNotIn(deodorant_product.id, missing_product_ids)
-        deodorant_product_ids = {item.supplier_product_id for item in deodorant_response.context["parses"]}
+        deodorant_product_ids = {
+            item.supplier_product_id for item in deodorant_response.context["parses"]
+        }
         self.assertIn(deodorant_product.id, deodorant_product_ids)
         self.assertNotIn(perfume_product.id, deodorant_product_ids)
         self.assertContains(detail_response, "Category: Deodorants")
@@ -924,10 +1054,18 @@ class TeachParseTests(TestCase):
             identity_key="dashboard-set",
             name="Montale Arabians Tonka gift set EDP 100ml",
         )
-        for product in [complete, missing_size, missing_concentration, missing_name, set_product]:
+        for product in [
+            complete,
+            missing_size,
+            missing_concentration,
+            missing_name,
+            set_product,
+        ]:
             save_parse(product)
 
-        response = self.client.get(reverse("assistant_linking:normalization_dashboard"), {"refresh": "1"})
+        response = self.client.get(
+            reverse("assistant_linking:normalization_dashboard"), {"refresh": "1"}
+        )
 
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.context["stats_available"])
@@ -969,8 +1107,13 @@ class TeachParseTests(TestCase):
 
         self.assertEqual(concentration_response.status_code, 200)
         self.assertEqual(name_response.status_code, 200)
-        concentration_ids = {item.supplier_product_id for item in concentration_response.context["parses"]}
-        name_ids = {item.supplier_product_id for item in name_response.context["parses"]}
+        concentration_ids = {
+            item.supplier_product_id
+            for item in concentration_response.context["parses"]
+        }
+        name_ids = {
+            item.supplier_product_id for item in name_response.context["parses"]
+        }
         self.assertIn(missing_concentration.id, concentration_ids)
         self.assertIn(missing_name.id, name_ids)
 
@@ -1096,7 +1239,12 @@ class TeachParseTests(TestCase):
         self.assertEqual(response.status_code, 200)
         parses = list(response.context["parses"])
         self.assertEqual(len(parses), 1)
-        self.assertTrue(all("tester" not in parsed.supplier_product.name.lower() for parsed in parses))
+        self.assertTrue(
+            all(
+                "tester" not in parsed.supplier_product.name.lower()
+                for parsed in parses
+            )
+        )
 
     def test_unparsed_page_uses_50_row_pagination(self):
         for index in range(60):
