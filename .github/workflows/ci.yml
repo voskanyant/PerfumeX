@@ -187,6 +187,7 @@ jobs:
               export FERNET_KEYS="$SALT_KEY"
             fi
             /opt/perfumex/PerfumeX/.venv/bin/python manage.py migrate
+            /opt/perfumex/PerfumeX/.venv/bin/python manage.py reparse_supplier_products --only-stale
             /opt/perfumex/PerfumeX/.venv/bin/python manage.py refresh_normalization_stats --all-user-scopes
             /opt/perfumex/PerfumeX/.venv/bin/python manage.py collectstatic --noinput
             systemctl restart perfumex

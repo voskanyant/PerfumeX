@@ -50,6 +50,7 @@ If models must change, inspect existing migrations and tests first, add a migrat
 - Do not hardcode one-off brand/product/parser fixes in code when an alias, catalogue fact, or parser rule can represent them.
 - Follow `assistant_linking/docs/assistant_learning_design.md` for assistant learning changes.
 - For wrong supplier parsing, prefer this order: catalogue data, brand alias, product alias, concentration alias, global/supplier rule, then parser code only for reusable capability gaps.
+- When parser rules, aliases, catalogue-backed normalization behavior, or seeded assistant knowledge change saved parse output, bump `PARSER_VERSION` so production deploys reparse stale unlocked `ParsedSupplierProduct` rows.
 - Do not auto-approve assistant suggestions or external catalogue rows.
 
 ## Supplier history preparation
