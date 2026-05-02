@@ -8739,6 +8739,36 @@ class SupplierImportBoundaryTests(TestCase):
         self.assertEqual(row["check_full"], _format_local_datetime(now))
         self.assertEqual(row["check_code"], "no-change")
 
+    def test_supplier_board_check_time_uses_latest_completed_global_scan(self):
+        now = timezone.now().replace(microsecond=0)
+        old = now - timedelta(hours=1)
+        self.supplier.from_address_pattern = "supplier@example.com"
+        self.supplier.last_email_check_at = old
+        self.supplier.last_email_matched = 0
+        self.supplier.last_email_processed = 0
+        self.supplier.save(
+            update_fields=[
+                "from_address_pattern",
+                "last_email_check_at",
+                "last_email_matched",
+                "last_email_processed",
+            ]
+        )
+        self.mailbox.last_checked_at = old
+        self.mailbox.save(update_fields=["last_checked_at"])
+        settings_obj = models.ImportSettings.get_solo()
+        settings_obj.last_run_at = now
+        settings_obj.save(update_fields=["last_run_at"])
+
+        row = _build_supplier_board_row(
+            supplier=self.supplier,
+            successful_batch=None,
+            latest_run=None,
+        )
+
+        self.assertEqual(row["check_full"], _format_local_datetime(now))
+        self.assertEqual(row["check_code"], "no-change")
+
     def test_running_email_status_shows_live_activity(self):
         run = models.EmailImportRun.objects.create(
             supplier=self.supplier,

@@ -170,16 +170,21 @@ def diagnostic_check_datetime(diagnostic):
     return diagnostic.created_at
 
 
-def latest_active_mailbox_check_datetime():
-    return models.Mailbox.objects.filter(is_active=True).aggregate(
+def latest_global_mailbox_check_datetime():
+    mailbox_dt = models.Mailbox.objects.filter(is_active=True).aggregate(
         latest=Max("last_checked_at")
     )["latest"]
+    folder_dt = models.MailboxFolderCursor.objects.filter(
+        mailbox__is_active=True
+    ).aggregate(latest=Max("last_checked_at"))["latest"]
+    settings_dt = models.ImportSettings.get_solo().last_run_at
+    return max([dt for dt in (mailbox_dt, folder_dt, settings_dt) if dt], default=None)
 
 
 def supplier_email_check_datetime(supplier, event_dt=None):
     candidates = [supplier.last_email_check_at, event_dt]
     if supplier.from_address_pattern:
-        candidates.append(latest_active_mailbox_check_datetime())
+        candidates.append(latest_global_mailbox_check_datetime())
     return max([dt for dt in candidates if dt], default=None)
 
 
