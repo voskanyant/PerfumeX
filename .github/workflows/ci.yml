@@ -188,18 +188,12 @@ jobs:
             fi
             /opt/perfumex/PerfumeX/.venv/bin/python manage.py migrate
             for term in \
-              "212 for Woman" \
-              "12 PARFUMEURS" \
-              "AZAY" \
-              "Exclus Edition" \
-              "без цел" \
-              "REFILLABLE" \
-              "Ciel" \
-              "Reflection" \
+              "AMOUAGE Ciel" \
+              "Reflection (M) 100ml EDP TECTEP" \
+              "Reflection (M) 100ml EDP Limited Ed" \
               "Guidance 46" \
               "Legacy WB" \
-              "Ultimate Crystal" \
-              "Limited Ed"; do
+              "Ultimate Crystal Saint Honore"; do
               /opt/perfumex/PerfumeX/.venv/bin/python manage.py reparse_supplier_products --only-stale --name-contains "$term"
             done
             /opt/perfumex/PerfumeX/.venv/bin/python manage.py refresh_normalization_stats --all-user-scopes
