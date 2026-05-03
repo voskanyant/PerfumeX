@@ -74,6 +74,9 @@ SAMPLE_PARSED_JSON = """
 
 
 class HtmlCatalogImporterTests(TestCase):
+    def test_canonical_key_preserves_ampersand_as_and(self):
+        self.assertEqual(canonical_key("Van Cleef & Arpels"), "van cleef and arpels")
+
     def test_parser_assigns_specific_collection_over_all_fragrances(self):
         items = parse_brand_catalog_html(SAMPLE_HTML)
         by_name = {canonical_key(item.name): item for item in items}

@@ -71,7 +71,8 @@ def clean_scraped_text(value: str) -> str:
 def canonical_key(value: str) -> str:
     text = unicodedata.normalize("NFKD", clean_scraped_text(value))
     text = "".join(char for char in text if not unicodedata.combining(char))
-    return normalize_alias_value(text).replace("&", "and")
+    text = text.replace("&", " and ")
+    return normalize_alias_value(text)
 
 
 def audience_from_classes(classes: set[str]) -> str:
