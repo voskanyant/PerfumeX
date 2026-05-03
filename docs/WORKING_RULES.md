@@ -37,6 +37,8 @@ Use `make deploy-gate-full` before big merges, schema changes, parser/linking lo
 
 If the needed deploy gate cannot run because local dependencies or PostgreSQL are missing, stop and report the blocker instead of pushing to `main`.
 
+Production deploy preserves unexpected tracked server edits in a timestamped Git stash before pulling `main`. Treat that stash as an audit artifact: inspect it later if the server had manual hotfixes, but do not let it block automated deploy.
+
 ## Model changes
 
 Do not change models when:
