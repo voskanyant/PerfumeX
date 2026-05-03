@@ -2382,6 +2382,30 @@ class NormalizerTests(TestCase):
         self.assertIn("excluded garbage keyword: потерт", parsed.warnings)
         self.assertFalse(parsed.product_name_text)
 
+    def test_inspired_by_russian_keyword_routes_to_garbage(self):
+        GlobalRule.objects.create(
+            title="Garbage keyword: inspired-by imitation rows",
+            rule_kind="garbage_keyword",
+            scope_type="global",
+            rule_text="по мотивам",
+            active=True,
+            approved=True,
+        )
+        brand = Brand.objects.create(name="Creed")
+        BrandAlias.objects.create(brand=brand, alias_text="Creed", normalized_alias="creed")
+        product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="inspired-by-creed",
+            name="По мотивам Creed Aventus male edp 30 ml CP 005",
+        )
+
+        parsed = parse_supplier_product(product)
+
+        self.assertEqual(parsed.modifiers, ["garbage"])
+        self.assertEqual(parsed.confidence, 100)
+        self.assertIn("excluded garbage keyword: по мотивам", parsed.warnings)
+        self.assertFalse(parsed.product_name_text)
+
     def test_custom_concentration_aliases_can_be_managed_in_database(self):
         brand = Brand.objects.create(name="Montale")
         BrandAlias.objects.create(brand=brand, alias_text="Montale", normalized_alias="montale")

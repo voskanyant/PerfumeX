@@ -70,9 +70,10 @@ Normalization and linking:
 10. Treat short supplier audience markers such as `wom` as parser audience knowledge. When the catalogue has same-base men/women scents, keep the audience in the parsed scent name (`Guilty Woman`/`Guilty Man` or the catalogue's equivalent names).
 11. Expand supplier abbreviations such as `Limited Ed.` to canonical name suffixes such as `Limited Edition`; when the supplier gives an audience hint and the catalogue has audience-specific base scents, keep that audience in the canonical scent name before the suffix.
 12. Treat supplier collection-looking prefixes as untrusted unless backed by a collection alias; use product aliases when supplier text incorrectly prepends a collection name to a scent, preserve intentional uppercase suffixes such as `WB`, and canonicalize supplier-expanded short names such as `Saint Honore` to catalogue style `St Honore`.
-13. Build `MatchGroup` records for likely same-product rows.
-14. Staff approve/reject/link through manual decisions or bulk actions.
-15. Persist links to `SupplierProduct.catalog_perfume` and optional `catalog_variant`; audit decisions.
+13. Treat supplier rows containing Cyrillic `по мотивам` as inspired-by/imitation rows and route them to garbage/exclusion instead of matching them to the referenced real brand.
+14. Build `MatchGroup` records for likely same-product rows.
+15. Staff approve/reject/link through manual decisions or bulk actions.
+16. Persist links to `SupplierProduct.catalog_perfume` and optional `catalog_variant`; audit decisions.
 
 External catalogue import:
 1. Parse saved HTML or parsed Fragrantica catalogue JSON/CSV into staged `FragranticaProduct` rows.
