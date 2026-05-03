@@ -6783,6 +6783,7 @@ class CatalogReviewServiceTests(SimpleTestCase):
         from prices.services.catalog_review import (
             audience_group_from_text,
             fragrance_name_without_audience,
+            fragrance_name_without_audience_or_concentration,
         )
 
         self.assertEqual(
@@ -6793,6 +6794,12 @@ class CatalogReviewServiceTests(SimpleTestCase):
         )
         self.assertEqual(audience_group_from_text("Light Blue Femme"), "women")
         self.assertEqual(audience_group_from_text("Light Blue Homme"), "men")
+        self.assertEqual(
+            fragrance_name_without_audience_or_concentration(
+                "Light Blue Eau de Toilette"
+            ),
+            "light blue",
+        )
 
     def test_fragrantica_review_row_status_detects_collection_conflicts_first(self):
         from prices.services.catalog_review import fragrantica_review_row_status
@@ -8182,6 +8189,41 @@ class OurProductCatalogueListTests(TestCase):
             response,
             reverse("prices:fragrantica_product_link", args=[source.pk]),
         )
+
+    def test_fragrantica_products_suggests_ampersand_brand_and_concentration_title(
+        self,
+    ):
+        dolce = Brand.objects.create(name="Dolce & Gabbana")
+        perfume = Perfume.objects.create(
+            brand=dolce,
+            name="Light Blue",
+            audience="Women",
+            concentration="Eau de Toilette",
+        )
+        source = FragranticaProduct.objects.create(
+            brand_name="Dolce&Gabbana",
+            normalized_brand_name="dolceandgabbana",
+            name="Light Blue Eau de Toilette",
+            normalized_name="light blue eau de toilette",
+            collection_name="LIGHT BLUE BY DOLCE&GABBANA",
+            audience="Women",
+            release_year=2025,
+            source_path="/perfume/Dolce-Gabbana/Light-Blue-Eau-de-Toilette-1.html",
+        )
+
+        response = self.client.get(
+            reverse("prices:fragrantica_product_review"),
+            {"brand": "Dolce&Gabbana", "q": "light blue"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Dolce &amp; Gabbana / Light Blue")
+        self.assertContains(response, "Same brand and scent after concentration words")
+        self.assertContains(
+            response,
+            reverse("prices:fragrantica_product_link", args=[source.pk]),
+        )
+        self.assertNotEqual(perfume.pk, self.perfume.pk)
 
     def test_staff_can_link_fragrantica_row_to_catalogue_without_changing_concentration(
         self,

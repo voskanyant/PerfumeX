@@ -109,6 +109,15 @@ AUDIENCE_GROUP_TERMS = {
         "uomo",
     },
 }
+FRAGRANCE_CONCENTRATION_NAME_TERMS = {
+    "eau de parfum",
+    "eau de toilette",
+    "eau de cologne",
+    "extrait de parfum",
+    "edp",
+    "edt",
+    "edc",
+}
 
 
 @dataclass(frozen=True)
@@ -283,11 +292,13 @@ def loose_fragrance_key(value: str) -> str:
 
 
 def fragrance_key_variants(value: str) -> set[str]:
+    loose_key = loose_fragrance_key(value)
     return {
         key
         for key in {
             normalized_fragrance_key(value),
-            loose_fragrance_key(value),
+            loose_key,
+            loose_key.replace(" ", ""),
         }
         if key
     }
@@ -312,8 +323,19 @@ def fragrance_name_without_audience(value: str) -> str:
     return re.sub(r"\s+", " ", text).strip()
 
 
+def fragrance_name_without_audience_or_concentration(value: str) -> str:
+    text = fragrance_name_without_audience(value)
+    for term in sorted(FRAGRANCE_CONCENTRATION_NAME_TERMS, key=len, reverse=True):
+        text = re.sub(rf"(^|\s){re.escape(term)}($|\s)", " ", text)
+    return re.sub(r"\s+", " ", text).strip()
+
+
 def loose_fragrance_name_without_audience(value: str) -> str:
     return loose_fragrance_key(fragrance_name_without_audience(value))
+
+
+def loose_fragrance_name_without_audience_or_concentration(value: str) -> str:
+    return loose_fragrance_key(fragrance_name_without_audience_or_concentration(value))
 
 
 def fragrantica_source_is_available_for_perfume(source, perfume) -> bool:
@@ -745,6 +767,18 @@ def _fragrantica_perfume_candidate_score(source, perfume, aliases) -> tuple[int,
     perfume_base = fragrance_name_without_audience(perfume.name)
     source_loose_base = loose_fragrance_name_without_audience(source.name)
     perfume_loose_base = loose_fragrance_name_without_audience(perfume.name)
+    source_identity_base = fragrance_name_without_audience_or_concentration(
+        source.name
+    )
+    perfume_identity_base = fragrance_name_without_audience_or_concentration(
+        perfume.name
+    )
+    source_loose_identity_base = (
+        loose_fragrance_name_without_audience_or_concentration(source.name)
+    )
+    perfume_loose_identity_base = (
+        loose_fragrance_name_without_audience_or_concentration(perfume.name)
+    )
     source_audience_group = audience_group_from_text(source.audience, source.name)
     perfume_audience_group = audience_group_from_text(perfume.audience, perfume.name)
     audience_compatible = (
@@ -762,6 +796,18 @@ def _fragrantica_perfume_candidate_score(source, perfume, aliases) -> tuple[int,
             and source_loose_base == perfume_loose_base
         ):
             return 93, "Same brand and scent after punctuation and audience words"
+        if source_identity_base and perfume_identity_base:
+            if source_identity_base == perfume_identity_base:
+                return 95, "Same brand and scent after concentration words"
+            if (
+                source_loose_identity_base
+                and perfume_loose_identity_base
+                and source_loose_identity_base == perfume_loose_identity_base
+            ):
+                return (
+                    94,
+                    "Same brand and scent after punctuation and concentration words",
+                )
 
     ratios = [
         SequenceMatcher(
@@ -778,6 +824,18 @@ def _fragrantica_perfume_candidate_score(source, perfume, aliases) -> tuple[int,
     if source_loose_base and perfume_loose_base:
         ratios.append(
             SequenceMatcher(None, source_loose_base, perfume_loose_base).ratio()
+        )
+    if source_identity_base and perfume_identity_base:
+        ratios.append(
+            SequenceMatcher(None, source_identity_base, perfume_identity_base).ratio()
+        )
+    if source_loose_identity_base and perfume_loose_identity_base:
+        ratios.append(
+            SequenceMatcher(
+                None,
+                source_loose_identity_base,
+                perfume_loose_identity_base,
+            ).ratio()
         )
     best_ratio = max(ratios)
     if audience_compatible and best_ratio >= 0.82:
