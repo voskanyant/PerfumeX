@@ -33,6 +33,26 @@
         form.appendChild(input);
     }
 
+    function appendCollectionSubname(parent, collection) {
+        if (!collection) return;
+        var subname = document.createElement("span");
+        subname.className = "catalogue-identity-subname";
+        var label = document.createElement("span");
+        label.textContent = "Collection";
+        subname.appendChild(label);
+        subname.appendChild(document.createTextNode(collection));
+        parent.appendChild(subname);
+    }
+
+    function renderSelected(selected) {
+        clearNode(selectedNode);
+        var title = document.createElement("span");
+        title.className = "catalogue-linking-selected-title";
+        title.textContent = selected.label;
+        selectedNode.appendChild(title);
+        appendCollectionSubname(selectedNode, selected.collection);
+    }
+
     function renderEmpty(message) {
         clearNode(candidatesNode);
         var empty = document.createElement("div");
@@ -70,6 +90,7 @@
         meta.textContent = metaParts.filter(Boolean).join(" · ");
 
         main.appendChild(title);
+        appendCollectionSubname(main, candidate.collection);
         main.appendChild(meta);
 
         var actions = document.createElement("div");
@@ -122,7 +143,7 @@
                 return response.json();
             })
             .then(function (data) {
-                selectedNode.textContent = data.selected.label;
+                renderSelected(data.selected);
                 clearNode(candidatesNode);
                 if (countNode) {
                     countNode.textContent = data.candidates.length + " candidate" + (data.candidates.length === 1 ? "" : "s");

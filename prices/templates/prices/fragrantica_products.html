@@ -44,12 +44,6 @@
                                 <span class="catalogue-field catalogue-field-brand">
                                     <span class="catalogue-cell-value catalogue-cell-value-strong">{{ row.source.brand_name }}</span>
                                 </span>
-                                {% if row.source.collection_name %}
-                                    <span class="catalogue-field catalogue-field-collection">
-                                        <span class="identity-separator">/</span>
-                                        <span class="catalogue-cell-value">{{ row.source.collection_name }}</span>
-                                    </span>
-                                {% endif %}
                                 <span class="catalogue-field catalogue-field-scent">
                                     <span class="identity-separator">/</span>
                                     <span class="catalogue-cell-value catalogue-cell-value-strong">{{ row.source.name }}</span>
@@ -67,6 +61,12 @@
                                     </span>
                                 {% endif %}
                             </div>
+                            {% if row.source.collection_name %}
+                                <div class="catalogue-identity-subname">
+                                    <span>Collection</span>
+                                    {{ row.source.collection_name }}
+                                </div>
+                            {% endif %}
                             <div class="fragrantica-product-meta">
                                 <span class="score-badge score-badge--{% if row.source.match_status == 'linked' %}success{% elif row.source.match_status == 'ignored' %}warning{% else %}muted{% endif %}">{{ row.source.get_match_status_display }}</span>
                                 {% if row.source.audience %}<span>{{ row.source.audience }}</span>{% endif %}
@@ -87,6 +87,12 @@
                                         <span class="fragrantica-match-name">
                                             {{ row.source.matched_perfume.brand.name }} / {{ row.source.matched_perfume.name }}{% if row.source.matched_perfume.concentration %} / {{ row.source.matched_perfume.concentration }}{% endif %}
                                         </span>
+                                        {% if row.source.matched_perfume.collection_name %}
+                                            <span class="catalogue-identity-subname">
+                                                <span>Collection</span>
+                                                {{ row.source.matched_perfume.collection_name }}
+                                            </span>
+                                        {% endif %}
                                     </div>
                                 </div>
                             {% elif row.candidate_choices %}
@@ -107,6 +113,12 @@
                                                 <span class="fragrantica-match-name">
                                                     {{ choice.perfume.brand.name }} / {{ choice.perfume.name }}{% if choice.perfume.concentration %} / {{ choice.perfume.concentration }}{% endif %}
                                                 </span>
+                                                {% if choice.perfume.collection_name %}
+                                                    <span class="catalogue-identity-subname">
+                                                        <span>Collection</span>
+                                                        {{ choice.perfume.collection_name }}
+                                                    </span>
+                                                {% endif %}
                                                 <span class="fragrantica-match-reason">
                                                     {{ choice.reason }} · Score {{ choice.score }}
                                                 </span>

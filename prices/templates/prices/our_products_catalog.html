@@ -70,10 +70,6 @@
                                     data-catalogue-select-toggle
                                     aria-label="Select product row">
                                 <span class="catalogue-cell-value catalogue-cell-value-strong">{{ variant.perfume.brand.name }}</span>
-                                {% if variant.perfume.collection_name %}
-                                    <span class="identity-separator">/</span>
-                                    <span class="catalogue-cell-value">{{ variant.perfume.collection_name }}</span>
-                                {% endif %}
                                 <span class="identity-separator">/</span>
                                 <span class="catalogue-cell-value catalogue-cell-value-strong">{{ variant.perfume.name }}</span>
                                 {% if variant.perfume.concentration %}
@@ -97,6 +93,12 @@
                                     <span class="catalogue-cell-value">{{ variant.variant_type }}</span>
                                 {% endif %}
                             </button>
+                            {% if variant.perfume.collection_name %}
+                                <div class="catalogue-identity-subname">
+                                    <span>Collection</span>
+                                    {{ variant.perfume.collection_name }}
+                                </div>
+                            {% endif %}
                             {% if variant.fragrantica_candidates %}
                                 <div class="fragrantica-match-panel"
                                      aria-label="Suggested Fragrantica matches">
@@ -110,8 +112,14 @@
                                                 <span class="fragrantica-match-name">
                                                     {{ candidate.source.brand_name }} / {{ candidate.source.name }}{% if candidate.source.audience %} / {{ candidate.source.audience }}{% endif %}{% if candidate.source.release_year %} / {{ candidate.source.release_year }}{% endif %}
                                                 </span>
+                                                {% if candidate.source.collection_name %}
+                                                    <span class="catalogue-identity-subname">
+                                                        <span>Collection</span>
+                                                        {{ candidate.source.collection_name }}
+                                                    </span>
+                                                {% endif %}
                                                 <span class="fragrantica-match-reason">
-                                                    {{ candidate.reason }} &middot; Score {{ candidate.score }}{% if candidate.source.collection_name %} &middot; {{ candidate.source.collection_name }}{% endif %}
+                                                    {{ candidate.reason }} &middot; Score {{ candidate.score }}
                                                 </span>
                                             </div>
                                             {% if candidate.source.match_status == "linked" %}

@@ -188,6 +188,7 @@ Standard responsive structure:
 - Our Products catalogue rows in `prices/our_products_catalog.html` are specialized as parsed read-only rows with a pencil-triggered inline editor; do not render every row as visible inputs by default.
 - Fragrantica staged source rows in `prices/fragrantica_products.html` should mirror the Our Products parsed-row structure and keep audience/gender, year, and source link visible.
 - Fragrantica staged source rows should show ranked Our Products candidates inline with same-page link actions; avoid forcing operators to navigate to another catalogue page for normal linking.
+- Catalogue comparison rows should keep collection names as muted secondary subnames under the primary identity, not inline between brand and scent, so Our Products and Fragrantica rows are easier to compare.
 - Catalogue row action columns must reserve enough width for text buttons; do not size text-action columns like icon-only columns. On narrow screens, row actions should wrap to the full row width instead of clipping off canvas.
 - Catalogue review lists that support row selection should use `prices/js/catalogue-selection.js` with `data-catalogue-selection-root`, row checkboxes, Ctrl/Shift range selection, Escape clear, and page-specific bulk actions instead of one-off selection scripts.
 - Assistant unparsed normalization rows should mirror parsed queue columns and may show bounded, non-persistent parser previews for the visible page; use explicit parse actions to create saved `ParsedSupplierProduct` rows.

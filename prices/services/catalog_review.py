@@ -1322,7 +1322,6 @@ def build_catalogue_fragrantica_candidates_for_perfumes(
 def catalogue_linking_perfume_label(perfume) -> str:
     parts = [
         perfume.brand.name,
-        perfume.collection_name,
         perfume.name,
         perfume.concentration,
     ]
@@ -1332,7 +1331,6 @@ def catalogue_linking_perfume_label(perfume) -> str:
 def catalogue_linking_source_label(source) -> str:
     parts = [
         source.brand_name,
-        source.collection_name,
         source.name,
         source.audience,
         str(source.release_year) if source.release_year else "",

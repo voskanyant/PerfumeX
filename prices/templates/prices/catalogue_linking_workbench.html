@@ -111,6 +111,12 @@
                                         data-linking-select
                                         data-catalogue-select-toggle>
                                     <span class="catalogue-linking-row-title">{{ row.label }}</span>
+                                    {% if row.perfume.collection_name %}
+                                        <span class="catalogue-identity-subname">
+                                            <span>Collection</span>
+                                            {{ row.perfume.collection_name }}
+                                        </span>
+                                    {% endif %}
                                     <span class="catalogue-linking-row-meta">
                                         {{ row.perfume.variant_count|default:0 }} variant{{ row.perfume.variant_count|default:0|pluralize }} ·
                                         {{ row.perfume.linked_fragrantica_count|default:0 }} linked Fragrantica
@@ -122,6 +128,12 @@
                                             </span>
                                             {{ row.top_candidate.source.brand_name }} / {{ row.top_candidate.source.name }}
                                         </span>
+                                        {% if row.top_candidate.source.collection_name %}
+                                            <span class="catalogue-identity-subname">
+                                                <span>Collection</span>
+                                                {{ row.top_candidate.source.collection_name }}
+                                            </span>
+                                        {% endif %}
                                     {% else %}
                                         <span class="catalogue-linking-row-suggestion tone-muted">No confident Fragrantica suggestion</span>
                                     {% endif %}
@@ -153,7 +165,13 @@
                 </div>
                 <div class="catalogue-linking-selected" data-linking-selected>
                     {% if selected_row %}
-                        {{ selected_row.label }}
+                        <span class="catalogue-linking-selected-title">{{ selected_row.label }}</span>
+                        {% if selected_row.perfume.collection_name %}
+                            <span class="catalogue-identity-subname">
+                                <span>Collection</span>
+                                {{ selected_row.perfume.collection_name }}
+                            </span>
+                        {% endif %}
                     {% else %}
                         Select an Our Products row.
                     {% endif %}
@@ -171,8 +189,14 @@
                                 <input type="hidden" name="apply_identity_group" value="1">
                                 <div class="catalogue-linking-candidate-main">
                                     <span class="catalogue-linking-candidate-title">
-                                        {{ candidate.source.brand_name }}{% if candidate.source.collection_name %} / {{ candidate.source.collection_name }}{% endif %} / {{ candidate.source.name }}
+                                        {{ candidate.source.brand_name }} / {{ candidate.source.name }}
                                     </span>
+                                    {% if candidate.source.collection_name %}
+                                        <span class="catalogue-identity-subname">
+                                            <span>Collection</span>
+                                            {{ candidate.source.collection_name }}
+                                        </span>
+                                    {% endif %}
                                     <span class="catalogue-linking-candidate-meta">
                                         {{ candidate.reason }} · Score {{ candidate.score }}{% if candidate.source.audience %} · {{ candidate.source.audience }}{% endif %}{% if candidate.source.release_year %} · {{ candidate.source.release_year }}{% endif %}
                                     </span>

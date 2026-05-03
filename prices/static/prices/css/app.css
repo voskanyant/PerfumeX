@@ -1499,6 +1499,23 @@ select:focus {
   text-overflow: clip;
   white-space: normal;
 }
+.catalogue-identity-subname {
+  display: block;
+  min-width: 0;
+  margin-top: 3px;
+  color: var(--grey-500);
+  font-size: 12px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+.catalogue-identity-subname span {
+  margin-right: 6px;
+  color: var(--grey-400);
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
 .our-products-row-flags {
   display: flex;
   align-items: center;
@@ -2022,8 +2039,13 @@ select:focus {
   overflow-wrap: anywhere;
 }
 .catalogue-linking-selected {
+  display: grid;
+  gap: 3px;
   padding: 14px 18px;
   border-bottom: 1px solid var(--grey-200);
+  color: var(--grey-800);
+}
+.catalogue-linking-selected-title {
   color: var(--grey-800);
 }
 .catalogue-linking-candidates {

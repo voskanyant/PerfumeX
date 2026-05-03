@@ -8472,7 +8472,8 @@ class OurProductCatalogueListTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "100 Bon / Ambre Et Tonka / Eau de Parfum")
-        self.assertContains(response, "100 Bon / L&#x27;Atelier / Ambre &amp; Tonka")
+        self.assertContains(response, "100 Bon / Ambre &amp; Tonka")
+        self.assertContains(response, "L&#x27;Atelier")
         self.assertContains(response, "Exact brand and scent identity match")
         self.assertContains(
             response,
@@ -8539,10 +8540,10 @@ class OurProductCatalogueListTests(TestCase):
         self.assertContains(response, "data-catalogue-select-toggle")
         self.assertContains(response, "data-catalogue-select-checkbox")
         self.assertContains(response, "data-catalogue-bulk-primary")
-        self.assertContains(response, "Montale / Classic / Vanilla Extasy")
-        self.assertContains(
-            response, "Montale / Fragrantica Collection / Vanilla Extasy"
-        )
+        self.assertContains(response, "Montale / Vanilla Extasy / Eau de Parfum")
+        self.assertContains(response, "Classic")
+        self.assertContains(response, "Montale / Vanilla Extasy")
+        self.assertContains(response, "Fragrantica Collection")
         self.assertContains(response, "Exact brand and scent identity match")
         self.assertContains(
             response,
