@@ -150,3 +150,13 @@ Context: Unparsed rows can appear well normalized when the parser preview is goo
 Decision: Treat `SupplierProduct.assistant_parse` as the queue boundary. A row leaves Unparsed only when an explicit parse job/action saves a `ParsedSupplierProduct`; visible-page previews are allowed only as non-persistent display.
 
 Consequences: Add bulk parse actions or background jobs for backlog processing. Do not let detail-page GETs or preview rendering silently move rows between queues. Keep matching/link evidence as a separate review layer from basic parse completeness.
+
+## 2026-05-03 - Catalogue linking uses one shared workbench
+
+Status: Accepted
+
+Context: Staff need to link Fragrantica rows from either Fragrantica Products or Our Products without bouncing between separate list/detail pages.
+
+Decision: Use the shared `/admin/our-products/linking/` two-column workbench for bidirectional Our Products <-> Fragrantica linking, confidence filtering, live candidate lookup, and bulk reviewed link actions.
+
+Consequences: Future Fragrantica/Our Products linking improvements should extend this workbench and its matching services instead of adding parallel link controls with separate behavior.

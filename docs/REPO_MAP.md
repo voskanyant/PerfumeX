@@ -28,6 +28,7 @@ Owns:
 - Supplier, mailbox, mailbox cursor, mailbox rule, supplier price source, and supplier file mapping models.
 - Supplier product rows, import batches/files, price snapshots, stock snapshots, exchange rates, import settings, user preferences.
 - Legacy/internal `OurProduct` records and older direct product linking screens.
+- Shared Our Products <-> Fragrantica catalogue linking workbench, including bidirectional review links and bulk reviewed link actions.
 - Public viewer product list/detail/search routes.
 - Custom `/admin/` dashboard, supplier overview, import board, import logs, import settings, currency, user/group, supplier product, and `OurProduct` screens.
 - File/email/import services in `prices/services/`: importer, email importer, link downloader, CBR rates, background runner, RQ job dispatch, supplier-board status, product filters, product visibility.

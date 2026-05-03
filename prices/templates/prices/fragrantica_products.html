@@ -3,6 +3,7 @@
 {% block topbar_label %}Fragrantica Products{% endblock %}
 {% block content %}
     {% include "includes/page_header.html" with kicker="Catalogue review" title="Fragrantica Products" meta_template="prices/_fragrantica_products_header_meta.html" actions_template="prices/_fragrantica_products_header_actions.html" %}
+    {% include "includes/tabs.html" with class_name="catalogue-tabs" label="Fragrantica catalogue tabs" items_template="prices/_fragrantica_catalogue_tab_items.html" active_fragrantica_tab="products" %}
     <div class="workspace-block our-products-catalog fragrantica-catalog">
         <form method="get" class="fragrantica-filter-bar">
             <select name="brand">

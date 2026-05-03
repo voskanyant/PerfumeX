@@ -7967,7 +7967,7 @@ class OurProductCatalogueListTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Suggested Fragrantica matches")
         self.assertContains(response, "Link without leaving this page")
-        self.assertContains(response, "name hint")
+        self.assertContains(response, "Exact brand and scent identity match")
         self.assertContains(response, "Fragrantica Collection")
         self.assertContains(response, "Montale / Vanilla Extasy pour Femme")
         self.assertContains(
@@ -8347,6 +8347,95 @@ class OurProductCatalogueListTests(TestCase):
         self.assertNotEqual(perfume.pk, self.perfume.pk)
         self.assertNotEqual(perfume.pk, generic_perfume.pk)
 
+    def test_catalogue_linking_workbench_lists_two_column_suggestions(self):
+        source = FragranticaProduct.objects.create(
+            brand_name="Montale",
+            normalized_brand_name="montale",
+            name="Vanilla Extasy",
+            normalized_name="vanilla extasy",
+            collection_name="Fragrantica Collection",
+            audience="Women",
+            release_year=2008,
+            source_path="/perfume/Montale/Vanilla-Extasy-1.html",
+        )
+
+        response = self.client.get(reverse("prices:catalogue_linking_workbench"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Link Our Products with Fragrantica")
+        self.assertContains(response, "Left column")
+        self.assertContains(response, "Right column")
+        self.assertContains(response, "Bulk link checked")
+        self.assertContains(response, "Montale / Classic / Vanilla Extasy")
+        self.assertContains(
+            response, "Montale / Fragrantica Collection / Vanilla Extasy"
+        )
+        self.assertContains(response, "Exact brand and scent identity match")
+        self.assertContains(
+            response,
+            reverse("prices:fragrantica_product_link", args=[source.pk]),
+        )
+        self.assertContains(response, reverse("prices:catalogue_linking_candidates"))
+
+    def test_catalogue_linking_candidate_endpoint_returns_fragrantica_matches(self):
+        source = FragranticaProduct.objects.create(
+            brand_name="Montale",
+            normalized_brand_name="montale",
+            name="Vanilla Extasy",
+            normalized_name="vanilla extasy",
+            collection_name="Fragrantica Collection",
+            audience="Women",
+            release_year=2008,
+            source_path="/perfume/Montale/Vanilla-Extasy-1.html",
+        )
+
+        response = self.client.get(
+            reverse("prices:catalogue_linking_candidates"),
+            {"perfume": self.perfume.pk, "min_score": "95"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["selected"]["id"], self.perfume.pk)
+        self.assertEqual(payload["candidates"][0]["source_id"], source.pk)
+        self.assertEqual(payload["candidates"][0]["score"], 100)
+        self.assertEqual(
+            payload["candidates"][0]["reason"],
+            "Exact brand and scent identity match",
+        )
+        self.assertEqual(
+            payload["candidates"][0]["link_url"],
+            reverse("prices:fragrantica_product_link", args=[source.pk]),
+        )
+
+    def test_catalogue_linking_workbench_bulk_links_checked_suggestions(self):
+        source = FragranticaProduct.objects.create(
+            brand_name="Montale",
+            normalized_brand_name="montale",
+            name="Vanilla Extasy",
+            normalized_name="vanilla extasy",
+            collection_name="Fragrantica Collection",
+            audience="Women",
+            release_year=2008,
+            source_path="/perfume/Montale/Vanilla-Extasy-1.html",
+        )
+
+        response = self.client.post(
+            reverse("prices:catalogue_linking_workbench"),
+            {
+                "action": "bulk_link",
+                "next": reverse("prices:catalogue_linking_workbench"),
+                "link_pair": f"{source.pk}:{self.perfume.pk}:0",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        source.refresh_from_db()
+        self.perfume.refresh_from_db()
+        self.assertEqual(source.matched_perfume, self.perfume)
+        self.assertEqual(source.match_status, FragranticaProduct.STATUS_LINKED)
+        self.assertEqual(self.perfume.name, "Vanilla Extasy")
+
     def test_fragrantica_products_uses_parser_preprocess_rules_for_identity(self):
         from assistant_core.models import GlobalRule
         from assistant_linking.services.parser_rules import clear_parser_rule_cache
@@ -8382,9 +8471,7 @@ class OurProductCatalogueListTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(
-            response, "Amouage / Reflection for Men Limited Edition"
-        )
+        self.assertContains(response, "Amouage / Reflection for Men Limited Edition")
         self.assertContains(response, "Exact brand and scent identity match")
         self.assertContains(
             response,

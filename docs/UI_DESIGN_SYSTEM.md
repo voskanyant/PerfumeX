@@ -276,6 +276,7 @@ History-back/cancel controls should be buttons with `data-history-back` and an o
 - Use `.metric-card`/`.kpi-link-card` for dashboard count/action cards.
 - Use `.card-label`, `.card-title`, and `.card-desc` inside cards/panels.
 - Import dashboard summaries use `.import-summary-card` variants in `imports.css`; product/catalog cards use existing `our-products-*` classes.
+- For bidirectional catalogue matching, extend the existing `.catalogue-linking-*` two-column workbench pattern instead of adding another one-off link list.
 - Do not nest decorative cards inside cards.
 
 ## Alerts, empty states, and status

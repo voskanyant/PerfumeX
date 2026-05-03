@@ -643,10 +643,11 @@ class SharedUiPartialRenderTests(SimpleTestCase):
         ).read_text(encoding="utf-8")
 
         self.assertIn("prices:our_product_list", content)
+        self.assertIn("prices:catalogue_linking_workbench", content)
         self.assertIn("tab=brands", content)
         self.assertIn("tab=collections", content)
         self.assertIn("tab=concentrations", content)
-        self.assertEqual(content.count('class="tab'), 4)
+        self.assertEqual(content.count('class="tab'), 5)
 
     def test_prices_supplier_import_tab_items_preserve_existing_links(self):
         content = (
@@ -987,6 +988,7 @@ class SharedUiPartialRenderTests(SimpleTestCase):
         ).read_text(encoding="utf-8")
 
         self.assertIn("prices:our_product_list", actions)
+        self.assertIn("prices:catalogue_linking_workbench", actions)
         self.assertIn("assistant_core:catalog_import", actions)
         self.assertIn('class="button secondary"', actions)
         self.assertIn('class="button primary"', actions)
@@ -1003,9 +1005,10 @@ class SharedUiPartialRenderTests(SimpleTestCase):
         ).read_text(encoding="utf-8")
 
         self.assertIn("prices:fragrantica_product_review", actions)
+        self.assertIn("prices:catalogue_linking_workbench", actions)
         self.assertIn("assistant_core:catalog_import", actions)
         self.assertIn("assistant_core:catalog_perfume_create", actions)
-        self.assertEqual(actions.count('class="button secondary"'), 2)
+        self.assertEqual(actions.count('class="button secondary"'), 3)
         self.assertIn('class="button primary"', actions)
         self.assertIn("total_count", meta)
 

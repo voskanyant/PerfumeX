@@ -1,0 +1,193 @@
+{% extends "prices/base.html" %}
+{% load static %}
+{% block title %}Catalogue Linking{% endblock %}
+{% block topbar_label %}Catalogue Linking{% endblock %}
+{% block content %}
+    {% include "includes/page_header.html" with kicker="Catalogue linking" title="Link Our Products with Fragrantica" %}
+    <div class="catalogue-linking-tab-grid">
+        {% include "includes/tabs.html" with class_name="catalogue-tabs" label="Our Products catalogue tabs" items_template="prices/_our_products_catalog_tab_items.html" %}
+        {% include "includes/tabs.html" with class_name="catalogue-tabs" label="Fragrantica catalogue tabs" items_template="prices/_fragrantica_catalogue_tab_items.html" active_fragrantica_tab="linking" %}
+    </div>
+    <div class="workspace-block catalogue-linking-workbench">
+        <form method="get" class="catalogue-linking-filters" aria-label="Linking filters">
+            <label class="catalogue-linking-filter">
+                <span>Brand</span>
+                <select name="brand">
+                    <option value="">All brands</option>
+                    {% for brand in brands %}
+                        <option value="{{ brand.id }}"
+                                {% if selected_brand == brand.id|stringformat:"s" %}selected{% endif %}>
+                            {{ brand.name }} ({{ brand.perfume_count }})
+                        </option>
+                    {% endfor %}
+                </select>
+            </label>
+            <label class="catalogue-linking-filter catalogue-linking-filter-wide">
+                <span>Search</span>
+                <input type="text"
+                       name="q"
+                       value="{{ search_query }}"
+                       placeholder="Brand, collection, scent, concentration">
+            </label>
+            <label class="catalogue-linking-filter">
+                <span>State</span>
+                <select name="status">
+                    <option value="all" {% if status_filter == "all" %}selected{% endif %}>All rows</option>
+                    <option value="unlinked" {% if status_filter == "unlinked" %}selected{% endif %}>Needs link</option>
+                    <option value="linked" {% if status_filter == "linked" %}selected{% endif %}>Linked</option>
+                </select>
+            </label>
+            <label class="catalogue-linking-filter">
+                <span>Confidence</span>
+                <select name="min_score" data-linking-min-score>
+                    <option value="0" {% if min_score == 0 %}selected{% endif %}>Any score</option>
+                    <option value="80" {% if min_score == 80 %}selected{% endif %}>80+</option>
+                    <option value="90" {% if min_score == 90 %}selected{% endif %}>90+</option>
+                    <option value="95" {% if min_score == 95 %}selected{% endif %}>95+</option>
+                    <option value="100" {% if min_score == 100 %}selected{% endif %}>Exact only</option>
+                </select>
+            </label>
+            <button class="button ghost" type="submit">Apply filters</button>
+        </form>
+
+        <div class="catalogue-linking-layout">
+            <section class="catalogue-linking-panel catalogue-linking-panel-left"
+                     aria-label="Our Products rows">
+                <div class="catalogue-linking-panel-head">
+                    <div>
+                        <span class="card-label">Left column</span>
+                        <h2 class="card-title">Our Products</h2>
+                    </div>
+                    <span class="catalogue-linking-count">{{ page_obj.paginator.count }} rows</span>
+                </div>
+                <form method="post" class="catalogue-linking-bulk-form">
+                    {% csrf_token %}
+                    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                    <input type="hidden" name="action" value="bulk_link">
+                    <div class="catalogue-linking-bulk-bar">
+                        <label class="catalogue-linking-check-all">
+                            <input type="checkbox" data-linking-check-all>
+                            <span>Ready suggestions</span>
+                        </label>
+                        <span class="tone-muted text-small">{{ ready_bulk_count }} visible above threshold</span>
+                        <button class="button primary" type="submit">Bulk link checked</button>
+                    </div>
+                    <div class="catalogue-linking-list" data-linking-list>
+                        {% for row in rows %}
+                            <article class="catalogue-linking-row {% if selected_row and selected_row.perfume.pk == row.perfume.pk %}is-selected{% endif %}"
+                                     data-linking-row
+                                     data-perfume-id="{{ row.perfume.pk }}"
+                                     data-candidates-url="{% url 'prices:catalogue_linking_candidates' %}?perfume={{ row.perfume.pk }}&min_score={{ min_score }}">
+                                <div class="catalogue-linking-row-check">
+                                    {% if row.ready_for_bulk %}
+                                        <input type="checkbox"
+                                               name="link_pair"
+                                               value="{{ row.top_candidate.source.pk }}:{{ row.perfume.pk }}:{% if row.top_candidate.creates_alias %}1{% else %}0{% endif %}"
+                                               aria-label="Select {{ row.label }} for bulk link">
+                                    {% else %}
+                                        <span aria-hidden="true"></span>
+                                    {% endif %}
+                                </div>
+                                <button class="catalogue-linking-row-button"
+                                        type="button"
+                                        data-linking-select>
+                                    <span class="catalogue-linking-row-title">{{ row.label }}</span>
+                                    <span class="catalogue-linking-row-meta">
+                                        {{ row.perfume.variant_count|default:0 }} variant{{ row.perfume.variant_count|default:0|pluralize }} ·
+                                        {{ row.perfume.linked_fragrantica_count|default:0 }} linked Fragrantica
+                                    </span>
+                                    {% if row.top_candidate %}
+                                        <span class="catalogue-linking-row-suggestion">
+                                            <span class="score-badge score-badge--{% if row.top_candidate.score >= 95 %}success{% elif row.top_candidate.score >= 90 %}strong{% else %}warning{% endif %}">
+                                                {{ row.top_candidate.score }}
+                                            </span>
+                                            {{ row.top_candidate.source.brand_name }} / {{ row.top_candidate.source.name }}
+                                        </span>
+                                    {% else %}
+                                        <span class="catalogue-linking-row-suggestion tone-muted">No confident Fragrantica suggestion</span>
+                                    {% endif %}
+                                </button>
+                            </article>
+                        {% empty %}
+                            {% include "includes/empty_state.html" with message="No Our Products rows match these filters." %}
+                        {% endfor %}
+                    </div>
+                </form>
+                {% if is_paginated %}
+                    {% include "includes/pagination.html" with page_obj=page_obj page_param="page" label="Catalogue linking pages" jump_id="catalogue-linking-page-jump" %}
+                {% endif %}
+            </section>
+
+            <section class="catalogue-linking-panel catalogue-linking-panel-right"
+                     aria-live="polite"
+                     aria-label="Fragrantica candidates"
+                     data-linking-panel
+                     data-next-url="{{ request.get_full_path }}">
+                <div class="catalogue-linking-panel-head">
+                    <div>
+                        <span class="card-label">Right column</span>
+                        <h2 class="card-title">Fragrantica matches</h2>
+                    </div>
+                    <span class="catalogue-linking-count" data-linking-candidate-count>
+                        {% if selected_row %}{{ selected_row.candidates|length }} candidates{% else %}0 candidates{% endif %}
+                    </span>
+                </div>
+                <div class="catalogue-linking-selected" data-linking-selected>
+                    {% if selected_row %}
+                        {{ selected_row.label }}
+                    {% else %}
+                        Select an Our Products row.
+                    {% endif %}
+                </div>
+                <div class="catalogue-linking-candidates" data-linking-candidates>
+                    {% if selected_row and selected_row.candidates %}
+                        {% for candidate in selected_row.candidates %}
+                            <form method="post"
+                                  action="{% url 'prices:fragrantica_product_link' candidate.source.pk %}"
+                                  class="catalogue-linking-candidate">
+                                {% csrf_token %}
+                                <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                <input type="hidden" name="perfume_id" value="{{ selected_row.perfume.pk }}">
+                                <input type="hidden" name="create_alias" value="{% if candidate.creates_alias %}1{% else %}0{% endif %}">
+                                <input type="hidden" name="apply_identity_group" value="1">
+                                <div class="catalogue-linking-candidate-main">
+                                    <span class="catalogue-linking-candidate-title">
+                                        {{ candidate.source.brand_name }}{% if candidate.source.collection_name %} / {{ candidate.source.collection_name }}{% endif %} / {{ candidate.source.name }}
+                                    </span>
+                                    <span class="catalogue-linking-candidate-meta">
+                                        {{ candidate.reason }} · Score {{ candidate.score }}{% if candidate.source.audience %} · {{ candidate.source.audience }}{% endif %}{% if candidate.source.release_year %} · {{ candidate.source.release_year }}{% endif %}
+                                    </span>
+                                </div>
+                                <div class="catalogue-linking-candidate-actions">
+                                    <span class="score-badge score-badge--{% if candidate.score >= 95 %}success{% elif candidate.score >= 90 %}strong{% else %}warning{% endif %}">
+                                        {{ candidate.score }}
+                                    </span>
+                                    {% if candidate.source.source_href %}
+                                        <a class="button ghost"
+                                           href="{{ candidate.source.source_href }}"
+                                           target="_blank"
+                                           rel="noopener">Open</a>
+                                    {% endif %}
+                                    {% if candidate.source.match_status == "linked" %}
+                                        <a class="button secondary"
+                                           href="{% url 'prices:fragrantica_product_review' %}?q={{ candidate.source.name|urlencode }}">Linked</a>
+                                    {% else %}
+                                        <button class="button primary" type="submit">Link</button>
+                                    {% endif %}
+                                </div>
+                            </form>
+                        {% endfor %}
+                    {% elif selected_row %}
+                        {% include "includes/empty_state.html" with message="No Fragrantica suggestions meet the current confidence filter." %}
+                    {% else %}
+                        {% include "includes/empty_state.html" with message="Select a row on the left to search Fragrantica matches." %}
+                    {% endif %}
+                </div>
+            </section>
+        </div>
+    </div>
+{% endblock %}
+{% block extra_scripts %}
+{{ block.super }}
+<script src="{% static 'prices/js/catalogue-linking.js' %}"></script>
+{% endblock %}
