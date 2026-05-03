@@ -1057,7 +1057,18 @@ def _catalog_name_from_audience_only_context(
     )
     audience_terms = {term for term in audience_terms if len(term) > 1}
     if candidate_key not in audience_terms:
-        return ""
+        token_keys = [
+            _catalog_scent_key(token) for token in normalize_text(candidate_text).split()
+        ]
+        non_audience_tokens = [
+            token_key for token_key in token_keys if token_key not in audience_terms
+        ]
+        audience_token_keys = [
+            token_key for token_key in token_keys if token_key in audience_terms
+        ]
+        if non_audience_tokens or not audience_token_keys:
+            return ""
+        candidate_key = max(audience_token_keys, key=len)
     brand_prefix_keys = {
         _catalog_scent_key(result.normalized_brand.name),
         *(

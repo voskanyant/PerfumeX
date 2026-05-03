@@ -1676,6 +1676,26 @@ class NormalizerTests(TestCase):
         self.assertEqual(parsed.packaging, "")
         self.assertEqual(parsed.variant_type, "standard")
 
+    def test_audience_only_catalogue_scent_ignores_duplicate_audience_marker(self):
+        brand = Brand.objects.create(name="Hugo Boss")
+        BrandAlias.objects.create(brand=brand, alias_text="H.BOSS", normalized_alias="h.boss")
+        brand.perfumes.create(name="Boss Woman", concentration="Eau de Parfum", audience="Woman")
+        product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="hugo-boss-woman-l-tester",
+            name="H.Boss Woman (L) \u0422\u0415\u0421\u0422\u0415\u0420 90ml EDP",
+        )
+
+        parsed = save_parse(product, force=True)
+
+        self.assertEqual(parsed.product_name_text, "Boss Woman")
+        self.assertEqual(parsed.supplier_gender_hint, "Woman")
+        self.assertEqual(parsed.variant_type, "tester")
+        self.assertEqual(
+            parsed.display_identity,
+            "Hugo Boss / Boss Woman / Eau de Parfum / 90ml / Tester",
+        )
+
     def test_catalog_base_name_drops_marketing_garbage_even_when_supplier_gender_differs(self):
         brand = Brand.objects.create(name="Afnan")
         BrandAlias.objects.create(brand=brand, alias_text="Afnan", normalized_alias="afnan")
