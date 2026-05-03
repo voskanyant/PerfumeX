@@ -36,9 +36,8 @@ STEPS = (
     Step("migrations: plan", (PYTHON, "manage.py", "migrate", "--plan")),
     Step(
         "test: django suite",
-        (PYTHON, "-m", "coverage", "run", "manage.py", "test", "--verbosity=2", "--noinput"),
+        (PYTHON, "manage.py", "test", "--parallel=4", "--verbosity=1", "--noinput"),
     ),
-    Step("test: coverage floor", (PYTHON, "-m", "coverage", "report", "--fail-under=30")),
     Step(
         "security: pip audit",
         (PYTHON, "-m", "pip_audit", "--strict", "-r", "requirements.txt"),

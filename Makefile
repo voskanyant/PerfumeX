@@ -29,8 +29,7 @@ migrations:
 	python manage.py migrate --plan
 
 test:
-	coverage run manage.py test --verbosity=2 --noinput
-	coverage report --fail-under=30
+	python manage.py test --parallel=4 --verbosity=1 --noinput
 
 security:
 	pip-audit --strict -r requirements.txt

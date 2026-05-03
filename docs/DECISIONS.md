@@ -160,3 +160,13 @@ Context: Staff need to link Fragrantica rows from either Fragrantica Products or
 Decision: Use the shared `/admin/our-products/linking/` two-column workbench for bidirectional Our Products <-> Fragrantica linking, confidence filtering, live candidate lookup, and bulk reviewed link actions.
 
 Consequences: Future Fragrantica/Our Products linking improvements should extend this workbench and its matching services instead of adding parallel link controls with separate behavior.
+
+## 2026-05-03 - Deploy pipeline skips repeated work
+
+Status: Accepted
+
+Context: Main-branch deploys were spending most time in serial Django tests, then repeating production setup work even when requirements, static assets, or normalization inputs did not change.
+
+Decision: Run CI Django tests in parallel and keep deploy steps change-aware. Production deploys should install requirements, collect static files, refresh normalization stats, or run parser reparses only when inputs changed or an explicit deploy environment option requests it.
+
+Consequences: Do not reintroduce fixed per-deploy reparses or unconditional package/static work. Use explicit maintenance commands or `DEPLOY_REPARSE_TERMS` for targeted production parser refreshes.

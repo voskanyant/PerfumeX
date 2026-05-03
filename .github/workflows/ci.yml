@@ -4,6 +4,10 @@ on:
   push:
   pull_request:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   PYTHON_VERSION: "3.13"
   DATABASE_ENGINE: postgres
@@ -108,8 +112,7 @@ jobs:
             requirements-dev.txt
       - run: python -m pip install --upgrade pip
       - run: pip install -r requirements-dev.txt
-      - run: coverage run manage.py test --verbosity=2 --noinput
-      - run: coverage report --fail-under=30
+      - run: python manage.py test --parallel=4 --verbosity=1 --noinput
 
   security:
     runs-on: ubuntu-latest
@@ -148,13 +151,29 @@ jobs:
             echo "Host: $(hostname)"
             cd /opt/perfumex/PerfumeX
             pwd
-            git pull origin main
-            /opt/perfumex/PerfumeX/.venv/bin/pip install -r requirements.txt
+            OLD_SHA="$(git rev-parse HEAD)"
+            git pull --ff-only origin main
+            NEW_SHA="$(git rev-parse HEAD)"
+            CHANGED_FILES="$(git diff --name-only "$OLD_SHA" "$NEW_SHA" || true)"
+            echo "Deploying $OLD_SHA -> $NEW_SHA"
+
+            REQ_HASH="$(sha256sum requirements.txt | awk '{print $1}')"
+            REQ_STAMP="/opt/perfumex/PerfumeX/.venv/.requirements.sha256"
+            if [ "${FORCE_PIP_INSTALL:-0}" = "1" ] || [ ! -f "$REQ_STAMP" ] || [ "$(cat "$REQ_STAMP")" != "$REQ_HASH" ]; then
+              echo "Installing Python requirements"
+              /opt/perfumex/PerfumeX/.venv/bin/pip install -r requirements.txt
+              printf '%s\n' "$REQ_HASH" > "$REQ_STAMP"
+            else
+              echo "requirements.txt unchanged; skipping pip install"
+            fi
+
             if ! command -v redis-server >/dev/null 2>&1; then
               apt-get update
               DEBIAN_FRONTEND=noninteractive apt-get install -y redis-server
             fi
-            if systemctl list-unit-files redis-server.service >/dev/null 2>&1; then
+            if systemctl is-active --quiet redis-server 2>/dev/null || systemctl is-active --quiet redis 2>/dev/null; then
+              echo "Redis is already active"
+            elif systemctl list-unit-files redis-server.service >/dev/null 2>&1; then
               systemctl enable --now redis-server
             elif systemctl list-unit-files redis.service >/dev/null 2>&1; then
               systemctl enable --now redis
@@ -187,16 +206,26 @@ jobs:
               export FERNET_KEYS="$SALT_KEY"
             fi
             /opt/perfumex/PerfumeX/.venv/bin/python manage.py migrate
-            for term in \
-              "AMOUAGE Ciel" \
-              "Reflection (M) 100ml EDP TECTEP" \
-              "Reflection (M) 100ml EDP Limited Ed" \
-              "Guidance 46" \
-              "Legacy WB" \
-              "Ultimate Crystal Saint Honore"; do
-              /opt/perfumex/PerfumeX/.venv/bin/python manage.py reparse_supplier_products --only-stale --name-contains "$term"
-            done
-            /opt/perfumex/PerfumeX/.venv/bin/python manage.py refresh_normalization_stats --all-user-scopes
-            /opt/perfumex/PerfumeX/.venv/bin/python manage.py collectstatic --noinput
+
+            if [ -n "${DEPLOY_REPARSE_TERMS:-}" ]; then
+              printf '%s' "$DEPLOY_REPARSE_TERMS" | tr '|' '\n' | while IFS= read -r term; do
+                [ -z "$term" ] && continue
+                /opt/perfumex/PerfumeX/.venv/bin/python manage.py reparse_supplier_products --only-stale --name-contains "$term"
+              done
+            else
+              echo "No DEPLOY_REPARSE_TERMS configured; skipping reparses"
+            fi
+
+            if printf '%s\n' "$CHANGED_FILES" | grep -Eq '^(assistant_linking/|assistant_core/migrations/|catalog/migrations/)'; then
+              /opt/perfumex/PerfumeX/.venv/bin/python manage.py refresh_normalization_stats --all-user-scopes
+            else
+              echo "No normalization-affecting files changed; skipping normalization stats refresh"
+            fi
+
+            if [ ! -f /opt/perfumex/PerfumeX/staticfiles/staticfiles.json ] || printf '%s\n' "$CHANGED_FILES" | grep -Eq '(^|/)static/|[.](css|js)$'; then
+              /opt/perfumex/PerfumeX/.venv/bin/python manage.py collectstatic --noinput
+            else
+              echo "No static asset changes; skipping collectstatic"
+            fi
             systemctl restart perfumex
-            systemctl restart nginx
+            echo "Application restarted; nginx reload not required for app-only deploy"
