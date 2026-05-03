@@ -1629,6 +1629,53 @@ class NormalizerTests(TestCase):
         self.assertTrue(parsed.is_tester)
         self.assertEqual(parsed.display_identity, "Afnan / Tribute White / Eau de Parfum / 100ml / Tester")
 
+    def test_supplier_white_comment_does_not_replace_audience_catalogue_scent(self):
+        brand = Brand.objects.create(name="Hugo Boss")
+        BrandAlias.objects.create(brand=brand, alias_text="H.BOSS", normalized_alias="h.boss")
+        brand.perfumes.create(name="Boss Woman", concentration="Eau de Parfum", audience="Woman")
+        product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="hugo-boss-woman-white-comment",
+            name="H.BOSS WOMAN edp 90 ml \u0411\u0415\u041b\u042b\u0419",
+        )
+
+        parsed = save_parse(product, force=True)
+
+        self.assertEqual(parsed.normalized_brand, brand)
+        self.assertEqual(parsed.product_name_text, "Boss Woman")
+        self.assertEqual(parsed.concentration, "Eau de Parfum")
+        self.assertEqual(parsed.size_ml, Decimal("90.00"))
+        self.assertEqual(parsed.supplier_gender_hint, "Woman")
+        self.assertEqual(
+            parsed.display_identity,
+            "Hugo Boss / Boss Woman / Eau de Parfum / 90ml",
+        )
+
+    def test_kb_supplier_comment_term_can_strip_non_packaging_notes(self):
+        brand = Brand.objects.create(name="Hugo Boss")
+        BrandAlias.objects.create(brand=brand, alias_text="H.BOSS", normalized_alias="h.boss")
+        brand.perfumes.create(name="Boss Woman", concentration="Eau de Parfum", audience="Woman")
+        GlobalRule.objects.create(
+            title="Supplier comment term: violet",
+            rule_kind="parser_supplier_comment_term",
+            scope_type="global",
+            rule_text="\u0444\u0438\u043e\u043b\u0435\u0442\u043e\u0432\u044b\u0439",
+            approved=True,
+            active=True,
+        )
+        cache.clear()
+        product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="hugo-boss-woman-violet-comment",
+            name="H.BOSS WOMAN edp 90 ml \u0444\u0438\u043e\u043b\u0435\u0442\u043e\u0432\u044b\u0439",
+        )
+
+        parsed = save_parse(product, force=True)
+
+        self.assertEqual(parsed.product_name_text, "Boss Woman")
+        self.assertEqual(parsed.packaging, "")
+        self.assertEqual(parsed.variant_type, "standard")
+
     def test_catalog_base_name_drops_marketing_garbage_even_when_supplier_gender_differs(self):
         brand = Brand.objects.create(name="Afnan")
         BrandAlias.objects.create(brand=brand, alias_text="Afnan", normalized_alias="afnan")

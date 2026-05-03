@@ -92,6 +92,12 @@ PARSER_RULE_KIND_OPTIONS = (
         "example": "без целлофана",
     },
     {
+        "key": "parser_supplier_comment_term",
+        "label": "Supplier comment term",
+        "description": "Removes supplier-only descriptive comments from the scent name without changing type or packaging.",
+        "example": "\u0431\u0435\u043b\u044b\u0439",
+    },
+    {
         "key": "parser_decoded_term",
         "label": "Decoded term",
         "description": "Marks decoded rows without treating the marker as part of the scent name.",

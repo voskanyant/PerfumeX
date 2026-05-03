@@ -63,13 +63,14 @@ Normalization and linking:
 3. Surface low-confidence/missing/conflict rows in normalization queues.
 4. Treat complete parse identity as separate from catalogue/link evidence; a clean parse can still need catalogue or link review.
 5. Treat damaged/no-cellophane packaging phrases as structured dented packaging terms (`parser_dented_packaging_term`), not as garbage exclusions. Treat supplier cap and old-design abbreviations such as `c фирм. крыш` and `ст.ди` as structured packaging terms, not scent-name tokens.
-6. Distinguish refill products from refillable bottles: `refill`/`refil` means the product is a refill, while `refillable` is packaging/comment-style metadata and must not become part of the scent name or refill type.
-7. Normalize Cyrillic/Latin lookalike letters inside otherwise Latin supplier tokens before parsing, so mixed-script scent names such as `Ciel` keep their Latin identity while fully Cyrillic supplier notes stay available to Russian term rules.
-8. Expand supplier abbreviations such as `Limited Ed.` to canonical name suffixes such as `Limited Edition`; when the supplier gives an audience hint and the catalogue has audience-specific base scents, keep that audience in the canonical scent name before the suffix.
-9. Treat supplier collection-looking prefixes as untrusted unless backed by a collection alias; use product aliases when supplier text incorrectly prepends a collection name to a scent, preserve intentional uppercase suffixes such as `WB`, and canonicalize supplier-expanded short names such as `Saint Honore` to catalogue style `St Honore`.
-10. Build `MatchGroup` records for likely same-product rows.
-11. Staff approve/reject/link through manual decisions or bulk actions.
-12. Persist links to `SupplierProduct.catalog_perfume` and optional `catalog_variant`; audit decisions.
+6. Treat supplier-only descriptor/color comments such as Cyrillic `белый` as `parser_supplier_comment_term` text that is stripped from the scent name without changing type or packaging.
+7. Distinguish refill products from refillable bottles: `refill`/`refil` means the product is a refill, while `refillable` is packaging/comment-style metadata and must not become part of the scent name or refill type.
+8. Normalize Cyrillic/Latin lookalike letters inside otherwise Latin supplier tokens before parsing, so mixed-script scent names such as `Ciel` keep their Latin identity while fully Cyrillic supplier notes stay available to Russian term rules.
+9. Expand supplier abbreviations such as `Limited Ed.` to canonical name suffixes such as `Limited Edition`; when the supplier gives an audience hint and the catalogue has audience-specific base scents, keep that audience in the canonical scent name before the suffix.
+10. Treat supplier collection-looking prefixes as untrusted unless backed by a collection alias; use product aliases when supplier text incorrectly prepends a collection name to a scent, preserve intentional uppercase suffixes such as `WB`, and canonicalize supplier-expanded short names such as `Saint Honore` to catalogue style `St Honore`.
+11. Build `MatchGroup` records for likely same-product rows.
+12. Staff approve/reject/link through manual decisions or bulk actions.
+13. Persist links to `SupplierProduct.catalog_perfume` and optional `catalog_variant`; audit decisions.
 
 External catalogue import:
 1. Parse saved HTML or parsed Fragrantica catalogue JSON/CSV into staged `FragranticaProduct` rows.

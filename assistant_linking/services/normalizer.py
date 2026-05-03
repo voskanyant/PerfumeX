@@ -47,7 +47,7 @@ from prices.models import SupplierProduct
 
 
 logger = logging.getLogger(__name__)
-PARSER_VERSION = "deterministic-v25"
+PARSER_VERSION = "deterministic-v26"
 REGEX_ALIAS_TIMEOUT_SECONDS = 1.0
 CATALOG_CONCENTRATION_CONFLICT_WARNING = (
     "Catalogue match suggests {suggested}. Supplier text parsed as {parsed}."
@@ -231,6 +231,12 @@ DENTED_PACKAGING_TERMS = (
     "помят",
 )
 REFILLABLE_PACKAGING_TERMS = ("refillable",)
+SUPPLIER_COMMENT_TERMS = (
+    "\u0431\u0435\u043b\u044b\u0439",
+    "\u0431\u0435\u043b\u0430\u044f",
+    "\u0431\u0435\u043b\u043e\u0435",
+    "\u0431\u0435\u043b",
+)
 DECODED_TERMS = ("decoded", "dec", "декод", "декодированный")
 GRAY_BOX_TERMS = ("gray box", "grey box", "серый бокс", "серый короб", "серая коробка")
 GRAY_BOX_COLOR_TERMS = ("серый", "серая", "сер", "gray", "grey")
@@ -555,6 +561,10 @@ def _dented_packaging_terms() -> tuple[str, ...]:
 
 def _refillable_packaging_terms() -> tuple[str, ...]:
     return _kb_terms("parser_refillable_packaging_term", REFILLABLE_PACKAGING_TERMS)
+
+
+def _supplier_comment_terms() -> tuple[str, ...]:
+    return _kb_terms("parser_supplier_comment_term", SUPPLIER_COMMENT_TERMS)
 
 
 def _with_cap_packaging_terms() -> tuple[str, ...]:
@@ -1018,6 +1028,61 @@ def _catalog_name_matches_audience_hint(value: str, result: ParseResult) -> bool
         re.search(rf"\s+{re.escape(normalize_text(suffix))}$", normalized_name)
         for suffix in sorted(suffixes, key=len, reverse=True)
     )
+
+
+def _catalog_name_from_audience_only_context(
+    result: ParseResult,
+    candidate_text: str,
+    audience_aliases: tuple[tuple[str, str, str], ...],
+) -> str:
+    if (
+        not result.normalized_brand
+        or not result.normalized_brand.id
+        or not result.supplier_gender_hint
+    ):
+        return ""
+    candidate_key = _catalog_scent_key(candidate_text)
+    if len(candidate_key) < 2:
+        return ""
+    expected_group = audience_group(result.supplier_gender_hint)
+    audience_terms = {
+        _catalog_scent_key(alias)
+        for alias, _display, group in audience_aliases
+        if group == expected_group
+    }
+    audience_terms.update(
+        _catalog_scent_key(display)
+        for _alias, display, group in audience_aliases
+        if group == expected_group
+    )
+    audience_terms = {term for term in audience_terms if len(term) > 1}
+    if candidate_key not in audience_terms:
+        return ""
+    brand_prefix_keys = {
+        _catalog_scent_key(result.normalized_brand.name),
+        *(
+            _catalog_scent_key(alias)
+            for alias in _generated_brand_alias_candidates(result.normalized_brand)
+        ),
+    }
+    brand_prefix_keys = {key for key in brand_prefix_keys if key}
+    names = {
+        perfume.name
+        for perfume in Perfume.objects.filter(
+            brand_id=result.normalized_brand.id
+        ).only("name", "concentration", "audience", "collection_name")
+        if _catalog_perfume_matches_parse_context(perfume, result)
+        and (
+            _catalog_scent_key(perfume.name) == candidate_key
+            or any(
+                _catalog_scent_key(perfume.name) == f"{prefix}{candidate_key}"
+                for prefix in brand_prefix_keys
+            )
+        )
+    }
+    if len(names) == 1:
+        return names.pop()
+    return ""
 
 
 def _catalog_name_with_audience_before_name_extension(
@@ -1709,6 +1774,7 @@ def parse_supplier_product(product: SupplierProduct) -> ParseResult:
     set_terms = _set_terms()
     refill_terms = _refill_terms()
     decoded_terms = _decoded_terms()
+    supplier_comment_terms = _supplier_comment_terms()
     cosmetic_poudre_terms = _cosmetic_poudre_terms()
     deodorant_terms = _deodorant_terms()
     detected_packaging, packaging_descriptor_terms = _extract_packaging_descriptor(text)
@@ -1811,6 +1877,7 @@ def parse_supplier_product(product: SupplierProduct) -> ParseResult:
         *deodorant_terms,
         *refill_terms,
         *decoded_terms,
+        *supplier_comment_terms,
         *packaging_descriptor_terms,
         *variant_type_terms,
         *NO_BOX_TERMS,
@@ -1928,6 +1995,7 @@ def parse_supplier_product(product: SupplierProduct) -> ParseResult:
                 *deodorant_terms,
                 *refill_terms,
                 *decoded_terms,
+                *supplier_comment_terms,
                 *packaging_descriptor_terms,
                 *variant_type_terms,
                 *NO_BOX_TERMS,
@@ -1938,6 +2006,20 @@ def parse_supplier_product(product: SupplierProduct) -> ParseResult:
         result.product_name_text = _clean_product_name_text(remaining)
 
     result.product_name_text = _clean_product_name_text(result.product_name_text)
+    if not result.product_name_text:
+        audience_identity_text = _strip_known_terms(
+            text,
+            [
+                result.raw_size_text,
+                result.concentration,
+                *product_alias_non_name_terms,
+            ],
+        )
+        result.product_name_text = _catalog_name_from_audience_only_context(
+            result,
+            audience_identity_text,
+            audience_aliases,
+        )
     result.product_name_text = _strip_trailing_supplier_status_garbage(result)
     result.product_name_text = _strip_cyrillic_name_tokens_for_latin_brand(result)
     result.product_name_text = _strip_redundant_trailing_audience_suffix(result)
