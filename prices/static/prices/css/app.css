@@ -1845,17 +1845,30 @@ select:focus {
   display: grid;
   grid-template-columns: minmax(0, 1.05fr) minmax(360px, 0.95fr);
   gap: 16px;
-  align-items: start;
+  align-items: stretch;
+  min-height: 520px;
+  height: calc(100vh - 290px);
+  height: calc(100dvh - 290px);
 }
 .catalogue-linking-panel {
   min-width: 0;
+  min-height: 0;
   border: 1px solid var(--grey-200);
   border-radius: var(--radius-sm);
   background: var(--white);
 }
+.catalogue-linking-panel-left,
+.catalogue-linking-panel-right {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
 .catalogue-linking-panel-right {
   position: sticky;
-  top: 84px;
+  top: 16px;
+  max-height: calc(100vh - 96px);
+  max-height: calc(100dvh - 96px);
+  overflow: hidden;
 }
 .catalogue-linking-panel-head {
   display: flex;
@@ -1883,6 +1896,12 @@ select:focus {
   border-bottom: 1px solid var(--grey-200);
   background: var(--grey-50);
 }
+.catalogue-linking-bulk-form {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+}
 .catalogue-linking-check-all {
   display: inline-flex;
   align-items: center;
@@ -1892,6 +1911,9 @@ select:focus {
 }
 .catalogue-linking-list {
   display: grid;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
 }
 .catalogue-linking-row {
   display: grid;
@@ -1956,7 +1978,10 @@ select:focus {
 }
 .catalogue-linking-candidates {
   display: grid;
+  flex: 1 1 auto;
   gap: 10px;
+  min-height: 0;
+  overflow-y: auto;
   padding: 14px;
 }
 .catalogue-linking-candidate {
@@ -2662,8 +2687,23 @@ pre, code {
   .catalogue-linking-layout {
     grid-template-columns: 1fr;
   }
+  .catalogue-linking-layout {
+    height: auto;
+    min-height: 0;
+  }
+  .catalogue-linking-panel-left,
   .catalogue-linking-panel-right {
+    display: block;
     position: static;
+    max-height: none;
+    overflow: visible;
+  }
+  .catalogue-linking-bulk-form {
+    display: block;
+  }
+  .catalogue-linking-list,
+  .catalogue-linking-candidates {
+    overflow: visible;
   }
   .catalogue-linking-bulk-bar,
   .catalogue-linking-panel-head,
