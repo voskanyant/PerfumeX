@@ -25,6 +25,8 @@
                 <form id="variant-form-{{ variant.pk }}" class="catalogue-row-form" method="post" action="{% url 'prices:our_product_variant_inline_update' variant.pk %}">
                     {% csrf_token %}
                     <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                    <input type="hidden" name="perfume_id" value="{{ variant.perfume.pk }}">
+                    <input type="hidden" name="apply_identity_group" value="1">
                     <div class="our-products-card-main">
                         <div class="our-products-card-body">
                             <div class="our-products-full-name" aria-label="Parsed product">
@@ -56,6 +58,38 @@
                                     <span class="catalogue-cell-value">{{ variant.variant_type }}</span>
                                 {% endif %}
                             </div>
+                            {% if variant.fragrantica_candidates %}
+                                <div class="fragrantica-match-panel"
+                                     aria-label="Suggested Fragrantica matches">
+                                    <div class="fragrantica-match-panel-head">
+                                        <span>Suggested Fragrantica matches</span>
+                                        <span>Link without leaving this page</span>
+                                    </div>
+                                    {% for candidate in variant.fragrantica_candidates %}
+                                        <div class="fragrantica-match-option">
+                                            <div class="fragrantica-match-summary">
+                                                <span class="fragrantica-match-name">
+                                                    {{ candidate.source.brand_name }} / {{ candidate.source.name }}{% if candidate.source.audience %} / {{ candidate.source.audience }}{% endif %}{% if candidate.source.release_year %} / {{ candidate.source.release_year }}{% endif %}
+                                                </span>
+                                                <span class="fragrantica-match-reason">
+                                                    {{ candidate.reason }} &middot; Score {{ candidate.score }}{% if candidate.source.collection_name %} &middot; {{ candidate.source.collection_name }}{% endif %}
+                                                </span>
+                                            </div>
+                                            {% if candidate.source.match_status == "linked" %}
+                                                <a class="button secondary"
+                                                   href="{% url 'prices:fragrantica_product_review' %}?q={{ candidate.source.name|urlencode }}">Linked</a>
+                                            {% else %}
+                                                <button class="button {% if forloop.first %}primary{% else %}secondary{% endif %}"
+                                                        type="submit"
+                                                        name="create_alias"
+                                                        value="{% if candidate.creates_alias %}1{% else %}0{% endif %}"
+                                                        formaction="{% url 'prices:fragrantica_product_link' candidate.source.pk %}"
+                                                        title="{{ candidate.reason }}">Link</button>
+                                            {% endif %}
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
                         </div>
                         <div class="our-products-row-flags" aria-label="Flags">
                             {% if variant.is_tester %}
@@ -86,15 +120,8 @@
                                     <a class="button secondary"
                                        href="{% url 'prices:fragrantica_product_review' %}?q={{ candidate.source.name|urlencode }}">Linked</a>
                                 {% else %}
-                                    <input type="hidden" name="perfume_id" value="{{ variant.perfume.pk }}">
-                                    <input type="hidden" name="create_alias" value="{% if candidate.creates_alias %}1{% else %}0{% endif %}">
-                                    <input type="hidden" name="apply_identity_group" value="1">
-                                    <button class="button secondary"
-                                            type="submit"
-                                            formaction="{% url 'prices:fragrantica_product_link' candidate.source.pk %}"
-                                            title="{{ candidate.reason }}">
-                                        Link Fragrantica
-                                    </button>
+                                    <a class="button secondary"
+                                       href="{% url 'prices:fragrantica_product_review' %}?q={{ candidate.source.name|urlencode }}">Review matches</a>
                                 {% endif %}
                             {% empty %}
                                 <a class="button ghost"

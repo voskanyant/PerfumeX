@@ -7951,7 +7951,7 @@ class OurProductCatalogueListTests(TestCase):
     def test_our_products_page_suggests_fragrantica_name_hint_match(self):
         self.perfume.name = "Vanilla Extasy Women"
         self.perfume.save(update_fields=["name", "updated_at"])
-        FragranticaProduct.objects.create(
+        source = FragranticaProduct.objects.create(
             brand_name="Montale",
             normalized_brand_name="montale",
             name="Vanilla Extasy pour Femme",
@@ -7965,9 +7965,15 @@ class OurProductCatalogueListTests(TestCase):
         response = self.client.get(reverse("prices:our_product_list"))
 
         self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Suggested Fragrantica matches")
+        self.assertContains(response, "Link without leaving this page")
         self.assertContains(response, "name hint")
         self.assertContains(response, "Fragrantica Collection")
-        self.assertContains(response, "Link Fragrantica")
+        self.assertContains(response, "Montale / Vanilla Extasy pour Femme")
+        self.assertContains(
+            response,
+            reverse("prices:fragrantica_product_link", args=[source.pk]),
+        )
 
     def test_fragrantica_products_lists_fragrantica_rows_only(self):
         supplier = models.Supplier.objects.create(name="Antonina")
