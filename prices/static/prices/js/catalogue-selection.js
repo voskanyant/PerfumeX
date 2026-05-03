@@ -35,6 +35,54 @@
         return rowsForRoot(root).filter(isRowSelected);
     }
 
+    function actionRows(root, action) {
+        var rows = selectedRows(root);
+        if (action.getAttribute("data-catalogue-selected-source") === "link-pair") {
+            return rows.filter(function (row) {
+                return Boolean(row.getAttribute("data-catalogue-link-pair"));
+            });
+        }
+        return rows;
+    }
+
+    function selectedValueForRow(row, action) {
+        if (action.getAttribute("data-catalogue-selected-source") === "link-pair") {
+            return row.getAttribute("data-catalogue-link-pair") || "";
+        }
+        return row.getAttribute("data-catalogue-row-id") || "";
+    }
+
+    function prepareSelectionSubmit(button) {
+        if (!button || button.disabled) return false;
+        var form = button.form || button.closest("form");
+        if (!form) return false;
+        var root = button.closest("[data-catalogue-selection-root]") || document;
+        var actionValue = button.getAttribute("data-catalogue-action-value");
+        var selectedName = button.getAttribute("data-catalogue-selected-name");
+        if (actionValue) {
+            var actionInput = form.querySelector("input[name='action']");
+            if (actionInput) {
+                actionInput.value = actionValue;
+            }
+        }
+        if (!selectedName) return true;
+        form.querySelectorAll("[data-catalogue-generated-selection-input]").forEach(function (input) {
+            input.remove();
+        });
+        var rows = actionRows(root, button);
+        rows.forEach(function (row) {
+            var value = selectedValueForRow(row, button);
+            if (!value) return;
+            var input = document.createElement("input");
+            input.type = "hidden";
+            input.name = selectedName;
+            input.value = value;
+            input.setAttribute("data-catalogue-generated-selection-input", "1");
+            form.appendChild(input);
+        });
+        return rows.length > 0;
+    }
+
     function updateCheckAll(root) {
         var checkAll = root.querySelector("[data-catalogue-check-all]");
         if (!checkAll) return;
@@ -53,7 +101,7 @@
             bar.hidden = count === 0;
         });
         root.querySelectorAll("[data-catalogue-selection-action]").forEach(function (action) {
-            action.disabled = count === 0;
+            action.disabled = actionRows(root, action).length === 0;
         });
         updateCheckAll(root);
     }
@@ -118,6 +166,7 @@
 
     function submitWithButton(button) {
         if (!button || button.disabled) return;
+        if (!prepareSelectionSubmit(button)) return;
         var form = button.form || button.closest("form");
         if (!form) return;
         if (typeof form.requestSubmit === "function") {
@@ -161,6 +210,14 @@
                 });
                 root.dataset.selectionAnchor = "";
                 updateStatus(root);
+            });
+        });
+
+        root.querySelectorAll("[data-catalogue-selection-action]").forEach(function (button) {
+            button.addEventListener("click", function (event) {
+                if (!prepareSelectionSubmit(button)) {
+                    event.preventDefault();
+                }
             });
         });
 

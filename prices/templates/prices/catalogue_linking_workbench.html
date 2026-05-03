@@ -67,19 +67,30 @@
                     <div class="catalogue-linking-bulk-bar">
                         <label class="catalogue-linking-check-all">
                             <input type="checkbox" data-catalogue-check-all>
-                            <span>Ready suggestions</span>
+                            <span>Visible rows</span>
                         </label>
                         <span class="tone-muted text-small">
-                            <span data-catalogue-selected-count>0</span> selected · {{ ready_bulk_count }} visible above threshold
+                            <span data-catalogue-selected-count>0</span> selected / {{ ready_bulk_count }} ready link suggestion{{ ready_bulk_count|pluralize }}
                         </span>
                         <div class="catalogue-selection-actions">
                             <button class="button ghost"
                                     type="button"
                                     data-catalogue-clear-selection>Clear selection</button>
+                            <button class="button danger"
+                                    type="submit"
+                                    data-catalogue-selection-action
+                                    data-catalogue-bulk-delete
+                                    data-catalogue-selected-name="perfume_id"
+                                    data-catalogue-action-value="bulk_delete_perfumes"
+                                    data-confirm="Delete selected Our Products perfume rows and their variants? Supplier and Fragrantica links will be cleared."
+                                    disabled>Delete selected</button>
                             <button class="button primary"
                                     type="submit"
                                     data-catalogue-selection-action
                                     data-catalogue-bulk-primary
+                                    data-catalogue-selected-name="link_pair"
+                                    data-catalogue-selected-source="link-pair"
+                                    data-catalogue-action-value="bulk_link"
                                     disabled>Bulk link checked</button>
                         </div>
                     </div>
@@ -89,22 +100,13 @@
                                      data-linking-row
                                      data-catalogue-selectable-row
                                      data-catalogue-row-id="{{ row.perfume.pk }}"
+                                     {% if row.ready_for_bulk %}data-catalogue-link-pair="{{ row.top_candidate.source.pk }}:{{ row.perfume.pk }}:{% if row.top_candidate.creates_alias %}1{% else %}0{% endif %}"{% endif %}
                                      data-perfume-id="{{ row.perfume.pk }}"
                                      data-candidates-url="{% url 'prices:catalogue_linking_candidates' %}?perfume={{ row.perfume.pk }}&min_score={{ min_score }}">
                                 <div class="catalogue-linking-row-check">
-                                    {% if row.ready_for_bulk %}
-                                        <input type="checkbox"
-                                               name="link_pair"
-                                               value="{{ row.top_candidate.source.pk }}:{{ row.perfume.pk }}:{% if row.top_candidate.creates_alias %}1{% else %}0{% endif %}"
-                                               data-catalogue-select-checkbox
-                                               aria-label="Select {{ row.label }} for bulk link">
-                                    {% else %}
-                                        <input type="checkbox"
-                                               data-catalogue-select-checkbox
-                                               aria-label="No bulk suggestion for {{ row.label }}"
-                                               disabled
-                                               hidden>
-                                    {% endif %}
+                                    <input type="checkbox"
+                                           data-catalogue-select-checkbox
+                                           aria-label="Select {{ row.label }}">
                                 </div>
                                 <button class="catalogue-linking-row-button"
                                         type="button"

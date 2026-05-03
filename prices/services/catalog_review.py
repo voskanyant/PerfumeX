@@ -1539,13 +1539,51 @@ def run_catalogue_linking_bulk_action(
         allowed_hosts={host} if host else None,
     ):
         redirect_url = reverse("prices:catalogue_linking_workbench")
-    if post_data.get("action") != "bulk_link":
+    action = post_data.get("action")
+    source_manager = source_manager or FragranticaProduct.objects
+    perfume_manager = perfume_manager or CatalogPerfume.objects
+
+    if action == "bulk_delete_perfumes":
+        perfume_ids = (
+            post_data.getlist("perfume_id")
+            if hasattr(post_data, "getlist")
+            else post_data.get("perfume_id", [])
+        )
+        if isinstance(perfume_ids, str):
+            perfume_ids = [perfume_ids]
+        clean_ids = [
+            perfume_id for perfume_id in perfume_ids if str(perfume_id).isdigit()
+        ]
+        if not clean_ids:
+            return CatalogueLinkingBulkResult(
+                "error",
+                "Select Our Products rows to delete.",
+                redirect_url,
+            )
+        queryset = perfume_manager.filter(pk__in=clean_ids)
+        deleted_count = queryset.count()
+        if not deleted_count:
+            return CatalogueLinkingBulkResult(
+                "error",
+                "Selected Our Products rows were not found.",
+                redirect_url,
+            )
+        source_manager.filter(matched_perfume_id__in=clean_ids).update(
+            matched_perfume=None,
+            match_status=FragranticaProduct.STATUS_UNLINKED,
+        )
+        queryset.delete()
+        return CatalogueLinkingBulkResult(
+            "success",
+            f"Deleted {deleted_count} Our Products perfume row(s).",
+            redirect_url,
+        )
+
+    if action != "bulk_link":
         return CatalogueLinkingBulkResult(
             "error", "Unknown linking action.", redirect_url
         )
 
-    source_manager = source_manager or FragranticaProduct.objects
-    perfume_manager = perfume_manager or CatalogPerfume.objects
     selected_pairs = post_data.getlist("link_pair")
     if not selected_pairs:
         return CatalogueLinkingBulkResult(

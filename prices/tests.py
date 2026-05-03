@@ -8610,6 +8610,45 @@ class OurProductCatalogueListTests(TestCase):
         self.assertEqual(source.match_status, FragranticaProduct.STATUS_LINKED)
         self.assertEqual(self.perfume.name, "Vanilla Extasy")
 
+    def test_catalogue_linking_workbench_selects_rows_without_suggestions(self):
+        response = self.client.get(reverse("prices:catalogue_linking_workbench"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "data-catalogue-bulk-delete")
+        self.assertContains(response, 'data-catalogue-selected-name="perfume_id"')
+        self.assertContains(response, 'data-catalogue-selected-source="link-pair"')
+        self.assertContains(
+            response, 'aria-label="Select Montale / Vanilla Extasy / Eau de Parfum"'
+        )
+        self.assertNotContains(response, "No bulk suggestion for")
+
+    def test_catalogue_linking_workbench_bulk_deletes_selected_perfumes(self):
+        source = FragranticaProduct.objects.create(
+            brand_name="Montale",
+            normalized_brand_name="montale",
+            name="Vanilla Extasy",
+            normalized_name="vanilla extasy",
+            matched_perfume=self.perfume,
+            match_status=FragranticaProduct.STATUS_LINKED,
+            source_path="/perfume/Montale/Vanilla-Extasy-1.html",
+        )
+
+        response = self.client.post(
+            reverse("prices:catalogue_linking_workbench"),
+            {
+                "action": "bulk_delete_perfumes",
+                "next": reverse("prices:catalogue_linking_workbench"),
+                "perfume_id": [str(self.perfume.pk)],
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(Perfume.objects.filter(pk=self.perfume.pk).exists())
+        self.assertFalse(PerfumeVariant.objects.filter(pk=self.variant.pk).exists())
+        source.refresh_from_db()
+        self.assertIsNone(source.matched_perfume)
+        self.assertEqual(source.match_status, FragranticaProduct.STATUS_UNLINKED)
+
     def test_fragrantica_link_normalizes_uppercase_collection_before_applying(self):
         source = FragranticaProduct.objects.create(
             brand_name="Montale",
