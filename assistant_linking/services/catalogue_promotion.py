@@ -12,6 +12,7 @@ from assistant_linking.models import FragranticaProduct
 from assistant_linking.utils.text import normalize_alias_value
 from catalog.models import Brand, Perfume, get_or_create_collection
 from prices.services.catalog_review import apply_fragrantica_identity_to_perfume
+from prices.services.catalog_review import normalize_catalogue_collection_name
 
 
 SCHEMA_VERSION = 1
@@ -178,7 +179,9 @@ def _resolve_target_perfume(
             brand=brand,
             name=perfume_name,
             concentration=(target.get("concentration") or "").strip(),
-            collection_name=(target.get("collection_name") or "").strip(),
+            collection_name=normalize_catalogue_collection_name(
+                target.get("collection_name") or ""
+            ),
             audience=(target.get("audience") or "").strip(),
             release_year=target.get("release_year") or None,
         ),

@@ -8610,6 +8610,39 @@ class OurProductCatalogueListTests(TestCase):
         self.assertEqual(source.match_status, FragranticaProduct.STATUS_LINKED)
         self.assertEqual(self.perfume.name, "Vanilla Extasy")
 
+    def test_fragrantica_link_normalizes_uppercase_collection_before_applying(self):
+        source = FragranticaProduct.objects.create(
+            brand_name="Montale",
+            normalized_brand_name="montale",
+            name="Vanilla Extasy",
+            normalized_name="vanilla extasy",
+            collection_name="PARFUM ORIENTAL FOR WOMEN",
+            audience="Women",
+            release_year=2008,
+            source_path="/perfume/Montale/Vanilla-Extasy-1.html",
+        )
+
+        response = self.client.post(
+            reverse("prices:fragrantica_product_link", args=[source.pk]),
+            {
+                "perfume_id": str(self.perfume.pk),
+                "next": reverse("prices:fragrantica_product_review"),
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.perfume.refresh_from_db()
+        self.assertEqual(self.perfume.collection_name, "Parfum Oriental for Women")
+        self.assertEqual(self.perfume.collection.name, "Parfum Oriental for Women")
+
+    def test_catalogue_collection_title_case_preserves_known_acronyms(self):
+        from prices.services.catalog_review import normalize_catalogue_collection_name
+
+        self.assertEqual(
+            normalize_catalogue_collection_name("LEGACY WB AND ORIENTAL II"),
+            "Legacy WB and Oriental II",
+        )
+
     def test_fragrantica_products_uses_parser_preprocess_rules_for_identity(self):
         from assistant_core.models import GlobalRule
         from assistant_linking.services.parser_rules import clear_parser_rule_cache

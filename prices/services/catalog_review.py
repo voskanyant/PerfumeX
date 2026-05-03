@@ -23,6 +23,8 @@ from assistant_linking.models import BrandAlias
 from assistant_linking.models import FragranticaProduct
 from assistant_linking.models import ParsedSupplierProduct
 from assistant_linking.models import ProductAlias
+from assistant_linking.models import TITLECASE_APOSTROPHE_SUFFIXES
+from assistant_linking.models import TITLECASE_LOWER_WORDS
 from assistant_linking.services.parser_rules import get_regex_preprocess_rules
 from assistant_linking.utils.text import normalize_alias_value
 from assistant_linking.utils.text import normalize_mixed_script_latin_lookalikes
@@ -48,6 +50,13 @@ FRAGRANTICA_REVIEW_STATUSES = {
     "ignored",
 }
 OUR_PRODUCT_CATALOG_TABS = {"products", "brands", "collections", "concentrations"}
+COLLECTION_TITLECASE_ACRONYMS = {
+    "DNA",
+    "VIP",
+    "WB",
+}
+ROMAN_NUMERAL_RE = re.compile(r"^[IVXLCDM]+$")
+TITLE_WORD_RE = re.compile(r"[A-Za-zÀ-ÖØ-öø-ÿ]+(?:'[A-Za-zÀ-ÖØ-öø-ÿ]+)?")
 CATALOGUE_LINKING_STATUSES = {"all", "unlinked", "linked"}
 CATALOG_VARIANT_SEARCH_FIELDS = (
     "perfume__name",
@@ -1698,18 +1707,62 @@ def first_from_queryset(queryset):
     return next(iter(queryset), None)
 
 
+def _catalogue_collection_title_word(word: str, index: int) -> str:
+    if not word:
+        return word
+    lower_word = word.lower()
+    if index > 0 and lower_word in TITLECASE_LOWER_WORDS:
+        return lower_word
+    if word.upper() in COLLECTION_TITLECASE_ACRONYMS:
+        return word.upper()
+    if word.isupper() and ROMAN_NUMERAL_RE.match(word):
+        return word
+    return lower_word[:1].upper() + lower_word[1:]
+
+
+def normalize_catalogue_collection_name(value: str) -> str:
+    """Normalize reviewed external collection names before storing locally."""
+
+    text = re.sub(r"\s+", " ", (value or "").strip())
+    if not text:
+        return ""
+
+    word_index = 0
+
+    def replace_word(match: re.Match[str]) -> str:
+        nonlocal word_index
+        raw_word = match.group(0)
+        apostrophe_parts = raw_word.split("'")
+        normalized_parts = []
+        for part_index, part in enumerate(apostrophe_parts):
+            if part_index > 0 and part.lower() in TITLECASE_APOSTROPHE_SUFFIXES:
+                normalized_parts.append(part.lower())
+                continue
+            normalized_parts.append(
+                _catalogue_collection_title_word(
+                    part,
+                    word_index if part_index == 0 else 0,
+                )
+            )
+        word_index += 1
+        return "'".join(normalized_parts)
+
+    return TITLE_WORD_RE.sub(replace_word, text)
+
+
 def apply_fragrantica_identity_to_perfume(source, perfume) -> list[str]:
     changed_fields = []
     if source.name and perfume.name != source.name:
         perfume.name = source.name
         changed_fields.append("name")
-    if source.collection_name and perfume.collection_name != source.collection_name:
-        perfume.collection_name = source.collection_name
+    source_collection_name = normalize_catalogue_collection_name(source.collection_name)
+    if source_collection_name and perfume.collection_name != source_collection_name:
+        perfume.collection_name = source_collection_name
         changed_fields.append("collection_name")
-    source_collection = getattr(source, "collection", None)
-    if not source_collection and source.collection_name:
+    source_collection = None
+    if source_collection_name:
         source_collection = get_or_create_collection(
-            perfume.brand, source.collection_name
+            perfume.brand, source_collection_name
         )
     if source_collection and perfume.collection_id != source_collection.id:
         perfume.collection = source_collection
@@ -1794,7 +1847,7 @@ def create_fragrantica_product_alias_if_needed(source, perfume, old_name: str) -
         brand=perfume.brand,
         alias_text=alias_text,
         canonical_text=canonical_text,
-        collection_name=source.collection_name,
+        collection_name=normalize_catalogue_collection_name(source.collection_name),
         audience=source.audience,
         priority=50,
     )
@@ -1913,11 +1966,15 @@ def build_catalog_tab_action_result(
             variant_id for variant_id in variant_ids if str(variant_id).isdigit()
         ]
         if not clean_ids:
-            return CatalogTabActionResult("error", "Select product rows to delete.", tab)
+            return CatalogTabActionResult(
+                "error", "Select product rows to delete.", tab
+            )
         queryset = variant_manager.filter(pk__in=clean_ids)
         deleted_count = queryset.count()
         if not deleted_count:
-            return CatalogTabActionResult("error", "Selected product rows were not found.", tab)
+            return CatalogTabActionResult(
+                "error", "Selected product rows were not found.", tab
+            )
         queryset.delete()
         return CatalogTabActionResult(
             "success", f"Deleted {deleted_count} catalogue variant row(s).", tab
