@@ -70,6 +70,7 @@ The current saved-HTML flow is:
 3. If accepted, stage external rows in `assistant_linking.FragranticaProduct`.
 4. Review staged Fragrantica rows next to local `catalog.Perfume` rows.
 5. Link or merge into `catalog.Perfume` only after review. Fragrantica can update brand/name/brand-scoped collection/audience/year through that reviewed link, but local concentration and variants are preserved. Our Products remains the source of truth used by supplier normalization.
+   If Fragrantica/local catalogue evidence shows same-base men/women scents, keep the audience in the reviewed local scent name (`for Men`/`for Women` or `Pour Homme`/`Pour Femme`) and also keep the separate audience field.
 6. When an approved Fragrantica link changes the local scent spelling, store the old local scent name as a `ProductAlias` for that brand so future matching uses knowledge instead of code.
 7. Promote reviewed local Fragrantica links to production with the Fragrantica catalogue link export/import commands; Git deploys move code, not local database rows.
 8. Create aliases or parser knowledge only from approved links/merges, not directly from raw HTML import.

@@ -46,7 +46,7 @@
                                 </span>
                                 <span class="catalogue-field catalogue-field-scent">
                                     <span class="identity-separator">/</span>
-                                    <span class="catalogue-cell-value catalogue-cell-value-strong">{{ row.source.name }}</span>
+                                    <span class="catalogue-cell-value catalogue-cell-value-strong">{{ row.display_name }}</span>
                                 </span>
                                 {% if row.source.audience %}
                                     <span class="catalogue-field catalogue-field-audience">
@@ -136,7 +136,7 @@
                                         <span class="fragrantica-match-reason">Use catalogue search only when the inline suggestions are empty.</span>
                                     </div>
                                     <a class="button secondary"
-                                       href="{% url 'prices:our_product_list' %}?q={{ row.source.name|urlencode }}">Search Our Products</a>
+                                       href="{% url 'prices:our_product_list' %}?q={{ row.display_name|urlencode }}">Search Our Products</a>
                                 </div>
                             {% endif %}
                         </div>

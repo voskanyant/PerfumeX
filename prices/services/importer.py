@@ -691,23 +691,15 @@ def process_import_file(import_file: models.ImportFile) -> None:
         key = _identity_key(parsed.sku, parsed.name)
         if not key:
             continue
-        normalized_price = _convert_price_with_rates(
-            parsed.price,
-            parsed.currency,
-            supplier_currency,
-            rates_for_date,
+        can_convert_to_supplier_currency = _convert_price_with_rates(
+            parsed.price, parsed.currency, supplier_currency, rates_for_date
         )
-        if normalized_price is None:
+        if can_convert_to_supplier_currency is None:
             raise RuntimeError(
                 f"Missing exchange rate for {parsed.currency}->{supplier_currency} "
                 f"on or before {rate_lookup_date}."
             )
-        unique_rows[key] = ParsedRow(
-            sku=parsed.sku,
-            name=parsed.name,
-            price=normalized_price,
-            currency=supplier_currency,
-        )
+        unique_rows[key] = parsed
     minimum_rows = int(models.ImportSettings.get_solo().minimum_price_rows or 100)
     if len(unique_rows) < minimum_rows:
         raise RuntimeError(

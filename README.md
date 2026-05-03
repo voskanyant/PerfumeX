@@ -235,6 +235,16 @@ See [PROJECT_HANDOFF.md](PROJECT_HANDOFF.md) for what each command does and when
 
 Deployment is defined in `.github/workflows/ci.yml`.
 
+Before pushing or deploying, run the deploy gate that matches the change:
+
+```bash
+make deploy-gate
+make deploy-gate DEPLOY_GATE_ARGS="--ui --test prices.tests.SomeFocusedTest"
+make deploy-gate-full
+```
+
+Use the fast default for focused corrections, add `--ui` for template/CSS/JS work and `--test` for touched behavior, and reserve full mode for high-risk or batched changes.
+
 Current behavior on push to `main`:
 
 1. SSH into the server.

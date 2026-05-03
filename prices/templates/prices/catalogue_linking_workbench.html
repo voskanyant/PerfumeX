@@ -38,13 +38,22 @@
                 </select>
             </label>
             <label class="catalogue-linking-filter">
+                <span>Suggestions</span>
+                <select name="suggestions">
+                    <option value="all" {% if suggestion_filter == "all" %}selected{% endif %}>All visible</option>
+                    <option value="with" {% if suggestion_filter == "with" %}selected{% endif %}>With suggestion</option>
+                    <option value="without" {% if suggestion_filter == "without" %}selected{% endif %}>Without suggestion</option>
+                </select>
+            </label>
+            <label class="catalogue-linking-filter">
                 <span>Confidence</span>
-                <select name="min_score" data-linking-min-score>
-                    <option value="0" {% if min_score == 0 %}selected{% endif %}>Any score</option>
-                    <option value="80" {% if min_score == 80 %}selected{% endif %}>80+</option>
-                    <option value="90" {% if min_score == 90 %}selected{% endif %}>90+</option>
-                    <option value="95" {% if min_score == 95 %}selected{% endif %}>95+</option>
-                    <option value="100" {% if min_score == 100 %}selected{% endif %}>Exact only</option>
+                <select name="confidence" data-linking-min-score>
+                    <option value="all" {% if confidence_filter == "all" %}selected{% endif %}>All rows</option>
+                    <option value="100" {% if confidence_filter == "100" %}selected{% endif %}>100 only</option>
+                    <option value="95" {% if confidence_filter == "95" %}selected{% endif %}>95+</option>
+                    <option value="90" {% if confidence_filter == "90" %}selected{% endif %}>90+</option>
+                    <option value="80" {% if confidence_filter == "80" %}selected{% endif %}>80+</option>
+                    <option value="0" {% if confidence_filter == "0" %}selected{% endif %}>Any suggestion</option>
                 </select>
             </label>
             <button class="button ghost" type="submit">Apply filters</button>
@@ -58,7 +67,13 @@
                         <span class="card-label">Left column</span>
                         <h2 class="card-title">Our Products</h2>
                     </div>
-                    <span class="catalogue-linking-count">{{ page_obj.paginator.count }} rows</span>
+                    <span class="catalogue-linking-count">
+                        {% if row_filter_active %}
+                            {{ suggestion_filtered_count }} shown / {{ suggestion_visible_count }} visible
+                        {% else %}
+                            {{ page_obj.paginator.count }} rows
+                        {% endif %}
+                    </span>
                 </div>
                 <form method="post" class="catalogue-linking-bulk-form">
                     {% csrf_token %}
@@ -96,7 +111,7 @@
                     </div>
                     <div class="catalogue-linking-list" data-linking-list>
                         {% for row in rows %}
-                            <article class="catalogue-linking-row {% if selected_row and selected_row.perfume.pk == row.perfume.pk %}is-selected{% endif %}"
+                            <article class="catalogue-linking-row {% if selected_row and selected_row.perfume.pk == row.perfume.pk %}is-selected{% endif %} {% if row.linked_sources %}is-linked{% endif %}"
                                      data-linking-row
                                      data-catalogue-selectable-row
                                      data-catalogue-row-id="{{ row.perfume.pk }}"
@@ -119,16 +134,39 @@
                                             {{ row.perfume.collection_name }}
                                         </span>
                                     {% endif %}
+                                    {% if row.perfume.audience %}
+                                        <span class="catalogue-identity-subname">
+                                            <span>Audience</span>
+                                            {{ row.perfume.audience }}
+                                        </span>
+                                    {% endif %}
+                                    {% if row.perfume.release_year %}
+                                        <span class="catalogue-identity-subname">
+                                            <span>Year</span>
+                                            {{ row.perfume.release_year }}
+                                        </span>
+                                    {% endif %}
                                     <span class="catalogue-linking-row-meta">
                                         {{ row.perfume.variant_count|default:0 }} variant{{ row.perfume.variant_count|default:0|pluralize }} ·
                                         {{ row.perfume.linked_fragrantica_count|default:0 }} linked Fragrantica
                                     </span>
-                                    {% if row.top_candidate %}
+                                    {% if row.top_linked_source %}
+                                        <span class="catalogue-linking-row-suggestion catalogue-linking-row-linked">
+                                            <span class="score-badge score-badge--success">Linked</span>
+                                            {{ row.top_linked_source.brand_name }} / {{ row.top_linked_source.catalogue_display_name }}
+                                        </span>
+                                        {% if row.top_linked_source.collection_name %}
+                                            <span class="catalogue-identity-subname">
+                                                <span>Collection</span>
+                                                {{ row.top_linked_source.collection_name }}
+                                            </span>
+                                        {% endif %}
+                                    {% elif row.top_candidate %}
                                         <span class="catalogue-linking-row-suggestion">
                                             <span class="score-badge score-badge--{% if row.top_candidate.score >= 95 %}success{% elif row.top_candidate.score >= 90 %}strong{% else %}warning{% endif %}">
                                                 {{ row.top_candidate.score }}
                                             </span>
-                                            {{ row.top_candidate.source.brand_name }} / {{ row.top_candidate.source.name }}
+                                            {{ row.top_candidate.source_label }}
                                         </span>
                                         {% if row.top_candidate.source.collection_name %}
                                             <span class="catalogue-identity-subname">
@@ -162,7 +200,13 @@
                         <h2 class="card-title">Fragrantica matches</h2>
                     </div>
                     <span class="catalogue-linking-count" data-linking-candidate-count>
-                        {% if selected_row %}{{ selected_row.candidates|length }} candidates{% else %}0 candidates{% endif %}
+                        {% if selected_row.linked_sources %}
+                            {{ selected_row.linked_sources|length }} linked
+                        {% elif selected_row %}
+                            {{ selected_row.candidates|length }} candidates
+                        {% else %}
+                            0 candidates
+                        {% endif %}
                     </span>
                 </div>
                 <div class="catalogue-linking-selected" data-linking-selected>
@@ -174,12 +218,54 @@
                                 {{ selected_row.perfume.collection_name }}
                             </span>
                         {% endif %}
+                        {% if selected_row.perfume.audience %}
+                            <span class="catalogue-identity-subname">
+                                <span>Audience</span>
+                                {{ selected_row.perfume.audience }}
+                            </span>
+                        {% endif %}
+                        {% if selected_row.perfume.release_year %}
+                            <span class="catalogue-identity-subname">
+                                <span>Year</span>
+                                {{ selected_row.perfume.release_year }}
+                            </span>
+                        {% endif %}
                     {% else %}
                         Select an Our Products row.
                     {% endif %}
                 </div>
                 <div class="catalogue-linking-candidates" data-linking-candidates>
-                    {% if selected_row and selected_row.candidates %}
+                    {% if selected_row and selected_row.linked_sources %}
+                        {% for source in selected_row.linked_sources %}
+                            <article class="catalogue-linking-candidate catalogue-linking-candidate-linked">
+                                <div class="catalogue-linking-candidate-main">
+                                    <span class="catalogue-linking-candidate-title">
+                                        {{ source.brand_name }} / {{ source.catalogue_display_name }}
+                                    </span>
+                                    {% if source.collection_name %}
+                                        <span class="catalogue-identity-subname">
+                                            <span>Collection</span>
+                                            {{ source.collection_name }}
+                                        </span>
+                                    {% endif %}
+                                    <span class="catalogue-linking-candidate-meta">
+                                        Linked Fragrantica row{% if source.audience %} &middot; {{ source.audience }}{% endif %}{% if source.release_year %} &middot; {{ source.release_year }}{% endif %}
+                                    </span>
+                                </div>
+                                <div class="catalogue-linking-candidate-actions">
+                                    <span class="score-badge score-badge--success">Linked</span>
+                                    {% if source.source_href %}
+                                        <a class="button ghost"
+                                           href="{{ source.source_href }}"
+                                           target="_blank"
+                                           rel="noopener">Open</a>
+                                    {% endif %}
+                                    <a class="button secondary"
+                                       href="{% url 'prices:fragrantica_product_review' %}?q={{ source.catalogue_display_name|urlencode }}">Review</a>
+                                </div>
+                            </article>
+                        {% endfor %}
+                    {% elif selected_row and selected_row.candidates %}
                         {% for candidate in selected_row.candidates %}
                             <form method="post"
                                   action="{% url 'prices:fragrantica_product_link' candidate.source.pk %}"
@@ -191,7 +277,7 @@
                                 <input type="hidden" name="apply_identity_group" value="1">
                                 <div class="catalogue-linking-candidate-main">
                                     <span class="catalogue-linking-candidate-title">
-                                        {{ candidate.source.brand_name }} / {{ candidate.source.name }}
+                                        {{ candidate.source_label }}
                                     </span>
                                     {% if candidate.source.collection_name %}
                                         <span class="catalogue-identity-subname">

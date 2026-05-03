@@ -10,6 +10,7 @@ from html.parser import HTMLParser
 from pathlib import Path
 
 from assistant_linking.models import FragranticaProduct
+from assistant_linking.models import normalized_fragrantica_product_name
 from assistant_linking.utils.text import normalize_alias_value
 from catalog.models import Brand, get_or_create_collection
 
@@ -108,7 +109,10 @@ class CatalogItem:
 
     @property
     def key(self) -> tuple[str, str]:
-        return canonical_key(self.brand_name), canonical_key(self.name)
+        return canonical_key(self.brand_name), normalized_fragrantica_product_name(
+            self.brand_name,
+            self.name,
+        )
 
 
 @dataclass
@@ -332,7 +336,11 @@ def import_brand_catalog(
 
     for item in items:
         normalized_brand = canonical_key(item.brand_name or resolved_brand_name)
-        normalized_name = canonical_key(item.name)
+        raw_normalized_name = canonical_key(item.name)
+        normalized_name = normalized_fragrantica_product_name(
+            item.brand_name or resolved_brand_name,
+            item.name,
+        )
         source_path = item.source_path or ""
         brand = Brand.objects.filter(
             name__iexact=item.brand_name or resolved_brand_name
@@ -347,6 +355,12 @@ def import_brand_catalog(
             normalized_name=normalized_name,
             source_path=source_path,
         ).first()
+        if fragrantica_product is None and raw_normalized_name != normalized_name:
+            fragrantica_product = FragranticaProduct.objects.filter(
+                normalized_brand_name=normalized_brand,
+                normalized_name=raw_normalized_name,
+                source_path=source_path,
+            ).first()
         if fragrantica_product is None:
             summary.missing_items.append(item)
             if apply:

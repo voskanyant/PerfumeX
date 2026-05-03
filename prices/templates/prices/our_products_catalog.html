@@ -46,7 +46,7 @@
             <span>Edit</span>
         </div>
         {% for variant in variants %}
-            <article class="our-products-card"
+            <article class="our-products-card {% if variant.fragrantica_linked_sources %}is-linked{% endif %}"
                      data-catalogue-row
                      data-catalogue-selectable-row
                      data-catalogue-row-id="{{ variant.pk }}">
@@ -99,7 +99,46 @@
                                     {{ variant.perfume.collection_name }}
                                 </div>
                             {% endif %}
-                            {% if variant.fragrantica_candidates %}
+                            {% if variant.perfume.audience %}
+                                <div class="catalogue-identity-subname">
+                                    <span>Audience</span>
+                                    {{ variant.perfume.audience }}
+                                </div>
+                            {% endif %}
+                            {% if variant.perfume.release_year %}
+                                <div class="catalogue-identity-subname">
+                                    <span>Year</span>
+                                    {{ variant.perfume.release_year }}
+                                </div>
+                            {% endif %}
+                            {% if variant.fragrantica_linked_sources %}
+                                <div class="fragrantica-match-panel fragrantica-match-panel-linked"
+                                     aria-label="Linked Fragrantica match">
+                                    <div class="fragrantica-match-panel-head">
+                                        <span>Linked Fragrantica match</span>
+                                        <span>Catalogue fields applied on link</span>
+                                    </div>
+                                    {% for source in variant.fragrantica_linked_sources %}
+                                        <div class="fragrantica-match-option fragrantica-match-option-linked">
+                                            <div class="fragrantica-match-summary">
+                                                <span class="fragrantica-match-name">
+                                                    {{ source.brand_name }} / {{ source.catalogue_display_name }}{% if source.audience %} / {{ source.audience }}{% endif %}{% if source.release_year %} / {{ source.release_year }}{% endif %}
+                                                </span>
+                                                {% if source.collection_name %}
+                                                    <span class="catalogue-identity-subname">
+                                                        <span>Collection</span>
+                                                        {{ source.collection_name }}
+                                                    </span>
+                                                {% endif %}
+                                                <span class="fragrantica-match-reason">
+                                                    Linked. Fragrantica collection and year are stored on this Our Products perfume when present.
+                                                </span>
+                                            </div>
+                                            <span class="score-badge score-badge--success">Linked</span>
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                            {% elif variant.fragrantica_candidates %}
                                 <div class="fragrantica-match-panel"
                                      aria-label="Suggested Fragrantica matches">
                                     <div class="fragrantica-match-panel-head">
@@ -146,6 +185,18 @@
                                 <span class="catalogue-chip">{{ variant.packaging }}</span>
                             {% endif %}
                             <span class="catalogue-chip">{{ variant.variant_type|default:"standard" }}</span>
+                            {% for source in variant.fragrantica_linked_sources|slice:":1" %}
+                                <span class="catalogue-chip catalogue-chip-success">Linked</span>
+                                {% if source.collection_name %}
+                                    <span class="catalogue-chip">{{ source.collection_name }}</span>
+                                {% endif %}
+                                {% if source.audience %}
+                                    <span class="catalogue-chip">{{ source.audience }}</span>
+                                {% endif %}
+                                {% if source.release_year %}
+                                    <span class="catalogue-chip">{{ source.release_year }}</span>
+                                {% endif %}
+                            {% empty %}
                             {% for candidate in variant.fragrantica_candidates|slice:":1" %}
                                 <span class="catalogue-chip">{{ candidate.match_type }} {{ candidate.score }}</span>
                                 {% if candidate.source.collection_name %}
@@ -160,8 +211,13 @@
                             {% empty %}
                                 <span class="catalogue-chip">No Fragrantica</span>
                             {% endfor %}
+                            {% endfor %}
                         </div>
                         <div class="layout-inline gap-sm">
+                            {% for source in variant.fragrantica_linked_sources|slice:":1" %}
+                                <a class="button secondary"
+                                   href="{% url 'prices:fragrantica_product_review' %}?q={{ source.catalogue_display_name|urlencode }}">Linked</a>
+                            {% empty %}
                             {% for candidate in variant.fragrantica_candidates|slice:":1" %}
                                 {% if candidate.source.match_status == "linked" %}
                                     <a class="button secondary"
@@ -173,6 +229,7 @@
                             {% empty %}
                                 <a class="button ghost"
                                    href="{% url 'prices:fragrantica_product_review' %}?brand={{ variant.perfume.brand.name|urlencode }}&q={{ variant.perfume.name|urlencode }}">Find match</a>
+                            {% endfor %}
                             {% endfor %}
                             <button class="button ghost icon our-products-edit-button" type="button" data-row-edit-toggle title="Edit row" aria-label="Edit row" aria-expanded="false">
                                 <svg class="icon icon-edit" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -280,6 +337,7 @@
                 <tr>
                     <th scope="col">Brand</th>
                     <th scope="col">Products</th>
+                    <th scope="col">Rename</th>
                     <th scope="col">Actions</th>
                 </tr>
             </thead>
@@ -288,6 +346,16 @@
                 <tr>
                     <td data-label="Brand">{{ brand.name }}</td>
                     <td data-label="Products">{{ brand.perfume_count }}</td>
+                    <td data-label="Rename">
+                        <form method="post" class="catalogue-inline-form">
+                            {% csrf_token %}
+                            <input type="hidden" name="tab" value="brands">
+                            <input type="hidden" name="action" value="rename_brand">
+                            <input type="hidden" name="brand_id" value="{{ brand.id }}">
+                            <input type="text" name="new_value" value="{{ brand.name }}" aria-label="New brand name">
+                            <button class="button ghost" type="submit">Save</button>
+                        </form>
+                    </td>
                     <td data-label="Actions" class="actions">
                         <form method="post" class="catalogue-inline-form">
                             {% csrf_token %}
@@ -299,7 +367,7 @@
                     </td>
             </tr>
             {% empty %}
-                {% include "includes/table_empty.html" with colspan=3 message="No brands yet." %}
+                {% include "includes/table_empty.html" with colspan=4 message="No brands yet." %}
             {% endfor %}
             </tbody>
         </table>

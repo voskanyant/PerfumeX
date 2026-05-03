@@ -15,8 +15,8 @@
     }
 
     function csrfToken() {
-        var token = document.querySelector("input[name=csrfmiddlewaretoken]");
-        return token ? token.value : "";
+        var csrfInput = document.querySelector("input[name=csrfmiddlewaretoken]");
+        return csrfInput ? csrfInput.value : "";
     }
 
     function scoreClass(score) {
@@ -33,15 +33,25 @@
         form.appendChild(input);
     }
 
-    function appendCollectionSubname(parent, collection) {
-        if (!collection) return;
+    function appendIdentitySubname(parent, labelText, value) {
+        if (!value) return;
         var subname = document.createElement("span");
         subname.className = "catalogue-identity-subname";
         var label = document.createElement("span");
-        label.textContent = "Collection";
+        label.textContent = labelText;
         subname.appendChild(label);
-        subname.appendChild(document.createTextNode(collection));
+        subname.appendChild(document.createTextNode(value));
         parent.appendChild(subname);
+    }
+
+    function appendCollectionSubname(parent, collection) {
+        appendIdentitySubname(parent, "Collection", collection);
+    }
+
+    function appendProductIdentitySubnames(parent, selected) {
+        appendIdentitySubname(parent, "Collection", selected.collection);
+        appendIdentitySubname(parent, "Audience", selected.audience);
+        appendIdentitySubname(parent, "Year", selected.release_year);
     }
 
     function renderSelected(selected) {
@@ -50,7 +60,7 @@
         title.className = "catalogue-linking-selected-title";
         title.textContent = selected.label;
         selectedNode.appendChild(title);
-        appendCollectionSubname(selectedNode, selected.collection);
+        appendProductIdentitySubnames(selectedNode, selected);
     }
 
     function renderEmpty(message) {
@@ -130,6 +140,57 @@
         candidatesNode.appendChild(form);
     }
 
+    function renderLinkedSource(source) {
+        var card = document.createElement("article");
+        card.className = "catalogue-linking-candidate catalogue-linking-candidate-linked";
+
+        var main = document.createElement("div");
+        main.className = "catalogue-linking-candidate-main";
+
+        var title = document.createElement("span");
+        title.className = "catalogue-linking-candidate-title";
+        title.textContent = source.label;
+
+        var meta = document.createElement("span");
+        meta.className = "catalogue-linking-candidate-meta";
+        var metaParts = ["Linked Fragrantica row"];
+        if (source.audience) metaParts.push(source.audience);
+        if (source.release_year) metaParts.push(String(source.release_year));
+        meta.textContent = metaParts.join(" - ");
+
+        main.appendChild(title);
+        appendCollectionSubname(main, source.collection);
+        main.appendChild(meta);
+
+        var actions = document.createElement("div");
+        actions.className = "catalogue-linking-candidate-actions";
+
+        var badge = document.createElement("span");
+        badge.className = "score-badge score-badge--success";
+        badge.textContent = "Linked";
+        actions.appendChild(badge);
+
+        if (source.source_href) {
+            var open = document.createElement("a");
+            open.className = "button ghost";
+            open.href = source.source_href;
+            open.target = "_blank";
+            open.rel = "noopener";
+            open.textContent = "Open";
+            actions.appendChild(open);
+        }
+
+        var review = document.createElement("a");
+        review.className = "button secondary";
+        review.href = source.review_url || "#";
+        review.textContent = "Review";
+        actions.appendChild(review);
+
+        card.appendChild(main);
+        card.appendChild(actions);
+        candidatesNode.appendChild(card);
+    }
+
     function selectRow(row) {
         rows.forEach(function (item) {
             item.classList.toggle("is-selected", item === row);
@@ -145,6 +206,13 @@
             .then(function (data) {
                 renderSelected(data.selected);
                 clearNode(candidatesNode);
+                if (data.linked_sources && data.linked_sources.length) {
+                    if (countNode) {
+                        countNode.textContent = data.linked_sources.length + " linked";
+                    }
+                    data.linked_sources.forEach(renderLinkedSource);
+                    return;
+                }
                 if (countNode) {
                     countNode.textContent = data.candidates.length + " candidate" + (data.candidates.length === 1 ? "" : "s");
                 }

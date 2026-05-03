@@ -170,3 +170,13 @@ Context: Main-branch deploys were spending most time in serial Django tests, the
 Decision: Run CI Django tests in parallel and keep deploy steps change-aware. Production deploys should install requirements, collect static files, refresh normalization stats, or run parser reparses only when inputs changed or an explicit deploy environment option requests it.
 
 Consequences: Do not reintroduce fixed per-deploy reparses or unconditional package/static work. Use explicit maintenance commands or `DEPLOY_REPARSE_TERMS` for targeted production parser refreshes.
+
+## 2026-05-03 - Deploy gate has fast and full modes
+
+Status: Accepted
+
+Context: Focused corrections were paying the cost of full test and repository check runs before every deploy.
+
+Decision: `make deploy-gate` runs the fast deploy gate by default: Django check, migration generation check, and migration plan. Add `DEPLOY_GATE_ARGS="--ui --test ..."` for UI syntax checks and targeted tests. Use `make deploy-gate-full` before big merges, schema changes, parser/linking logic changes, import/deletion behavior, shared service refactors, or batched releases.
+
+Consequences: Do not require full Django tests for every small deploy. Pick the gate based on blast radius, and document any skipped high-risk checks in the task summary.

@@ -1,4 +1,5 @@
 import re
+import unicodedata
 
 from django.conf import settings
 from django.contrib.postgres.indexes import GinIndex
@@ -58,6 +59,31 @@ TITLECASE_LOWER_WORDS = {
 TITLECASE_APOSTROPHE_SUFFIXES = {"d", "ll", "m", "re", "s", "t", "ve"}
 
 
+def strip_leading_fragrantica_brand_name(brand_name: str, scent_name: str) -> str:
+    scent = re.sub(r"\s+", " ", (scent_name or "").strip())
+    brand = re.sub(r"\s+", " ", (brand_name or "").strip())
+    if not scent or not brand:
+        return scent
+    pattern = re.compile(
+        rf"^{re.escape(brand)}(?:[\s/\-:]+)",
+        flags=re.IGNORECASE,
+    )
+    match = pattern.match(scent)
+    if not match:
+        return scent
+    cleaned = scent[match.end() :].strip()
+    return cleaned or scent
+
+
+def normalized_fragrantica_product_name(brand_name: str, scent_name: str) -> str:
+    text = unicodedata.normalize(
+        "NFKD",
+        strip_leading_fragrantica_brand_name(brand_name, scent_name),
+    )
+    text = "".join(char for char in text if not unicodedata.combining(char))
+    return normalize_alias_value(text).replace("&", "and")
+
+
 def display_label(value: str, *, default: str = "") -> str:
     text = (value or default or "").replace("_", " ").strip()
     if not text:
@@ -79,15 +105,22 @@ def display_title(value: str) -> str:
 
     words = []
     for index, word in enumerate(text.split()):
-        lower_allowed = index > 0 or (word[:1].islower() and word.lower() in TITLECASE_LOWER_WORDS)
+        lower_allowed = index > 0 or (
+            word[:1].islower() and word.lower() in TITLECASE_LOWER_WORDS
+        )
         hyphen_parts = []
         for hyphen_part in word.split("-"):
             apostrophe_parts = hyphen_part.split("'")
             hyphen_parts.append(
                 "'".join(
-                    part.lower()
-                    if sub_index > 0 and part.lower() in TITLECASE_APOSTROPHE_SUFFIXES
-                    else title_piece(part, lower_allowed=lower_allowed and sub_index == 0)
+                    (
+                        part.lower()
+                        if sub_index > 0
+                        and part.lower() in TITLECASE_APOSTROPHE_SUFFIXES
+                        else title_piece(
+                            part, lower_allowed=lower_allowed and sub_index == 0
+                        )
+                    )
                     for sub_index, part in enumerate(apostrophe_parts)
                 )
             )
@@ -104,10 +137,19 @@ class TimeStampedModel(models.Model):
 
 
 class BrandAlias(TimeStampedModel):
-    brand = models.ForeignKey("catalog.Brand", on_delete=models.CASCADE, related_name="aliases", db_index=True)
+    brand = models.ForeignKey(
+        "catalog.Brand", on_delete=models.CASCADE, related_name="aliases", db_index=True
+    )
     alias_text = models.CharField(max_length=255, db_index=True)
     normalized_alias = models.CharField(max_length=255, db_index=True)
-    supplier = models.ForeignKey("prices.Supplier", on_delete=models.CASCADE, null=True, blank=True, related_name="brand_aliases", db_index=True)
+    supplier = models.ForeignKey(
+        "prices.Supplier",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="brand_aliases",
+        db_index=True,
+    )
     active = models.BooleanField(default=True, db_index=True)
     priority = models.IntegerField(default=100, db_index=True)
     is_regex = models.BooleanField(default=False, db_index=True)
@@ -115,7 +157,10 @@ class BrandAlias(TimeStampedModel):
     class Meta:
         ordering = ("supplier__name", "priority", "alias_text")
         constraints = [
-            models.UniqueConstraint(fields=["alias_text", "supplier", "brand"], name="uniq_assistant_brand_alias")
+            models.UniqueConstraint(
+                fields=["alias_text", "supplier", "brand"],
+                name="uniq_assistant_brand_alias",
+            )
         ]
 
     def __str__(self) -> str:
@@ -133,7 +178,9 @@ class BrandAlias(TimeStampedModel):
             except re.error as exc:
                 raise ValidationError({"normalized_alias": f"Invalid regex: {exc}"})
             if len(pattern) > 200:
-                raise ValidationError({"normalized_alias": "Pattern too long (max 200 chars)."})
+                raise ValidationError(
+                    {"normalized_alias": "Pattern too long (max 200 chars)."}
+                )
             for bad in REDOS_REGEX_SHAPES:
                 if bad in pattern:
                     raise ValidationError(
@@ -152,12 +199,33 @@ class BrandAlias(TimeStampedModel):
 
 
 class ProductAlias(TimeStampedModel):
-    perfume = models.ForeignKey("catalog.Perfume", on_delete=models.SET_NULL, null=True, blank=True, related_name="product_aliases", db_index=True)
-    brand = models.ForeignKey("catalog.Brand", on_delete=models.SET_NULL, null=True, blank=True, related_name="product_aliases", db_index=True)
+    perfume = models.ForeignKey(
+        "catalog.Perfume",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="product_aliases",
+        db_index=True,
+    )
+    brand = models.ForeignKey(
+        "catalog.Brand",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="product_aliases",
+        db_index=True,
+    )
     alias_text = models.CharField(max_length=255, db_index=True)
     canonical_text = models.CharField(max_length=255, db_index=True)
     collection_name = models.CharField(max_length=180, blank=True, db_index=True)
-    supplier = models.ForeignKey("prices.Supplier", on_delete=models.CASCADE, null=True, blank=True, related_name="product_aliases", db_index=True)
+    supplier = models.ForeignKey(
+        "prices.Supplier",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="product_aliases",
+        db_index=True,
+    )
     concentration = models.CharField(max_length=80, blank=True)
     audience = models.CharField(max_length=80, blank=True)
     excluded_terms = models.TextField(blank=True)
@@ -185,13 +253,24 @@ class FragranticaProduct(TimeStampedModel):
     normalized_brand_name = models.CharField(max_length=255, db_index=True)
     name = models.CharField(max_length=220, db_index=True)
     normalized_name = models.CharField(max_length=255, db_index=True)
-    collection = models.ForeignKey("catalog.Collection", on_delete=models.SET_NULL, null=True, blank=True, related_name="fragrantica_products", db_index=True)
+    collection = models.ForeignKey(
+        "catalog.Collection",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="fragrantica_products",
+        db_index=True,
+    )
     collection_name = models.CharField(max_length=180, blank=True, db_index=True)
     audience = models.CharField(max_length=80, blank=True, db_index=True)
-    release_year = models.PositiveSmallIntegerField(null=True, blank=True, db_index=True)
+    release_year = models.PositiveSmallIntegerField(
+        null=True, blank=True, db_index=True
+    )
     source_path = models.CharField(max_length=500, blank=True)
     source_url = models.URLField(blank=True)
-    source_domain = models.CharField(max_length=160, default="fragrantica.com", db_index=True)
+    source_domain = models.CharField(
+        max_length=160, default="fragrantica.com", db_index=True
+    )
     matched_perfume = models.ForeignKey(
         "catalog.Perfume",
         on_delete=models.SET_NULL,
@@ -218,9 +297,13 @@ class FragranticaProduct(TimeStampedModel):
 
     def save(self, *args, **kwargs):
         if not self.normalized_brand_name:
-            self.normalized_brand_name = normalize_alias_value(self.brand_name).replace("&", "and")
-        if not self.normalized_name:
-            self.normalized_name = normalize_alias_value(self.name).replace("&", "and")
+            self.normalized_brand_name = normalize_alias_value(self.brand_name).replace(
+                "&", "and"
+            )
+        self.normalized_name = normalized_fragrantica_product_name(
+            self.brand_name,
+            self.name,
+        )
         if self.collection_id:
             self.collection_name = self.collection.name
         elif self.collection_name:
@@ -249,7 +332,14 @@ class ConcentrationAlias(TimeStampedModel):
     concentration = models.CharField(max_length=80, db_index=True)
     alias_text = models.CharField(max_length=255, db_index=True)
     normalized_alias = models.CharField(max_length=255, db_index=True)
-    supplier = models.ForeignKey("prices.Supplier", on_delete=models.CASCADE, null=True, blank=True, related_name="concentration_aliases", db_index=True)
+    supplier = models.ForeignKey(
+        "prices.Supplier",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="concentration_aliases",
+        db_index=True,
+    )
     active = models.BooleanField(default=True, db_index=True)
     priority = models.IntegerField(default=100, db_index=True)
     is_regex = models.BooleanField(default=False, db_index=True)
@@ -257,7 +347,10 @@ class ConcentrationAlias(TimeStampedModel):
     class Meta:
         ordering = ("supplier__name", "priority", "alias_text")
         constraints = [
-            models.UniqueConstraint(fields=["alias_text", "supplier", "concentration"], name="uniq_assistant_concentration_alias")
+            models.UniqueConstraint(
+                fields=["alias_text", "supplier", "concentration"],
+                name="uniq_assistant_concentration_alias",
+            )
         ]
 
     def save(self, *args, **kwargs):
@@ -276,17 +369,27 @@ class ConcentrationAlias(TimeStampedModel):
 
 
 class ParsedSupplierProduct(TimeStampedModel):
-    supplier_product = models.OneToOneField("prices.SupplierProduct", on_delete=models.CASCADE, related_name="assistant_parse")
+    supplier_product = models.OneToOneField(
+        "prices.SupplierProduct",
+        on_delete=models.CASCADE,
+        related_name="assistant_parse",
+    )
     raw_name = models.TextField()
     normalized_text = models.TextField(db_index=True)
     detected_brand_text = models.CharField(max_length=255, blank=True)
-    normalized_brand = models.ForeignKey("catalog.Brand", on_delete=models.SET_NULL, null=True, blank=True, db_index=True)
+    normalized_brand = models.ForeignKey(
+        "catalog.Brand", on_delete=models.SET_NULL, null=True, blank=True, db_index=True
+    )
     product_name_text = models.CharField(max_length=255, blank=True, db_index=True)
     collection_name = models.CharField(max_length=180, blank=True, db_index=True)
     concentration = models.CharField(max_length=80, blank=True, db_index=True)
-    size_ml = models.DecimalField(max_digits=7, decimal_places=2, null=True, blank=True, db_index=True)
+    size_ml = models.DecimalField(
+        max_digits=7, decimal_places=2, null=True, blank=True, db_index=True
+    )
     raw_size_text = models.CharField(max_length=80, blank=True)
-    release_year = models.PositiveSmallIntegerField(null=True, blank=True, db_index=True)
+    release_year = models.PositiveSmallIntegerField(
+        null=True, blank=True, db_index=True
+    )
     supplier_gender_hint = models.CharField(max_length=80, blank=True, db_index=True)
     packaging = models.CharField(max_length=80, blank=True, db_index=True)
     variant_type = models.CharField(max_length=80, blank=True, db_index=True)
@@ -336,9 +439,15 @@ class ParsedSupplierProduct(TimeStampedModel):
     def display_variant_type(self) -> str:
         if BAG_MODIFIER in (self.modifiers or []) or self.variant_type == BAG_MODIFIER:
             return "Bag"
-        if COSMETIC_PUDRE_MODIFIER in (self.modifiers or []) or self.variant_type == "poudre":
+        if (
+            COSMETIC_PUDRE_MODIFIER in (self.modifiers or [])
+            or self.variant_type == "poudre"
+        ):
             return "Poudre"
-        if DEODORANT_MODIFIER in (self.modifiers or []) or self.variant_type == DEODORANT_MODIFIER:
+        if (
+            DEODORANT_MODIFIER in (self.modifiers or [])
+            or self.variant_type == DEODORANT_MODIFIER
+        ):
             return "Deodorant"
         if self.variant_type == "decoded":
             return "Decoded"
@@ -358,9 +467,15 @@ class ParsedSupplierProduct(TimeStampedModel):
     def product_category_label(self) -> str:
         if BAG_MODIFIER in (self.modifiers or []) or self.variant_type == BAG_MODIFIER:
             return "Bags"
-        if COSMETIC_PUDRE_MODIFIER in (self.modifiers or []) or self.variant_type == "poudre":
+        if (
+            COSMETIC_PUDRE_MODIFIER in (self.modifiers or [])
+            or self.variant_type == "poudre"
+        ):
             return "Cosmetics"
-        if DEODORANT_MODIFIER in (self.modifiers or []) or self.variant_type == DEODORANT_MODIFIER:
+        if (
+            DEODORANT_MODIFIER in (self.modifiers or [])
+            or self.variant_type == DEODORANT_MODIFIER
+        ):
             return "Deodorants"
         if self.concentration in HAIR_CARE_CATEGORY_CONCENTRATIONS:
             return "Hair Care"
@@ -370,7 +485,10 @@ class ParsedSupplierProduct(TimeStampedModel):
 
     @property
     def product_subcategory_label(self) -> str:
-        if COSMETIC_PUDRE_MODIFIER in (self.modifiers or []) or self.variant_type == "poudre":
+        if (
+            COSMETIC_PUDRE_MODIFIER in (self.modifiers or [])
+            or self.variant_type == "poudre"
+        ):
             return "Poudre"
         return ""
 
@@ -390,14 +508,20 @@ class ParsedSupplierProduct(TimeStampedModel):
     @property
     def identity_packaging_label(self) -> str:
         packaging = self.display_packaging
-        if packaging and packaging != "Standard" and packaging != self.identity_variant_label:
+        if (
+            packaging
+            and packaging != "Standard"
+            and packaging != self.identity_variant_label
+        ):
             return packaging
         return ""
 
     @property
     def display_identity(self) -> str:
         product_name = self.display_product_name
-        if product_name and normalize_alias_value(product_name) == normalize_alias_value(self.display_brand):
+        if product_name and normalize_alias_value(
+            product_name
+        ) == normalize_alias_value(self.display_brand):
             product_name = ""
         parts = [
             self.display_brand,
@@ -461,17 +585,35 @@ class MatchGroup(TimeStampedModel):
     )
 
     group_key = models.CharField(max_length=500, unique=True, db_index=True)
-    normalized_brand = models.ForeignKey("catalog.Brand", on_delete=models.SET_NULL, null=True, blank=True, db_index=True)
+    normalized_brand = models.ForeignKey(
+        "catalog.Brand", on_delete=models.SET_NULL, null=True, blank=True, db_index=True
+    )
     canonical_name = models.CharField(max_length=255, db_index=True)
     collection_name = models.CharField(max_length=180, blank=True, db_index=True)
     concentration = models.CharField(max_length=80, blank=True, db_index=True)
     audience_hint = models.CharField(max_length=80, blank=True, db_index=True)
-    size_ml = models.DecimalField(max_digits=7, decimal_places=2, null=True, blank=True, db_index=True)
+    size_ml = models.DecimalField(
+        max_digits=7, decimal_places=2, null=True, blank=True, db_index=True
+    )
     packaging = models.CharField(max_length=80, blank=True, db_index=True)
     variant_type = models.CharField(max_length=80, blank=True, db_index=True)
-    candidate_perfume = models.ForeignKey("catalog.Perfume", on_delete=models.SET_NULL, null=True, blank=True, db_index=True)
-    candidate_variant = models.ForeignKey("catalog.PerfumeVariant", on_delete=models.SET_NULL, null=True, blank=True, db_index=True)
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_OPEN, db_index=True)
+    candidate_perfume = models.ForeignKey(
+        "catalog.Perfume",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        db_index=True,
+    )
+    candidate_variant = models.ForeignKey(
+        "catalog.PerfumeVariant",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        db_index=True,
+    )
+    status = models.CharField(
+        max_length=20, choices=STATUS_CHOICES, default=STATUS_OPEN, db_index=True
+    )
     confidence = models.PositiveSmallIntegerField(default=50, db_index=True)
 
     class Meta:
@@ -526,16 +668,34 @@ class MatchGroupItem(models.Model):
         (ROLE_CONFLICT, "Conflict"),
     )
 
-    match_group = models.ForeignKey(MatchGroup, on_delete=models.CASCADE, related_name="items", db_index=True)
-    supplier_product = models.ForeignKey("prices.SupplierProduct", on_delete=models.CASCADE, related_name="assistant_group_items", db_index=True)
-    parsed_product = models.ForeignKey(ParsedSupplierProduct, on_delete=models.SET_NULL, null=True, blank=True, db_index=True)
-    role = models.CharField(max_length=20, choices=ROLE_CHOICES, default=ROLE_MEMBER, db_index=True)
+    match_group = models.ForeignKey(
+        MatchGroup, on_delete=models.CASCADE, related_name="items", db_index=True
+    )
+    supplier_product = models.ForeignKey(
+        "prices.SupplierProduct",
+        on_delete=models.CASCADE,
+        related_name="assistant_group_items",
+        db_index=True,
+    )
+    parsed_product = models.ForeignKey(
+        ParsedSupplierProduct,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        db_index=True,
+    )
+    role = models.CharField(
+        max_length=20, choices=ROLE_CHOICES, default=ROLE_MEMBER, db_index=True
+    )
     match_score = models.PositiveSmallIntegerField(default=50, db_index=True)
     reasoning = models.TextField(blank=True)
 
     class Meta:
         constraints = [
-            models.UniqueConstraint(fields=["match_group", "supplier_product"], name="uniq_assistant_group_item")
+            models.UniqueConstraint(
+                fields=["match_group", "supplier_product"],
+                name="uniq_assistant_group_item",
+            )
         ]
 
     def __str__(self) -> str:
@@ -554,13 +714,34 @@ class ManualLinkDecision(models.Model):
         (DECISION_EXCLUDE, "Exclude"),
     )
 
-    supplier_product = models.ForeignKey("prices.SupplierProduct", on_delete=models.CASCADE, related_name="assistant_decisions", db_index=True)
-    perfume = models.ForeignKey("catalog.Perfume", on_delete=models.SET_NULL, null=True, blank=True, db_index=True)
-    variant = models.ForeignKey("catalog.PerfumeVariant", on_delete=models.SET_NULL, null=True, blank=True, db_index=True)
-    decision_type = models.CharField(max_length=40, choices=DECISION_CHOICES, db_index=True)
+    supplier_product = models.ForeignKey(
+        "prices.SupplierProduct",
+        on_delete=models.CASCADE,
+        related_name="assistant_decisions",
+        db_index=True,
+    )
+    perfume = models.ForeignKey(
+        "catalog.Perfume",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        db_index=True,
+    )
+    variant = models.ForeignKey(
+        "catalog.PerfumeVariant",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        db_index=True,
+    )
+    decision_type = models.CharField(
+        max_length=40, choices=DECISION_CHOICES, db_index=True
+    )
     reason = models.TextField(blank=True)
     apply_to_similar = models.BooleanField(default=False, db_index=True)
-    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -597,7 +778,11 @@ class LinkAction(models.Model):
         (ACTION_UNDO_BULK_LINK, "Undo bulk link"),
     )
 
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="assistant_link_actions")
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="assistant_link_actions",
+    )
     action_type = models.CharField(max_length=40, choices=ACTION_CHOICES, db_index=True)
     payload_json = models.JSONField(default=dict)
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
@@ -605,7 +790,9 @@ class LinkAction(models.Model):
     class Meta:
         ordering = ("-created_at", "-id")
         indexes = [
-            models.Index(fields=["user", "-created_at"], name="alink_action_user_created_idx"),
+            models.Index(
+                fields=["user", "-created_at"], name="alink_action_user_created_idx"
+            ),
         ]
 
     def __str__(self) -> str:
@@ -624,18 +811,52 @@ class LinkSuggestion(TimeStampedModel):
         (STATUS_EXCLUDED, "Excluded"),
     )
 
-    supplier_product = models.ForeignKey("prices.SupplierProduct", on_delete=models.CASCADE, related_name="assistant_link_suggestions", db_index=True)
-    match_group = models.ForeignKey(MatchGroup, on_delete=models.SET_NULL, null=True, blank=True, related_name="link_suggestions", db_index=True)
-    suggested_perfume = models.ForeignKey("catalog.Perfume", on_delete=models.SET_NULL, null=True, blank=True, db_index=True)
-    suggested_variant = models.ForeignKey("catalog.PerfumeVariant", on_delete=models.SET_NULL, null=True, blank=True, db_index=True)
-    research_job = models.ForeignKey("assistant_core.ResearchJob", on_delete=models.SET_NULL, null=True, blank=True, db_index=True)
+    supplier_product = models.ForeignKey(
+        "prices.SupplierProduct",
+        on_delete=models.CASCADE,
+        related_name="assistant_link_suggestions",
+        db_index=True,
+    )
+    match_group = models.ForeignKey(
+        MatchGroup,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="link_suggestions",
+        db_index=True,
+    )
+    suggested_perfume = models.ForeignKey(
+        "catalog.Perfume",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        db_index=True,
+    )
+    suggested_variant = models.ForeignKey(
+        "catalog.PerfumeVariant",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        db_index=True,
+    )
+    research_job = models.ForeignKey(
+        "assistant_core.ResearchJob",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        db_index=True,
+    )
     confidence = models.PositiveSmallIntegerField(default=0, db_index=True)
     reasoning = models.TextField(blank=True)
     rules_used_json = models.JSONField(default=list, blank=True)
     uncertainties_json = models.JSONField(default=list, blank=True)
     source_engine = models.CharField(max_length=60, default="mock", db_index=True)
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING, db_index=True)
-    reviewed_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)
+    status = models.CharField(
+        max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING, db_index=True
+    )
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True
+    )
     reviewed_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:

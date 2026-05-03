@@ -1425,6 +1425,10 @@ select:focus {
   background: #fbfbfb;
   box-shadow: inset 2px 0 0 var(--black);
 }
+.our-products-card.is-linked {
+  background: #f7fbf8;
+  box-shadow: inset 2px 0 0 #2f7d46;
+}
 .our-products-card .catalogue-row-form {
   display: block;
   margin: 0;
@@ -1537,6 +1541,11 @@ select:focus {
   font-size: 12px;
   line-height: 1.2;
   white-space: nowrap;
+}
+.catalogue-chip-success {
+  border-color: #b9dcc4;
+  color: #245c35;
+  background: #eaf7ee;
 }
 .our-products-inline-editor {
   display: grid;
@@ -1825,6 +1834,11 @@ select:focus {
   border-color: var(--grey-300);
   background: #fcfcfc;
 }
+.fragrantica-match-panel-linked,
+.fragrantica-match-option-linked {
+  border-color: #b9dcc4;
+  background: #f7fbf8;
+}
 .fragrantica-match-summary {
   display: grid;
   gap: 3px;
@@ -1855,7 +1869,7 @@ select:focus {
 }
 .catalogue-linking-filters {
   display: grid;
-  grid-template-columns: minmax(150px, 220px) minmax(220px, 1fr) minmax(140px, 180px) minmax(130px, 170px) auto;
+  grid-template-columns: minmax(140px, 200px) minmax(220px, 1fr) minmax(130px, 170px) minmax(140px, 180px) minmax(140px, 180px) auto;
   gap: 10px;
   align-items: end;
 }
@@ -1999,6 +2013,10 @@ select:focus {
 .catalogue-linking-row.is-selected.is-bulk-selected {
   box-shadow: inset 2px 0 0 var(--black);
 }
+.catalogue-linking-row.is-linked {
+  background: #f7fbf8;
+  box-shadow: inset 2px 0 0 #2f7d46;
+}
 .catalogue-linking-row-check {
   display: flex;
   align-items: center;
@@ -2069,6 +2087,10 @@ select:focus {
 .catalogue-linking-candidate:first-child {
   border-color: var(--grey-300);
   background: #fcfcfc;
+}
+.catalogue-linking-candidate-linked {
+  border-color: #b9dcc4;
+  background: #f7fbf8;
 }
 .catalogue-linking-candidate-main {
   display: grid;

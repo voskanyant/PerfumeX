@@ -1,4 +1,4 @@
-.PHONY: agent-docs-rules agent-docs-smoke ci deploy-gate lint markdown-link-rules markdown-link-smoke make-target-rules make-target-smoke migration-graph-rules migration-graph-smoke migrations test security command-rules command-smoke css-rules css-smoke destructive-action-rules destructive-action-smoke doc-drift doc-drift-rules js-a11y js-a11y-rules js-dom-safety js-dom-safety-rules js-rules js-smoke js-table-labels js-table-labels-rules python-rules python-smoke secret-rules secret-smoke service-rules service-smoke static-ref-rules static-ref-smoke template-a11y-rules template-a11y-smoke template-button-rules template-button-smoke template-drawer-rules template-drawer-smoke template-id-rules template-id-smoke template-inline-style-rules template-inline-style-smoke table-header-rules table-header-smoke table-mobile-rules table-mobile-smoke template-csrf-rules template-csrf-smoke template-label-rules template-label-smoke template-link-rules template-link-smoke template-rules template-smoke template-layout-rules template-layout-smoke template-url-rules template-url-smoke url-rules url-smoke view-export-rules view-export-smoke ui-partial-rules ui-partial-smoke local-smoke-rules local-smoke
+.PHONY: agent-docs-rules agent-docs-smoke ci deploy-gate deploy-gate-full lint markdown-link-rules markdown-link-smoke make-target-rules make-target-smoke migration-graph-rules migration-graph-smoke migrations test security command-rules command-smoke css-rules css-smoke destructive-action-rules destructive-action-smoke doc-drift doc-drift-rules js-a11y js-a11y-rules js-dom-safety js-dom-safety-rules js-rules js-smoke js-table-labels js-table-labels-rules python-rules python-smoke secret-rules secret-smoke service-rules service-smoke static-ref-rules static-ref-smoke template-a11y-rules template-a11y-smoke template-button-rules template-button-smoke template-drawer-rules template-drawer-smoke template-id-rules template-id-smoke template-inline-style-rules template-inline-style-smoke table-header-rules table-header-smoke table-mobile-rules table-mobile-smoke template-csrf-rules template-csrf-smoke template-label-rules template-label-smoke template-link-rules template-link-smoke template-rules template-smoke template-layout-rules template-layout-smoke template-url-rules template-url-smoke url-rules url-smoke view-export-rules view-export-smoke ui-partial-rules ui-partial-smoke local-smoke-rules local-smoke
 
 export DEBUG ?= 1
 export SECRET_KEY ?= local-ci-not-secret-8f6a90e4d2b64782a4d4c3b2452dd6d7f7e83bb164f24c86
@@ -16,7 +16,10 @@ export ASSISTANT_USE_OPENAI ?= false
 ci: lint migrations test security
 
 deploy-gate:
-	python scripts/deploy_gate.py
+	python scripts/deploy_gate.py $(DEPLOY_GATE_ARGS)
+
+deploy-gate-full:
+	python scripts/deploy_gate.py --full
 
 lint:
 	ruff check .

@@ -26,7 +26,9 @@ class NormalizerTests(TestCase):
         cache.clear()
         self.supplier = Supplier.objects.create(name="Supplier", code="sup")
         self.brand = Brand.objects.create(name="Dolce Gabbana")
-        BrandAlias.objects.create(brand=self.brand, alias_text="DG", normalized_alias="dg")
+        BrandAlias.objects.create(
+            brand=self.brand, alias_text="DG", normalized_alias="dg"
+        )
         GlobalRule.objects.bulk_create(
             [
                 GlobalRule(
@@ -91,7 +93,11 @@ class NormalizerTests(TestCase):
 
     def test_parses_decimal_ml_with_comma_or_dot(self):
         brand = Brand.objects.create(name="Tiziana Terenzi")
-        BrandAlias.objects.create(brand=brand, alias_text="Tiziana Terenzi", normalized_alias="tiziana terenzi")
+        BrandAlias.objects.create(
+            brand=brand,
+            alias_text="Tiziana Terenzi",
+            normalized_alias="tiziana terenzi",
+        )
         examples = (
             ("TIZIANA TERENZI CABIRIA EDP 1,5 ML", Decimal("1.50")),
             ("TIZIANA TERENZI CABIRIA EDP 1.5 ML", Decimal("1.50")),
@@ -114,9 +120,17 @@ class NormalizerTests(TestCase):
 
     def test_catalog_variant_does_not_override_explicit_supplier_size(self):
         brand = Brand.objects.create(name="Tiziana Terenzi")
-        BrandAlias.objects.create(brand=brand, alias_text="Tiziana Terenzi", normalized_alias="tiziana terenzi")
-        perfume = brand.perfumes.create(name="Cabiria", concentration="Extrait de Parfum")
-        variant = perfume.variants.create(size_ml=Decimal("5.00"), variant_type="standard")
+        BrandAlias.objects.create(
+            brand=brand,
+            alias_text="Tiziana Terenzi",
+            normalized_alias="tiziana terenzi",
+        )
+        perfume = brand.perfumes.create(
+            name="Cabiria", concentration="Extrait de Parfum"
+        )
+        variant = perfume.variants.create(
+            size_ml=Decimal("5.00"), variant_type="standard"
+        )
         product = SupplierProduct.objects.create(
             supplier=self.supplier,
             identity_key="cabiria-linked-decimal",
@@ -131,9 +145,13 @@ class NormalizerTests(TestCase):
         self.assertEqual(parsed.concentration, "Eau de Parfum")
         self.assertEqual(parsed.size_ml, Decimal("1.50"))
 
-    def test_global_product_alias_does_not_override_explicit_supplier_concentration(self):
+    def test_global_product_alias_does_not_override_explicit_supplier_concentration(
+        self,
+    ):
         brand = Brand.objects.create(name="Nina Ricci")
-        BrandAlias.objects.create(brand=brand, alias_text="Nina Ricci", normalized_alias="nina ricci")
+        BrandAlias.objects.create(
+            brand=brand, alias_text="Nina Ricci", normalized_alias="nina ricci"
+        )
         ProductAlias.objects.create(
             brand=brand,
             alias_text="nina",
@@ -157,7 +175,11 @@ class NormalizerTests(TestCase):
 
     def test_product_alias_does_not_invent_missing_supplier_concentration(self):
         brand = Brand.objects.create(name="Francis Kurkdjian")
-        BrandAlias.objects.create(brand=brand, alias_text="Francis Kurkdjian", normalized_alias="francis kurkdjian")
+        BrandAlias.objects.create(
+            brand=brand,
+            alias_text="Francis Kurkdjian",
+            normalized_alias="francis kurkdjian",
+        )
         ProductAlias.objects.create(
             brand=brand,
             alias_text="a la rose",
@@ -182,11 +204,23 @@ class NormalizerTests(TestCase):
 
     def test_parses_multi_pack_sizes_as_set_size_label(self):
         brand = Brand.objects.create(name="Vilhelm Parfumerie")
-        BrandAlias.objects.create(brand=brand, alias_text="Vilhelm Parfumerie", normalized_alias="vilhelm parfumerie")
+        BrandAlias.objects.create(
+            brand=brand,
+            alias_text="Vilhelm Parfumerie",
+            normalized_alias="vilhelm parfumerie",
+        )
         examples = (
-            ("Vilhelm Parfumerie MODEST MIMOSA edp 3 x 10ml", "3*10ml", Decimal("10.00")),
+            (
+                "Vilhelm Parfumerie MODEST MIMOSA edp 3 x 10ml",
+                "3*10ml",
+                Decimal("10.00"),
+            ),
             ("Vilhelm Parfumerie MODEST MIMOSA edp 3*10ml", "3*10ml", Decimal("10.00")),
-            ("Vilhelm Parfumerie MODEST MIMOSA edp 5 * 7,5 ml", "5*7.5ml", Decimal("7.50")),
+            (
+                "Vilhelm Parfumerie MODEST MIMOSA edp 5 * 7,5 ml",
+                "5*7.5ml",
+                Decimal("7.50"),
+            ),
             ("Vilhelm Parfumerie MODEST MIMOSA edp 5x7.5", "5*7.5ml", Decimal("7.50")),
         )
 
@@ -213,8 +247,12 @@ class NormalizerTests(TestCase):
 
     def test_russian_hair_mist_beats_linked_perfume_concentration(self):
         brand = Brand.objects.create(name="Givenchy")
-        BrandAlias.objects.create(brand=brand, alias_text="Givenchy", normalized_alias="givenchy")
-        perfume = brand.perfumes.create(name="L'Interdit", concentration="Eau de Toilette")
+        BrandAlias.objects.create(
+            brand=brand, alias_text="Givenchy", normalized_alias="givenchy"
+        )
+        perfume = brand.perfumes.create(
+            name="L'Interdit", concentration="Eau de Toilette"
+        )
         product = SupplierProduct.objects.create(
             supplier=self.supplier,
             identity_key="givenchy-hair-mist",
@@ -230,11 +268,16 @@ class NormalizerTests(TestCase):
         self.assertTrue(parsed.is_tester)
         self.assertEqual(parsed.display_variant_type, "Tester")
         self.assertEqual(parsed.product_category_label, "Hair Care")
-        self.assertEqual(parsed.display_identity, "Givenchy / L'Interdit / Hair Perfume / 35ml / Tester")
+        self.assertEqual(
+            parsed.display_identity,
+            "Givenchy / L'Interdit / Hair Perfume / 35ml / Tester",
+        )
 
     def test_english_hair_mist_and_hair_perfume_keep_supplier_form(self):
         brand = Brand.objects.create(name="Givenchy")
-        BrandAlias.objects.create(brand=brand, alias_text="Givenchy", normalized_alias="givenchy")
+        BrandAlias.objects.create(
+            brand=brand, alias_text="Givenchy", normalized_alias="givenchy"
+        )
         examples = (
             ("Givenchy L'Interdit hair mist 35ml", "Hair Mist"),
             ("Givenchy L'Interdit hair perfume 35ml", "Hair Perfume"),
@@ -436,11 +479,102 @@ class NormalizerTests(TestCase):
             "Baldessarini / Ambre / Eau de Toilette / 90ml / Tester",
         )
 
+    def test_generated_brand_alias_does_not_use_generic_collection_suffix(self):
+        attar = Brand.objects.create(name="Attar Collection")
+        clive = Brand.objects.create(name="Clive Christian")
+        BrandAlias.objects.create(
+            brand=clive,
+            alias_text="Clive Christian",
+            normalized_alias="clive christian",
+        )
+        product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="collection-not-attar",
+            name="Original Collection 1872 FEMININE Perfume Spray 50 ml",
+        )
+
+        parsed = parse_supplier_product(product)
+
+        self.assertNotEqual(parsed.normalized_brand, attar)
+        self.assertIsNone(parsed.normalized_brand)
+        self.assertIn("brand missing", parsed.warnings)
+
+    def test_brand_scoped_collection_alias_can_infer_missing_brand(self):
+        Brand.objects.create(name="Attar Collection")
+        clive = Brand.objects.create(name="Clive Christian")
+        ProductAlias.objects.create(
+            brand=clive,
+            alias_text="original collection",
+            canonical_text="",
+            collection_name="Original Collection",
+            priority=30,
+        )
+        product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="collection-alias-inferred-brand",
+            name="Original Collection 1872 FEMININE Perfume Spray 50 ml",
+        )
+
+        parsed = parse_supplier_product(product)
+
+        self.assertEqual(parsed.normalized_brand, clive)
+        self.assertEqual(parsed.collection_name, "Original Collection")
+        self.assertIn("1872", parsed.product_name_text)
+        self.assertNotIn("brand missing", parsed.warnings)
+
+    def test_attar_prefix_is_attar_collection_brand_not_oil_concentration(self):
+        attar_collection = Brand.objects.create(name="Attar Collection")
+        Brand.objects.create(name="Al Attar")
+        BrandAlias.objects.create(
+            brand=attar_collection,
+            alias_text="Attar",
+            normalized_alias="attar",
+            priority=35,
+        )
+        attar_collection.perfumes.create(
+            name="Azalea",
+            concentration="Eau de Parfum",
+        )
+        product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="attar-azalea-edp-not-oil",
+            name="ATTAR AZALEA 100ml edP test",
+        )
+
+        parsed = parse_supplier_product(product)
+
+        self.assertEqual(parsed.normalized_brand, attar_collection)
+        self.assertEqual(parsed.product_name_text, "Azalea")
+        self.assertEqual(parsed.concentration, "Eau de Parfum")
+        self.assertTrue(parsed.is_tester)
+
+    def test_exact_brand_still_beats_generic_collection_suffix(self):
+        Brand.objects.create(name="Attar Collection")
+        regalien = Brand.objects.create(name="Regalien")
+        product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="regalien-heritage-not-attar",
+            name="Regalien Heritage Collection Sah Extrait De Parfum 50ml",
+        )
+
+        parsed = parse_supplier_product(product)
+
+        self.assertEqual(parsed.normalized_brand, regalien)
+        self.assertEqual(parsed.product_name_text, "heritage collection sah")
+        self.assertEqual(parsed.concentration, "Extrait de Parfum")
+        self.assertEqual(parsed.size_ml, Decimal("50.00"))
+
     def test_standalone_w_and_m_are_audience_aliases_not_product_name(self):
         brand = Brand.objects.create(name="Abercrombie & Fitch")
-        BrandAlias.objects.create(brand=brand, alias_text="Abercrombie Fitch", normalized_alias="abercrombie fitch")
+        BrandAlias.objects.create(
+            brand=brand,
+            alias_text="Abercrombie Fitch",
+            normalized_alias="abercrombie fitch",
+        )
         chanel = Brand.objects.create(name="Chanel")
-        BrandAlias.objects.create(brand=chanel, alias_text="Chanel", normalized_alias="chanel")
+        BrandAlias.objects.create(
+            brand=chanel, alias_text="Chanel", normalized_alias="chanel"
+        )
         woman_product = SupplierProduct.objects.create(
             supplier=self.supplier,
             identity_key="audience-w",
@@ -471,7 +605,9 @@ class NormalizerTests(TestCase):
 
     def test_parenthetical_l_is_exact_woman_marker_not_product_name(self):
         brand = Brand.objects.create(name="Kenzo")
-        BrandAlias.objects.create(brand=brand, alias_text="Kenzo", normalized_alias="kenzo")
+        BrandAlias.objects.create(
+            brand=brand, alias_text="Kenzo", normalized_alias="kenzo"
+        )
         product = SupplierProduct.objects.create(
             supplier=self.supplier,
             identity_key="kenzo-ciel-l",
@@ -488,7 +624,9 @@ class NormalizerTests(TestCase):
 
     def test_parenthetical_u_is_unisex_marker_not_product_name(self):
         brand = Brand.objects.create(name="Agonist")
-        BrandAlias.objects.create(brand=brand, alias_text="Agonist", normalized_alias="agonist")
+        BrandAlias.objects.create(
+            brand=brand, alias_text="Agonist", normalized_alias="agonist"
+        )
         product = SupplierProduct.objects.create(
             supplier=self.supplier,
             identity_key="agonist-liquid-crystal-u",
@@ -506,8 +644,12 @@ class NormalizerTests(TestCase):
 
     def test_latin_brand_scent_drops_cyrillic_supplier_leftover_tokens(self):
         brand = Brand.objects.create(name="Amouage")
-        BrandAlias.objects.create(brand=brand, alias_text="AMOUAGE", normalized_alias="amouage")
-        brand.perfumes.create(name="Ashore", concentration="Eau de Parfum", audience="Woman")
+        BrandAlias.objects.create(
+            brand=brand, alias_text="AMOUAGE", normalized_alias="amouage"
+        )
+        brand.perfumes.create(
+            name="Ashore", concentration="Eau de Parfum", audience="Woman"
+        )
         product = SupplierProduct.objects.create(
             supplier=self.supplier,
             identity_key="amouage-ashore-oman",
@@ -522,12 +664,18 @@ class NormalizerTests(TestCase):
         self.assertEqual(parsed.size_ml, Decimal("100.00"))
         self.assertEqual(parsed.supplier_gender_hint, "Woman")
         self.assertTrue(parsed.is_tester)
-        self.assertEqual(parsed.display_identity, "Amouage / Ashore / Eau de Parfum / 100ml / Tester")
+        self.assertEqual(
+            parsed.display_identity, "Amouage / Ashore / Eau de Parfum / 100ml / Tester"
+        )
 
     def test_messy_alians_spacing_tester_and_design_notes_are_structured(self):
         brand = Brand.objects.create(name="Amouage")
-        BrandAlias.objects.create(brand=brand, alias_text="AMOUAGE", normalized_alias="amouage")
-        brand.perfumes.create(name="Blossom Love", concentration="Eau de Parfum", audience="Woman")
+        BrandAlias.objects.create(
+            brand=brand, alias_text="AMOUAGE", normalized_alias="amouage"
+        )
+        brand.perfumes.create(
+            name="Blossom Love", concentration="Eau de Parfum", audience="Woman"
+        )
         product = SupplierProduct.objects.create(
             supplier=self.supplier,
             identity_key="amouage-blossom-love-messy",
@@ -549,8 +697,12 @@ class NormalizerTests(TestCase):
 
     def test_messy_alians_decoded_old_design_and_cap_notes_are_structured(self):
         brand = Brand.objects.create(name="Amouage")
-        BrandAlias.objects.create(brand=brand, alias_text="AMOUAGE", normalized_alias="amouage")
-        brand.perfumes.create(name="Epic", concentration="Eau de Parfum", audience="Men")
+        BrandAlias.objects.create(
+            brand=brand, alias_text="AMOUAGE", normalized_alias="amouage"
+        )
+        brand.perfumes.create(
+            name="Epic", concentration="Eau de Parfum", audience="Men"
+        )
         product = SupplierProduct.objects.create(
             supplier=self.supplier,
             identity_key="amouage-epic-decoded-old-design",
@@ -571,8 +723,12 @@ class NormalizerTests(TestCase):
 
     def test_messy_alians_no_box_and_dented_notes_are_structured(self):
         brand = Brand.objects.create(name="Amouage")
-        BrandAlias.objects.create(brand=brand, alias_text="AMOUAGE", normalized_alias="amouage")
-        brand.perfumes.create(name="Dia", concentration="Eau de Parfum", audience="Woman")
+        BrandAlias.objects.create(
+            brand=brand, alias_text="AMOUAGE", normalized_alias="amouage"
+        )
+        brand.perfumes.create(
+            name="Dia", concentration="Eau de Parfum", audience="Woman"
+        )
         product = SupplierProduct.objects.create(
             supplier=self.supplier,
             identity_key="amouage-dia-sample-no-box-dented",
@@ -592,7 +748,9 @@ class NormalizerTests(TestCase):
 
     def test_masculine_dented_packaging_note_is_structured(self):
         brand = Brand.objects.create(name="Afnan")
-        BrandAlias.objects.create(brand=brand, alias_text="Afnan", normalized_alias="afnan")
+        BrandAlias.objects.create(
+            brand=brand, alias_text="Afnan", normalized_alias="afnan"
+        )
         product = SupplierProduct.objects.create(
             supplier=self.supplier,
             identity_key="afnan-tribute-blue-dented",
@@ -615,8 +773,12 @@ class NormalizerTests(TestCase):
 
     def test_no_cellophane_and_damaged_wrap_terms_are_dented_packaging(self):
         brand = Brand.objects.create(name="Armani")
-        BrandAlias.objects.create(brand=brand, alias_text="Armani", normalized_alias="armani")
-        brand.perfumes.create(name="Code", concentration="Eau de Parfum", audience="Men")
+        BrandAlias.objects.create(
+            brand=brand, alias_text="Armani", normalized_alias="armani"
+        )
+        brand.perfumes.create(
+            name="Code", concentration="Eau de Parfum", audience="Men"
+        )
         terms = (
             "\u0431\u0435\u0437 \u0446\u0435\u043b",
             "\u0431\u0435\u0437 \u0446\u0435\u043b\u043e\u0444\u043d\u0430",
@@ -653,7 +815,10 @@ class NormalizerTests(TestCase):
                 self.assertEqual(parsed.size_ml, Decimal("15.00"))
                 self.assertEqual(parsed.packaging, "dented")
                 self.assertNotIn(term, parsed.product_name_text.lower())
-                self.assertEqual(parsed.display_identity, "Armani / Code / Eau de Parfum / 15ml / Dented")
+                self.assertEqual(
+                    parsed.display_identity,
+                    "Armani / Code / Eau de Parfum / 15ml / Dented",
+                )
 
     def test_display_identity_title_cases_scent_but_keeps_joiners_lowercase(self):
         product = SupplierProduct.objects.create(
@@ -672,14 +837,19 @@ class NormalizerTests(TestCase):
         )
 
         self.assertEqual(parsed.display_product_name, "Rose of No Man's Land in Bloom")
-        self.assertEqual(parsed.display_identity, "Byredo / Rose of No Man's Land in Bloom / Eau de Parfum / 100ml")
+        self.assertEqual(
+            parsed.display_identity,
+            "Byredo / Rose of No Man's Land in Bloom / Eau de Parfum / 100ml",
+        )
 
         parsed.product_name_text = "for her"
         self.assertEqual(parsed.display_product_name, "for Her")
         parsed.product_name_text = "The Majestic Amber"
         self.assertEqual(parsed.display_product_name, "The Majestic Amber")
 
-    def test_self_titled_catalogue_scent_fills_brand_only_supplier_row_and_collapses_display(self):
+    def test_self_titled_catalogue_scent_fills_brand_only_supplier_row_and_collapses_display(
+        self,
+    ):
         brand = Brand.objects.create(name="Agent Provocateur")
         brand.perfumes.create(
             name="Agent Provocateur",
@@ -700,9 +870,13 @@ class NormalizerTests(TestCase):
         self.assertEqual(parsed.size_ml, Decimal("50.00"))
         self.assertEqual(parsed.supplier_gender_hint, "Woman")
         self.assertNotIn("product name missing", parsed.warnings)
-        self.assertEqual(parsed.display_identity, "Agent Provocateur / Eau de Parfum / 50ml")
+        self.assertEqual(
+            parsed.display_identity, "Agent Provocateur / Eau de Parfum / 50ml"
+        )
 
-    def test_blank_catalogue_scent_can_confirm_self_titled_brand_only_supplier_row(self):
+    def test_blank_catalogue_scent_can_confirm_self_titled_brand_only_supplier_row(
+        self,
+    ):
         brand = Brand.objects.create(name="Example Self Title")
         brand.perfumes.create(
             name="",
@@ -719,7 +893,9 @@ class NormalizerTests(TestCase):
 
         self.assertEqual(parsed.normalized_brand, brand)
         self.assertEqual(parsed.product_name_text, "Example Self Title")
-        self.assertEqual(parsed.display_identity, "Example Self Title / Eau de Parfum / 50ml")
+        self.assertEqual(
+            parsed.display_identity, "Example Self Title / Eau de Parfum / 50ml"
+        )
 
     def test_brand_alias_left_as_name_can_confirm_self_titled_catalogue_scent(self):
         brand = Brand.objects.create(name="Salvador Dali")
@@ -746,12 +922,16 @@ class NormalizerTests(TestCase):
         self.assertEqual(parsed.concentration, "Eau de Parfum")
         self.assertEqual(parsed.size_ml, Decimal("30.00"))
         self.assertNotIn("product name missing", parsed.warnings)
-        self.assertEqual(parsed.display_identity, "Salvador Dali / Eau de Parfum / 30ml")
+        self.assertEqual(
+            parsed.display_identity, "Salvador Dali / Eau de Parfum / 30ml"
+        )
 
     def test_ambiguous_self_titled_catalogue_candidates_go_to_manual_review(self):
         brand = Brand.objects.create(name="Example Ambiguous")
         brand.perfumes.create(name="", concentration="Eau de Parfum", audience="Woman")
-        brand.perfumes.create(name="Example Ambiguous", concentration="Eau de Parfum", audience="Woman")
+        brand.perfumes.create(
+            name="Example Ambiguous", concentration="Eau de Parfum", audience="Woman"
+        )
         product = SupplierProduct.objects.create(
             supplier=self.supplier,
             identity_key="ambiguous-self-title",
@@ -779,8 +959,14 @@ class NormalizerTests(TestCase):
 
     def test_for_woman_suffix_canonicalizes_to_catalogue_scent_name(self):
         brand = Brand.objects.create(name="Carolina Herrera")
-        BrandAlias.objects.create(brand=brand, alias_text="Carolina Herrera", normalized_alias="carolina herrera")
-        brand.perfumes.create(name="212 Woman", concentration="Eau de Toilette", audience="Woman")
+        BrandAlias.objects.create(
+            brand=brand,
+            alias_text="Carolina Herrera",
+            normalized_alias="carolina herrera",
+        )
+        brand.perfumes.create(
+            name="212 Woman", concentration="Eau de Toilette", audience="Woman"
+        )
         ProductAlias.objects.create(
             brand=brand,
             alias_text="Woman",
@@ -802,7 +988,10 @@ class NormalizerTests(TestCase):
         self.assertEqual(parsed.product_name_text, "212 Woman")
         self.assertEqual(parsed.concentration, "Eau de Toilette")
         self.assertEqual(parsed.size_ml, Decimal("30.00"))
-        self.assertEqual(parsed.display_identity, "Carolina Herrera / 212 Woman / Eau de Toilette / 30ml")
+        self.assertEqual(
+            parsed.display_identity,
+            "Carolina Herrera / 212 Woman / Eau de Toilette / 30ml",
+        )
 
     def test_wom_audience_alias_canonicalizes_to_catalogue_audience_scent(self):
         brand = Brand.objects.create(name="Gucci")
@@ -892,11 +1081,19 @@ class NormalizerTests(TestCase):
             "Guilty Man",
         )
 
-    def test_mixed_script_cyrillic_lookalike_keeps_latin_scent_name_and_audience_catalogue_match(self):
+    def test_mixed_script_cyrillic_lookalike_keeps_latin_scent_name_and_audience_catalogue_match(
+        self,
+    ):
         brand = Brand.objects.create(name="Amouage")
-        BrandAlias.objects.create(brand=brand, alias_text="AMOUAGE", normalized_alias="amouage")
-        brand.perfumes.create(name="Ciel for Men", concentration="Eau de Parfum", audience="Men")
-        brand.perfumes.create(name="Ciel for Woman", concentration="Eau de Parfum", audience="Woman")
+        BrandAlias.objects.create(
+            brand=brand, alias_text="AMOUAGE", normalized_alias="amouage"
+        )
+        brand.perfumes.create(
+            name="Ciel for Men", concentration="Eau de Parfum", audience="Men"
+        )
+        brand.perfumes.create(
+            name="Ciel for Woman", concentration="Eau de Parfum", audience="Woman"
+        )
         product = SupplierProduct.objects.create(
             supplier=self.supplier,
             identity_key="amouage-ciel-cyrillic-c",
@@ -910,13 +1107,21 @@ class NormalizerTests(TestCase):
         self.assertEqual(parsed.concentration, "Eau de Parfum")
         self.assertEqual(parsed.size_ml, Decimal("50.00"))
         self.assertEqual(parsed.supplier_gender_hint, "Woman")
-        self.assertEqual(parsed.display_identity, "Amouage / Ciel for Woman / Eau de Parfum / 50ml")
+        self.assertEqual(
+            parsed.display_identity, "Amouage / Ciel for Woman / Eau de Parfum / 50ml"
+        )
 
     def test_supplier_packaging_abbreviations_do_not_leave_c_in_reflection_name(self):
         brand = Brand.objects.create(name="Amouage")
-        BrandAlias.objects.create(brand=brand, alias_text="AMOUAGE", normalized_alias="amouage")
-        brand.perfumes.create(name="Reflection for Men", concentration="Eau de Parfum", audience="Men")
-        brand.perfumes.create(name="Reflection for Woman", concentration="Eau de Parfum", audience="Woman")
+        BrandAlias.objects.create(
+            brand=brand, alias_text="AMOUAGE", normalized_alias="amouage"
+        )
+        brand.perfumes.create(
+            name="Reflection for Men", concentration="Eau de Parfum", audience="Men"
+        )
+        brand.perfumes.create(
+            name="Reflection for Woman", concentration="Eau de Parfum", audience="Woman"
+        )
         GlobalRule.objects.update_or_create(
             rule_kind="parser_with_cap_packaging_term",
             scope_type="global",
@@ -963,8 +1168,12 @@ class NormalizerTests(TestCase):
 
     def test_short_with_cap_abbreviation_does_not_leave_c_in_guidance_name(self):
         brand = Brand.objects.create(name="Amouage")
-        BrandAlias.objects.create(brand=brand, alias_text="AMOUAGE", normalized_alias="amouage")
-        brand.perfumes.create(name="Guidance 46", concentration="Extrait de Parfum", audience="Woman")
+        BrandAlias.objects.create(
+            brand=brand, alias_text="AMOUAGE", normalized_alias="amouage"
+        )
+        brand.perfumes.create(
+            name="Guidance 46", concentration="Extrait de Parfum", audience="Woman"
+        )
         product = SupplierProduct.objects.create(
             supplier=self.supplier,
             identity_key="amouage-guidance-46-short-cap-decoded",
@@ -986,11 +1195,19 @@ class NormalizerTests(TestCase):
             "Amouage / Guidance 46 / Eau de Parfum / 100ml / Decoded / With Cap",
         )
 
-    def test_limited_ed_abbreviation_uses_catalogue_audience_name_before_edition_suffix(self):
+    def test_limited_ed_abbreviation_uses_catalogue_audience_name_before_edition_suffix(
+        self,
+    ):
         brand = Brand.objects.create(name="Amouage")
-        BrandAlias.objects.create(brand=brand, alias_text="AMOUAGE", normalized_alias="amouage")
-        brand.perfumes.create(name="Reflection for Men", concentration="Eau de Parfum", audience="Men")
-        brand.perfumes.create(name="Reflection for Woman", concentration="Eau de Parfum", audience="Woman")
+        BrandAlias.objects.create(
+            brand=brand, alias_text="AMOUAGE", normalized_alias="amouage"
+        )
+        brand.perfumes.create(
+            name="Reflection for Men", concentration="Eau de Parfum", audience="Men"
+        )
+        brand.perfumes.create(
+            name="Reflection for Woman", concentration="Eau de Parfum", audience="Woman"
+        )
         GlobalRule.objects.update_or_create(
             rule_kind="regex_preprocess",
             scope_type="global",
@@ -1044,12 +1261,19 @@ class NormalizerTests(TestCase):
         self.assertEqual(parsed.product_name_text, "Azay-Le-Rideau")
         self.assertEqual(parsed.concentration, "Extrait de Parfum")
         self.assertEqual(parsed.size_ml, Decimal("100.00"))
-        self.assertEqual(parsed.display_identity, "12 Parfumeurs / Azay-Le-Rideau / Extrait de Parfum / 100ml")
+        self.assertEqual(
+            parsed.display_identity,
+            "12 Parfumeurs / Azay-Le-Rideau / Extrait de Parfum / 100ml",
+        )
 
     def test_exclus_edition_typo_normalizes_to_catalogue_exclusive_edition(self):
         brand = Brand.objects.create(name="Armani")
-        BrandAlias.objects.create(brand=brand, alias_text="Armani", normalized_alias="armani")
-        brand.perfumes.create(name="My Way Exclusive Edition", concentration="Eau de Parfum")
+        BrandAlias.objects.create(
+            brand=brand, alias_text="Armani", normalized_alias="armani"
+        )
+        brand.perfumes.create(
+            name="My Way Exclusive Edition", concentration="Eau de Parfum"
+        )
         ProductAlias.objects.create(
             brand=brand,
             alias_text="My Way Exclusive Edition",
@@ -1083,11 +1307,16 @@ class NormalizerTests(TestCase):
         self.assertEqual(parsed.concentration, "Eau de Parfum")
         self.assertEqual(parsed.size_ml, Decimal("50.00"))
         self.assertEqual(parsed.supplier_gender_hint, "Woman")
-        self.assertEqual(parsed.display_identity, "Armani / My Way Exclusive Edition / Eau de Parfum / 50ml")
+        self.assertEqual(
+            parsed.display_identity,
+            "Armani / My Way Exclusive Edition / Eau de Parfum / 50ml",
+        )
 
     def test_name_bearing_audience_alias_preserves_preceding_scent_words(self):
         brand = Brand.objects.create(name="Versace")
-        BrandAlias.objects.create(brand=brand, alias_text="VERSACE", normalized_alias="versace")
+        BrandAlias.objects.create(
+            brand=brand, alias_text="VERSACE", normalized_alias="versace"
+        )
         ProductAlias.objects.create(
             brand=brand,
             alias_text="pour femme",
@@ -1113,7 +1342,9 @@ class NormalizerTests(TestCase):
 
     def test_release_year_is_stored_separately_not_displayed_in_name(self):
         brand = Brand.objects.create(name="Versace")
-        BrandAlias.objects.create(brand=brand, alias_text="VERSACE", normalized_alias="versace")
+        BrandAlias.objects.create(
+            brand=brand, alias_text="VERSACE", normalized_alias="versace"
+        )
         product = SupplierProduct.objects.create(
             supplier=self.supplier,
             identity_key="versace-eros-flame-year",
@@ -1127,7 +1358,10 @@ class NormalizerTests(TestCase):
         self.assertEqual(parsed.release_year, 2019)
         self.assertEqual(parsed.concentration, "Eau de Parfum")
         self.assertEqual(parsed.size_ml, Decimal("100.00"))
-        self.assertEqual(parsed.display_identity, "Versace / Eros Flame Man / Eau de Parfum / 100ml / Tester")
+        self.assertEqual(
+            parsed.display_identity,
+            "Versace / Eros Flame Man / Eau de Parfum / 100ml / Tester",
+        )
 
     def test_four_digit_number_between_scent_words_stays_in_name(self):
         brand = Brand.objects.create(name="Norana Perfumes")
@@ -1269,7 +1503,10 @@ class NormalizerTests(TestCase):
         self.assertEqual(parsed.concentration, "Eau de Toilette")
         self.assertEqual(parsed.size_ml, Decimal("100.00"))
         self.assertEqual(parsed.supplier_gender_hint, "Men")
-        self.assertEqual(parsed.display_identity, "Alfred Dunhill / Desire for Men / Eau de Toilette / 100ml")
+        self.assertEqual(
+            parsed.display_identity,
+            "Alfred Dunhill / Desire for Men / Eau de Toilette / 100ml",
+        )
 
     def test_alexandre_j_art_deco_collection_prefix_parses_collection_and_scent(self):
         brand = Brand.objects.create(name="Alexandre J.")
@@ -1343,9 +1580,13 @@ class NormalizerTests(TestCase):
         self.assertEqual(parsed.concentration, "Eau de Parfum")
         self.assertEqual(parsed.size_ml, Decimal("100.00"))
         self.assertEqual(parsed.supplier_gender_hint, "Woman")
-        self.assertEqual(parsed.display_identity, "Alexandre J. / Legacy WB / Eau de Parfum / 100ml")
+        self.assertEqual(
+            parsed.display_identity, "Alexandre J. / Legacy WB / Eau de Parfum / 100ml"
+        )
 
-    def test_alexandre_j_ultimate_crystal_saint_honore_uses_ultimate_collection_and_st_name(self):
+    def test_alexandre_j_ultimate_crystal_saint_honore_uses_ultimate_collection_and_st_name(
+        self,
+    ):
         brand = Brand.objects.create(name="Alexandre J.")
         BrandAlias.objects.create(
             brand=brand,
@@ -1422,7 +1663,9 @@ class NormalizerTests(TestCase):
 
     def test_woodbox_is_packaging_not_scent_name(self):
         brand = Brand.objects.create(name="Afnan")
-        BrandAlias.objects.create(brand=brand, alias_text="AFNAN", normalized_alias="afnan")
+        BrandAlias.objects.create(
+            brand=brand, alias_text="AFNAN", normalized_alias="afnan"
+        )
         product = SupplierProduct.objects.create(
             supplier=self.supplier,
             identity_key="afnan-tribute-blue-woodbox",
@@ -1437,13 +1680,22 @@ class NormalizerTests(TestCase):
         self.assertEqual(parsed.size_ml, Decimal("100.00"))
         self.assertEqual(parsed.variant_type, "standard")
         self.assertEqual(parsed.packaging, "woodbox")
-        self.assertEqual(parsed.display_identity, "Afnan / Tribute Blue / Eau de Parfum / 100ml / Woodbox")
+        self.assertEqual(
+            parsed.display_identity,
+            "Afnan / Tribute Blue / Eau de Parfum / 100ml / Woodbox",
+        )
 
     def test_new_design_and_gray_box_are_packaging_not_scent_name(self):
         brand = Brand.objects.create(name="Ajmal")
-        BrandAlias.objects.create(brand=brand, alias_text="AJMAL", normalized_alias="ajmal")
-        perfume = brand.perfumes.create(name="Shadow", concentration="Eau de Parfum", audience="Men")
-        perfume.variants.create(size_ml=Decimal("75.00"), variant_type="standard", packaging="gray box")
+        BrandAlias.objects.create(
+            brand=brand, alias_text="AJMAL", normalized_alias="ajmal"
+        )
+        perfume = brand.perfumes.create(
+            name="Shadow", concentration="Eau de Parfum", audience="Men"
+        )
+        perfume.variants.create(
+            size_ml=Decimal("75.00"), variant_type="standard", packaging="gray box"
+        )
         product = SupplierProduct.objects.create(
             supplier=self.supplier,
             identity_key="ajmal-shadow-gray-box",
@@ -1459,11 +1711,15 @@ class NormalizerTests(TestCase):
         self.assertEqual(parsed.supplier_gender_hint, "Men")
         self.assertEqual(parsed.variant_type, "standard")
         self.assertEqual(parsed.packaging, "gray_box")
-        self.assertEqual(parsed.display_identity, "Ajmal / Shadow / Eau de Parfum / 75ml / Gray Box")
+        self.assertEqual(
+            parsed.display_identity, "Ajmal / Shadow / Eau de Parfum / 75ml / Gray Box"
+        )
 
     def test_product_name_compacts_spaces_around_numeric_dot(self):
         brand = Brand.objects.create(name="Zarkoperfume")
-        BrandAlias.objects.create(brand=brand, alias_text="Zarkoperfume", normalized_alias="zarkoperfume")
+        BrandAlias.objects.create(
+            brand=brand, alias_text="Zarkoperfume", normalized_alias="zarkoperfume"
+        )
         product = SupplierProduct.objects.create(
             supplier=self.supplier,
             identity_key="zarkoperfume-pink-molecule-090-09",
@@ -1474,12 +1730,19 @@ class NormalizerTests(TestCase):
 
         self.assertEqual(parsed.normalized_brand, brand)
         self.assertEqual(parsed.product_name_text, "pink molecule 090.09")
-        self.assertEqual(parsed.display_identity, "Zarkoperfume / Pink Molecule 090.09 / Eau de Parfum / 100ml / Tester")
+        self.assertEqual(
+            parsed.display_identity,
+            "Zarkoperfume / Pink Molecule 090.09 / Eau de Parfum / 100ml / Tester",
+        )
 
     def test_product_name_uses_brand_catalog_spacing_when_compact_name_matches(self):
         brand = Brand.objects.create(name="Paco Rabanne")
-        BrandAlias.objects.create(brand=brand, alias_text="PACO RABANNE", normalized_alias="paco rabanne")
-        brand.perfumes.create(name="1 Million", concentration="Eau de Toilette", audience="Men")
+        BrandAlias.objects.create(
+            brand=brand, alias_text="PACO RABANNE", normalized_alias="paco rabanne"
+        )
+        brand.perfumes.create(
+            name="1 Million", concentration="Eau de Toilette", audience="Men"
+        )
         product = SupplierProduct.objects.create(
             supplier=self.supplier,
             identity_key="paco-rabanne-1million-men",
@@ -1494,12 +1757,19 @@ class NormalizerTests(TestCase):
         self.assertEqual(parsed.size_ml, Decimal("100.00"))
         self.assertTrue(parsed.is_tester)
         self.assertEqual(parsed.supplier_gender_hint, "Men")
-        self.assertEqual(parsed.display_identity, "Paco Rabanne / 1 Million / Eau de Toilette / 100ml / Tester")
+        self.assertEqual(
+            parsed.display_identity,
+            "Paco Rabanne / 1 Million / Eau de Toilette / 100ml / Tester",
+        )
 
     def test_catalog_audience_variant_can_canonicalize_scent_name(self):
         brand = Brand.objects.create(name="Abercrombie & Fitch")
-        brand.perfumes.create(name="Away Tonight Man", concentration="Eau de Parfum", audience="Men")
-        brand.perfumes.create(name="Away Tonight Woman", concentration="Eau de Parfum", audience="Woman")
+        brand.perfumes.create(
+            name="Away Tonight Man", concentration="Eau de Parfum", audience="Men"
+        )
+        brand.perfumes.create(
+            name="Away Tonight Woman", concentration="Eau de Parfum", audience="Woman"
+        )
         product = SupplierProduct.objects.create(
             supplier=self.supplier,
             identity_key="abercrombie-away-tonight-lady",
@@ -1513,13 +1783,24 @@ class NormalizerTests(TestCase):
         self.assertEqual(parsed.concentration, "Eau de Parfum")
         self.assertEqual(parsed.size_ml, Decimal("30.00"))
         self.assertEqual(parsed.supplier_gender_hint, "Woman")
-        self.assertEqual(parsed.display_identity, "Abercrombie & Fitch / Away Tonight Woman / Eau de Parfum / 30ml")
+        self.assertEqual(
+            parsed.display_identity,
+            "Abercrombie & Fitch / Away Tonight Woman / Eau de Parfum / 30ml",
+        )
 
     def test_catalog_for_men_variant_can_canonicalize_scent_name(self):
         brand = Brand.objects.create(name="Angel Schlesser")
-        BrandAlias.objects.create(brand=brand, alias_text="Angel Schlesser", normalized_alias="angel schlesser")
-        brand.perfumes.create(name="Essential for Men", concentration="Eau de Toilette", audience="Men")
-        brand.perfumes.create(name="Essential for Women", concentration="Eau de Parfum", audience="Woman")
+        BrandAlias.objects.create(
+            brand=brand,
+            alias_text="Angel Schlesser",
+            normalized_alias="angel schlesser",
+        )
+        brand.perfumes.create(
+            name="Essential for Men", concentration="Eau de Toilette", audience="Men"
+        )
+        brand.perfumes.create(
+            name="Essential for Women", concentration="Eau de Parfum", audience="Woman"
+        )
         product = SupplierProduct.objects.create(
             supplier=self.supplier,
             identity_key="angel-schlesser-essential-men",
@@ -1533,13 +1814,24 @@ class NormalizerTests(TestCase):
         self.assertEqual(parsed.concentration, "Eau de Toilette")
         self.assertEqual(parsed.size_ml, Decimal("100.00"))
         self.assertEqual(parsed.supplier_gender_hint, "Men")
-        self.assertEqual(parsed.display_identity, "Angel Schlesser / Essential for Men / Eau de Toilette / 100ml")
+        self.assertEqual(
+            parsed.display_identity,
+            "Angel Schlesser / Essential for Men / Eau de Toilette / 100ml",
+        )
 
     def test_catalog_for_women_variant_can_canonicalize_scent_name(self):
         brand = Brand.objects.create(name="Angel Schlesser")
-        BrandAlias.objects.create(brand=brand, alias_text="Angel Schlesser", normalized_alias="angel schlesser")
-        brand.perfumes.create(name="Essential for Men", concentration="Eau de Toilette", audience="Men")
-        brand.perfumes.create(name="Essential for Women", concentration="Eau de Parfum", audience="Woman")
+        BrandAlias.objects.create(
+            brand=brand,
+            alias_text="Angel Schlesser",
+            normalized_alias="angel schlesser",
+        )
+        brand.perfumes.create(
+            name="Essential for Men", concentration="Eau de Toilette", audience="Men"
+        )
+        brand.perfumes.create(
+            name="Essential for Women", concentration="Eau de Parfum", audience="Woman"
+        )
         product = SupplierProduct.objects.create(
             supplier=self.supplier,
             identity_key="angel-schlesser-essential-women",
@@ -1553,11 +1845,16 @@ class NormalizerTests(TestCase):
         self.assertEqual(parsed.concentration, "Eau de Parfum")
         self.assertEqual(parsed.size_ml, Decimal("50.00"))
         self.assertEqual(parsed.supplier_gender_hint, "Woman")
-        self.assertEqual(parsed.display_identity, "Angel Schlesser / Essential for Women / Eau de Parfum / 50ml")
+        self.assertEqual(
+            parsed.display_identity,
+            "Angel Schlesser / Essential for Women / Eau de Parfum / 50ml",
+        )
 
     def test_catalog_audience_variant_respects_concentration_context(self):
         brand = Brand.objects.create(name="Abercrombie & Fitch")
-        brand.perfumes.create(name="Away Tonight Woman", concentration="Eau de Toilette", audience="Woman")
+        brand.perfumes.create(
+            name="Away Tonight Woman", concentration="Eau de Toilette", audience="Woman"
+        )
         product = SupplierProduct.objects.create(
             supplier=self.supplier,
             identity_key="abercrombie-away-tonight-lady-edp",
@@ -1573,8 +1870,12 @@ class NormalizerTests(TestCase):
 
     def test_catalog_base_name_can_drop_trailing_audience_name(self):
         brand = Brand.objects.create(name="Versace")
-        BrandAlias.objects.create(brand=brand, alias_text="VERSACE", normalized_alias="versace")
-        brand.perfumes.create(name="Eros Flame", concentration="Eau de Parfum", audience="Men")
+        BrandAlias.objects.create(
+            brand=brand, alias_text="VERSACE", normalized_alias="versace"
+        )
+        brand.perfumes.create(
+            name="Eros Flame", concentration="Eau de Parfum", audience="Men"
+        )
         product = SupplierProduct.objects.create(
             supplier=self.supplier,
             identity_key="versace-eros-flame-man",
@@ -1589,12 +1890,19 @@ class NormalizerTests(TestCase):
         self.assertEqual(parsed.size_ml, Decimal("100.00"))
         self.assertEqual(parsed.supplier_gender_hint, "Men")
         self.assertTrue(parsed.is_tester)
-        self.assertEqual(parsed.display_identity, "Versace / Eros Flame / Eau de Parfum / 100ml / Tester")
+        self.assertEqual(
+            parsed.display_identity,
+            "Versace / Eros Flame / Eau de Parfum / 100ml / Tester",
+        )
 
     def test_catalog_base_name_can_drop_trailing_audience_for_ajmal(self):
         brand = Brand.objects.create(name="Ajmal")
-        BrandAlias.objects.create(brand=brand, alias_text="AJMAL", normalized_alias="ajmal")
-        brand.perfumes.create(name="Silver Shade", concentration="Eau de Parfum", audience="Men")
+        BrandAlias.objects.create(
+            brand=brand, alias_text="AJMAL", normalized_alias="ajmal"
+        )
+        brand.perfumes.create(
+            name="Silver Shade", concentration="Eau de Parfum", audience="Men"
+        )
         product = SupplierProduct.objects.create(
             supplier=self.supplier,
             identity_key="ajmal-silver-shade-man",
@@ -1611,9 +1919,15 @@ class NormalizerTests(TestCase):
 
     def test_catalog_base_name_keeps_trailing_audience_when_named_sibling_exists(self):
         brand = Brand.objects.create(name="Versace")
-        BrandAlias.objects.create(brand=brand, alias_text="VERSACE", normalized_alias="versace")
-        brand.perfumes.create(name="Eros Flame", concentration="Eau de Parfum", audience="Men")
-        brand.perfumes.create(name="Eros Flame Femme", concentration="Eau de Parfum", audience="Woman")
+        BrandAlias.objects.create(
+            brand=brand, alias_text="VERSACE", normalized_alias="versace"
+        )
+        brand.perfumes.create(
+            name="Eros Flame", concentration="Eau de Parfum", audience="Men"
+        )
+        brand.perfumes.create(
+            name="Eros Flame Femme", concentration="Eau de Parfum", audience="Woman"
+        )
         product = SupplierProduct.objects.create(
             supplier=self.supplier,
             identity_key="versace-eros-flame-man-with-femme-sibling",
@@ -1630,7 +1944,9 @@ class NormalizerTests(TestCase):
 
     def test_catalog_exact_audience_name_still_wins(self):
         brand = Brand.objects.create(name="Abercrombie & Fitch")
-        brand.perfumes.create(name="Away Tonight Man", concentration="Eau de Parfum", audience="Men")
+        brand.perfumes.create(
+            name="Away Tonight Man", concentration="Eau de Parfum", audience="Men"
+        )
         product = SupplierProduct.objects.create(
             supplier=self.supplier,
             identity_key="abercrombie-away-tonight-man",
@@ -1647,7 +1963,9 @@ class NormalizerTests(TestCase):
 
     def test_man_eau_fraiche_is_name_bearing_not_modifier_warning(self):
         brand = Brand.objects.create(name="Versace")
-        BrandAlias.objects.create(brand=brand, alias_text="VERSACE", normalized_alias="versace")
+        BrandAlias.objects.create(
+            brand=brand, alias_text="VERSACE", normalized_alias="versace"
+        )
         product = SupplierProduct.objects.create(
             supplier=self.supplier,
             identity_key="versace-man-eau-fraiche",
@@ -1666,7 +1984,9 @@ class NormalizerTests(TestCase):
 
     def test_pour_homme_stays_in_product_name_while_setting_audience(self):
         brand = Brand.objects.create(name="Issey Miyake")
-        BrandAlias.objects.create(brand=brand, alias_text="Issey Miyake", normalized_alias="issey miyake")
+        BrandAlias.objects.create(
+            brand=brand, alias_text="Issey Miyake", normalized_alias="issey miyake"
+        )
         product = SupplierProduct.objects.create(
             supplier=self.supplier,
             identity_key="issey-pour-homme",
@@ -1676,15 +1996,23 @@ class NormalizerTests(TestCase):
         parsed = parse_supplier_product(product)
 
         self.assertEqual(parsed.supplier_gender_hint, "Pour Homme")
-        self.assertEqual(parsed.product_name_text, "l'eau d'issey pour homme shades of kolam")
+        self.assertEqual(
+            parsed.product_name_text, "l'eau d'issey pour homme shades of kolam"
+        )
         self.assertEqual(parsed.concentration, "Eau de Toilette")
         self.assertEqual(parsed.size_ml, Decimal("125.00"))
         self.assertTrue(parsed.is_tester)
 
     def test_redundant_pour_femme_suffix_drops_when_scent_already_has_her(self):
         brand = Brand.objects.create(name="Zadig & Voltaire")
-        BrandAlias.objects.create(brand=brand, alias_text="Zadig & Voltaire", normalized_alias="zadig voltaire")
-        brand.perfumes.create(name="This Is Her", concentration="Eau de Parfum", audience="Woman")
+        BrandAlias.objects.create(
+            brand=brand,
+            alias_text="Zadig & Voltaire",
+            normalized_alias="zadig voltaire",
+        )
+        brand.perfumes.create(
+            name="This Is Her", concentration="Eau de Parfum", audience="Woman"
+        )
         product = SupplierProduct.objects.create(
             supplier=self.supplier,
             identity_key="zadig-this-is-her-pour-femme",
@@ -1698,12 +2026,21 @@ class NormalizerTests(TestCase):
         self.assertEqual(parsed.concentration, "Eau de Parfum")
         self.assertEqual(parsed.size_ml, Decimal("100.00"))
         self.assertEqual(parsed.supplier_gender_hint, "Pour Femme")
-        self.assertEqual(parsed.display_identity, "Zadig & Voltaire / This Is Her / Eau de Parfum / 100ml")
+        self.assertEqual(
+            parsed.display_identity,
+            "Zadig & Voltaire / This Is Her / Eau de Parfum / 100ml",
+        )
 
     def test_brand_scoped_collection_alias_extracts_armand_basi_uniform(self):
         brand = Brand.objects.create(name="Armand Basi")
-        BrandAlias.objects.create(brand=brand, alias_text="A.Basi", normalized_alias="a.basi")
-        brand.perfumes.create(name="Don't Look Back", collection_name="Uniform", concentration="Eau de Toilette")
+        BrandAlias.objects.create(
+            brand=brand, alias_text="A.Basi", normalized_alias="a.basi"
+        )
+        brand.perfumes.create(
+            name="Don't Look Back",
+            collection_name="Uniform",
+            concentration="Eau de Toilette",
+        )
         ProductAlias.objects.create(
             brand=brand,
             alias_text="uniform",
@@ -1733,8 +2070,12 @@ class NormalizerTests(TestCase):
 
     def test_catalog_base_name_can_drop_trailing_supplier_marketing_garbage(self):
         brand = Brand.objects.create(name="Afnan")
-        BrandAlias.objects.create(brand=brand, alias_text="Afnan", normalized_alias="afnan")
-        brand.perfumes.create(name="Tribute White", concentration="Eau de Parfum", audience="Woman")
+        BrandAlias.objects.create(
+            brand=brand, alias_text="Afnan", normalized_alias="afnan"
+        )
+        brand.perfumes.create(
+            name="Tribute White", concentration="Eau de Parfum", audience="Woman"
+        )
         product = SupplierProduct.objects.create(
             supplier=self.supplier,
             identity_key="afnan-tribute-white-exclusive-new",
@@ -1749,12 +2090,19 @@ class NormalizerTests(TestCase):
         self.assertEqual(parsed.size_ml, Decimal("100.00"))
         self.assertEqual(parsed.supplier_gender_hint, "Woman")
         self.assertTrue(parsed.is_tester)
-        self.assertEqual(parsed.display_identity, "Afnan / Tribute White / Eau de Parfum / 100ml / Tester")
+        self.assertEqual(
+            parsed.display_identity,
+            "Afnan / Tribute White / Eau de Parfum / 100ml / Tester",
+        )
 
     def test_supplier_white_comment_does_not_replace_audience_catalogue_scent(self):
         brand = Brand.objects.create(name="Hugo Boss")
-        BrandAlias.objects.create(brand=brand, alias_text="H.BOSS", normalized_alias="h.boss")
-        brand.perfumes.create(name="Boss Woman", concentration="Eau de Parfum", audience="Woman")
+        BrandAlias.objects.create(
+            brand=brand, alias_text="H.BOSS", normalized_alias="h.boss"
+        )
+        brand.perfumes.create(
+            name="Boss Woman", concentration="Eau de Parfum", audience="Woman"
+        )
         product = SupplierProduct.objects.create(
             supplier=self.supplier,
             identity_key="hugo-boss-woman-white-comment",
@@ -1775,8 +2123,12 @@ class NormalizerTests(TestCase):
 
     def test_kb_supplier_comment_term_can_strip_non_packaging_notes(self):
         brand = Brand.objects.create(name="Hugo Boss")
-        BrandAlias.objects.create(brand=brand, alias_text="H.BOSS", normalized_alias="h.boss")
-        brand.perfumes.create(name="Boss Woman", concentration="Eau de Parfum", audience="Woman")
+        BrandAlias.objects.create(
+            brand=brand, alias_text="H.BOSS", normalized_alias="h.boss"
+        )
+        brand.perfumes.create(
+            name="Boss Woman", concentration="Eau de Parfum", audience="Woman"
+        )
         GlobalRule.objects.create(
             title="Supplier comment term: violet",
             rule_kind="parser_supplier_comment_term",
@@ -1800,8 +2152,12 @@ class NormalizerTests(TestCase):
 
     def test_audience_only_catalogue_scent_ignores_duplicate_audience_marker(self):
         brand = Brand.objects.create(name="Hugo Boss")
-        BrandAlias.objects.create(brand=brand, alias_text="H.BOSS", normalized_alias="h.boss")
-        brand.perfumes.create(name="Boss Woman", concentration="Eau de Parfum", audience="Woman")
+        BrandAlias.objects.create(
+            brand=brand, alias_text="H.BOSS", normalized_alias="h.boss"
+        )
+        brand.perfumes.create(
+            name="Boss Woman", concentration="Eau de Parfum", audience="Woman"
+        )
         product = SupplierProduct.objects.create(
             supplier=self.supplier,
             identity_key="hugo-boss-woman-l-tester",
@@ -1818,10 +2174,16 @@ class NormalizerTests(TestCase):
             "Hugo Boss / Boss Woman / Eau de Parfum / 90ml / Tester",
         )
 
-    def test_catalog_base_name_drops_marketing_garbage_even_when_supplier_gender_differs(self):
+    def test_catalog_base_name_drops_marketing_garbage_even_when_supplier_gender_differs(
+        self,
+    ):
         brand = Brand.objects.create(name="Afnan")
-        BrandAlias.objects.create(brand=brand, alias_text="Afnan", normalized_alias="afnan")
-        brand.perfumes.create(name="Tribute Blue", concentration="Eau de Parfum", audience="Unisex")
+        BrandAlias.objects.create(
+            brand=brand, alias_text="Afnan", normalized_alias="afnan"
+        )
+        brand.perfumes.create(
+            name="Tribute Blue", concentration="Eau de Parfum", audience="Unisex"
+        )
         product = SupplierProduct.objects.create(
             supplier=self.supplier,
             identity_key="afnan-tribute-blue-exclusive-dented",
@@ -1836,11 +2198,16 @@ class NormalizerTests(TestCase):
         self.assertEqual(parsed.size_ml, Decimal("100.00"))
         self.assertEqual(parsed.supplier_gender_hint, "Men")
         self.assertEqual(parsed.packaging, "dented")
-        self.assertEqual(parsed.display_identity, "Afnan / Tribute Blue / Eau de Parfum / 100ml / Dented")
+        self.assertEqual(
+            parsed.display_identity,
+            "Afnan / Tribute Blue / Eau de Parfum / 100ml / Dented",
+        )
 
     def test_trailing_new_after_size_is_supplier_status_garbage(self):
         brand = Brand.objects.create(name="Afnan")
-        BrandAlias.objects.create(brand=brand, alias_text="Afnan", normalized_alias="afnan")
+        BrandAlias.objects.create(
+            brand=brand, alias_text="Afnan", normalized_alias="afnan"
+        )
         product = SupplierProduct.objects.create(
             supplier=self.supplier,
             identity_key="afnan-rave-carbon-new-after-size",
@@ -1854,11 +2221,15 @@ class NormalizerTests(TestCase):
         self.assertEqual(parsed.concentration, "Eau de Parfum")
         self.assertEqual(parsed.size_ml, Decimal("100.00"))
         self.assertEqual(parsed.supplier_gender_hint, "Woman")
-        self.assertEqual(parsed.display_identity, "Afnan / Rave Carbon / Eau de Parfum / 100ml")
+        self.assertEqual(
+            parsed.display_identity, "Afnan / Rave Carbon / Eau de Parfum / 100ml"
+        )
 
     def test_specific_product_alias_beats_blocked_generic_alias(self):
         brand = Brand.objects.create(name="Thierry Mugler")
-        BrandAlias.objects.create(brand=brand, alias_text="Thierry Mugler", normalized_alias="thierry mugler")
+        BrandAlias.objects.create(
+            brand=brand, alias_text="Thierry Mugler", normalized_alias="thierry mugler"
+        )
         ProductAlias.objects.create(
             brand=brand,
             alias_text="angel",
@@ -1889,7 +2260,9 @@ class NormalizerTests(TestCase):
         etoile_parse = parse_supplier_product(etoile_product)
         angel_parse = parse_supplier_product(angel_product)
 
-        self.assertEqual(etoile_parse.product_name_text, "Angel Etoile des Reves Eau de Nuit")
+        self.assertEqual(
+            etoile_parse.product_name_text, "Angel Etoile des Reves Eau de Nuit"
+        )
         self.assertEqual(etoile_parse.concentration, "Eau de Parfum")
         self.assertEqual(etoile_parse.size_ml, Decimal("100.00"))
         self.assertEqual(etoile_parse.supplier_gender_hint, "Woman")
@@ -1897,7 +2270,12 @@ class NormalizerTests(TestCase):
 
     def test_product_alias_can_extract_collection_and_scent(self):
         armani = Brand.objects.create(name="Armani")
-        BrandAlias.objects.create(brand=armani, alias_text="Giorgio Armani", normalized_alias="giorgio armani", priority=20)
+        BrandAlias.objects.create(
+            brand=armani,
+            alias_text="Giorgio Armani",
+            normalized_alias="giorgio armani",
+            priority=20,
+        )
         ProductAlias.objects.create(
             brand=armani,
             alias_text="emporio armani stronger with amber exclusive edi",
@@ -1925,7 +2303,9 @@ class NormalizerTests(TestCase):
             "Armani / Emporio Armani Stronger with You / Amber / Eau de Parfum / 100ml",
         )
 
-    def test_dunhill_signature_collection_alias_keeps_brand_and_collection_separate(self):
+    def test_dunhill_signature_collection_alias_keeps_brand_and_collection_separate(
+        self,
+    ):
         dunhill = Brand.objects.create(name="Alfred Dunhill")
         BrandAlias.objects.create(
             brand=dunhill,
@@ -2005,7 +2385,12 @@ class NormalizerTests(TestCase):
 
     def test_product_alias_can_make_modifier_name_bearing(self):
         armani = Brand.objects.create(name="Armani")
-        BrandAlias.objects.create(brand=armani, alias_text="Giorgio Armani", normalized_alias="giorgio armani", priority=20)
+        BrandAlias.objects.create(
+            brand=armani,
+            alias_text="Giorgio Armani",
+            normalized_alias="giorgio armani",
+            priority=20,
+        )
         ProductAlias.objects.create(
             brand=armani,
             alias_text="acqua di gioia intense",
@@ -2028,11 +2413,16 @@ class NormalizerTests(TestCase):
         self.assertTrue(parsed.is_tester)
         self.assertNotIn("intense", parsed.modifiers)
         self.assertNotIn("intense detected", parsed.warnings)
-        self.assertEqual(parsed.display_identity, "Armani / Acqua di Gioia Intense / Eau de Parfum / 100ml / Tester")
+        self.assertEqual(
+            parsed.display_identity,
+            "Armani / Acqua di Gioia Intense / Eau de Parfum / 100ml / Tester",
+        )
 
     def test_explicit_edp_wins_over_catalogue_link_concentration(self):
         brand = Brand.objects.create(name="Trussardi")
-        BrandAlias.objects.create(brand=brand, alias_text="Trussardi", normalized_alias="trussardi")
+        BrandAlias.objects.create(
+            brand=brand, alias_text="Trussardi", normalized_alias="trussardi"
+        )
         perfume = Brand.objects.get(name="Trussardi").perfumes.create(
             name="Donna",
             concentration="Eau de Toilette",
@@ -2052,7 +2442,9 @@ class NormalizerTests(TestCase):
         self.assertEqual(parsed.supplier_gender_hint, "Woman")
 
     def test_locked_human_parse_is_not_overwritten(self):
-        product = SupplierProduct.objects.create(supplier=self.supplier, identity_key="2", name="DG Light Blue EDP 100ml")
+        product = SupplierProduct.objects.create(
+            supplier=self.supplier, identity_key="2", name="DG Light Blue EDP 100ml"
+        )
         parsed = save_parse(product)
         parsed.locked_by_human = True
         parsed.product_name_text = "Human value"
@@ -2064,7 +2456,9 @@ class NormalizerTests(TestCase):
 
     def test_product_alias_must_match_whole_phrase(self):
         brand = Brand.objects.create(name="12 Parfumeurs")
-        BrandAlias.objects.create(brand=brand, alias_text="12 Parfumeurs", normalized_alias="12 parfumeurs")
+        BrandAlias.objects.create(
+            brand=brand, alias_text="12 Parfumeurs", normalized_alias="12 parfumeurs"
+        )
         ProductAlias.objects.create(
             brand=brand,
             alias_text="O",
@@ -2084,7 +2478,9 @@ class NormalizerTests(TestCase):
 
     def test_compact_concentration_and_size_are_split(self):
         brand = Brand.objects.create(name="Montale")
-        BrandAlias.objects.create(brand=brand, alias_text="Montale", normalized_alias="montale")
+        BrandAlias.objects.create(
+            brand=brand, alias_text="Montale", normalized_alias="montale"
+        )
         product = SupplierProduct.objects.create(
             supplier=self.supplier,
             identity_key="4",
@@ -2101,7 +2497,9 @@ class NormalizerTests(TestCase):
 
     def test_bare_trailing_size_is_inferred_after_brand_and_concentration(self):
         brand = Brand.objects.create(name="100 Bon")
-        BrandAlias.objects.create(brand=brand, alias_text="100 BON", normalized_alias="100 bon")
+        BrandAlias.objects.create(
+            brand=brand, alias_text="100 BON", normalized_alias="100 bon"
+        )
         product = SupplierProduct.objects.create(
             supplier=self.supplier,
             identity_key="5",
@@ -2135,7 +2533,10 @@ class NormalizerTests(TestCase):
     def test_reversed_ml_size_is_parsed(self):
         cases = (
             ("reversed-ml-latin", "1916 Agua De Colonia Limon & Tonca ml 100 tester"),
-            ("reversed-ml-cyrillic", "1916 Agua De Colonia Limon & Tonca мл 100 тестер"),
+            (
+                "reversed-ml-cyrillic",
+                "1916 Agua De Colonia Limon & Tonca мл 100 тестер",
+            ),
         )
         for identity_key, name in cases:
             with self.subTest(name=name):
@@ -2151,7 +2552,9 @@ class NormalizerTests(TestCase):
                 self.assertTrue(parsed.is_tester)
 
     def test_kb_regex_preprocess_handles_eau_de_perfume_as_eau_de_parfum(self):
-        for index, raw in enumerate(("eau de perfume", "eau de parfume", "eau de parf"), start=1):
+        for index, raw in enumerate(
+            ("eau de perfume", "eau de parfume", "eau de parf"), start=1
+        ):
             product = SupplierProduct.objects.create(
                 supplier=self.supplier,
                 identity_key=f"eau-perfume-{index}",
@@ -2203,7 +2606,9 @@ class NormalizerTests(TestCase):
 
     def test_kb_sample_terms_mark_probe_tubes_as_sample(self):
         brand = Brand.objects.create(name="Byredo")
-        BrandAlias.objects.create(brand=brand, alias_text="Byredo", normalized_alias="byredo")
+        BrandAlias.objects.create(
+            brand=brand, alias_text="Byredo", normalized_alias="byredo"
+        )
         product = SupplierProduct.objects.create(
             supplier=self.supplier,
             identity_key="sample-probe-tube",
@@ -2231,8 +2636,12 @@ class NormalizerTests(TestCase):
 
     def test_refillable_supplier_note_is_packaging_not_refill_type(self):
         brand = Brand.objects.create(name="Armani")
-        BrandAlias.objects.create(brand=brand, alias_text="Armani", normalized_alias="armani")
-        brand.perfumes.create(name="Acqua di Gio", concentration="Extrait de Parfum", audience="Men")
+        BrandAlias.objects.create(
+            brand=brand, alias_text="Armani", normalized_alias="armani"
+        )
+        brand.perfumes.create(
+            name="Acqua di Gio", concentration="Extrait de Parfum", audience="Men"
+        )
         GlobalRule.objects.update_or_create(
             rule_kind="parser_refillable_packaging_term",
             scope_type="global",
@@ -2264,7 +2673,10 @@ class NormalizerTests(TestCase):
         self.assertEqual(parsed.display_packaging, "Refillable")
         self.assertNotIn("refillable", parsed.product_name_text.lower())
         self.assertNotIn("refill detected", parsed.warnings)
-        self.assertEqual(parsed.display_identity, "Armani / Acqua di Gio / Extrait de Parfum / 75ml / Refillable")
+        self.assertEqual(
+            parsed.display_identity,
+            "Armani / Acqua di Gio / Extrait de Parfum / 75ml / Refillable",
+        )
 
     def test_damage_terms_route_to_garbage_but_decode_does_not(self):
         damaged = SupplierProduct.objects.create(
@@ -2301,7 +2713,9 @@ class NormalizerTests(TestCase):
 
     def test_no_five_is_not_treated_as_size(self):
         brand = Brand.objects.create(name="Chanel")
-        BrandAlias.objects.create(brand=brand, alias_text="Chanel", normalized_alias="chanel")
+        BrandAlias.objects.create(
+            brand=brand, alias_text="Chanel", normalized_alias="chanel"
+        )
         product = SupplierProduct.objects.create(
             supplier=self.supplier,
             identity_key="6",
@@ -2392,7 +2806,9 @@ class NormalizerTests(TestCase):
             approved=True,
         )
         brand = Brand.objects.create(name="Creed")
-        BrandAlias.objects.create(brand=brand, alias_text="Creed", normalized_alias="creed")
+        BrandAlias.objects.create(
+            brand=brand, alias_text="Creed", normalized_alias="creed"
+        )
         product = SupplierProduct.objects.create(
             supplier=self.supplier,
             identity_key="inspired-by-creed",
@@ -2408,7 +2824,9 @@ class NormalizerTests(TestCase):
 
     def test_custom_concentration_aliases_can_be_managed_in_database(self):
         brand = Brand.objects.create(name="Montale")
-        BrandAlias.objects.create(brand=brand, alias_text="Montale", normalized_alias="montale")
+        BrandAlias.objects.create(
+            brand=brand, alias_text="Montale", normalized_alias="montale"
+        )
         ConcentrationAlias.objects.create(
             concentration="Eau de Parfum",
             alias_text="парфюмированная вода",
@@ -2429,7 +2847,9 @@ class NormalizerTests(TestCase):
 
     def test_russian_concentration_tester_size_and_unisex_terms_are_normalized(self):
         brand = Brand.objects.create(name="100 Bon")
-        BrandAlias.objects.create(brand=brand, alias_text="100 Bon", normalized_alias="100 bon")
+        BrandAlias.objects.create(
+            brand=brand, alias_text="100 Bon", normalized_alias="100 bon"
+        )
         ConcentrationAlias.objects.create(
             concentration="Eau de Parfum",
             alias_text="парфюмированная вода",
@@ -2479,7 +2899,9 @@ class NormalizerTests(TestCase):
 
     def test_duplicate_concentration_aliases_are_not_left_in_product_name(self):
         brand = Brand.objects.create(name="Morph")
-        BrandAlias.objects.create(brand=brand, alias_text="Morph", normalized_alias="morph")
+        BrandAlias.objects.create(
+            brand=brand, alias_text="Morph", normalized_alias="morph"
+        )
         product = SupplierProduct.objects.create(
             supplier=self.supplier,
             identity_key="morph-duplicate-concentration",
@@ -2496,7 +2918,9 @@ class NormalizerTests(TestCase):
 
     def test_repeated_brand_can_be_part_of_scent_name(self):
         brand = Brand.objects.create(name="Fendi")
-        BrandAlias.objects.create(brand=brand, alias_text="Fendi", normalized_alias="fendi")
+        BrandAlias.objects.create(
+            brand=brand, alias_text="Fendi", normalized_alias="fendi"
+        )
         product = SupplierProduct.objects.create(
             supplier=self.supplier,
             identity_key="fendi-fan-di-fendi",
@@ -2514,7 +2938,9 @@ class NormalizerTests(TestCase):
 
     def test_chloe_atelier_alias_sets_collection_and_scent(self):
         brand = Brand.objects.create(name="Chloe")
-        BrandAlias.objects.create(brand=brand, alias_text="Chloe", normalized_alias="chloe")
+        BrandAlias.objects.create(
+            brand=brand, alias_text="Chloe", normalized_alias="chloe"
+        )
         ProductAlias.objects.create(
             brand=brand,
             alias_text="atelier jasminum sambac",
@@ -2539,7 +2965,9 @@ class NormalizerTests(TestCase):
 
     def test_chloe_atelier_collection_alias_keeps_unknown_scent_name(self):
         brand = Brand.objects.create(name="Chloe")
-        BrandAlias.objects.create(brand=brand, alias_text="Chloe", normalized_alias="chloe")
+        BrandAlias.objects.create(
+            brand=brand, alias_text="Chloe", normalized_alias="chloe"
+        )
         ProductAlias.objects.create(
             brand=brand,
             alias_text="atelier",
@@ -2597,7 +3025,9 @@ class NormalizerTests(TestCase):
 
     def test_product_alias_prefix_keeps_remaining_scent_words(self):
         brand = Brand.objects.create(name="4711")
-        BrandAlias.objects.create(brand=brand, alias_text="4711", normalized_alias="4711")
+        BrandAlias.objects.create(
+            brand=brand, alias_text="4711", normalized_alias="4711"
+        )
         ProductAlias.objects.create(
             brand=brand,
             alias_text="acqua colonia",
@@ -2613,14 +3043,20 @@ class NormalizerTests(TestCase):
         parsed = parse_supplier_product(product)
 
         self.assertEqual(parsed.normalized_brand, brand)
-        self.assertEqual(parsed.product_name_text, "Acqua Colonia pink pepper & grapefruit")
+        self.assertEqual(
+            parsed.product_name_text, "Acqua Colonia pink pepper & grapefruit"
+        )
         self.assertEqual(parsed.concentration, "Eau de Cologne")
         self.assertEqual(parsed.size_ml, Decimal("170.00"))
         self.assertTrue(parsed.is_tester)
 
     def test_brand_scoped_for_her_alias_preserves_narciso_scent_name(self):
         brand = Brand.objects.create(name="Narciso Rodriguez")
-        BrandAlias.objects.create(brand=brand, alias_text="NARCISO RODRIGUEZ", normalized_alias="narciso rodriguez")
+        BrandAlias.objects.create(
+            brand=brand,
+            alias_text="NARCISO RODRIGUEZ",
+            normalized_alias="narciso rodriguez",
+        )
         ProductAlias.objects.create(
             brand=brand,
             alias_text="for her",
@@ -2641,7 +3077,10 @@ class NormalizerTests(TestCase):
         self.assertEqual(parsed.concentration, "Eau de Parfum")
         self.assertEqual(parsed.size_ml, Decimal("100.00"))
         self.assertEqual(parsed.supplier_gender_hint, "Woman")
-        self.assertEqual(parsed.display_identity, "Narciso Rodriguez / for Her / Eau de Parfum / 100ml")
+        self.assertEqual(
+            parsed.display_identity,
+            "Narciso Rodriguez / for Her / Eau de Parfum / 100ml",
+        )
 
     def test_product_alias_corrects_supplier_scent_misspelling(self):
         brand = Brand.objects.create(name="Ex Nihilo")
@@ -2722,7 +3161,9 @@ class NormalizerTests(TestCase):
 
     def test_kb_preprocess_removes_supplier_cap_notes_from_name(self):
         brand = Brand.objects.create(name="Versace")
-        BrandAlias.objects.create(brand=brand, alias_text="VERSACE", normalized_alias="versace")
+        BrandAlias.objects.create(
+            brand=brand, alias_text="VERSACE", normalized_alias="versace"
+        )
         GlobalRule.objects.create(
             title="Remove supplier cap notes",
             rule_kind="regex_preprocess",
@@ -2856,8 +3297,12 @@ class NormalizerTests(TestCase):
         self.assertIn("catastrophic-backtracking shape", str(ctx.exception))
 
     @patch("assistant_linking.services.normalizer.mail_admins")
-    @patch("assistant_linking.services.normalizer.regex.search", side_effect=TimeoutError)
-    def test_normalizer_skips_alias_on_regex_timeout(self, mock_search, mock_mail_admins):
+    @patch(
+        "assistant_linking.services.normalizer.regex.search", side_effect=TimeoutError
+    )
+    def test_normalizer_skips_alias_on_regex_timeout(
+        self, mock_search, mock_mail_admins
+    ):
         brand = Brand.objects.create(name="Timeout Brand")
         alias = BrandAlias.objects.create(
             brand=brand,

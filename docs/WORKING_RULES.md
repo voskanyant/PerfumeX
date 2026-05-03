@@ -31,9 +31,11 @@ Add or update tests when:
 
 For documentation-only changes, a full test run is usually unnecessary. Run a lightweight check such as `git diff --check` when practical.
 
-Before pushing to `main` or triggering deploy, run `make deploy-gate`. It mirrors the GitHub CI jobs that must pass before deploy. `make local-smoke` is only a fast iteration guard and is not enough for a main/deploy push.
+Before pushing to `main` or triggering deploy, run the deploy gate that matches the risk level. `make deploy-gate` is the default fast deploy gate: Django check, migration generation check, and migration plan. Add UI and targeted test checks with `make deploy-gate DEPLOY_GATE_ARGS="--ui --test prices.tests.SomeTest"` when templates/CSS/JS or focused behavior changed.
 
-If `make deploy-gate` cannot run because local dependencies or PostgreSQL are missing, stop and report the blocker instead of pushing to `main`.
+Use `make deploy-gate-full` before big merges, schema changes, parser/linking logic changes, import/deletion behavior, shared service refactors, or batched releases. Full mode runs the heavier CI-style checks, full Django tests, and repo check scripts.
+
+If the needed deploy gate cannot run because local dependencies or PostgreSQL are missing, stop and report the blocker instead of pushing to `main`.
 
 ## Model changes
 
@@ -56,6 +58,8 @@ If models must change, inspect existing migrations and tests first, add a migrat
 ## Supplier history preparation
 
 - 2026-05-01 - Rule: When a supplier changed spreadsheet structure and the user chooses normalization for price-history import, split source files into layout/date folders, create a fresh final supplier folder, and normalize only files whose layout does not match the latest/current mapping. Files already using the current layout must be copied/renamed without rewriting workbook contents. Keep unknown layouts or failed transformations suspicious.
+- 2026-05-03 - Rule: When normalizing old-layout supplier files in place for history import, first copy the original stock files into a clearly named review subfolder, then normalize only the main root copies for import. The review folder is for user inspection of originals; the normalized files remain in the main import root. The normal `import_supplier_folder` workflow scans only root files unless `--recursive` is passed, so do not use `--recursive` when review or suspicious subfolders are present.
+- 2026-05-03 - Rule: For suppliers whose current mapping uses multiple sheets, normalize old-layout history files into the same sheet names/order as the latest live file. Do not rely on temporary one-sheet mappings if future email backfill should use the same files and mapping. Empty category sheets are acceptable only when old data cannot be confidently classified; keep import data on the sheet used by the current mapping.
 
 ## Documentation updates
 

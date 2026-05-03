@@ -48,11 +48,29 @@ from prices.models import SupplierProduct
 
 
 logger = logging.getLogger(__name__)
-PARSER_VERSION = "deterministic-v31"
+PARSER_VERSION = "deterministic-v32"
 REGEX_ALIAS_TIMEOUT_SECONDS = 1.0
 CATALOG_CONCENTRATION_CONFLICT_WARNING = (
     "Catalogue match suggests {suggested}. Supplier text parsed as {parsed}."
 )
+GENERATED_BRAND_ALIAS_STOPWORDS = {
+    "atelier",
+    "beauty",
+    "collection",
+    "company",
+    "cosmetics",
+    "edition",
+    "fragrance",
+    "fragrances",
+    "inc",
+    "limited",
+    "ltd",
+    "parfum",
+    "parfums",
+    "paris",
+    "perfume",
+    "perfumes",
+}
 
 DEFAULT_CONCENTRATION_ALIASES = (
     ("extrait de parfum", "Extrait de Parfum"),
@@ -86,8 +104,6 @@ DEFAULT_CONCENTRATION_ALIASES = (
     ("масляные духи", "Perfume Oil"),
     ("духи масляные", "Perfume Oil"),
     ("парфюмированное масло", "Perfume Oil"),
-    ("attar", "Perfume Oil"),
-    ("аттар", "Perfume Oil"),
 )
 
 DEFAULT_AUDIENCE_ALIASES = (
@@ -1035,9 +1051,7 @@ def _catalog_name_matches_audience_hint(value: str, result: ParseResult) -> bool
     )
 
 
-def _catalog_name_with_audience_disambiguation(
-    value: str, result: ParseResult
-) -> str:
+def _catalog_name_with_audience_disambiguation(value: str, result: ParseResult) -> str:
     group = audience_group(result.supplier_gender_hint)
     suffix = AUDIENCE_DISAMBIGUATION_SUFFIXES.get(group)
     if not value or not suffix or _catalog_name_matches_audience_hint(value, result):
@@ -1089,7 +1103,8 @@ def _catalog_name_from_audience_only_context(
     audience_terms = {term for term in audience_terms if len(term) > 1}
     if candidate_key not in audience_terms:
         token_keys = [
-            _catalog_scent_key(token) for token in normalize_text(candidate_text).split()
+            _catalog_scent_key(token)
+            for token in normalize_text(candidate_text).split()
         ]
         non_audience_tokens = [
             token_key for token_key in token_keys if token_key not in audience_terms
@@ -1110,9 +1125,9 @@ def _catalog_name_from_audience_only_context(
     brand_prefix_keys = {key for key in brand_prefix_keys if key}
     names = {
         perfume.name
-        for perfume in Perfume.objects.filter(
-            brand_id=result.normalized_brand.id
-        ).only("name", "concentration", "audience", "collection_name")
+        for perfume in Perfume.objects.filter(brand_id=result.normalized_brand.id).only(
+            "name", "concentration", "audience", "collection_name"
+        )
         if _catalog_perfume_matches_parse_context(perfume, result)
         and (
             _catalog_scent_key(perfume.name) == candidate_key
@@ -1664,6 +1679,7 @@ def _generated_brand_alias_candidates(brand: Brand) -> set[str]:
     if (
         len(tokens) == 2
         and len(rest[0]) >= 4
+        and rest[0] not in GENERATED_BRAND_ALIAS_STOPWORDS
         and not first.startswith(rest[0][:4])
         and not rest[0].startswith(first[:4])
     ):
@@ -1983,6 +1999,9 @@ def parse_supplier_product(product: SupplierProduct) -> ParseResult:
         if alias_match_context and not any(
             _contains_phrase(text, term) for term in excluded_terms
         ):
+            if not result.normalized_brand and product_alias.brand_id:
+                result.normalized_brand = product_alias.brand
+                result.detected_brand_text = product_alias.alias_text
             if product_alias.collection_name:
                 result.collection_name = product_alias.collection_name
             if not product_alias.canonical_text:
