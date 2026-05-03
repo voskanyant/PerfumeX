@@ -8347,6 +8347,109 @@ class OurProductCatalogueListTests(TestCase):
         self.assertNotEqual(perfume.pk, self.perfume.pk)
         self.assertNotEqual(perfume.pk, generic_perfume.pk)
 
+    def test_fragrantica_products_treats_et_and_ampersand_as_identity_connectors(
+        self,
+    ):
+        brand = Brand.objects.create(name="100 Bon")
+        perfume = Perfume.objects.create(
+            brand=brand,
+            name="Ambre Et Tonka",
+            concentration="Eau de Parfum",
+            release_year=2023,
+        )
+        source = FragranticaProduct.objects.create(
+            brand_name="100 Bon",
+            normalized_brand_name="100 bon",
+            name="Ambre & Tonka",
+            normalized_name="ambre & tonka",
+            collection_name="L'Atelier",
+            release_year=2023,
+            source_path="/perfume/100-Bon/Ambre-Tonka-1.html",
+        )
+
+        response = self.client.get(
+            reverse("prices:fragrantica_product_review"),
+            {"brand": "100 Bon", "q": "ambre"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "100 Bon / Ambre Et Tonka")
+        self.assertContains(response, "Exact brand and scent identity match")
+        self.assertContains(
+            response,
+            reverse("prices:fragrantica_product_link", args=[source.pk]),
+        )
+        self.assertNotEqual(perfume.pk, self.perfume.pk)
+
+    def test_catalogue_linking_workbench_uses_same_et_ampersand_identity_logic(self):
+        brand = Brand.objects.create(name="100 Bon")
+        perfume = Perfume.objects.create(
+            brand=brand,
+            name="Ambre Et Tonka",
+            concentration="Eau de Parfum",
+            release_year=2023,
+        )
+        source = FragranticaProduct.objects.create(
+            brand_name="100 Bon",
+            normalized_brand_name="100 bon",
+            name="Ambre & Tonka",
+            normalized_name="ambre & tonka",
+            collection_name="L'Atelier",
+            release_year=2023,
+            source_path="/perfume/100-Bon/Ambre-Tonka-1.html",
+        )
+
+        response = self.client.get(
+            reverse("prices:catalogue_linking_workbench"),
+            {"q": "ambre tonka"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "100 Bon / Ambre Et Tonka / Eau de Parfum")
+        self.assertContains(response, "100 Bon / L&#x27;Atelier / Ambre &amp; Tonka")
+        self.assertContains(response, "Exact brand and scent identity match")
+        self.assertContains(
+            response,
+            reverse("prices:fragrantica_product_link", args=[source.pk]),
+        )
+        self.assertNotEqual(perfume.pk, self.perfume.pk)
+
+    def test_catalogue_linking_workbench_default_threshold_keeps_useful_fuzzy_matches(
+        self,
+    ):
+        brand = Brand.objects.create(name="100 Bon")
+        Perfume.objects.create(
+            brand=brand,
+            name="Ambre Et Tonka",
+            concentration="Eau de Parfum",
+        )
+        source = FragranticaProduct.objects.create(
+            brand_name="100 Bon",
+            normalized_brand_name="100 bon",
+            name="Ambre Tonka",
+            normalized_name="ambre tonka",
+            source_path="/perfume/100-Bon/Ambre-Tonka-2.html",
+        )
+
+        default_response = self.client.get(
+            reverse("prices:catalogue_linking_workbench"),
+            {"q": "ambre tonka"},
+        )
+        strict_response = self.client.get(
+            reverse("prices:catalogue_linking_workbench"),
+            {"q": "ambre tonka", "min_score": "90"},
+        )
+
+        self.assertEqual(default_response.status_code, 200)
+        self.assertEqual(strict_response.status_code, 200)
+        self.assertContains(default_response, "Similar same-brand scent name")
+        self.assertContains(default_response, "Ambre Tonka")
+        self.assertContains(
+            default_response,
+            reverse("prices:fragrantica_product_link", args=[source.pk]),
+        )
+        self.assertNotContains(strict_response, "Similar same-brand scent name")
+
     def test_catalogue_linking_workbench_lists_two_column_suggestions(self):
         source = FragranticaProduct.objects.create(
             brand_name="Montale",

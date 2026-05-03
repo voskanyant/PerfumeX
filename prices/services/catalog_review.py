@@ -127,7 +127,7 @@ FRAGRANCE_CONCENTRATION_NAME_TERMS = {
     "edt",
     "edc",
 }
-CATALOGUE_LINKING_DEFAULT_MIN_SCORE = 90
+CATALOGUE_LINKING_DEFAULT_MIN_SCORE = 80
 
 
 @dataclass(frozen=True)
@@ -299,7 +299,8 @@ def build_our_product_catalog_list_context(
 
 
 def normalized_fragrance_key(value: str) -> str:
-    return normalize_alias_value(value or "").replace("&", "and")
+    text = normalize_alias_value(value or "").replace("&", "and")
+    return re.sub(r"\bet\b", "and", text)
 
 
 def loose_fragrance_key(value: str) -> str:
