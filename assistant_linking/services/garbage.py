@@ -9,6 +9,7 @@ GARBAGE_KEYWORD_CACHE_KEY = "assistant_linking:garbage_keywords:v1"
 GARBAGE_RULE_KINDS = ("garbage_keyword", "exclude_keyword")
 GARBAGE_MODIFIER = "garbage"
 GARBAGE_WARNING_PREFIX = "excluded garbage keyword"
+TRAILING_FAKE_MARKER_KEYWORD = "fake marker *"
 
 
 def normalize_garbage_keyword(value: str) -> str:
@@ -65,4 +66,10 @@ def match_garbage_keyword(text: str) -> str:
     for keyword in get_garbage_keywords():
         if keyword.casefold() in haystack:
             return keyword
+    return ""
+
+
+def match_trailing_garbage_marker(text: str) -> str:
+    if re.search(r"(?:^|\s)\*\s*$", text or ""):
+        return TRAILING_FAKE_MARKER_KEYWORD
     return ""

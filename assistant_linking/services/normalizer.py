@@ -31,6 +31,7 @@ from assistant_linking.services.garbage import (
     GARBAGE_MODIFIER,
     GARBAGE_WARNING_PREFIX,
     match_garbage_keyword,
+    match_trailing_garbage_marker,
 )
 from assistant_linking.services.parser_rules import (
     get_audience_alias_rules,
@@ -47,7 +48,7 @@ from prices.models import SupplierProduct
 
 
 logger = logging.getLogger(__name__)
-PARSER_VERSION = "deterministic-v26"
+PARSER_VERSION = "deterministic-v27"
 REGEX_ALIAS_TIMEOUT_SECONDS = 1.0
 CATALOG_CONCENTRATION_CONFLICT_WARNING = (
     "Catalogue match suggests {suggested}. Supplier text parsed as {parsed}."
@@ -1723,7 +1724,7 @@ def parse_supplier_product(product: SupplierProduct) -> ParseResult:
     is_deodorant_candidate = _contains_any_phrase(text, _deodorant_terms())
     is_non_perfume = is_bag or is_cosmetic_poudre
 
-    garbage_keyword = match_garbage_keyword(text)
+    garbage_keyword = match_trailing_garbage_marker(raw) or match_garbage_keyword(text)
     structured_packaging_keywords = {
         normalize_text(term) for term in _structured_packaging_terms()
     }

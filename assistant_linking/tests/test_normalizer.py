@@ -2213,6 +2213,31 @@ class NormalizerTests(TestCase):
         self.assertIn("excluded garbage keyword: blotters", parsed.warnings)
         self.assertFalse(parsed.product_name_text)
 
+    def test_trailing_star_marks_supplier_row_as_fake_garbage(self):
+        product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="trailing-star-fake",
+            name="GUY LAROCHE FIDJI wom 14 ml parfum *",
+        )
+
+        parsed = parse_supplier_product(product)
+
+        self.assertEqual(parsed.modifiers, ["garbage"])
+        self.assertEqual(parsed.confidence, 100)
+        self.assertIn("excluded garbage keyword: fake marker *", parsed.warnings)
+        self.assertFalse(parsed.product_name_text)
+
+    def test_internal_star_in_size_does_not_mark_row_as_garbage(self):
+        product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="internal-star-size",
+            name="Some Brand Discovery Set 2*100ml",
+        )
+
+        parsed = parse_supplier_product(product)
+
+        self.assertNotEqual(parsed.modifiers, ["garbage"])
+
     def test_worn_russian_keyword_routes_to_garbage(self):
         GlobalRule.objects.create(
             title="Garbage keyword: worn",
