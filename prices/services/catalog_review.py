@@ -304,10 +304,29 @@ def fragrance_key_variants(value: str) -> set[str]:
     }
 
 
-def fragrance_identity_key_variants(value: str) -> set[str]:
+def fragrance_name_without_concentration(value: str) -> str:
+    text = normalized_fragrance_key(value)
+    for term in sorted(FRAGRANCE_CONCENTRATION_NAME_TERMS, key=len, reverse=True):
+        text = re.sub(rf"(^|\s){re.escape(term)}($|\s)", " ", text)
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def fragrance_precise_identity_key_variants(value: str) -> set[str]:
+    identity_values = {
+        value or "",
+        fragrance_name_without_concentration(value),
+    }
+    keys: set[str] = set()
+    for identity_value in identity_values:
+        keys.update(fragrance_key_variants(identity_value))
+    return keys
+
+
+def fragrance_loose_identity_key_variants(value: str) -> set[str]:
     identity_values = {
         value or "",
         fragrance_name_without_audience(value),
+        fragrance_name_without_concentration(value),
         fragrance_name_without_audience_or_concentration(value),
     }
     keys: set[str] = set()
@@ -763,13 +782,21 @@ def _product_alias_supports_fragrantica_source(source, perfume, alias) -> bool:
 
 
 def _fragrantica_perfume_candidate_score(source, perfume, aliases) -> tuple[int, str]:
-    source_name_keys = fragrance_identity_key_variants(source.name)
-    source_name_keys.update(
-        fragrance_identity_key_variants(getattr(source, "normalized_name", ""))
+    source_precise_name_keys = fragrance_precise_identity_key_variants(source.name)
+    source_precise_name_keys.update(
+        fragrance_precise_identity_key_variants(getattr(source, "normalized_name", ""))
     )
-    perfume_name_keys = fragrance_identity_key_variants(perfume.name)
-    if source_name_keys & perfume_name_keys:
+    perfume_precise_name_keys = fragrance_precise_identity_key_variants(perfume.name)
+    if source_precise_name_keys & perfume_precise_name_keys:
         return 100, "Exact brand and scent identity match"
+
+    source_name_keys = fragrance_loose_identity_key_variants(source.name)
+    source_name_keys.update(
+        fragrance_loose_identity_key_variants(getattr(source, "normalized_name", ""))
+    )
+    perfume_name_keys = fragrance_loose_identity_key_variants(perfume.name)
+    if source_name_keys & perfume_name_keys:
+        return 98, "Exact brand and scent identity match"
 
     for alias in aliases:
         if _product_alias_supports_fragrantica_source(source, perfume, alias):
@@ -779,9 +806,7 @@ def _fragrantica_perfume_candidate_score(source, perfume, aliases) -> tuple[int,
     perfume_base = fragrance_name_without_audience(perfume.name)
     source_loose_base = loose_fragrance_name_without_audience(source.name)
     perfume_loose_base = loose_fragrance_name_without_audience(perfume.name)
-    source_identity_base = fragrance_name_without_audience_or_concentration(
-        source.name
-    )
+    source_identity_base = fragrance_name_without_audience_or_concentration(source.name)
     perfume_identity_base = fragrance_name_without_audience_or_concentration(
         perfume.name
     )

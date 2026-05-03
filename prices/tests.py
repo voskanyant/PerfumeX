@@ -8262,6 +8262,48 @@ class OurProductCatalogueListTests(TestCase):
         )
         self.assertNotEqual(perfume.pk, self.perfume.pk)
 
+    def test_fragrantica_products_suggests_pour_homme_with_concentration_title(
+        self,
+    ):
+        dolce = Brand.objects.create(name="Dolce & Gabbana")
+        generic_perfume = Perfume.objects.create(
+            brand=dolce,
+            name="Light Blue",
+            audience="Women",
+            concentration="Eau de Toilette",
+        )
+        perfume = Perfume.objects.create(
+            brand=dolce,
+            name="Light Blue Pour Homme",
+            audience="Men",
+            concentration="Eau de Toilette",
+        )
+        source = FragranticaProduct.objects.create(
+            brand_name="Dolce&Gabbana",
+            normalized_brand_name="dolceandgabbana",
+            name="Light Blue Pour Homme Eau de Toilette",
+            normalized_name="light blue pour homme eau de toilette",
+            collection_name="LIGHT BLUE BY DOLCE&GABBANA",
+            audience="Men",
+            release_year=2025,
+            source_path="/perfume/Dolce-Gabbana/Light-Blue-Pour-Homme-1.html",
+        )
+
+        response = self.client.get(
+            reverse("prices:fragrantica_product_review"),
+            {"brand": "Dolce&Gabbana", "q": "light blue pour homme"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Dolce &amp; Gabbana / Light Blue Pour Homme")
+        self.assertContains(response, "Exact brand and scent identity match")
+        self.assertContains(
+            response,
+            reverse("prices:fragrantica_product_link", args=[source.pk]),
+        )
+        self.assertNotEqual(perfume.pk, self.perfume.pk)
+        self.assertNotEqual(perfume.pk, generic_perfume.pk)
+
     def test_staff_can_link_fragrantica_row_to_catalogue_without_changing_concentration(
         self,
     ):
