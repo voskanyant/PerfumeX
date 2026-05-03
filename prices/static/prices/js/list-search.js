@@ -255,19 +255,16 @@
                 pagination.style.display = "none";
                 return;
             }
-            var start = Math.max(1, page - 2);
-            var end = Math.min(totalPages, page + 2);
             var knownList = el("div", "pagination-list");
             pagination.appendChild(knownList);
             if (data.has_previous) {
                 knownList.appendChild(buildPageItem(data.previous_page, "Previous", false));
             }
-            for (var p = start; p <= end; p += 1) {
-                knownList.appendChild(buildPageItem(p, p, p === page));
-            }
+            appendSharedPageRange(knownList, page, totalPages);
             if (data.has_next) {
                 knownList.appendChild(buildPageItem(data.next_page, "Next", false));
             }
+            pagination.appendChild(buildPageJump(page, totalPages, query));
             pagination.appendChild(el("div", "pagination-summary", "Page " + page + " of " + totalPages));
         } else {
             if (!data.has_previous && !data.has_next) {
@@ -295,6 +292,23 @@
         });
     }
 
+    function appendSharedPageRange(list, page, totalPages) {
+        for (var p = 1; p <= totalPages; p += 1) {
+            if (p <= 5 || p > totalPages - 3) {
+                if (p === totalPages - 2 && totalPages > 8) {
+                    list.appendChild(buildPageGap());
+                }
+                list.appendChild(buildPageItem(p, p, p === page));
+            }
+        }
+    }
+
+    function buildPageGap() {
+        var gap = el("span", "page-link is-disabled", "...");
+        gap.setAttribute("aria-hidden", "true");
+        return gap;
+    }
+
     function buildPageItem(pageNumber, label, active) {
         if (active) {
             return el("span", "page-link is-active", label);
@@ -303,6 +317,40 @@
         link.href = "#";
         link.dataset.page = String(pageNumber || 1);
         return link;
+    }
+
+    function buildPageJump(page, totalPages, query) {
+        var form = document.createElement("form");
+        form.className = "pagination-jump";
+        form.method = "get";
+
+        var label = el("label", "", "Page");
+        label.setAttribute("for", "page-jump-input");
+
+        var inputNode = document.createElement("input");
+        inputNode.id = "page-jump-input";
+        inputNode.type = "number";
+        inputNode.name = "page";
+        inputNode.min = "1";
+        inputNode.max = String(totalPages);
+        inputNode.value = String(page);
+
+        var button = el("button", "button secondary", "Go");
+        button.type = "submit";
+
+        form.appendChild(label);
+        form.appendChild(inputNode);
+        form.appendChild(button);
+        form.addEventListener("submit", function (event) {
+            event.preventDefault();
+            var requestedPage = Number(inputNode.value || page);
+            if (!Number.isFinite(requestedPage)) {
+                requestedPage = page;
+            }
+            requestedPage = Math.min(Math.max(Math.floor(requestedPage), 1), totalPages);
+            runAjaxSearch(query, requestedPage, true);
+        });
+        return form;
     }
 
     function applyLastViewedHighlight() {

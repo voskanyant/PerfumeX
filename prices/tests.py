@@ -4295,10 +4295,11 @@ class ProductDisplayServiceTests(SimpleTestCase):
             )
 
         attach_display.assert_called_once_with(products[:2], models.Currency.USD)
-        self.assertEqual(response["count"], None)
-        self.assertEqual(response["count_display"], "2+")
+        self.assertEqual(response["count"], 3)
+        self.assertEqual(response["count_display"], "3")
         self.assertEqual(response["shown"], 2)
         self.assertEqual(response["page"], 1)
+        self.assertEqual(response["num_pages"], 2)
         self.assertTrue(response["has_next"])
         self.assertFalse(response["has_previous"])
         self.assertEqual(response["next_page"], 2)

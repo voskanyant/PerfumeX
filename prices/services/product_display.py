@@ -388,11 +388,9 @@ def build_supplier_product_search_response(
     page_size: int = 100,
 ) -> dict:
     page_number = parse_positive_page_number(page_raw)
-    offset = (page_number - 1) * page_size
-    rows = list(queryset[offset : offset + page_size + 1])
-    has_next = len(rows) > page_size
-    visible_products = rows[:page_size]
-    has_previous = page_number > 1
+    paginator = Paginator(queryset, page_size)
+    page_obj = paginator.get_page(page_number)
+    visible_products = list(page_obj.object_list)
     attach_supplier_product_list_display(visible_products, currency)
 
     items = [
@@ -404,17 +402,17 @@ def build_supplier_product_search_response(
     ]
 
     return {
-        "count": None,
-        "count_display": (
-            f"{offset + len(items)}+" if has_next else str(offset + len(items))
-        ),
+        "count": paginator.count,
+        "count_display": str(paginator.count),
         "shown": len(items),
-        "page": page_number,
-        "num_pages": None,
-        "has_next": has_next,
-        "has_previous": has_previous,
-        "next_page": page_number + 1 if has_next else None,
-        "previous_page": page_number - 1 if has_previous else None,
+        "page": page_obj.number,
+        "num_pages": paginator.num_pages,
+        "has_next": page_obj.has_next(),
+        "has_previous": page_obj.has_previous(),
+        "next_page": page_obj.next_page_number() if page_obj.has_next() else None,
+        "previous_page": (
+            page_obj.previous_page_number() if page_obj.has_previous() else None
+        ),
         "items": items,
     }
 

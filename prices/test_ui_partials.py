@@ -604,8 +604,10 @@ class SharedUiPartialRenderTests(SimpleTestCase):
         content = PRODUCT_LIST_JS.read_text(encoding="utf-8")
 
         self.assertIn('el("div", "pagination-list")', content)
+        self.assertIn('"pagination-jump"', content)
         self.assertIn('"pagination-summary"', content)
         self.assertIn('"page-link is-active"', content)
+        self.assertIn('"page-link is-disabled"', content)
         self.assertNotIn('el("nav", "space-top-md")', content)
         self.assertNotIn('"page-item active"', content)
 
