@@ -112,7 +112,12 @@ jobs:
             requirements-dev.txt
       - run: python -m pip install --upgrade pip
       - run: pip install -r requirements-dev.txt
-      - run: python manage.py test --parallel=4 --verbosity=1 --noinput
+      - name: Fast deploy gate
+        if: github.event_name == 'push'
+        run: python scripts/deploy_gate.py --ui
+      - name: Full test suite
+        if: github.event_name != 'push'
+        run: python manage.py test --parallel=4 --verbosity=1 --noinput
 
   security:
     runs-on: ubuntu-latest
