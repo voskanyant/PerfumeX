@@ -1,13 +1,17 @@
 from __future__ import annotations
 
+import logging
 import re
+import unicodedata
 from collections import defaultdict
 from collections.abc import Iterable
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 from difflib import SequenceMatcher
+from functools import lru_cache
 from urllib.parse import urlencode
 
+import regex
 from django.core.paginator import Paginator
 from django.db.models import Count, Q
 from django.http import Http404
@@ -19,7 +23,9 @@ from assistant_linking.models import BrandAlias
 from assistant_linking.models import FragranticaProduct
 from assistant_linking.models import ParsedSupplierProduct
 from assistant_linking.models import ProductAlias
+from assistant_linking.services.parser_rules import get_regex_preprocess_rules
 from assistant_linking.utils.text import normalize_alias_value
+from assistant_linking.utils.text import normalize_mixed_script_latin_lookalikes
 from catalog.models import Brand as CatalogBrand
 from catalog.models import Perfume as CatalogPerfume
 from catalog.models import Source as CatalogSource
@@ -33,6 +39,8 @@ from prices.services.product_filters import (
 from prices.services.product_visibility import apply_hidden_product_keywords
 
 
+logger = logging.getLogger(__name__)
+FRAGRANTICA_REGEX_TIMEOUT_SECONDS = 1.0
 FRAGRANTICA_REVIEW_STATUSES = {
     "all",
     "unlinked",
@@ -302,6 +310,135 @@ def fragrance_key_variants(value: str) -> set[str]:
         }
         if key
     }
+
+
+def _safe_fragrantica_regex_sub(pattern: str, replacement: str, text: str) -> str:
+    try:
+        return regex.sub(
+            pattern,
+            replacement,
+            text,
+            timeout=FRAGRANTICA_REGEX_TIMEOUT_SECONDS,
+        )
+    except (TimeoutError, regex.error) as exc:
+        logger.warning("Fragrantica regex preprocess rule skipped: %s", exc)
+        return text
+
+
+@lru_cache(maxsize=32768)
+def _fragrance_match_text_values_cached(
+    value: str,
+    regex_preprocess_rules: tuple[tuple[str, str], ...] = (),
+) -> tuple[str, ...]:
+    text = value or ""
+    values = {text}
+    if regex_preprocess_rules:
+        preprocessed = unicodedata.normalize("NFKC", text)
+        preprocessed = normalize_mixed_script_latin_lookalikes(preprocessed).lower()
+        for pattern, replacement in regex_preprocess_rules:
+            preprocessed = _safe_fragrantica_regex_sub(
+                pattern,
+                replacement,
+                preprocessed,
+            )
+        preprocessed = re.sub(r"\s+", " ", preprocessed).strip()
+        if preprocessed:
+            values.add(preprocessed)
+    return tuple(sorted(values))
+
+
+def fragrance_match_text_values(
+    value: str,
+    regex_preprocess_rules: tuple[tuple[str, str], ...] = (),
+) -> set[str]:
+    return set(_fragrance_match_text_values_cached(value, regex_preprocess_rules))
+
+
+@lru_cache(maxsize=32768)
+def _fragrance_match_key_variants_cached(
+    value: str,
+    regex_preprocess_rules: tuple[tuple[str, str], ...] = (),
+) -> tuple[str, ...]:
+    keys: set[str] = set()
+    for match_value in _fragrance_match_text_values_cached(
+        value,
+        regex_preprocess_rules,
+    ):
+        keys.update(fragrance_key_variants(match_value))
+    return tuple(sorted(keys))
+
+
+@lru_cache(maxsize=32768)
+def _fragrance_precise_identity_match_keys_cached(
+    value: str,
+    regex_preprocess_rules: tuple[tuple[str, str], ...] = (),
+) -> tuple[str, ...]:
+    keys: set[str] = set()
+    for match_value in _fragrance_match_text_values_cached(
+        value,
+        regex_preprocess_rules,
+    ):
+        keys.update(fragrance_precise_identity_key_variants(match_value))
+    return tuple(sorted(keys))
+
+
+@lru_cache(maxsize=32768)
+def _fragrance_loose_identity_match_keys_cached(
+    value: str,
+    regex_preprocess_rules: tuple[tuple[str, str], ...] = (),
+) -> tuple[str, ...]:
+    keys: set[str] = set()
+    for match_value in _fragrance_match_text_values_cached(
+        value,
+        regex_preprocess_rules,
+    ):
+        keys.update(fragrance_loose_identity_key_variants(match_value))
+    return tuple(sorted(keys))
+
+
+def fragrance_match_key_variants(
+    *values: str,
+    regex_preprocess_rules: tuple[tuple[str, str], ...] = (),
+) -> set[str]:
+    keys: set[str] = set()
+    for value in values:
+        keys.update(
+            _fragrance_match_key_variants_cached(
+                value,
+                regex_preprocess_rules,
+            )
+        )
+    return keys
+
+
+def fragrance_precise_identity_match_keys(
+    *values: str,
+    regex_preprocess_rules: tuple[tuple[str, str], ...] = (),
+) -> set[str]:
+    keys: set[str] = set()
+    for value in values:
+        keys.update(
+            _fragrance_precise_identity_match_keys_cached(
+                value,
+                regex_preprocess_rules,
+            )
+        )
+    return keys
+
+
+def fragrance_loose_identity_match_keys(
+    *values: str,
+    regex_preprocess_rules: tuple[tuple[str, str], ...] = (),
+) -> set[str]:
+    keys: set[str] = set()
+    for value in values:
+        keys.update(
+            _fragrance_loose_identity_match_keys_cached(
+                value,
+                regex_preprocess_rules,
+            )
+        )
+    return keys
 
 
 def fragrance_name_without_concentration(value: str) -> str:
@@ -725,7 +862,9 @@ def fragrantica_identity_key(brand_name: str, perfume_name: str) -> tuple[str, s
 
 
 def _build_fragrantica_brand_id_map(
-    perfumes, brand_alias_manager=None
+    perfumes,
+    brand_alias_manager=None,
+    regex_preprocess_rules: tuple[tuple[str, str], ...] = (),
 ) -> dict[str, set[int]]:
     brand_key_to_ids: dict[str, set[int]] = defaultdict(set)
     brand_ids = set()
@@ -734,7 +873,10 @@ def _build_fragrantica_brand_id_map(
         if not brand:
             continue
         brand_ids.add(perfume.brand_id)
-        for key in fragrance_key_variants(brand.name):
+        for key in fragrance_match_key_variants(
+            brand.name,
+            regex_preprocess_rules=regex_preprocess_rules,
+        ):
             brand_key_to_ids[key].add(perfume.brand_id)
 
     brand_alias_manager = brand_alias_manager or BrandAlias.objects
@@ -743,23 +885,41 @@ def _build_fragrantica_brand_id_map(
     else:
         alias_queryset = brand_alias_manager.none()
     for alias in alias_queryset:
-        for key in fragrance_key_variants(alias.normalized_alias or alias.alias_text):
+        for key in fragrance_match_key_variants(
+            alias.normalized_alias or alias.alias_text,
+            regex_preprocess_rules=regex_preprocess_rules,
+        ):
             brand_key_to_ids[key].add(alias.brand_id)
-        for key in fragrance_key_variants(alias.alias_text):
+        for key in fragrance_match_key_variants(
+            alias.alias_text,
+            regex_preprocess_rules=regex_preprocess_rules,
+        ):
             brand_key_to_ids[key].add(alias.brand_id)
     return brand_key_to_ids
 
 
-def _source_brand_ids(source, brand_key_to_ids: dict[str, set[int]]) -> set[int]:
-    keys = fragrance_key_variants(source.brand_name)
-    keys.update(fragrance_key_variants(getattr(source, "normalized_brand_name", "")))
+def _source_brand_ids(
+    source,
+    brand_key_to_ids: dict[str, set[int]],
+    regex_preprocess_rules: tuple[tuple[str, str], ...] = (),
+) -> set[int]:
+    keys = fragrance_match_key_variants(
+        source.brand_name,
+        getattr(source, "normalized_brand_name", ""),
+        regex_preprocess_rules=regex_preprocess_rules,
+    )
     brand_ids = set()
     for key in keys:
         brand_ids.update(brand_key_to_ids.get(key, set()))
     return brand_ids
 
 
-def _product_alias_supports_fragrantica_source(source, perfume, alias) -> bool:
+def _product_alias_supports_fragrantica_source(
+    source,
+    perfume,
+    alias,
+    regex_preprocess_rules: tuple[tuple[str, str], ...] = (),
+) -> bool:
     alias_brand_id = getattr(alias, "brand_id", None)
     if alias_brand_id and alias_brand_id != perfume.brand_id:
         return False
@@ -767,11 +927,23 @@ def _product_alias_supports_fragrantica_source(source, perfume, alias) -> bool:
     if alias_perfume_id and alias_perfume_id != perfume.id:
         return False
 
-    source_keys = fragrance_key_variants(source.name)
-    source_keys.update(fragrance_key_variants(getattr(source, "normalized_name", "")))
-    alias_keys = fragrance_key_variants(alias.alias_text)
-    canonical_keys = fragrance_key_variants(alias.canonical_text)
-    perfume_keys = fragrance_key_variants(perfume.name)
+    source_keys = fragrance_loose_identity_match_keys(
+        source.name,
+        getattr(source, "normalized_name", ""),
+        regex_preprocess_rules=regex_preprocess_rules,
+    )
+    alias_keys = fragrance_loose_identity_match_keys(
+        alias.alias_text,
+        regex_preprocess_rules=regex_preprocess_rules,
+    )
+    canonical_keys = fragrance_loose_identity_match_keys(
+        alias.canonical_text,
+        regex_preprocess_rules=regex_preprocess_rules,
+    )
+    perfume_keys = fragrance_loose_identity_match_keys(
+        perfume.name,
+        regex_preprocess_rules=regex_preprocess_rules,
+    )
 
     if alias_perfume_id == perfume.id:
         return bool(source_keys & (alias_keys | canonical_keys))
@@ -781,25 +953,43 @@ def _product_alias_supports_fragrantica_source(source, perfume, alias) -> bool:
     )
 
 
-def _fragrantica_perfume_candidate_score(source, perfume, aliases) -> tuple[int, str]:
-    source_precise_name_keys = fragrance_precise_identity_key_variants(source.name)
-    source_precise_name_keys.update(
-        fragrance_precise_identity_key_variants(getattr(source, "normalized_name", ""))
+def _fragrantica_perfume_candidate_score(
+    source,
+    perfume,
+    aliases,
+    regex_preprocess_rules: tuple[tuple[str, str], ...] = (),
+) -> tuple[int, str]:
+    source_precise_name_keys = fragrance_precise_identity_match_keys(
+        source.name,
+        getattr(source, "normalized_name", ""),
+        regex_preprocess_rules=regex_preprocess_rules,
     )
-    perfume_precise_name_keys = fragrance_precise_identity_key_variants(perfume.name)
+    perfume_precise_name_keys = fragrance_precise_identity_match_keys(
+        perfume.name,
+        regex_preprocess_rules=regex_preprocess_rules,
+    )
     if source_precise_name_keys & perfume_precise_name_keys:
         return 100, "Exact brand and scent identity match"
 
-    source_name_keys = fragrance_loose_identity_key_variants(source.name)
-    source_name_keys.update(
-        fragrance_loose_identity_key_variants(getattr(source, "normalized_name", ""))
+    source_name_keys = fragrance_loose_identity_match_keys(
+        source.name,
+        getattr(source, "normalized_name", ""),
+        regex_preprocess_rules=regex_preprocess_rules,
     )
-    perfume_name_keys = fragrance_loose_identity_key_variants(perfume.name)
+    perfume_name_keys = fragrance_loose_identity_match_keys(
+        perfume.name,
+        regex_preprocess_rules=regex_preprocess_rules,
+    )
     if source_name_keys & perfume_name_keys:
         return 98, "Exact brand and scent identity match"
 
     for alias in aliases:
-        if _product_alias_supports_fragrantica_source(source, perfume, alias):
+        if _product_alias_supports_fragrantica_source(
+            source,
+            perfume,
+            alias,
+            regex_preprocess_rules=regex_preprocess_rules,
+        ):
             return 96, "Matched by product alias knowledge"
 
     source_base = fragrance_name_without_audience(source.name)
@@ -923,9 +1113,11 @@ def build_fragrantica_candidate_choices(
     perfumes = list(candidates)
     if not perfumes:
         return {}
+    regex_preprocess_rules = get_regex_preprocess_rules()
     brand_key_to_ids = _build_fragrantica_brand_id_map(
         perfumes,
         brand_alias_manager=brand_alias_manager,
+        regex_preprocess_rules=regex_preprocess_rules,
     )
     brand_ids = {perfume.brand_id for perfume in perfumes if perfume.brand_id}
     aliases = list(
@@ -939,7 +1131,11 @@ def build_fragrantica_candidate_choices(
 
     candidate_choices: dict[object, list[FragranticaPerfumeCandidate]] = {}
     for source in fragrantica_rows:
-        source_brand_ids = _source_brand_ids(source, brand_key_to_ids)
+        source_brand_ids = _source_brand_ids(
+            source,
+            brand_key_to_ids,
+            regex_preprocess_rules=regex_preprocess_rules,
+        )
         if not source_brand_ids:
             continue
         scored_candidates = []
@@ -955,6 +1151,7 @@ def build_fragrantica_candidate_choices(
                 source,
                 perfume,
                 candidate_aliases,
+                regex_preprocess_rules=regex_preprocess_rules,
             )
             if score:
                 scored_candidates.append((source, perfume, score, reason))

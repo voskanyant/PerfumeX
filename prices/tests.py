@@ -8154,6 +8154,43 @@ class OurProductCatalogueListTests(TestCase):
             reverse("prices:fragrantica_product_link", args=[source.pk]),
         )
 
+    def test_fragrantica_products_uses_product_alias_with_concentration_words(self):
+        alexandre = Brand.objects.create(name="Alexandre J.")
+        perfume = Perfume.objects.create(
+            brand=alexandre,
+            name="St Honore",
+            audience="Women",
+            concentration="Eau de Parfum",
+        )
+        ProductAlias.objects.create(
+            perfume=perfume,
+            brand=alexandre,
+            alias_text="Saint Honore",
+            canonical_text="St Honore",
+            active=True,
+        )
+        source = FragranticaProduct.objects.create(
+            brand_name="Alexandre J.",
+            normalized_brand_name="alexandre j.",
+            name="Saint Honore Eau de Parfum",
+            normalized_name="saint honore eau de parfum",
+            audience="Women",
+            source_path="/perfume/Alexandre-J/Saint-Honore-2.html",
+        )
+
+        response = self.client.get(
+            reverse("prices:fragrantica_product_review"),
+            {"brand": "Alexandre J.", "q": "saint honore"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Alexandre J. / St Honore")
+        self.assertContains(response, "Matched by product alias knowledge")
+        self.assertContains(
+            response,
+            reverse("prices:fragrantica_product_link", args=[source.pk]),
+        )
+
     def test_fragrantica_products_uses_brand_alias_knowledge_for_suggestion(self):
         alexandre = Brand.objects.create(name="Alexandre J.")
         Perfume.objects.create(
@@ -8303,6 +8340,92 @@ class OurProductCatalogueListTests(TestCase):
         )
         self.assertNotEqual(perfume.pk, self.perfume.pk)
         self.assertNotEqual(perfume.pk, generic_perfume.pk)
+
+    def test_fragrantica_products_uses_parser_preprocess_rules_for_identity(self):
+        from assistant_core.models import GlobalRule
+        from assistant_linking.services.parser_rules import clear_parser_rule_cache
+
+        amouage = Brand.objects.create(name="Amouage")
+        Perfume.objects.create(
+            brand=amouage,
+            name="Reflection for Men Limited Edition",
+            audience="Men",
+            concentration="Eau de Parfum",
+        )
+        GlobalRule.objects.create(
+            title="Normalize Limited Ed supplier abbreviation",
+            rule_kind="regex_preprocess",
+            scope_type="global",
+            rule_text=r"\blimited\s+ed\.?\b => limited edition",
+            active=True,
+            approved=True,
+        )
+        clear_parser_rule_cache()
+        source = FragranticaProduct.objects.create(
+            brand_name="Amouage",
+            normalized_brand_name="amouage",
+            name="Reflection for Men Limited Ed.",
+            normalized_name="reflection for men limited ed.",
+            audience="Men",
+            source_path="/perfume/Amouage/Reflection-Limited-Edition-1.html",
+        )
+
+        response = self.client.get(
+            reverse("prices:fragrantica_product_review"),
+            {"brand": "Amouage", "q": "reflection"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response, "Amouage / Reflection for Men Limited Edition"
+        )
+        self.assertContains(response, "Exact brand and scent identity match")
+        self.assertContains(
+            response,
+            reverse("prices:fragrantica_product_link", args=[source.pk]),
+        )
+
+    def test_fragrantica_products_uses_parser_audience_marker_preprocess_rule(self):
+        from assistant_core.models import GlobalRule
+        from assistant_linking.services.parser_rules import clear_parser_rule_cache
+
+        amouage = Brand.objects.create(name="Amouage")
+        Perfume.objects.create(
+            brand=amouage,
+            name="Ciel for Woman",
+            audience="Women",
+            concentration="Eau de Parfum",
+        )
+        GlobalRule.objects.create(
+            title="Audience marker: (L) means woman",
+            rule_kind="regex_preprocess",
+            scope_type="global",
+            rule_text=r"\(\s*l\s*\) => woman",
+            active=True,
+            approved=True,
+        )
+        clear_parser_rule_cache()
+        source = FragranticaProduct.objects.create(
+            brand_name="Amouage",
+            normalized_brand_name="amouage",
+            name="Ciel (L)",
+            normalized_name="ciel l",
+            audience="Women",
+            source_path="/perfume/Amouage/Ciel-Woman-1.html",
+        )
+
+        response = self.client.get(
+            reverse("prices:fragrantica_product_review"),
+            {"brand": "Amouage", "q": "ciel"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Amouage / Ciel for Woman")
+        self.assertContains(response, "Exact brand and scent identity match")
+        self.assertContains(
+            response,
+            reverse("prices:fragrantica_product_link", args=[source.pk]),
+        )
 
     def test_staff_can_link_fragrantica_row_to_catalogue_without_changing_concentration(
         self,
