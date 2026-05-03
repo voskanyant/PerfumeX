@@ -2585,6 +2585,41 @@ class NormalizerTests(TestCase):
         self.assertEqual(parsed.supplier_gender_hint, "Woman")
         self.assertEqual(parsed.display_identity, "Narciso Rodriguez / for Her / Eau de Parfum / 100ml")
 
+    def test_product_alias_corrects_supplier_scent_misspelling(self):
+        brand = Brand.objects.create(name="Ex Nihilo")
+        perfume = brand.perfumes.create(
+            name="Fleur Narcotique",
+            concentration="Eau de Parfum",
+        )
+        BrandAlias.objects.create(
+            brand=brand,
+            alias_text="EX NIHILO",
+            normalized_alias="ex nihilo",
+        )
+        ProductAlias.objects.create(
+            brand=brand,
+            perfume=perfume,
+            alias_text="fleur narcotigue",
+            canonical_text="Fleur Narcotique",
+            priority=25,
+        )
+        product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="ex-nihilo-fleur-narcotigue",
+            name="EX NIHILO FLEUR NARCOTIGUE edp 50 ml",
+        )
+
+        parsed = save_parse(product, force=True)
+
+        self.assertEqual(parsed.normalized_brand, brand)
+        self.assertEqual(parsed.product_name_text, "Fleur Narcotique")
+        self.assertEqual(parsed.concentration, "Eau de Parfum")
+        self.assertEqual(parsed.size_ml, Decimal("50.00"))
+        self.assertEqual(
+            parsed.display_identity,
+            "Ex Nihilo / Fleur Narcotique / Eau de Parfum / 50ml",
+        )
+
     def test_xerjoff_casamorati_combination_maps_to_casamorati_brand(self):
         xerjoff = Brand.objects.create(name="Xerjoff")
         casamorati = Brand.objects.create(name="Casamorati")

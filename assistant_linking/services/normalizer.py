@@ -48,7 +48,7 @@ from prices.models import SupplierProduct
 
 
 logger = logging.getLogger(__name__)
-PARSER_VERSION = "deterministic-v28"
+PARSER_VERSION = "deterministic-v29"
 REGEX_ALIAS_TIMEOUT_SECONDS = 1.0
 CATALOG_CONCENTRATION_CONFLICT_WARNING = (
     "Catalogue match suggests {suggested}. Supplier text parsed as {parsed}."

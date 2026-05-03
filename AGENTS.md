@@ -37,10 +37,11 @@ For every task:
 4. If business behavior, architecture, file placement, or app ownership is touched, read `docs/DECISIONS.md`.
 5. Reuse existing patterns before creating new ones.
 6. Do not invent a new design if an existing pattern exists.
-7. After any change, check whether docs should be updated.
-8. Update docs only if a durable new rule, pattern, decision, or lesson was discovered.
-9. The repo memory lives in files, not in chat. Future prompts should usually be short: "Read AGENTS.md first. [task]"
-10. Every task summary must say:
+7. When the user's requested implementation can be improved with a better approach, stronger layout, safer workflow, or useful adjacent function, briefly propose it and explain why it is better before or during implementation.
+8. After any change, check whether docs should be updated.
+9. Update docs only if a durable new rule, pattern, decision, or lesson was discovered.
+10. The repo memory lives in files, not in chat. Future prompts should usually be short: "Read AGENTS.md first. [task]"
+11. Every task summary must say:
    - Code changed
    - Docs changed
    - Tests/checks run
