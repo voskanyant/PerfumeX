@@ -770,6 +770,94 @@ class NormalizerTests(TestCase):
         self.assertEqual(parsed.size_ml, Decimal("30.00"))
         self.assertEqual(parsed.display_identity, "Carolina Herrera / 212 Woman / Eau de Toilette / 30ml")
 
+    def test_wom_audience_alias_canonicalizes_to_catalogue_audience_scent(self):
+        brand = Brand.objects.create(name="Gucci")
+        brand.perfumes.create(
+            name="Guilty",
+            concentration="Eau de Toilette",
+        )
+        brand.perfumes.create(
+            name="Guilty Pour Femme",
+            concentration="Eau de Toilette",
+            audience="Women",
+        )
+        brand.perfumes.create(
+            name="Guilty Pour Homme",
+            concentration="Eau de Toilette",
+            audience="Men",
+        )
+        GlobalRule.objects.create(
+            title="Audience alias: wom",
+            rule_kind="parser_audience_term",
+            scope_type="global",
+            rule_text="wom => Woman | women",
+            approved=True,
+            active=True,
+        )
+        cache.clear()
+        woman_product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="gucci-guilty-wom",
+            name="GUCCI GUILTY wom edt 90 ml",
+        )
+        men_product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="gucci-guilty-men",
+            name="GUCCI GUILTY men edt 90 ml",
+        )
+
+        woman_parse = parse_supplier_product(woman_product)
+        men_parse = parse_supplier_product(men_product)
+
+        self.assertEqual(woman_parse.normalized_brand, brand)
+        self.assertEqual(woman_parse.supplier_gender_hint, "Woman")
+        self.assertEqual(woman_parse.product_name_text, "Guilty Pour Femme")
+        self.assertNotIn("gender missing", woman_parse.warnings)
+        self.assertEqual(woman_parse.confidence, 100)
+        self.assertEqual(men_parse.product_name_text, "Guilty Pour Homme")
+        self.assertEqual(men_parse.supplier_gender_hint, "Men")
+
+    def test_same_catalogue_name_with_multiple_audiences_gets_name_suffix(self):
+        brand = Brand.objects.create(name="Gucci")
+        brand.perfumes.create(
+            name="Guilty",
+            concentration="Eau de Toilette",
+            audience="Women",
+        )
+        brand.perfumes.create(
+            name="Guilty",
+            concentration="Eau de Toilette",
+            audience="Men",
+        )
+        GlobalRule.objects.create(
+            title="Audience alias: wom",
+            rule_kind="parser_audience_term",
+            scope_type="global",
+            rule_text="wom => Woman | women",
+            approved=True,
+            active=True,
+        )
+        cache.clear()
+        woman_product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="gucci-guilty-generic-wom",
+            name="GUCCI GUILTY wom edt 90 ml",
+        )
+        men_product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="gucci-guilty-generic-men",
+            name="GUCCI GUILTY men edt 90 ml",
+        )
+
+        self.assertEqual(
+            parse_supplier_product(woman_product).product_name_text,
+            "Guilty Woman",
+        )
+        self.assertEqual(
+            parse_supplier_product(men_product).product_name_text,
+            "Guilty Man",
+        )
+
     def test_mixed_script_cyrillic_lookalike_keeps_latin_scent_name_and_audience_catalogue_match(self):
         brand = Brand.objects.create(name="Amouage")
         BrandAlias.objects.create(brand=brand, alias_text="AMOUAGE", normalized_alias="amouage")

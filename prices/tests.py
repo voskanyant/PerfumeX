@@ -6792,7 +6792,11 @@ class CatalogReviewServiceTests(SimpleTestCase):
         self.assertEqual(
             fragrance_name_without_audience("Light Blue pour Femme"), "light blue"
         )
+        self.assertEqual(
+            fragrance_name_without_audience("Gucci Guilty wom"), "gucci guilty"
+        )
         self.assertEqual(audience_group_from_text("Light Blue Femme"), "women")
+        self.assertEqual(audience_group_from_text("Gucci Guilty wom"), "women")
         self.assertEqual(audience_group_from_text("Light Blue Homme"), "men")
         self.assertEqual(
             fragrance_name_without_audience_or_concentration(
@@ -8350,6 +8354,64 @@ class OurProductCatalogueListTests(TestCase):
         )
         self.assertNotEqual(perfume.pk, self.perfume.pk)
         self.assertNotEqual(perfume.pk, generic_perfume.pk)
+
+    def test_fragrantica_suggestions_reject_opposite_audience_identity(self):
+        from prices.services.catalog_review import (
+            build_fragrantica_candidate_choices,
+            build_fragrantica_candidates_for_perfume,
+        )
+
+        gucci = Brand.objects.create(name="Gucci")
+        femme = Perfume.objects.create(
+            brand=gucci,
+            name="Guilty Pour Femme",
+            audience="Women",
+            concentration="Eau de Toilette",
+        )
+        homme = Perfume.objects.create(
+            brand=gucci,
+            name="Guilty Pour Homme",
+            audience="Men",
+            concentration="Eau de Toilette",
+        )
+        femme_source = FragranticaProduct.objects.create(
+            brand_name="Gucci",
+            normalized_brand_name="gucci",
+            name="Guilty Pour Femme",
+            normalized_name="guilty pour femme",
+            audience="Women",
+            source_path="/perfume/Gucci/Guilty-Pour-Femme-1.html",
+        )
+        homme_source = FragranticaProduct.objects.create(
+            brand_name="Gucci",
+            normalized_brand_name="gucci",
+            name="Guilty Pour Homme",
+            normalized_name="guilty pour homme",
+            audience="Men",
+            source_path="/perfume/Gucci/Guilty-Pour-Homme-1.html",
+        )
+
+        self.assertEqual(
+            build_fragrantica_candidates_for_perfume(femme, [homme_source], []),
+            [],
+        )
+        femme_candidates = build_fragrantica_candidates_for_perfume(
+            femme,
+            [femme_source, homme_source],
+            [],
+        )
+        self.assertEqual(femme_candidates[0].source, femme_source)
+
+        choices = build_fragrantica_candidate_choices(
+            [femme_source],
+            perfume_manager=Perfume.objects.filter(brand=gucci),
+        )
+
+        self.assertEqual(choices[femme_source.pk][0].perfume, femme)
+        self.assertNotIn(
+            homme,
+            [candidate.perfume for candidate in choices[femme_source.pk]],
+        )
 
     def test_fragrantica_products_treats_et_and_ampersand_as_identity_connectors(
         self,

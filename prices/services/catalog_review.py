@@ -86,6 +86,7 @@ AUDIENCE_NAME_TERMS = {
     "w",
     "woman",
     "women",
+    "wom",
 }
 AUDIENCE_GROUP_TERMS = {
     "women": {
@@ -103,6 +104,7 @@ AUDIENCE_GROUP_TERMS = {
         "w",
         "woman",
         "women",
+        "wom",
     },
     "men": {
         "for him",
@@ -572,6 +574,14 @@ def build_fragrantica_candidates_for_perfume(
             continue
         if not fragrantica_source_is_available_for_perfume(source, perfume):
             continue
+        source_audience_group = audience_group_from_text(source.audience, source.name)
+        audience_compatible = (
+            not audience_group
+            or not source_audience_group
+            or audience_group == source_audience_group
+        )
+        if not audience_compatible:
+            continue
         source_name_key = source.normalized_name or normalized_fragrance_key(
             source.name
         )
@@ -588,12 +598,6 @@ def build_fragrantica_candidates_for_perfume(
             continue
 
         source_base = fragrance_name_without_audience(source.name)
-        source_audience_group = audience_group_from_text(source.audience, source.name)
-        audience_compatible = (
-            not audience_group
-            or not source_audience_group
-            or audience_group == source_audience_group
-        )
         if (
             name_base
             and source_base
@@ -949,6 +953,16 @@ def _fragrantica_perfume_candidate_score(
     aliases,
     regex_preprocess_rules: tuple[tuple[str, str], ...] = (),
 ) -> tuple[int, str]:
+    source_audience_group = audience_group_from_text(source.audience, source.name)
+    perfume_audience_group = audience_group_from_text(perfume.audience, perfume.name)
+    audience_compatible = (
+        not source_audience_group
+        or not perfume_audience_group
+        or source_audience_group == perfume_audience_group
+    )
+    if not audience_compatible:
+        return 0, ""
+
     source_precise_name_keys = fragrance_precise_identity_match_keys(
         source.name,
         getattr(source, "normalized_name", ""),
@@ -996,14 +1010,6 @@ def _fragrantica_perfume_candidate_score(
     perfume_loose_identity_base = (
         loose_fragrance_name_without_audience_or_concentration(perfume.name)
     )
-    source_audience_group = audience_group_from_text(source.audience, source.name)
-    perfume_audience_group = audience_group_from_text(perfume.audience, perfume.name)
-    audience_compatible = (
-        not source_audience_group
-        or not perfume_audience_group
-        or source_audience_group == perfume_audience_group
-    )
-
     if audience_compatible and source_base and perfume_base:
         if source_base == perfume_base:
             return 94, "Same brand and scent after audience words"

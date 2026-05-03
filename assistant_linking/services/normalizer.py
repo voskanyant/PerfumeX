@@ -48,7 +48,7 @@ from prices.models import SupplierProduct
 
 
 logger = logging.getLogger(__name__)
-PARSER_VERSION = "deterministic-v27"
+PARSER_VERSION = "deterministic-v28"
 REGEX_ALIAS_TIMEOUT_SECONDS = 1.0
 CATALOG_CONCENTRATION_CONFLICT_WARNING = (
     "Catalogue match suggests {suggested}. Supplier text parsed as {parsed}."
@@ -272,6 +272,10 @@ AUDIENCE_NAME_SUFFIXES = {
         "femme",
     ),
     "men": ("man", "men", "for man", "for men", "for him", "pour homme", "homme"),
+}
+AUDIENCE_DISAMBIGUATION_SUFFIXES = {
+    "women": "Woman",
+    "men": "Man",
 }
 TRAILING_MARKETING_GARBAGE_TERMS = ("new", "exclusive", "exlusive")
 NAME_EXTENSION_SUFFIXES = ("limited edition",)
@@ -1031,6 +1035,32 @@ def _catalog_name_matches_audience_hint(value: str, result: ParseResult) -> bool
     )
 
 
+def _catalog_name_with_audience_disambiguation(
+    value: str, result: ParseResult
+) -> str:
+    group = audience_group(result.supplier_gender_hint)
+    suffix = AUDIENCE_DISAMBIGUATION_SUFFIXES.get(group)
+    if not value or not suffix or _catalog_name_matches_audience_hint(value, result):
+        return value
+    return f"{display_title(value)} {suffix}"
+
+
+def _catalog_has_same_name_audience_conflict(
+    perfumes: list[Perfume], key: str, result: ParseResult
+) -> bool:
+    group = audience_group(result.supplier_gender_hint)
+    if group not in AUDIENCE_DISAMBIGUATION_SUFFIXES:
+        return False
+    matching_groups = {
+        audience_group(perfume.audience)
+        for perfume in perfumes
+        if _catalog_perfume_matches_non_audience_context(perfume, result)
+        and _catalog_scent_key(perfume.name) == key
+    }
+    matching_groups.discard("")
+    return group in matching_groups and len(matching_groups) > 1
+
+
 def _catalog_name_from_audience_only_context(
     result: ParseResult,
     candidate_text: str,
@@ -1143,12 +1173,11 @@ def _canonicalize_product_name_from_catalog(result: ParseResult) -> str:
             "collection_name",
         )
     )
-    names = {
-        perfume.name for perfume in perfumes if _catalog_scent_key(perfume.name) == key
-    }
-    if len(names) == 1:
-        return names.pop()
-
+    if _catalog_has_same_name_audience_conflict(perfumes, key, result):
+        return _catalog_name_with_audience_disambiguation(
+            result.product_name_text,
+            result,
+        )
     equivalent_audience_keys = _catalog_keys_with_equivalent_trailing_audience(result)
     if equivalent_audience_keys:
         names = {
@@ -1159,6 +1188,50 @@ def _canonicalize_product_name_from_catalog(result: ParseResult) -> str:
         }
         if len(names) == 1:
             return names.pop()
+
+    audience_suffixes = AUDIENCE_NAME_SUFFIXES.get(
+        audience_group(result.supplier_gender_hint), ()
+    )
+    if audience_suffixes:
+        audience_variant_keys = {
+            f"{key}{_catalog_scent_key(suffix)}" for suffix in audience_suffixes
+        }
+        names = {
+            perfume.name
+            for perfume in perfumes
+            if _catalog_perfume_matches_parse_context(perfume, result)
+            and _catalog_scent_key(perfume.name) in audience_variant_keys
+        }
+        if len(names) == 1:
+            return names.pop()
+
+    names = {
+        perfume.name
+        for perfume in perfumes
+        if _catalog_perfume_matches_parse_context(perfume, result)
+        and _catalog_scent_key(perfume.name) == key
+    }
+    if len(names) == 1:
+        return names.pop()
+    names = {
+        perfume.name
+        for perfume in perfumes
+        if _catalog_scent_key(perfume.name) == key
+        and (
+            not result.collection_name
+            or not perfume.collection_name
+            or _catalog_scent_key(result.collection_name)
+            == _catalog_scent_key(perfume.collection_name)
+        )
+        and (
+            not result.supplier_gender_hint
+            or not perfume.audience
+            or audience_group(result.supplier_gender_hint)
+            == audience_group(perfume.audience)
+        )
+    }
+    if len(names) == 1:
+        return names.pop()
 
     base_keys = _catalog_base_keys_without_trailing_audience(result)
     if base_keys:
@@ -1184,23 +1257,6 @@ def _canonicalize_product_name_from_catalog(result: ParseResult) -> str:
         }
         if len(names) == 1:
             return names.pop()
-
-    audience_suffixes = AUDIENCE_NAME_SUFFIXES.get(
-        audience_group(result.supplier_gender_hint), ()
-    )
-    if not audience_suffixes:
-        return result.product_name_text
-    audience_variant_keys = {
-        f"{key}{_catalog_scent_key(suffix)}" for suffix in audience_suffixes
-    }
-    names = {
-        perfume.name
-        for perfume in perfumes
-        if _catalog_perfume_matches_parse_context(perfume, result)
-        and _catalog_scent_key(perfume.name) in audience_variant_keys
-    }
-    if len(names) == 1:
-        return names.pop()
 
     name_with_audience_extension = _catalog_name_with_audience_before_name_extension(
         result, perfumes
