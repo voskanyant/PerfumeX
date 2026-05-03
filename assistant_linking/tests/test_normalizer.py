@@ -402,6 +402,40 @@ class NormalizerTests(TestCase):
         self.assertEqual(parsed.normalized_brand, brand)
         self.assertEqual(parsed.product_name_text, "uomo")
 
+    def test_specific_brand_alias_beats_supplier_parent_brand_prefix(self):
+        Brand.objects.create(name="Hugo Boss")
+        brand = Brand.objects.create(name="Baldessarini")
+        brand.perfumes.create(
+            name="Ambre",
+            concentration="Eau de Toilette",
+            audience="Men",
+        )
+        BrandAlias.objects.create(
+            brand=brand,
+            alias_text="boss baldessarini",
+            normalized_alias="boss baldessarini",
+            priority=10,
+        )
+        product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="boss-baldessarini-ambre-tester",
+            name="BOSS BALDESSARINI AMBRE men edt 90 ml TESTER",
+        )
+
+        parsed = save_parse(product, force=True)
+
+        self.assertEqual(parsed.normalized_brand, brand)
+        self.assertEqual(parsed.detected_brand_text, "boss baldessarini")
+        self.assertEqual(parsed.product_name_text, "Ambre")
+        self.assertEqual(parsed.concentration, "Eau de Toilette")
+        self.assertEqual(parsed.size_ml, Decimal("90.00"))
+        self.assertEqual(parsed.supplier_gender_hint, "Men")
+        self.assertTrue(parsed.is_tester)
+        self.assertEqual(
+            parsed.display_identity,
+            "Baldessarini / Ambre / Eau de Toilette / 90ml / Tester",
+        )
+
     def test_standalone_w_and_m_are_audience_aliases_not_product_name(self):
         brand = Brand.objects.create(name="Abercrombie & Fitch")
         BrandAlias.objects.create(brand=brand, alias_text="Abercrombie Fitch", normalized_alias="abercrombie fitch")
