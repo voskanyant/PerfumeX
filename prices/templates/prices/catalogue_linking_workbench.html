@@ -164,9 +164,12 @@
                                     {% elif row.top_candidate %}
                                         <span class="catalogue-linking-row-suggestion">
                                             <span class="score-badge score-badge--{% if row.top_candidate.score >= 95 %}success{% elif row.top_candidate.score >= 90 %}strong{% else %}warning{% endif %}">
-                                                {{ row.top_candidate.score }}
+                                                {% if row.top_candidate.manual_review_reason %}Review{% else %}{{ row.top_candidate.score }}{% endif %}
                                             </span>
                                             {{ row.top_candidate.source_label }}
+                                            {% if row.top_candidate.manual_review_reason %}
+                                                <span class="tone-muted text-small">{{ row.top_candidate.manual_review_reason }}</span>
+                                            {% endif %}
                                         </span>
                                         {% if row.top_candidate.source.collection_name %}
                                             <span class="catalogue-identity-subname">
@@ -278,6 +281,9 @@
                                 <div class="catalogue-linking-candidate-main">
                                     <span class="catalogue-linking-candidate-title">
                                         {{ candidate.source_label }}
+                                        {% if candidate.manual_review_reason %}
+                                            <span class="tone-muted text-small">{{ candidate.manual_review_reason }}</span>
+                                        {% endif %}
                                     </span>
                                     {% if candidate.source.collection_name %}
                                         <span class="catalogue-identity-subname">
@@ -291,7 +297,7 @@
                                 </div>
                                 <div class="catalogue-linking-candidate-actions">
                                     <span class="score-badge score-badge--{% if candidate.score >= 95 %}success{% elif candidate.score >= 90 %}strong{% else %}warning{% endif %}">
-                                        {{ candidate.score }}
+                                        {% if candidate.manual_review_reason %}Review{% else %}{{ candidate.score }}{% endif %}
                                     </span>
                                     {% if candidate.source.source_href %}
                                         <a class="button ghost"
@@ -299,7 +305,10 @@
                                            target="_blank"
                                            rel="noopener">Open</a>
                                     {% endif %}
-                                    {% if candidate.source.match_status == "linked" %}
+                                    {% if candidate.manual_review_reason %}
+                                        <a class="button secondary"
+                                           href="{% url 'prices:fragrantica_product_review' %}?q={{ candidate.source.name|urlencode }}">Review manually</a>
+                                    {% elif candidate.source.match_status == "linked" %}
                                         <a class="button secondary"
                                            href="{% url 'prices:fragrantica_product_review' %}?q={{ candidate.source.name|urlencode }}">Linked</a>
                                     {% else %}

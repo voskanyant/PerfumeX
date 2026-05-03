@@ -22,6 +22,7 @@ from assistant_linking.services.normalization_views import (
     build_bag_queryset,
     build_complete_parsed_queryset,
     build_cosmetic_queryset,
+    build_decant_queryset,
     build_deodorant_queryset,
     build_garbage_queryset,
     build_low_confidence_queryset,
@@ -35,6 +36,7 @@ from assistant_linking.services.normalization_views import (
     build_set_queryset,
     build_tester_sample_queryset,
     build_unparsed_queryset,
+    build_vintage_queryset,
     dispatch_parse_unparsed_products,
     refresh_visible_parsed_context,
     refresh_visible_unparsed_context,
@@ -206,6 +208,26 @@ class DeodorantListView(NormalizationIssueListView):
 
     def get_queryset(self):
         return build_deodorant_queryset(
+            self.get_search_query(),
+            _hidden_product_keywords(self.request),
+        )
+
+
+class DecantListView(NormalizationIssueListView):
+    issue_title = "Decant rows"
+
+    def get_queryset(self):
+        return build_decant_queryset(
+            self.get_search_query(),
+            _hidden_product_keywords(self.request),
+        )
+
+
+class VintageListView(NormalizationIssueListView):
+    issue_title = "Vintage rows"
+
+    def get_queryset(self):
+        return build_vintage_queryset(
             self.get_search_query(),
             _hidden_product_keywords(self.request),
         )

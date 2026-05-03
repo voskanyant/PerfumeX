@@ -9,14 +9,17 @@ from assistant_core.models import GlobalRule
 from assistant_linking.models import (
     BAG_MODIFIER,
     COSMETIC_PUDRE_MODIFIER,
+    DECANT_MODIFIER,
     DEODORANT_MODIFIER,
     MANUAL_REVIEW_MODIFIER,
+    VINTAGE_MODIFIER,
     BrandAlias,
     ConcentrationAlias,
     ParsedSupplierProduct,
     ProductAlias,
 )
 from assistant_linking.services.normalizer import parse_supplier_product, save_parse
+from assistant_linking.utils.text import normalize_alias_value
 from catalog.models import Brand
 from prices.models import Supplier, SupplierProduct
 
@@ -90,6 +93,38 @@ class NormalizerTests(TestCase):
         self.assertEqual(parsed.supplier_gender_hint, "Pour Homme")
         self.assertEqual(parsed.normalized_brand, self.brand)
         self.assertEqual(parsed.product_name_text, "light blue pour homme")
+
+    def test_brand_alias_matching_ignores_ampersands_and_non_decimal_dots(self):
+        abercrombie = Brand.objects.create(name="Abercrombie & Fitch")
+        banderas = Brand.objects.create(name="Antonio Banderas")
+        BrandAlias.objects.create(
+            brand=abercrombie,
+            alias_text="Аберкромби & Фитч",
+            normalized_alias=normalize_alias_value("Аберкромби & Фитч"),
+            priority=35,
+        )
+        BrandAlias.objects.create(
+            brand=banderas,
+            alias_text="АНТ. БАН.",
+            normalized_alias=normalize_alias_value("АНТ. БАН."),
+            priority=35,
+        )
+        examples = (
+            ("abercrombie", "Аберкромби Фитч Fierce EDT 50ml", abercrombie),
+            ("banderas", "АНТ БАН The Secret EDT 100ml", banderas),
+        )
+
+        for identity_key, name, expected_brand in examples:
+            with self.subTest(name=name):
+                product = SupplierProduct.objects.create(
+                    supplier=self.supplier,
+                    identity_key=identity_key,
+                    name=name,
+                )
+
+                parsed = parse_supplier_product(product)
+
+                self.assertEqual(parsed.normalized_brand, expected_brand)
 
     def test_parses_decimal_ml_with_comma_or_dot(self):
         brand = Brand.objects.create(name="Tiziana Terenzi")
@@ -372,6 +407,99 @@ class NormalizerTests(TestCase):
         self.assertNotIn("size ambiguous", parsed.warnings)
         self.assertNotIn("gender missing", parsed.warnings)
 
+    def test_decant_terms_route_to_decants_and_display_decant_suffix(self):
+        brand = Brand.objects.create(name="Zarkoperfume")
+        BrandAlias.objects.create(
+            brand=brand,
+            alias_text="Zarkoperfume",
+            normalized_alias="zarkoperfume",
+        )
+        examples = (
+            (
+                "zarko-the-muse-decant",
+                "Zarkoperfume the muse edp 10ml \u043e\u0442\u043b\u0438\u0432",
+                "the muse",
+                Decimal("10.00"),
+            ),
+            (
+                "zarko-purple-molecule-short-decant",
+                "Zarkoperfume PURPLE MOLECULE 070.07 5ml edp \u043e\u0442\u043b",
+                "purple molecule 070.07",
+                Decimal("5.00"),
+            ),
+            (
+                "zarko-cloud-uppercase-decant",
+                "Zarkoperfume CLOUD COLLECTION No.3 2ml edp \u041e\u0422\u041b\u0418\u0412\u0410",
+                "cloud collection no.3",
+                Decimal("2.00"),
+            ),
+        )
+
+        for identity_key, name, expected_name, expected_size in examples:
+            with self.subTest(name=name):
+                product = SupplierProduct.objects.create(
+                    supplier=self.supplier,
+                    identity_key=identity_key,
+                    name=name,
+                )
+
+                parsed = save_parse(product, force=True)
+
+                self.assertEqual(parsed.normalized_brand, brand)
+                self.assertEqual(parsed.product_category_label, "Decants")
+                self.assertEqual(parsed.product_name_text, expected_name)
+                self.assertEqual(parsed.concentration, "Eau de Parfum")
+                self.assertEqual(parsed.size_ml, expected_size)
+                self.assertEqual(parsed.variant_type, DECANT_MODIFIER)
+                self.assertEqual(parsed.display_variant_type, "Decant")
+                self.assertIn(DECANT_MODIFIER, parsed.modifiers)
+                self.assertNotIn("gender missing", parsed.warnings)
+                self.assertTrue(parsed.display_identity.endswith(" / Decant"))
+
+    def test_vintage_terms_route_to_vintage_and_display_vintage_suffix(self):
+        brand = Brand.objects.create(name="Chanel")
+        BrandAlias.objects.create(
+            brand=brand,
+            alias_text="Chanel",
+            normalized_alias="chanel",
+        )
+        examples = (
+            (
+                "chanel-no5-vintage",
+                "Chanel No 5 edp 50ml vintage",
+                "no 5",
+            ),
+            (
+                "chanel-coco-cyrillic-vintage",
+                "Chanel Coco edt 100ml \u0432\u0438\u043d\u0442\u0430\u0436",
+                "coco",
+            ),
+            (
+                "chanel-chance-short-vint",
+                "Chanel Chance edt 35ml vint",
+                "chance",
+            ),
+        )
+
+        for identity_key, name, expected_name in examples:
+            with self.subTest(name=name):
+                product = SupplierProduct.objects.create(
+                    supplier=self.supplier,
+                    identity_key=identity_key,
+                    name=name,
+                )
+
+                parsed = save_parse(product, force=True)
+
+                self.assertEqual(parsed.normalized_brand, brand)
+                self.assertEqual(parsed.product_category_label, "Vintage")
+                self.assertEqual(parsed.product_name_text, expected_name)
+                self.assertEqual(parsed.variant_type, VINTAGE_MODIFIER)
+                self.assertEqual(parsed.display_variant_type, "Vintage")
+                self.assertIn(VINTAGE_MODIFIER, parsed.modifiers)
+                self.assertNotIn("gender missing", parsed.warnings)
+                self.assertTrue(parsed.display_identity.endswith(" / Vintage"))
+
     def test_deodorant_word_with_concentration_stays_perfume(self):
         brand = Brand.objects.create(name="Chanel")
         BrandAlias.objects.create(
@@ -621,6 +749,66 @@ class NormalizerTests(TestCase):
         self.assertEqual(parsed.concentration, "Eau de Parfum")
         self.assertEqual(parsed.size_ml, Decimal("75.00"))
         self.assertTrue(parsed.is_tester)
+
+    def test_bracketed_l_is_exact_woman_marker_not_product_name(self):
+        armand_basi = Brand.objects.create(name="Armand Basi")
+        BrandAlias.objects.create(
+            brand=armand_basi,
+            alias_text="Armand Basi",
+            normalized_alias="armand basi",
+        )
+        armaf = Brand.objects.create(name="Armaf")
+        BrandAlias.objects.create(
+            brand=armaf,
+            alias_text="Armaf",
+            normalized_alias="armaf",
+        )
+        examples = (
+            (
+                "armand-basi-in-red-bracket-l",
+                "Armand Basi in Red [ L ] Edt 100ml Tester",
+                armand_basi,
+                "in red",
+                "Eau de Toilette",
+                Decimal("100.00"),
+                True,
+            ),
+            (
+                "armaf-club-de-nuit-intense-bracket-l",
+                "Armaf Club De Nuit Intense [ L] edp 105 ml",
+                armaf,
+                "club de nuit intense",
+                "Eau de Parfum",
+                Decimal("105.00"),
+                False,
+            ),
+        )
+
+        for (
+            identity_key,
+            name,
+            expected_brand,
+            expected_name,
+            expected_concentration,
+            expected_size,
+            expected_tester,
+        ) in examples:
+            with self.subTest(name=name):
+                product = SupplierProduct.objects.create(
+                    supplier=self.supplier,
+                    identity_key=identity_key,
+                    name=name,
+                )
+
+                parsed = parse_supplier_product(product)
+
+                self.assertEqual(parsed.normalized_brand, expected_brand)
+                self.assertEqual(parsed.supplier_gender_hint, "Woman")
+                self.assertEqual(parsed.product_name_text, expected_name)
+                self.assertEqual(parsed.concentration, expected_concentration)
+                self.assertEqual(parsed.size_ml, expected_size)
+                self.assertEqual(parsed.is_tester, expected_tester)
+                self.assertNotIn("gender missing", parsed.warnings)
 
     def test_parenthetical_u_is_unisex_marker_not_product_name(self):
         brand = Brand.objects.create(name="Agonist")
@@ -3159,33 +3347,41 @@ class NormalizerTests(TestCase):
         self.assertEqual(standalone.normalized_brand, xerjoff)
         self.assertEqual(standalone.product_name_text, "naxos")
 
-    def test_kb_preprocess_removes_supplier_cap_notes_from_name(self):
+    def test_supplier_cap_note_is_structured_packaging_not_scent_name(self):
         brand = Brand.objects.create(name="Versace")
         BrandAlias.objects.create(
             brand=brand, alias_text="VERSACE", normalized_alias="versace"
         )
-        GlobalRule.objects.create(
-            title="Remove supplier cap notes",
-            rule_kind="regex_preprocess",
-            scope_type="global",
-            rule_text=r"\b(?:с|без)\s+крышк(?:ой|и|а|у)?\b|\b(?:with|without)\s+(?:cap|lid)\b => ",
-            approved=True,
-            active=True,
-        )
-        cache.clear()
-        product = SupplierProduct.objects.create(
-            supplier=self.supplier,
-            identity_key="versace-yellow-diamond-cap",
-            name="VERSACE Yellow Diamond edt 90 ml Tester с крышкой",
+        examples = (
+            (
+                "versace-yellow-diamond-cap",
+                "VERSACE Yellow Diamond edt 90 ml Tester с крышкой",
+                "yellow diamond",
+            ),
+            (
+                "versace-bright-crystal-cap",
+                "Versace BRIGHT CRYSTAL 90ml edt TEST с крышкой",
+                "bright crystal",
+            ),
         )
 
-        parsed = parse_supplier_product(product)
+        for identity_key, name, expected_scent in examples:
+            with self.subTest(name=name):
+                product = SupplierProduct.objects.create(
+                    supplier=self.supplier,
+                    identity_key=identity_key,
+                    name=name,
+                )
 
-        self.assertEqual(parsed.normalized_brand, brand)
-        self.assertEqual(parsed.product_name_text, "yellow diamond")
-        self.assertEqual(parsed.concentration, "Eau de Toilette")
-        self.assertEqual(parsed.size_ml, Decimal("90.00"))
-        self.assertTrue(parsed.is_tester)
+                parsed = parse_supplier_product(product)
+
+                self.assertEqual(parsed.normalized_brand, brand)
+                self.assertEqual(parsed.product_name_text, expected_scent)
+                self.assertEqual(parsed.concentration, "Eau de Toilette")
+                self.assertEqual(parsed.size_ml, Decimal("90.00"))
+                self.assertTrue(parsed.is_tester)
+                self.assertEqual(parsed.packaging, "with_cap")
+                self.assertEqual(parsed.display_packaging, "With Cap")
 
     def test_kb_preprocess_normalizes_apostrophe_like_marks_between_letters(self):
         brand = Brand.objects.create(name="State of Mind")

@@ -48,12 +48,12 @@ def normalize_mixed_script_latin_lookalikes(value: str) -> str:
     """
 
     def normalize_token(match: re.Match[str]) -> str:
-        token = match.group(0)
-        has_latin = bool(re.search(r"[A-Za-z]", token))
-        has_cyrillic = bool(re.search(r"[\u0400-\u04ff]", token))
+        segment = match.group(0)
+        has_latin = bool(re.search(r"[A-Za-z]", segment))
+        has_cyrillic = bool(re.search(r"[\u0400-\u04ff]", segment))
         if has_latin and has_cyrillic:
-            return token.translate(CYRILLIC_LATIN_LOOKALIKE_TRANSLATION)
-        return token
+            return segment.translate(CYRILLIC_LATIN_LOOKALIKE_TRANSLATION)
+        return segment
 
     return re.sub(r"[\w\u0400-\u04ff]+", normalize_token, value or "")
 
@@ -75,7 +75,8 @@ def normalize_alias_value(value: str) -> str:
         r"\1 ",
         text,
     )
-    text = re.sub(r"[\u00a0_/,;:|()\[\]{}]+", " ", text)
     text = re.sub(r"(?<=\d),(?=\d)", ".", text)
+    text = re.sub(r"(?<!\d)\.(?!\d)", " ", text)
+    text = re.sub(r"[\u00a0_&/,;:|()\[\]{}]+", " ", text)
     text = re.sub(r"\s+", " ", text).strip()
     return text

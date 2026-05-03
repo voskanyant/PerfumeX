@@ -132,9 +132,25 @@ def exclude_deodorant_parses(queryset):
     )
 
 
+def exclude_decant_parses(queryset):
+    return queryset.exclude(modifiers__contains=[models.DECANT_MODIFIER]).exclude(
+        variant_type=models.DECANT_MODIFIER
+    )
+
+
+def exclude_vintage_parses(queryset):
+    return queryset.exclude(modifiers__contains=[models.VINTAGE_MODIFIER]).exclude(
+        variant_type=models.VINTAGE_MODIFIER
+    )
+
+
 def exclude_non_perfume_parses(queryset):
-    return exclude_deodorant_parses(
-        exclude_cosmetic_parses(exclude_bag_parses(queryset))
+    return exclude_vintage_parses(
+        exclude_decant_parses(
+            exclude_deodorant_parses(
+                exclude_cosmetic_parses(exclude_bag_parses(queryset))
+            )
+        )
     )
 
 
@@ -168,6 +184,20 @@ def deodorant_parses(queryset):
     return queryset.filter(
         Q(modifiers__contains=[models.DEODORANT_MODIFIER])
         | Q(variant_type=models.DEODORANT_MODIFIER)
+    )
+
+
+def decant_parses(queryset):
+    return queryset.filter(
+        Q(modifiers__contains=[models.DECANT_MODIFIER])
+        | Q(variant_type=models.DECANT_MODIFIER)
+    )
+
+
+def vintage_parses(queryset):
+    return queryset.filter(
+        Q(modifiers__contains=[models.VINTAGE_MODIFIER])
+        | Q(variant_type=models.VINTAGE_MODIFIER)
     )
 
 
@@ -452,6 +482,28 @@ def build_deodorant_queryset(
     hider=hide_parsed_products,
 ):
     queryset = deodorant_parses(parsed_supplier_product_queryset(parsed_model))
+    return _category_issue_queryset(queryset, query, hidden_keywords, hider=hider)
+
+
+def build_decant_queryset(
+    query: str,
+    hidden_keywords: list[str],
+    *,
+    parsed_model=models.ParsedSupplierProduct,
+    hider=hide_parsed_products,
+):
+    queryset = decant_parses(parsed_supplier_product_queryset(parsed_model))
+    return _category_issue_queryset(queryset, query, hidden_keywords, hider=hider)
+
+
+def build_vintage_queryset(
+    query: str,
+    hidden_keywords: list[str],
+    *,
+    parsed_model=models.ParsedSupplierProduct,
+    hider=hide_parsed_products,
+):
+    queryset = vintage_parses(parsed_supplier_product_queryset(parsed_model))
     return _category_issue_queryset(queryset, query, hidden_keywords, hider=hider)
 
 

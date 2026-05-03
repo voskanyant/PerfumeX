@@ -15,6 +15,8 @@ CONCENTRATION_ALIAS_CACHE_KEY = "assistant_linking:concentration_aliases:v1"
 BAG_MODIFIER = "bag"
 COSMETIC_PUDRE_MODIFIER = "cosmetic_poudre"
 DEODORANT_MODIFIER = "deodorant"
+DECANT_MODIFIER = "decant"
+VINTAGE_MODIFIER = "vintage"
 MANUAL_REVIEW_MODIFIER = "manual_review"
 PERFUME_CATEGORY_CONCENTRATIONS = {
     "Eau de Parfum",
@@ -449,6 +451,16 @@ class ParsedSupplierProduct(TimeStampedModel):
             or self.variant_type == DEODORANT_MODIFIER
         ):
             return "Deodorant"
+        if (
+            DECANT_MODIFIER in (self.modifiers or [])
+            or self.variant_type == DECANT_MODIFIER
+        ):
+            return "Decant"
+        if (
+            VINTAGE_MODIFIER in (self.modifiers or [])
+            or self.variant_type == VINTAGE_MODIFIER
+        ):
+            return "Vintage"
         if self.variant_type == "decoded":
             return "Decoded"
         if self.is_tester or self.variant_type == "tester":
@@ -477,6 +489,16 @@ class ParsedSupplierProduct(TimeStampedModel):
             or self.variant_type == DEODORANT_MODIFIER
         ):
             return "Deodorants"
+        if (
+            DECANT_MODIFIER in (self.modifiers or [])
+            or self.variant_type == DECANT_MODIFIER
+        ):
+            return "Decants"
+        if (
+            VINTAGE_MODIFIER in (self.modifiers or [])
+            or self.variant_type == VINTAGE_MODIFIER
+        ):
+            return "Vintage"
         if self.concentration in HAIR_CARE_CATEGORY_CONCENTRATIONS:
             return "Hair Care"
         if self.concentration in PERFUME_CATEGORY_CONCENTRATIONS:
@@ -554,6 +576,8 @@ class NormalizationStatsSnapshot(TimeStampedModel):
     bag_count = models.PositiveIntegerField(default=0)
     cosmetic_count = models.PositiveIntegerField(default=0)
     deodorant_count = models.PositiveIntegerField(default=0)
+    decant_count = models.PositiveIntegerField(default=0)
+    vintage_count = models.PositiveIntegerField(default=0)
     manual_review_count = models.PositiveIntegerField(default=0)
     recent_parse_ids = models.JSONField(default=list, blank=True)
     generated_at = models.DateTimeField(null=True, blank=True, db_index=True)

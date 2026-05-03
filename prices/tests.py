@@ -6495,6 +6495,14 @@ class CatalogReviewServiceTests(SimpleTestCase):
         self.assertIs(result["variant_type_rows"], variant_rows)
         self.assertIn(("order_by", ("name",)), brand_rows.calls)
         self.assertIn(("exclude", {"collection_name": ""}), perfume_rows.calls)
+        self.assertIn(
+            ("values", ("brand_id", "brand__name", "collection_name")),
+            perfume_rows.calls,
+        )
+        self.assertIn(
+            ("order_by", ("brand__name", "collection_name")),
+            perfume_rows.calls,
+        )
         self.assertIn(("exclude", {"concentration": ""}), perfume_rows.calls)
         self.assertIn(
             ("values_list", ("variant_type",), {"flat": True}),
@@ -6771,20 +6779,40 @@ class CatalogReviewServiceTests(SimpleTestCase):
             {
                 "action": "rename_collection",
                 "tab": "collections",
+                "brand_id": "7",
                 "old_value": "Classic",
                 "new_value": "Archive",
             },
+            brand_manager=brand_manager,
             perfume_manager=perfume_manager,
+            collection_getter=lambda brand, name: SimpleNamespace(
+                id=99,
+                brand=brand,
+                name=name,
+            ),
         )
 
         self.assertEqual(renamed.level, "success")
-        self.assertEqual(renamed.message, "Collection renamed on 4 products.")
         self.assertEqual(
-            perfume_manager.calls, [("filter", {"collection_name": "Classic"})]
+            renamed.message,
+            "Collection renamed on 4 Montale Paris products.",
+        )
+        self.assertEqual(
+            perfume_manager.calls,
+            [("filter", {"brand": brand, "collection_name": "Classic"})],
         )
         self.assertEqual(
             perfume_manager.queryset.update_calls,
-            [{"collection_name": "Archive"}],
+            [
+                {
+                    "collection_name": "Archive",
+                    "collection": SimpleNamespace(
+                        id=99,
+                        brand=brand,
+                        name="Archive",
+                    ),
+                }
+            ],
         )
 
         used_brand = FakeBrand("Used House")
@@ -7032,6 +7060,7 @@ class CatalogReviewServiceTests(SimpleTestCase):
                     "update_fields": [
                         "brand",
                         "name",
+                        "collection",
                         "collection_name",
                         "concentration",
                         "updated_at",
@@ -8780,6 +8809,46 @@ class OurProductCatalogueListTests(TestCase):
         )
         self.assertContains(without_suggestion, "1 shown / 2 visible")
 
+    def test_catalogue_linking_workbench_refills_filtered_page_after_bulk_links(self):
+        brand = Brand.objects.create(name="Pagination Brand")
+        for index in range(40):
+            Perfume.objects.create(
+                brand=brand,
+                name=f"No Suggestion {index:02d}",
+                concentration="Eau de Parfum",
+            )
+        for index in range(5):
+            name = f"Ready Match {index:02d}"
+            Perfume.objects.create(
+                brand=brand,
+                name=name,
+                concentration="Eau de Parfum",
+            )
+            FragranticaProduct.objects.create(
+                brand_name="Pagination Brand",
+                normalized_brand_name="pagination brand",
+                name=name,
+                normalized_name=name.lower(),
+                source_path=f"/perfume/Pagination-Brand/Ready-Match-{index}.html",
+            )
+
+        response = self.client.get(
+            reverse("prices:catalogue_linking_workbench"),
+            {
+                "brand": str(brand.pk),
+                "status": "unlinked",
+                "suggestions": "with",
+                "confidence": "100",
+                "page": "1",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Ready Match 00")
+        self.assertContains(response, "5 shown / 45 visible")
+        self.assertNotContains(response, "No Our Products rows match these filters.")
+        self.assertNotContains(response, "No Suggestion 00")
+
     def test_catalogue_linking_workbench_filters_visible_rows_by_confidence(self):
         FragranticaProduct.objects.create(
             brand_name="Montale",
@@ -8867,6 +8936,66 @@ class OurProductCatalogueListTests(TestCase):
         self.assertEqual(
             payload["candidates"][0]["link_url"],
             reverse("prices:fragrantica_product_link", args=[source.pk]),
+        )
+
+    def test_catalogue_linking_scores_explicit_concentration_match_above_conflict(self):
+        brand = Brand.objects.create(name="Acca Kappa")
+        perfume = Perfume.objects.create(
+            brand=brand,
+            name="1869",
+            concentration="Eau de Parfum",
+        )
+        matching_source = FragranticaProduct.objects.create(
+            brand_name="Acca Kappa",
+            normalized_brand_name="acca kappa",
+            name="1869 Eau de Parfum",
+            normalized_name="1869 eau de parfum",
+            audience="Men",
+            source_path="/perfume/Acca-Kappa/1869-Eau-de-Parfum.html",
+        )
+        conflicting_source = FragranticaProduct.objects.create(
+            brand_name="Acca Kappa",
+            normalized_brand_name="acca kappa",
+            name="1869 Eau de Cologne",
+            normalized_name="1869 eau de cologne",
+            audience="Men",
+            release_year=2005,
+            source_path="/perfume/Acca-Kappa/1869-Eau-de-Cologne.html",
+        )
+
+        response = self.client.get(
+            reverse("prices:catalogue_linking_candidates"),
+            {"perfume": perfume.pk, "min_score": "0"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        candidates = {
+            candidate["source_id"]: candidate for candidate in payload["candidates"]
+        }
+        self.assertEqual(payload["candidates"][0]["source_id"], matching_source.pk)
+        self.assertEqual(candidates[matching_source.pk]["score"], 100)
+        self.assertEqual(
+            candidates[matching_source.pk]["reason"],
+            "Exact brand, scent, and concentration match",
+        )
+        self.assertEqual(candidates[conflicting_source.pk]["score"], 88)
+        self.assertEqual(
+            candidates[conflicting_source.pk]["reason"],
+            "Same brand and scent; concentration differs",
+        )
+
+        exact_response = self.client.get(
+            reverse("prices:catalogue_linking_candidates"),
+            {"perfume": perfume.pk, "min_score": "100"},
+        )
+
+        self.assertEqual(exact_response.status_code, 200)
+        exact_payload = exact_response.json()
+        self.assertEqual(len(exact_payload["candidates"]), 1)
+        self.assertEqual(
+            exact_payload["candidates"][0]["source_id"],
+            matching_source.pk,
         )
 
     def test_catalogue_linking_candidate_endpoint_returns_linked_state_only(self):
@@ -9250,6 +9379,42 @@ class OurProductCatalogueListTests(TestCase):
         self.assertEqual(self.perfume.release_year, 2008)
         self.assertEqual(self.perfume.concentration, "Eau de Parfum")
 
+    def test_staff_link_strips_source_concentration_from_catalogue_name(self):
+        brand = Brand.objects.create(name="Acqua di Parma")
+        perfume = Perfume.objects.create(
+            brand=brand,
+            name="Ambra",
+            concentration="Eau de Parfum",
+        )
+        source = FragranticaProduct.objects.create(
+            brand_name="Acqua di Parma",
+            normalized_brand_name="acqua di parma",
+            name="Ambra Eau de Parfum",
+            normalized_name="ambra eau de parfum",
+            collection_name="Signatures Of The Sun",
+            audience="Unisex",
+            release_year=2019,
+            source_path="/perfume/Acqua-di-Parma/Ambra-1.html",
+        )
+
+        response = self.client.post(
+            reverse("prices:fragrantica_product_link", args=[source.pk]),
+            {
+                "perfume_id": perfume.pk,
+                "next": reverse("prices:catalogue_linking_workbench"),
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        source.refresh_from_db()
+        perfume.refresh_from_db()
+        self.assertEqual(source.matched_perfume, perfume)
+        self.assertEqual(perfume.name, "Ambra")
+        self.assertEqual(perfume.concentration, "Eau de Parfum")
+        self.assertEqual(perfume.collection_name, "Signatures of the Sun")
+        self.assertEqual(perfume.audience, "Unisex")
+        self.assertEqual(perfume.release_year, 2019)
+
     def test_staff_can_link_from_our_products_and_save_alias_for_old_name(self):
         self.perfume.name = "Vanilla Extasy Women"
         self.perfume.save(update_fields=["name", "updated_at"])
@@ -9343,6 +9508,8 @@ class OurProductCatalogueListTests(TestCase):
         self.assertEqual(self.perfume.brand.name, "Montale Paris")
         self.assertEqual(self.perfume.name, "Vanilla Extasy Intense")
         self.assertEqual(self.perfume.collection_name, "Intense")
+        self.assertEqual(self.perfume.collection.name, "Intense")
+        self.assertEqual(self.perfume.collection.brand.name, "Montale Paris")
         self.assertEqual(self.perfume.concentration, "Extrait de Parfum")
         self.assertEqual(self.variant.size_ml, 50)
         self.assertFalse(self.variant.is_tester)
@@ -9432,11 +9599,20 @@ class OurProductCatalogueListTests(TestCase):
         self.assertFalse(Brand.objects.filter(id=brand.id).exists())
 
     def test_our_products_collection_tab_renames_collection(self):
+        other_brand = Brand.objects.create(name="Other House")
+        other_perfume = Perfume.objects.create(
+            brand=other_brand,
+            name="Other Classic",
+            collection_name="Classic",
+            concentration="Eau de Parfum",
+        )
+
         response = self.client.post(
             reverse("prices:our_product_list"),
             {
                 "tab": "collections",
                 "action": "rename_collection",
+                "brand_id": self.perfume.brand_id,
                 "old_value": "Classic",
                 "new_value": "Les Classiques",
             },
@@ -9444,7 +9620,32 @@ class OurProductCatalogueListTests(TestCase):
 
         self.assertEqual(response.status_code, 302)
         self.perfume.refresh_from_db()
+        other_perfume.refresh_from_db()
         self.assertEqual(self.perfume.collection_name, "Les Classiques")
+        self.assertEqual(self.perfume.collection.name, "Les Classiques")
+        self.assertEqual(self.perfume.collection.brand, self.perfume.brand)
+        self.assertEqual(other_perfume.collection_name, "Classic")
+        self.assertEqual(other_perfume.collection.brand, other_brand)
+
+    def test_our_products_collections_tab_lists_brand_scoped_collection_rows(self):
+        other_brand = Brand.objects.create(name="Other House")
+        Perfume.objects.create(
+            brand=other_brand,
+            name="Other Classic",
+            collection_name="Classic",
+            concentration="Eau de Parfum",
+        )
+
+        response = self.client.get(
+            reverse("prices:our_product_list"),
+            {"tab": "collections"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Montale")
+        self.assertContains(response, "Other House")
+        self.assertContains(response, f'name="brand_id" value="{self.perfume.brand_id}"')
+        self.assertContains(response, f'name="brand_id" value="{other_brand.id}"')
 
     def test_our_products_concentration_tab_renames_concentration(self):
         response = self.client.post(

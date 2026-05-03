@@ -377,6 +377,7 @@
         <table class="data-table table-mobile catalogue-admin-table our-products-admin-table">
             <thead>
                 <tr>
+                    <th scope="col">Brand</th>
                     <th scope="col">Collection</th>
                     <th scope="col">Products</th>
                     <th scope="col">Rename</th>
@@ -386,6 +387,7 @@
             <tbody>
             {% for row in collection_rows %}
                 <tr>
+                    <td data-label="Brand">{{ row.brand__name }}</td>
                     <td data-label="Collection">{{ row.collection_name }}</td>
                     <td data-label="Products">{{ row.perfume_count }}</td>
                     <td data-label="Rename">
@@ -393,6 +395,7 @@
                             {% csrf_token %}
                             <input type="hidden" name="tab" value="collections">
                             <input type="hidden" name="action" value="rename_collection">
+                            <input type="hidden" name="brand_id" value="{{ row.brand_id }}">
                             <input type="hidden" name="old_value" value="{{ row.collection_name }}">
                             <input type="text" name="new_value" value="{{ row.collection_name }}" aria-label="New collection name">
                             <button class="button ghost" type="submit">Save</button>
@@ -403,13 +406,14 @@
                             {% csrf_token %}
                             <input type="hidden" name="tab" value="collections">
                             <input type="hidden" name="action" value="clear_collection">
+                            <input type="hidden" name="brand_id" value="{{ row.brand_id }}">
                             <input type="hidden" name="old_value" value="{{ row.collection_name }}">
-                            <button class="button danger" type="submit" data-confirm="Clear this collection value from matching legacy catalogue rows?">Clear</button>
+                            <button class="button danger" type="submit" data-confirm="Clear this brand collection value from matching legacy catalogue rows?">Clear</button>
                         </form>
                     </td>
             </tr>
             {% empty %}
-                {% include "includes/table_empty.html" with colspan=4 message="No collections yet." %}
+                {% include "includes/table_empty.html" with colspan=5 message="No collections yet." %}
             {% endfor %}
             </tbody>
         </table>

@@ -15,6 +15,7 @@ from assistant_linking.views_normalization import (
     AcceptCatalogCandidateView as AcceptCatalogCandidateView,
     BagListView as BagListView,
     CosmeticListView as CosmeticListView,
+    DecantListView as DecantListView,
     DeodorantListView as DeodorantListView,
     ExcludeGarbageKeywordView as ExcludeGarbageKeywordView,
     GarbageListView as GarbageListView,
@@ -39,4 +40,5 @@ from assistant_linking.views_normalization import (
     TeachParseView as TeachParseView,
     TesterSampleListView as TesterSampleListView,
     UnparsedListView as UnparsedListView,
+    VintageListView as VintageListView,
 )

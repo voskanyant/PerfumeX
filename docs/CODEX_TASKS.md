@@ -75,6 +75,7 @@ Related docs: [AGENTS.md](../AGENTS.md), [README.md](../README.md), [docs/REPO_M
 - Do not treat staged Fragrantica rows as canonical catalogue products.
 - Do not silently overwrite assistant/manual links without explicit staff intent and audit trail.
 - Do not leave final summaries without code/docs/tests/follow-up fields.
+- Do not treat failed deploys, failed checks, parser misses, bad link suggestions, or UI regressions as isolated incidents; extract the reusable cause and add a rule, KB seed, test, checker, or doc note when it can prevent the same error later.
 
 ## Lessons learned
 

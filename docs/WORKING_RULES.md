@@ -137,3 +137,7 @@ When the user corrects the same kind of issue more than once:
 2. Add a short rule to the smallest relevant doc.
 3. Mention the docs update in the final task summary.
 4. Avoid broad rewrites unless the correction reveals a systemic bug.
+
+## Learning From Errors
+
+After a failed deploy, failed check, parser miss, bad link suggestion, UI regression, or repeated user correction, identify the underlying reusable cause before fixing only the visible example. If the cause can recur, update the relevant rule, knowledge-base seed, test, checker, or documentation so future work avoids the same class of error.

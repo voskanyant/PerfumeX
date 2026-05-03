@@ -12,6 +12,14 @@ from assistant_linking.services.catalogue_promotion import (
     import_fragrantica_catalogue_link_export,
 )
 from catalog.models import Brand, Perfume
+from prices.services.catalog_review import (
+    apply_fragrantica_identity_to_perfume,
+    build_catalogue_fragrantica_candidates_for_perfumes,
+    build_catalogue_linking_rows,
+    catalogue_linking_perfume_label,
+    normalize_catalogue_perfume_name,
+    run_fragrantica_catalogue_link_action,
+)
 
 
 class FragranticaCataloguePromotionTests(TestCase):
@@ -90,6 +98,97 @@ class FragranticaCataloguePromotionTests(TestCase):
         self.assertEqual(self.perfume.audience, "Women")
         self.assertEqual(self.perfume.release_year, 2008)
         self.assertEqual(self.perfume.concentration, "Eau de Parfum")
+
+    def test_reviewed_uppercase_source_name_is_title_normalized(self):
+        source = FragranticaProduct.objects.create(
+            brand_name="Montale",
+            normalized_brand_name="montale",
+            name="ROSE & BLACK PEPPER",
+            normalized_name="rose and black pepper",
+            collection_name="L'ATELIER",
+            source_path="/perfume/Montale/Rose-Black-Pepper.html",
+            match_status=FragranticaProduct.STATUS_LINKED,
+        )
+
+        changed_fields = apply_fragrantica_identity_to_perfume(source, self.perfume)
+
+        self.perfume.refresh_from_db()
+        self.assertIn("name", changed_fields)
+        self.assertEqual(self.perfume.name, "Rose & Black Pepper")
+        self.assertEqual(self.perfume.collection_name, "L'Atelier")
+        self.assertEqual(
+            catalogue_linking_perfume_label(self.perfume),
+            "Montale / Rose & Black Pepper / Eau de Parfum",
+        )
+
+    def test_catalogue_perfume_name_title_normalization_is_conservative(self):
+        self.assertEqual(
+            normalize_catalogue_perfume_name("ROSE & BLACK PEPPER"),
+            "Rose & Black Pepper",
+        )
+        self.assertEqual(
+            normalize_catalogue_perfume_name("Light Blue Pour Homme"),
+            "Light Blue Pour Homme",
+        )
+
+    def test_equal_top_fragrantica_source_requires_manual_review(self):
+        brand = Brand.objects.create(name="100 Bon")
+        edp = Perfume.objects.create(
+            brand=brand,
+            name="Mirage du Desert",
+            concentration="Eau de Parfum",
+        )
+        edt = Perfume.objects.create(
+            brand=brand,
+            name="Mirage du Desert",
+            concentration="Eau de Toilette",
+        )
+        FragranticaProduct.objects.create(
+            brand_name="100 Bon",
+            normalized_brand_name="100 bon",
+            name="Mirage du Desert",
+            normalized_name="mirage du desert",
+            source_path="/perfume/100-Bon/Mirage-du-Desert.html",
+        )
+
+        candidate_map = build_catalogue_fragrantica_candidates_for_perfumes(
+            [edp, edt],
+            min_score=80,
+        )
+        rows = build_catalogue_linking_rows([edp, edt], min_score=80)
+
+        self.assertTrue(candidate_map[edp.id][0].manual_review_reason)
+        self.assertTrue(candidate_map[edt.id][0].manual_review_reason)
+        self.assertFalse(rows[0]["ready_for_bulk"])
+        self.assertFalse(rows[1]["ready_for_bulk"])
+
+    def test_link_action_does_not_reassign_linked_fragrantica_source(self):
+        other_perfume = Perfume.objects.create(
+            brand=self.brand,
+            name="Other Vanilla",
+            concentration="Eau de Parfum",
+        )
+        source = FragranticaProduct.objects.create(
+            brand_name="Montale",
+            normalized_brand_name="montale",
+            name="Vanilla Extasy",
+            normalized_name="vanilla extasy",
+            source_path="/perfume/Montale/Vanilla-Extasy.html",
+            matched_perfume=self.perfume,
+            match_status=FragranticaProduct.STATUS_LINKED,
+        )
+
+        result = run_fragrantica_catalogue_link_action(
+            source.id,
+            {
+                "perfume_id": str(other_perfume.id),
+                "next": "/admin/our-products/linking/",
+            },
+        )
+
+        source.refresh_from_db()
+        self.assertEqual(result.level, "error")
+        self.assertEqual(source.matched_perfume, self.perfume)
 
     def _write_bundle(self, path: Path) -> Path:
         bundle = {

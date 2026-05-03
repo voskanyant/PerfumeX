@@ -9,10 +9,12 @@ from django.utils import timezone
 from assistant_linking.models import (
     BAG_MODIFIER,
     COSMETIC_PUDRE_MODIFIER,
+    DECANT_MODIFIER,
     DEODORANT_MODIFIER,
     MANUAL_REVIEW_MODIFIER,
     NormalizationStatsSnapshot,
     ParsedSupplierProduct,
+    VINTAGE_MODIFIER,
 )
 from assistant_linking.services.garbage import GARBAGE_MODIFIER
 from assistant_linking.services.normalizer import PARSER_VERSION
@@ -41,6 +43,8 @@ COUNT_KEYS = (
     "bag_count",
     "cosmetic_count",
     "deodorant_count",
+    "decant_count",
+    "vintage_count",
     "manual_review_count",
 )
 
@@ -51,6 +55,10 @@ NON_PERFUME_QUERY = (
     | Q(variant_type="poudre")
     | Q(modifiers__contains=[DEODORANT_MODIFIER])
     | Q(variant_type=DEODORANT_MODIFIER)
+    | Q(modifiers__contains=[DECANT_MODIFIER])
+    | Q(variant_type=DECANT_MODIFIER)
+    | Q(modifiers__contains=[VINTAGE_MODIFIER])
+    | Q(variant_type=VINTAGE_MODIFIER)
 )
 MANUAL_REVIEW_QUERY = Q(modifiers__contains=[MANUAL_REVIEW_MODIFIER])
 
@@ -125,6 +133,12 @@ def refresh_stats_snapshot(*, hidden_keywords: list[str] | None = None) -> Norma
     deodorant_queryset = non_garbage_queryset.filter(
         Q(modifiers__contains=[DEODORANT_MODIFIER]) | Q(variant_type=DEODORANT_MODIFIER)
     )
+    decant_queryset = non_garbage_queryset.filter(
+        Q(modifiers__contains=[DECANT_MODIFIER]) | Q(variant_type=DECANT_MODIFIER)
+    )
+    vintage_queryset = non_garbage_queryset.filter(
+        Q(modifiers__contains=[VINTAGE_MODIFIER]) | Q(variant_type=VINTAGE_MODIFIER)
+    )
     manual_review_queryset = non_garbage_queryset.filter(MANUAL_REVIEW_QUERY)
     normal_product_queryset = non_garbage_queryset.exclude(is_set=True).exclude(NON_PERFUME_QUERY).exclude(
         MANUAL_REVIEW_QUERY
@@ -153,6 +167,8 @@ def refresh_stats_snapshot(*, hidden_keywords: list[str] | None = None) -> Norma
     counts["bag_count"] = bag_queryset.count()
     counts["cosmetic_count"] = cosmetic_queryset.count()
     counts["deodorant_count"] = deodorant_queryset.count()
+    counts["decant_count"] = decant_queryset.count()
+    counts["vintage_count"] = vintage_queryset.count()
     counts["manual_review_count"] = manual_review_queryset.count()
     counts["unparsed_count"] = unparsed_queryset.filter(assistant_parse__isnull=True).count()
     counts["recent_parse_ids"] = list(

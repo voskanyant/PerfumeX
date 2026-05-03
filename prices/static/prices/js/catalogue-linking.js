@@ -91,6 +91,12 @@
         var title = document.createElement("span");
         title.className = "catalogue-linking-candidate-title";
         title.textContent = candidate.label;
+        if (candidate.manual_review_reason) {
+            var reviewReason = document.createElement("span");
+            reviewReason.className = "tone-muted text-small";
+            reviewReason.textContent = candidate.manual_review_reason;
+            title.appendChild(reviewReason);
+        }
 
         var meta = document.createElement("span");
         meta.className = "catalogue-linking-candidate-meta";
@@ -108,7 +114,7 @@
 
         var badge = document.createElement("span");
         badge.className = scoreClass(candidate.score || 0);
-        badge.textContent = String(candidate.score || 0);
+        badge.textContent = candidate.manual_review_reason ? "Review" : String(candidate.score || 0);
         actions.appendChild(badge);
 
         if (candidate.source_href) {
@@ -121,7 +127,13 @@
             actions.appendChild(open);
         }
 
-        if (candidate.match_status === "linked") {
+        if (candidate.manual_review_reason) {
+            var manual = document.createElement("a");
+            manual.className = "button secondary";
+            manual.href = candidate.review_url || "#";
+            manual.textContent = "Review manually";
+            actions.appendChild(manual);
+        } else if (candidate.match_status === "linked") {
             var linked = document.createElement("a");
             linked.className = "button secondary";
             linked.href = candidate.review_url || "#";

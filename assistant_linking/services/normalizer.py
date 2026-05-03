@@ -16,10 +16,12 @@ from assistant_linking.models import (
     BAG_MODIFIER,
     CONCENTRATION_ALIAS_CACHE_KEY,
     COSMETIC_PUDRE_MODIFIER,
+    DECANT_MODIFIER,
     DEODORANT_MODIFIER,
     HAIR_CARE_CATEGORY_CONCENTRATIONS,
     MANUAL_REVIEW_MODIFIER,
     PERFUME_CATEGORY_CONCENTRATIONS,
+    VINTAGE_MODIFIER,
     BrandAlias,
     ConcentrationAlias,
     ParsedSupplierProduct,
@@ -48,7 +50,7 @@ from prices.models import SupplierProduct
 
 
 logger = logging.getLogger(__name__)
-PARSER_VERSION = "deterministic-v32"
+PARSER_VERSION = "deterministic-v34"
 REGEX_ALIAS_TIMEOUT_SECONDS = 1.0
 CATALOG_CONCENTRATION_CONFLICT_WARNING = (
     "Catalogue match suggests {suggested}. Supplier text parsed as {parsed}."
@@ -162,6 +164,20 @@ DEODORANT_TERMS = (
     "deo stick",
     "deostick",
     "дезодорант",
+)
+DECANT_TERMS = (
+    "\u043e\u0442\u043b\u0438\u0432 \u0438\u0437 \u0444\u043b\u0430\u043a\u043e\u043d\u0430",
+    "\u043e\u0442\u043b\u0438\u0432\u0430\u043d\u0442",
+    "\u043e\u0442\u043b\u0438\u0432\u0430",
+    "\u043e\u0442\u043b\u0438\u0432\u0430\u043d",
+    "\u043e\u0442\u043b\u0438\u0432",
+    "\u043e\u0442\u043b",
+)
+VINTAGE_TERMS = (
+    "\u0432\u0438\u043d\u0442\u0430\u0436",
+    "\u0432\u0438\u043d\u0442",
+    "vintage",
+    "vint",
 )
 NO_BOX_TERMS = (
     "no box",
@@ -362,6 +378,16 @@ class ParseResult:
             or self.variant_type == DEODORANT_MODIFIER
         ):
             return "Deodorant"
+        if (
+            DECANT_MODIFIER in (self.modifiers or [])
+            or self.variant_type == DECANT_MODIFIER
+        ):
+            return "Decant"
+        if (
+            VINTAGE_MODIFIER in (self.modifiers or [])
+            or self.variant_type == VINTAGE_MODIFIER
+        ):
+            return "Vintage"
         if self.variant_type == "decoded":
             return "Decoded"
         if self.is_tester or self.variant_type == "tester":
@@ -390,6 +416,16 @@ class ParseResult:
             or self.variant_type == DEODORANT_MODIFIER
         ):
             return "Deodorants"
+        if (
+            DECANT_MODIFIER in (self.modifiers or [])
+            or self.variant_type == DECANT_MODIFIER
+        ):
+            return "Decants"
+        if (
+            VINTAGE_MODIFIER in (self.modifiers or [])
+            or self.variant_type == VINTAGE_MODIFIER
+        ):
+            return "Vintage"
         if self.concentration in HAIR_CARE_CATEGORY_CONCENTRATIONS:
             return "Hair Care"
         if self.concentration in PERFUME_CATEGORY_CONCENTRATIONS:
@@ -512,7 +548,11 @@ def _split_terms(value: str) -> list[str]:
 
 
 def _phrase_pattern(phrase: str) -> str:
-    escaped = re.escape(normalize_text(phrase)).replace(r"\.", r"\.\s*")
+    escaped = re.escape(normalize_text(phrase))
+    escaped = escaped.replace(r"\.", r"(?:\.\s*|\s+)")
+    escaped = escaped.replace(r"\ \&\ ", r"(?:\s*&\s*|\s+)")
+    escaped = escaped.replace(r"\&", r"(?:&|\s+)")
+    escaped = escaped.replace(r"\ ", r"(?:\s+|\.\s*)")
     return rf"(?<![a-z0-9а-яё]){escaped}(?![a-z0-9а-яё])"
 
 
@@ -570,6 +610,14 @@ def _cosmetic_poudre_terms() -> tuple[str, ...]:
 
 def _deodorant_terms() -> tuple[str, ...]:
     return _kb_terms("parser_deodorant_term", DEODORANT_TERMS)
+
+
+def _decant_terms() -> tuple[str, ...]:
+    return _kb_terms("parser_decant_term", DECANT_TERMS)
+
+
+def _vintage_terms() -> tuple[str, ...]:
+    return _kb_terms("parser_vintage_term", VINTAGE_TERMS)
 
 
 def _refill_terms() -> tuple[str, ...]:
@@ -1641,17 +1689,17 @@ def _extract_loose_trailing_size(text: str) -> tuple[Decimal | None, str, str]:
 
 
 def _brand_alias_pattern(alias: BrandAlias) -> str:
-    return alias.normalized_alias or normalize_alias_value(alias.alias_text)
+    return normalize_alias_value(alias.normalized_alias or alias.alias_text)
 
 
 def _brand_alias_match(alias: BrandAlias, text: str):
     pattern = _brand_alias_pattern(alias)
     if not pattern:
         return None
+    alias_text = normalize_alias_value(text)
     if alias.is_regex:
-        return _safe_regex_search(pattern, text, alias=alias)
-    pattern = re.escape(pattern).replace(r"\.", r"\.\s*")
-    return re.search(rf"(^|\s){pattern}($|\s)", text)
+        return _safe_regex_search(pattern, alias_text, alias=alias)
+    return re.search(rf"(^|\s){re.escape(pattern)}($|\s)", alias_text)
 
 
 def _brand_name_match(brand: Brand, text: str):
@@ -1794,15 +1842,18 @@ def parse_supplier_product(product: SupplierProduct) -> ParseResult:
     is_bag = _contains_any_phrase(text, _bag_terms())
     is_cosmetic_poudre = _contains_any_phrase(text, _cosmetic_poudre_terms())
     is_deodorant_candidate = _contains_any_phrase(text, _deodorant_terms())
+    is_decant = _contains_any_phrase(text, _decant_terms())
+    is_vintage = _contains_any_phrase(text, _vintage_terms())
     is_non_perfume = is_bag or is_cosmetic_poudre
 
     garbage_keyword = match_trailing_garbage_marker(raw) or match_garbage_keyword(text)
-    structured_packaging_keywords = {
+    structured_non_garbage_keywords = {
         normalize_text(term) for term in _structured_packaging_terms()
     }
+    structured_non_garbage_keywords.update(_vintage_terms())
     if (
         garbage_keyword
-        and normalize_text(garbage_keyword) not in structured_packaging_keywords
+        and normalize_text(garbage_keyword) not in structured_non_garbage_keywords
     ):
         result.modifiers = [GARBAGE_MODIFIER]
         result.warnings = [f"{GARBAGE_WARNING_PREFIX}: {garbage_keyword}"]
@@ -1843,7 +1894,7 @@ def parse_supplier_product(product: SupplierProduct) -> ParseResult:
         if result.concentration:
             text = _strip_concentration_aliases(text, applicable_concentration_aliases)
     is_deodorant = is_deodorant_candidate and not result.concentration
-    is_non_perfume = is_non_perfume or is_deodorant
+    is_non_perfume = is_non_perfume or is_deodorant or is_decant or is_vintage
 
     audience_aliases = _audience_aliases()
     for alias_text, display_value, _group in audience_aliases:
@@ -1861,6 +1912,8 @@ def parse_supplier_product(product: SupplierProduct) -> ParseResult:
     supplier_comment_terms = _supplier_comment_terms()
     cosmetic_poudre_terms = _cosmetic_poudre_terms()
     deodorant_terms = _deodorant_terms()
+    decant_terms = _decant_terms()
+    vintage_terms = _vintage_terms()
     detected_packaging, packaging_descriptor_terms = _extract_packaging_descriptor(text)
     variant_type_aliases = _variant_type_aliases()
     variant_type_terms = tuple(alias for alias, _variant_type in variant_type_aliases)
@@ -1912,6 +1965,10 @@ def parse_supplier_product(product: SupplierProduct) -> ParseResult:
         result.variant_type = "poudre"
     elif is_deodorant:
         result.variant_type = DEODORANT_MODIFIER
+    elif is_decant:
+        result.variant_type = DECANT_MODIFIER
+    elif is_vintage:
+        result.variant_type = VINTAGE_MODIFIER
     result.modifiers = [
         term
         for term in MODIFIER_TERMS
@@ -1923,6 +1980,10 @@ def parse_supplier_product(product: SupplierProduct) -> ParseResult:
         result.modifiers.append(COSMETIC_PUDRE_MODIFIER)
     if is_deodorant:
         result.modifiers.append(DEODORANT_MODIFIER)
+    if is_decant:
+        result.modifiers.append(DECANT_MODIFIER)
+    if is_vintage:
+        result.modifiers.append(VINTAGE_MODIFIER)
     if is_mini and MINI_MODIFIER not in result.modifiers:
         result.modifiers.append(MINI_MODIFIER)
     if _contains_any_phrase(text, refill_terms):
@@ -1959,6 +2020,8 @@ def parse_supplier_product(product: SupplierProduct) -> ParseResult:
         *set_terms,
         *cosmetic_poudre_terms,
         *deodorant_terms,
+        *decant_terms,
+        *vintage_terms,
         *refill_terms,
         *decoded_terms,
         *supplier_comment_terms,
@@ -2080,6 +2143,8 @@ def parse_supplier_product(product: SupplierProduct) -> ParseResult:
                 *set_terms,
                 *cosmetic_poudre_terms,
                 *deodorant_terms,
+                *decant_terms,
+                *vintage_terms,
                 *refill_terms,
                 *decoded_terms,
                 *supplier_comment_terms,
@@ -2143,6 +2208,8 @@ def parse_supplier_product(product: SupplierProduct) -> ParseResult:
             BAG_MODIFIER,
             COSMETIC_PUDRE_MODIFIER,
             DEODORANT_MODIFIER,
+            DECANT_MODIFIER,
+            VINTAGE_MODIFIER,
             REFILL_MODIFIER,
         }:
             continue

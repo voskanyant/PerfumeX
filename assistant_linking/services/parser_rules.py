@@ -62,6 +62,18 @@ PARSER_RULE_KIND_OPTIONS = (
         "example": "deo",
     },
     {
+        "key": "parser_decant_term",
+        "label": "Decant term",
+        "description": "Routes supplier decant/отлив rows to Decants and removes the marker from the scent name.",
+        "example": "отлив",
+    },
+    {
+        "key": "parser_vintage_term",
+        "label": "Vintage term",
+        "description": "Routes supplier vintage rows to Vintage and removes the marker from the scent name.",
+        "example": "vintage",
+    },
+    {
         "key": "parser_refill_term",
         "label": "Refill term",
         "description": "Adds the refill modifier to matching rows.",

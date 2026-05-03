@@ -186,6 +186,7 @@ Standard responsive structure:
 - Use `includes/table_empty.html` for table empty rows when possible.
 - Product list tables are specialized with `.products-grid` and `.products-mobile`; extend those only in `prices/list.html`/`products.css`.
 - Our Products catalogue rows in `prices/our_products_catalog.html` are specialized as parsed read-only rows with a pencil-triggered inline editor; do not render every row as visible inputs by default.
+- Our Products collections tab must display collection rows with their brand and submit brand-scoped actions; collection names are not global buckets.
 - Fragrantica staged source rows in `prices/fragrantica_products.html` should mirror the Our Products parsed-row structure and keep audience/gender, year, and source link visible.
 - Fragrantica staged source rows should show ranked Our Products candidates inline with same-page link actions; avoid forcing operators to navigate to another catalogue page for normal linking.
 - Catalogue comparison rows should keep collection names as muted secondary subnames under the primary identity, not inline between brand and scent, so Our Products and Fragrantica rows are easier to compare.
@@ -193,6 +194,7 @@ Standard responsive structure:
 - Catalogue row action columns must reserve enough width for text buttons; do not size text-action columns like icon-only columns. On narrow screens, row actions should wrap to the full row width instead of clipping off canvas.
 - Catalogue review lists that support row selection should use `prices/js/catalogue-selection.js` with `data-catalogue-selection-root`, row checkboxes, Ctrl/Shift range selection, Escape clear, and page-specific bulk actions instead of one-off selection scripts.
 - Catalogue linking workbench selection must allow rows without ready suggestions to be selected and deleted; bulk-link enablement should depend only on selected rows that carry link-pair data.
+- Catalogue linking workbench suggestion/confidence filters must fill the current page from matching rows, not only filter the already-paginated 40 rows; after bulk linking, page 1 should continue showing later eligible matches instead of an empty panel while matches remain on later pages.
 - Assistant unparsed normalization rows should mirror parsed queue columns and may show bounded, non-persistent parser previews for the visible page; use explicit parse actions to create saved `ParsedSupplierProduct` rows.
 - Supplier import spreadsheet previews are specialized scrollable tables. Keep `.import-preview-table` headers visible because they are mapping controls; do not add `.table-mobile` there. Generated preview cells should still use scoped headers and `data-label` metadata.
 - Keep actions in `td.actions` or `td[data-label="Actions"]`.

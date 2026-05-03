@@ -79,6 +79,16 @@
             <div class="metric-value">{{ deodorant_count }}</div>
         </a>
         <a class="metric-card"
+           href="{% url 'assistant_linking:normalization_decants' %}">
+            <div class="metric-label">Decants</div>
+            <div class="metric-value">{{ decant_count }}</div>
+        </a>
+        <a class="metric-card"
+           href="{% url 'assistant_linking:normalization_vintage' %}">
+            <div class="metric-label">Vintage</div>
+            <div class="metric-value">{{ vintage_count }}</div>
+        </a>
+        <a class="metric-card"
            href="{% url 'assistant_linking:normalization_garbage' %}">
             <div class="metric-label">Garbage</div>
             <div class="metric-value">{{ garbage_count }}</div>
