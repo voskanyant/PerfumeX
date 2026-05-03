@@ -8110,7 +8110,7 @@ class OurProductCatalogueListTests(TestCase):
             response,
             "Amouage / Beach Hut for Men / Eau de Parfum",
         )
-        self.assertContains(response, "Same brand and scent after audience words")
+        self.assertContains(response, "Exact brand and scent identity match")
         self.assertContains(
             response,
             reverse("prices:fragrantica_product_link", args=[source.pk]),
@@ -8184,7 +8184,7 @@ class OurProductCatalogueListTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Alexandre J. / Legacy WB")
-        self.assertContains(response, "Exact brand and scent match")
+        self.assertContains(response, "Exact brand and scent identity match")
         self.assertContains(
             response,
             reverse("prices:fragrantica_product_link", args=[source.pk]),
@@ -8218,7 +8218,44 @@ class OurProductCatalogueListTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Dolce &amp; Gabbana / Light Blue")
-        self.assertContains(response, "Same brand and scent after concentration words")
+        self.assertContains(response, "Exact brand and scent identity match")
+        self.assertContains(
+            response,
+            reverse("prices:fragrantica_product_link", args=[source.pk]),
+        )
+        self.assertNotEqual(perfume.pk, self.perfume.pk)
+
+    def test_fragrantica_products_suggests_audience_suffix_and_concentration_title(
+        self,
+    ):
+        dolce = Brand.objects.create(name="Dolce & Gabbana")
+        perfume = Perfume.objects.create(
+            brand=dolce,
+            name="Light Blue Capri In Love Pour Femme",
+            audience="Women",
+            concentration="Eau de Parfum",
+        )
+        source = FragranticaProduct.objects.create(
+            brand_name="Dolce&Gabbana",
+            normalized_brand_name="dolceandgabbana",
+            name="Light Blue Capri In Love Eau de Parfum",
+            normalized_name="light blue capri in love eau de parfum",
+            collection_name="LIGHT BLUE BY DOLCE&GABBANA",
+            audience="Women",
+            release_year=2025,
+            source_path="/perfume/Dolce-Gabbana/Light-Blue-Capri-In-Love-1.html",
+        )
+
+        response = self.client.get(
+            reverse("prices:fragrantica_product_review"),
+            {"brand": "Dolce&Gabbana", "q": "capri in love"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response, "Dolce &amp; Gabbana / Light Blue Capri In Love Pour Femme"
+        )
+        self.assertContains(response, "Exact brand and scent identity match")
         self.assertContains(
             response,
             reverse("prices:fragrantica_product_link", args=[source.pk]),

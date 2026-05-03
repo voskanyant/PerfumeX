@@ -304,6 +304,18 @@ def fragrance_key_variants(value: str) -> set[str]:
     }
 
 
+def fragrance_identity_key_variants(value: str) -> set[str]:
+    identity_values = {
+        value or "",
+        fragrance_name_without_audience(value),
+        fragrance_name_without_audience_or_concentration(value),
+    }
+    keys: set[str] = set()
+    for identity_value in identity_values:
+        keys.update(fragrance_key_variants(identity_value))
+    return keys
+
+
 def _contains_audience_term(name_key: str, term: str) -> bool:
     return bool(re.search(rf"(^|\s){re.escape(term)}($|\s)", name_key))
 
@@ -751,13 +763,13 @@ def _product_alias_supports_fragrantica_source(source, perfume, alias) -> bool:
 
 
 def _fragrantica_perfume_candidate_score(source, perfume, aliases) -> tuple[int, str]:
-    source_name_keys = fragrance_key_variants(source.name)
+    source_name_keys = fragrance_identity_key_variants(source.name)
     source_name_keys.update(
-        fragrance_key_variants(getattr(source, "normalized_name", ""))
+        fragrance_identity_key_variants(getattr(source, "normalized_name", ""))
     )
-    perfume_name_keys = fragrance_key_variants(perfume.name)
+    perfume_name_keys = fragrance_identity_key_variants(perfume.name)
     if source_name_keys & perfume_name_keys:
-        return 100, "Exact brand and scent match"
+        return 100, "Exact brand and scent identity match"
 
     for alias in aliases:
         if _product_alias_supports_fragrantica_source(source, perfume, alias):
