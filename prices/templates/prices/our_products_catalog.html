@@ -5,7 +5,7 @@
 {% block content %}
 {% include "includes/page_header.html" with kicker="Catalogue" title="Our Products" meta_template="prices/_our_products_catalog_header_meta.html" actions_template="prices/_our_products_catalog_header_actions.html" %}
 
-<div class="workspace-block our-products-catalog">
+<div class="workspace-block our-products-catalog" data-catalogue-selection-root>
     {% include "includes/tabs.html" with class_name="catalogue-tabs" label="Catalogue management tabs" items_template="prices/_our_products_catalog_tab_items.html" %}
 
     {% if active_tab == 'products' %}
@@ -14,22 +14,61 @@
         <input type="text" name="q" value="{{ search_query }}" placeholder="Search brand, scent, size, packaging..." aria-label="Search catalogue products">
         <button class="button ghost" type="submit">Search</button>
     </form>
+    <form id="catalogue-products-bulk-form"
+          method="post"
+          class="catalogue-selection-bar"
+          data-catalogue-selection-bar
+          data-catalogue-bulk-form
+          hidden>
+        {% csrf_token %}
+        <input type="hidden" name="tab" value="products">
+        <input type="hidden" name="action" value="bulk_delete_variants">
+        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+        <span class="catalogue-selection-count">
+            <span data-catalogue-selected-count>0</span> selected
+        </span>
+        <div class="catalogue-selection-actions">
+            <button class="button ghost"
+                    type="button"
+                    data-catalogue-clear-selection>Clear selection</button>
+            <button class="button danger"
+                    type="submit"
+                    data-catalogue-selection-action
+                    data-catalogue-bulk-delete
+                    data-confirm="Delete selected catalogue variant rows? Supplier links to deleted variants will be cleared.">Delete selected</button>
+        </div>
+    </form>
     <div class="our-products-list" aria-label="Catalogue products">
         <div class="our-products-list-head" aria-hidden="true">
+            <span></span>
             <span>Parsed</span>
             <span>Flags</span>
             <span>Edit</span>
         </div>
         {% for variant in variants %}
-            <article class="our-products-card" data-catalogue-row>
+            <article class="our-products-card"
+                     data-catalogue-row
+                     data-catalogue-selectable-row
+                     data-catalogue-row-id="{{ variant.pk }}">
                 <form id="variant-form-{{ variant.pk }}" class="catalogue-row-form" method="post" action="{% url 'prices:our_product_variant_inline_update' variant.pk %}">
                     {% csrf_token %}
                     <input type="hidden" name="next" value="{{ request.get_full_path }}">
                     <input type="hidden" name="perfume_id" value="{{ variant.perfume.pk }}">
                     <input type="hidden" name="apply_identity_group" value="1">
                     <div class="our-products-card-main">
+                        <label class="catalogue-row-check">
+                            <input type="checkbox"
+                                   name="variant_id"
+                                   value="{{ variant.pk }}"
+                                   form="catalogue-products-bulk-form"
+                                   data-catalogue-select-checkbox
+                                   aria-label="Select {{ variant.perfume.brand.name }} {{ variant.perfume.name }}{% if variant.display_size %} {{ variant.display_size }}{% endif %}">
+                        </label>
                         <div class="our-products-card-body">
-                            <div class="our-products-full-name" aria-label="Parsed product">
+                            <button class="our-products-full-name catalogue-row-name-button"
+                                    type="button"
+                                    data-catalogue-select-toggle
+                                    aria-label="Select product row">
                                 <span class="catalogue-cell-value catalogue-cell-value-strong">{{ variant.perfume.brand.name }}</span>
                                 {% if variant.perfume.collection_name %}
                                     <span class="identity-separator">/</span>
@@ -57,7 +96,7 @@
                                     <span class="identity-separator">/</span>
                                     <span class="catalogue-cell-value">{{ variant.variant_type }}</span>
                                 {% endif %}
-                            </div>
+                            </button>
                             {% if variant.fragrantica_candidates %}
                                 <div class="fragrantica-match-panel"
                                      aria-label="Suggested Fragrantica matches">
@@ -346,5 +385,6 @@
 {% endblock %}
 {% block extra_scripts %}
 {{ block.super }}
+<script src="{% static 'prices/js/catalogue-selection.js' %}"></script>
 <script src="{% static 'prices/js/our-products-catalog.js' %}"></script>
 {% endblock %}

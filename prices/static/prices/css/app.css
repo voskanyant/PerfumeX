@@ -1391,7 +1391,7 @@ select:focus {
 }
 .our-products-list-head {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(160px, 260px) minmax(130px, 190px);
+  grid-template-columns: 34px minmax(0, 1fr) minmax(160px, 260px) minmax(130px, 190px);
   gap: 18px;
   align-items: center;
   min-height: 42px;
@@ -1421,13 +1421,17 @@ select:focus {
   background: #fbfbfb;
   box-shadow: inset 2px 0 0 var(--black);
 }
+.our-products-card.is-bulk-selected {
+  background: #fbfbfb;
+  box-shadow: inset 2px 0 0 var(--black);
+}
 .our-products-card .catalogue-row-form {
   display: block;
   margin: 0;
 }
 .our-products-card-main {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(160px, 260px) minmax(130px, 190px);
+  grid-template-columns: 34px minmax(0, 1fr) minmax(160px, 260px) minmax(130px, 190px);
   gap: 18px;
   align-items: center;
   min-height: 70px;
@@ -1445,6 +1449,12 @@ select:focus {
 .our-products-card-body {
   min-width: 0;
 }
+.catalogue-row-check {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+}
 .our-products-full-name {
   display: flex;
   flex-wrap: wrap;
@@ -1454,6 +1464,18 @@ select:focus {
   color: var(--black);
   font-size: 18px;
   line-height: 1.45;
+}
+.catalogue-row-name-button {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.catalogue-row-name-button:focus-visible {
+  outline: 2px solid var(--black);
+  outline-offset: 3px;
 }
 .identity-separator {
   color: var(--black);
@@ -1902,6 +1924,28 @@ select:focus {
   flex-direction: column;
   min-height: 0;
 }
+.catalogue-selection-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--grey-200);
+  border-radius: var(--radius-sm);
+  background: var(--grey-50);
+}
+.catalogue-selection-count {
+  color: var(--grey-800);
+  font-size: 13px;
+}
+.catalogue-selection-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
 .catalogue-linking-check-all {
   display: inline-flex;
   align-items: center;
@@ -1930,6 +1974,12 @@ select:focus {
 }
 .catalogue-linking-row.is-selected {
   background: #fbfbfb;
+  box-shadow: inset 2px 0 0 var(--black);
+}
+.catalogue-linking-row.is-bulk-selected {
+  background: #fbfbfb;
+}
+.catalogue-linking-row.is-selected.is-bulk-selected {
   box-shadow: inset 2px 0 0 var(--black);
 }
 .catalogue-linking-row-check {
@@ -2711,17 +2761,21 @@ pre, code {
     grid-template-columns: minmax(0, 1fr);
   }
   .catalogue-linking-bulk-bar,
+  .catalogue-selection-bar,
   .catalogue-linking-panel-head {
     align-items: flex-start;
   }
-  .catalogue-linking-bulk-bar {
+  .catalogue-linking-bulk-bar,
+  .catalogue-selection-bar {
     flex-direction: column;
   }
   .catalogue-linking-candidate-actions {
     justify-content: flex-start;
   }
   .catalogue-linking-candidate-actions .button,
-  .catalogue-linking-bulk-bar .button {
+  .catalogue-linking-bulk-bar .button,
+  .catalogue-selection-actions,
+  .catalogue-selection-actions .button {
     width: 100%;
     justify-content: center;
   }
@@ -2769,6 +2823,10 @@ pre, code {
     grid-template-columns: minmax(0, 1fr);
     gap: 10px;
     padding: 16px 14px;
+  }
+
+  .catalogue-row-check {
+    justify-content: flex-start;
   }
 
   .fragrantica-product-main {

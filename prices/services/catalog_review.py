@@ -1889,11 +1889,35 @@ def build_catalog_tab_action_result(
     *,
     brand_manager=None,
     perfume_manager=None,
+    variant_manager=None,
 ) -> CatalogTabActionResult:
     brand_manager = brand_manager or CatalogBrand.objects
     perfume_manager = perfume_manager or CatalogPerfume.objects
+    variant_manager = variant_manager or CatalogPerfumeVariant.objects
     action = post_data.get("action", "").strip()
     tab = post_data.get("tab", "products").strip() or "products"
+
+    if action == "bulk_delete_variants":
+        variant_ids = (
+            post_data.getlist("variant_id")
+            if hasattr(post_data, "getlist")
+            else post_data.get("variant_id", [])
+        )
+        if isinstance(variant_ids, str):
+            variant_ids = [variant_ids]
+        clean_ids = [
+            variant_id for variant_id in variant_ids if str(variant_id).isdigit()
+        ]
+        if not clean_ids:
+            return CatalogTabActionResult("error", "Select product rows to delete.", tab)
+        queryset = variant_manager.filter(pk__in=clean_ids)
+        deleted_count = queryset.count()
+        if not deleted_count:
+            return CatalogTabActionResult("error", "Selected product rows were not found.", tab)
+        queryset.delete()
+        return CatalogTabActionResult(
+            "success", f"Deleted {deleted_count} catalogue variant row(s).", tab
+        )
 
     if action == "add_brand":
         name = post_data.get("name", "").strip()
@@ -1972,12 +1996,18 @@ def build_catalog_tab_action_result(
 def run_catalog_tab_post_action(
     post_data,
     *,
+    host: str = "",
     action_builder=build_catalog_tab_action_result,
 ) -> CatalogTabPostActionResult:
     result = action_builder(post_data)
-    redirect_url = (
-        f"{reverse('prices:our_product_list')}?{urlencode({'tab': result.tab})}"
-    )
+    redirect_url = post_data.get("next", "").strip()
+    if not redirect_url or not url_has_allowed_host_and_scheme(
+        redirect_url,
+        allowed_hosts={host} if host else None,
+    ):
+        redirect_url = (
+            f"{reverse('prices:our_product_list')}?{urlencode({'tab': result.tab})}"
+        )
     return CatalogTabPostActionResult(
         level=result.level,
         message=result.message,

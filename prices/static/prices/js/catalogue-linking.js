@@ -4,7 +4,7 @@
     var candidatesNode = document.querySelector("[data-linking-candidates]");
     var selectedNode = document.querySelector("[data-linking-selected]");
     var countNode = document.querySelector("[data-linking-candidate-count]");
-    var checkAll = document.querySelector("[data-linking-check-all]");
+    var selectionRoot = document.querySelector("[data-catalogue-selection-root]");
 
     if (!panel || !candidatesNode || !selectedNode) return;
 
@@ -142,18 +142,19 @@
             });
     }
 
-    rows.forEach(function (row) {
-        var button = row.querySelector("[data-linking-select]");
-        if (!button) return;
-        button.addEventListener("click", function () {
-            selectRow(row);
+    if (selectionRoot) {
+        selectionRoot.addEventListener("catalogue-selection:row-selected", function (event) {
+            var row = event.detail && event.detail.row;
+            if (row && row.matches("[data-linking-row]")) {
+                selectRow(row);
+            }
         });
-    });
-
-    if (checkAll) {
-        checkAll.addEventListener("change", function () {
-            document.querySelectorAll(".catalogue-linking-bulk-form input[name=link_pair]").forEach(function (input) {
-                input.checked = checkAll.checked;
+    } else {
+        rows.forEach(function (row) {
+            var button = row.querySelector("[data-linking-select]");
+            if (!button) return;
+            button.addEventListener("click", function () {
+                selectRow(row);
             });
         });
     }

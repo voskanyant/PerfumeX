@@ -7940,6 +7940,10 @@ class OurProductCatalogueListTests(TestCase):
         response = self.client.get(reverse("prices:our_product_list"))
 
         self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "data-catalogue-selection-root")
+        self.assertContains(response, "Delete selected")
+        self.assertContains(response, "data-catalogue-select-toggle")
+        self.assertContains(response, "data-catalogue-select-checkbox")
         self.assertContains(response, "Montale")
         self.assertContains(response, "Vanilla Extasy")
         self.assertContains(response, "Eau de Parfum")
@@ -8469,6 +8473,10 @@ class OurProductCatalogueListTests(TestCase):
         self.assertContains(response, "Left column")
         self.assertContains(response, "Right column")
         self.assertContains(response, "Bulk link checked")
+        self.assertContains(response, "data-catalogue-selection-root")
+        self.assertContains(response, "data-catalogue-select-toggle")
+        self.assertContains(response, "data-catalogue-select-checkbox")
+        self.assertContains(response, "data-catalogue-bulk-primary")
         self.assertContains(response, "Montale / Classic / Vanilla Extasy")
         self.assertContains(
             response, "Montale / Fragrantica Collection / Vanilla Extasy"
@@ -8754,6 +8762,21 @@ class OurProductCatalogueListTests(TestCase):
         self.assertFalse(self.variant.is_tester)
         self.assertEqual(self.variant.packaging, "no box")
         self.assertEqual(self.variant.variant_type, "travel")
+
+    def test_our_products_products_tab_bulk_deletes_selected_variants(self):
+        response = self.client.post(
+            reverse("prices:our_product_list"),
+            {
+                "tab": "products",
+                "action": "bulk_delete_variants",
+                "variant_id": [str(self.variant.pk)],
+                "next": reverse("prices:our_product_list"),
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(PerfumeVariant.objects.filter(pk=self.variant.pk).exists())
+        self.assertTrue(Perfume.objects.filter(pk=self.perfume.pk).exists())
 
     def test_our_products_brands_tab_can_add_brand(self):
         response = self.client.post(

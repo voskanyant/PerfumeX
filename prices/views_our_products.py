@@ -43,7 +43,7 @@ class OurProductListView(LoginRequiredMixin, ListView):
         return context
 
     def post(self, request, *args, **kwargs):
-        result = run_catalog_tab_post_action(request.POST)
+        result = run_catalog_tab_post_action(request.POST, host=request.get_host())
         getattr(messages, result.level)(request, result.message)
         return redirect(result.redirect_url)
 

@@ -8,7 +8,7 @@
         {% include "includes/tabs.html" with class_name="catalogue-tabs" label="Our Products catalogue tabs" items_template="prices/_our_products_catalog_tab_items.html" %}
         {% include "includes/tabs.html" with class_name="catalogue-tabs" label="Fragrantica catalogue tabs" items_template="prices/_fragrantica_catalogue_tab_items.html" active_fragrantica_tab="linking" %}
     </div>
-    <div class="workspace-block catalogue-linking-workbench">
+    <div class="workspace-block catalogue-linking-workbench" data-catalogue-selection-root>
         <form method="get" class="catalogue-linking-filters" aria-label="Linking filters">
             <label class="catalogue-linking-filter">
                 <span>Brand</span>
@@ -66,16 +66,29 @@
                     <input type="hidden" name="action" value="bulk_link">
                     <div class="catalogue-linking-bulk-bar">
                         <label class="catalogue-linking-check-all">
-                            <input type="checkbox" data-linking-check-all>
+                            <input type="checkbox" data-catalogue-check-all>
                             <span>Ready suggestions</span>
                         </label>
-                        <span class="tone-muted text-small">{{ ready_bulk_count }} visible above threshold</span>
-                        <button class="button primary" type="submit">Bulk link checked</button>
+                        <span class="tone-muted text-small">
+                            <span data-catalogue-selected-count>0</span> selected · {{ ready_bulk_count }} visible above threshold
+                        </span>
+                        <div class="catalogue-selection-actions">
+                            <button class="button ghost"
+                                    type="button"
+                                    data-catalogue-clear-selection>Clear selection</button>
+                            <button class="button primary"
+                                    type="submit"
+                                    data-catalogue-selection-action
+                                    data-catalogue-bulk-primary
+                                    disabled>Bulk link checked</button>
+                        </div>
                     </div>
                     <div class="catalogue-linking-list" data-linking-list>
                         {% for row in rows %}
                             <article class="catalogue-linking-row {% if selected_row and selected_row.perfume.pk == row.perfume.pk %}is-selected{% endif %}"
                                      data-linking-row
+                                     data-catalogue-selectable-row
+                                     data-catalogue-row-id="{{ row.perfume.pk }}"
                                      data-perfume-id="{{ row.perfume.pk }}"
                                      data-candidates-url="{% url 'prices:catalogue_linking_candidates' %}?perfume={{ row.perfume.pk }}&min_score={{ min_score }}">
                                 <div class="catalogue-linking-row-check">
@@ -83,14 +96,20 @@
                                         <input type="checkbox"
                                                name="link_pair"
                                                value="{{ row.top_candidate.source.pk }}:{{ row.perfume.pk }}:{% if row.top_candidate.creates_alias %}1{% else %}0{% endif %}"
+                                               data-catalogue-select-checkbox
                                                aria-label="Select {{ row.label }} for bulk link">
                                     {% else %}
-                                        <span aria-hidden="true"></span>
+                                        <input type="checkbox"
+                                               data-catalogue-select-checkbox
+                                               aria-label="No bulk suggestion for {{ row.label }}"
+                                               disabled
+                                               hidden>
                                     {% endif %}
                                 </div>
                                 <button class="catalogue-linking-row-button"
                                         type="button"
-                                        data-linking-select>
+                                        data-linking-select
+                                        data-catalogue-select-toggle>
                                     <span class="catalogue-linking-row-title">{{ row.label }}</span>
                                     <span class="catalogue-linking-row-meta">
                                         {{ row.perfume.variant_count|default:0 }} variant{{ row.perfume.variant_count|default:0|pluralize }} ·
@@ -189,5 +208,6 @@
 {% endblock %}
 {% block extra_scripts %}
 {{ block.super }}
+<script src="{% static 'prices/js/catalogue-selection.js' %}"></script>
 <script src="{% static 'prices/js/catalogue-linking.js' %}"></script>
 {% endblock %}

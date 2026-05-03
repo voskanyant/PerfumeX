@@ -87,6 +87,7 @@ External catalogue import:
 - `prices.OurProduct` is not `catalog.Perfume`. `OurProduct` is legacy/internal grouping; `catalog.Perfume` is the canonical fragrance identity.
 - Collection names are brand-scoped. Do not merge two collections only because their names match across different brands.
 - `catalog.PerfumeVariant` is not a supplier row. It describes canonical size/package/type variants.
+- Deleting selected rows from the Our Products products tab deletes catalogue variant rows only. It should not automatically delete the underlying `catalog.Perfume` identity.
 - `FragranticaProduct` is not a supplier row or variant. It is staged external source evidence; it becomes trusted for local normalization only after staff links/applies it to `catalog.Perfume`.
 - Alias/rule data is preferred over parser code for one-off brand, product, concentration, collection, or garbage corrections.
 - Import batch/import file are operational audit records, not product identity.
