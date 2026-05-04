@@ -2234,6 +2234,94 @@ def _catalogue_linking_sequence_slice(sequence, start: int, stop: int):
     return sequence[start:stop]
 
 
+def _catalogue_linking_strict_exact_perfume_ids(sequence) -> set[int]:
+    perfumes = list(sequence)
+    if not perfumes:
+        return set()
+
+    regex_preprocess_rules = get_regex_preprocess_rules()
+    brand_key_to_ids = _build_fragrantica_brand_id_map(
+        perfumes,
+        regex_preprocess_rules=regex_preprocess_rules,
+    )
+    brand_keys = _catalogue_linking_brand_keys_for_perfumes(
+        perfumes,
+        regex_preprocess_rules=regex_preprocess_rules,
+    )
+    if not brand_keys:
+        return set()
+
+    perfumes_by_brand_id = _group_perfumes_by_brand_id(perfumes)
+    normalized_names_by_perfume_id = {
+        perfume.id: _fragrantica_normalized_name_candidates_for_perfume(perfume)
+        for perfume in perfumes
+    }
+    matched_perfume_ids: set[int] = set()
+    source_rows = (
+        FragranticaProduct.objects.filter(
+            normalized_brand_name__in=brand_keys,
+            match_status=FragranticaProduct.STATUS_UNLINKED,
+        )
+        .only("brand_name", "normalized_brand_name", "normalized_name")
+        .iterator(chunk_size=1000)
+    )
+    for source in source_rows:
+        source_brand_ids = _source_brand_ids(
+            source,
+            brand_key_to_ids,
+            regex_preprocess_rules=regex_preprocess_rules,
+        )
+        if not source_brand_ids:
+            continue
+        source_name = source.normalized_name or normalized_fragrance_key(
+            fragrantica_source_catalogue_name(source)
+        )
+        if not source_name:
+            continue
+        for perfume in _perfumes_for_brand_ids(perfumes_by_brand_id, source_brand_ids):
+            if source_name in normalized_names_by_perfume_id.get(perfume.id, set()):
+                matched_perfume_ids.add(perfume.id)
+    return matched_perfume_ids
+
+
+def _build_catalogue_linking_strict_exact_page_rows(
+    sequence,
+    *,
+    page_number: int,
+    page_size: int,
+    min_score: int,
+) -> list[dict]:
+    target_start = max(page_number - 1, 0) * page_size
+    target_stop = target_start + page_size
+    exact_perfume_ids = _catalogue_linking_strict_exact_perfume_ids(sequence)
+    if not exact_perfume_ids:
+        return []
+
+    matching_perfumes = [
+        perfume for perfume in list(sequence) if perfume.id in exact_perfume_ids
+    ]
+    page_rows: list[dict] = []
+    scan_stop = target_stop
+    while len(page_rows) < page_size and target_start < len(matching_perfumes):
+        candidates = matching_perfumes[target_start:scan_stop]
+        if not candidates:
+            break
+        visible_rows = build_catalogue_linking_rows(
+            candidates,
+            min_score=min_score,
+            include_candidates=True,
+        )
+        filtered_rows = filter_catalogue_linking_rows_by_confidence(
+            visible_rows,
+            "100",
+        )
+        page_rows.extend(filtered_rows[: page_size - len(page_rows)])
+        if scan_stop >= len(matching_perfumes):
+            break
+        scan_stop += page_size
+    return page_rows
+
+
 def _build_catalogue_linking_filtered_page_rows(
     sequence,
     *,
@@ -2243,6 +2331,14 @@ def _build_catalogue_linking_filtered_page_rows(
     confidence_filter: str,
     suggestion_filter: str,
 ) -> list[dict]:
+    if confidence_filter == "100" and suggestion_filter in {"all", "with"}:
+        return _build_catalogue_linking_strict_exact_page_rows(
+            sequence,
+            page_number=page_number,
+            page_size=page_size,
+            min_score=min_score,
+        )
+
     target_start = max(page_number - 1, 0) * page_size
     target_stop = target_start + page_size
     matched_seen = 0
