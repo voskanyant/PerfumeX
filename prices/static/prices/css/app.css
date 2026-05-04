@@ -1844,6 +1844,20 @@ select:focus {
   gap: 3px;
   min-width: 0;
 }
+.fragrantica-match-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.fragrantica-match-head-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
 .fragrantica-match-name {
   overflow-wrap: anywhere;
   font-size: 15px;
@@ -1899,9 +1913,9 @@ select:focus {
   grid-template-columns: minmax(0, 1.05fr) minmax(360px, 0.95fr);
   gap: 16px;
   align-items: stretch;
-  min-height: 680px;
-  height: clamp(680px, calc(100vh - 220px), 960px);
-  height: clamp(680px, calc(100dvh - 220px), 960px);
+  min-height: 820px;
+  height: clamp(820px, calc(100vh - 96px), 1180px);
+  height: clamp(820px, calc(100dvh - 96px), 1180px);
 }
 .catalogue-linking-panel {
   min-width: 0;
@@ -1919,8 +1933,8 @@ select:focus {
 .catalogue-linking-panel-right {
   position: sticky;
   top: 16px;
-  max-height: calc(100vh - 96px);
-  max-height: calc(100dvh - 96px);
+  height: 100%;
+  max-height: none;
   overflow: hidden;
 }
 .catalogue-linking-panel-head {
@@ -2112,6 +2126,23 @@ select:focus {
 }
 .catalogue-linking-candidate-actions .button {
   white-space: nowrap;
+}
+.catalogue-linking-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--grey-700);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 12px;
+  letter-spacing: normal;
+  line-height: 1.25;
+  text-transform: none;
+  white-space: nowrap;
+}
+.catalogue-linking-option input {
+  width: 14px;
+  height: 14px;
+  margin: 0;
 }
 .fragrantica-row-link {
   width: 38px;

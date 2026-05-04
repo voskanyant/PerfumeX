@@ -79,6 +79,7 @@ Related docs: [AGENTS.md](../AGENTS.md), [README.md](../README.md), [docs/REPO_M
 - Do not treat staged Fragrantica rows as canonical catalogue products.
 - Do not silently overwrite assistant/manual links without explicit staff intent and audit trail.
 - Do not leave final summaries without code/docs/tests/follow-up fields.
+- Do not claim a visual UI change is fixed until the CSS rule that controls the actually visible scroll/work area has been updated and checked against the user's viewport.
 - Do not treat failed deploys, failed checks, parser misses, bad link suggestions, or UI regressions as isolated incidents; extract the reusable cause and add a rule, KB seed, test, checker, or doc note when it can prevent the same error later.
 
 ## Lessons learned
@@ -87,6 +88,7 @@ Related docs: [AGENTS.md](../AGENTS.md), [README.md](../README.md), [docs/REPO_M
 - `assistant_linking/docs/assistant_learning_design.md` is the source of truth for assistant learning discipline.
 - The canonical catalogue lives in `catalog`; supplier offers and import history live in `prices`.
 - Shared UI components already exist for page headers, tabs, pagination, and table empty states.
+- 2026-05-04 - Area: catalogue linking UI height. Source: repeated user correction after the workbench columns stayed visually cramped.
 
 ## Future note format
 

@@ -109,6 +109,7 @@
                                             {% csrf_token %}
                                             <input type="hidden" name="next" value="{{ request.get_full_path }}">
                                             <input type="hidden" name="perfume_id" value="{{ choice.perfume.pk }}">
+                                            <input type="hidden" name="update_name" value="0">
                                             <div class="fragrantica-match-summary">
                                                 <span class="fragrantica-match-name">
                                                     {{ choice.perfume.brand.name }} / {{ choice.perfume.name }}{% if choice.perfume.concentration %} / {{ choice.perfume.concentration }}{% endif %}
@@ -123,8 +124,14 @@
                                                     {{ choice.reason }} · Score {{ choice.score }}
                                                 </span>
                                             </div>
-                                            <button class="button {% if forloop.first %}primary{% else %}secondary{% endif %}"
-                                                    type="submit">Link</button>
+                                            <div class="fragrantica-match-actions">
+                                                <label class="catalogue-linking-option">
+                                                    <input type="checkbox" name="update_name" value="1" checked>
+                                                    Use Fragrantica name
+                                                </label>
+                                                <button class="button {% if forloop.first %}primary{% else %}secondary{% endif %}"
+                                                        type="submit">Link</button>
+                                            </div>
                                         </form>
                                     {% endfor %}
                                 </div>

@@ -55,6 +55,7 @@
                     <input type="hidden" name="next" value="{{ request.get_full_path }}">
                     <input type="hidden" name="perfume_id" value="{{ variant.perfume.pk }}">
                     <input type="hidden" name="apply_identity_group" value="1">
+                    <input type="hidden" name="update_name" value="0">
                     <div class="our-products-card-main">
                         <label class="catalogue-row-check">
                             <input type="checkbox"
@@ -143,7 +144,13 @@
                                      aria-label="Suggested Fragrantica matches">
                                     <div class="fragrantica-match-panel-head">
                                         <span>Suggested Fragrantica matches</span>
-                                        <span>Link without leaving this page</span>
+                                        <div class="fragrantica-match-head-actions">
+                                            <span>Link without leaving this page</span>
+                                            <label class="catalogue-linking-option">
+                                                <input type="checkbox" name="update_name" value="1" checked>
+                                                Use Fragrantica name
+                                            </label>
+                                        </div>
                                     </div>
                                     {% for candidate in variant.fragrantica_candidates %}
                                         <div class="fragrantica-match-option">

@@ -222,6 +222,32 @@ class FragranticaCataloguePromotionTests(TestCase):
             "Montale / Rose & Black Pepper / Eau de Parfum",
         )
 
+    def test_apply_fragrantica_identity_can_preserve_local_name(self):
+        source = FragranticaProduct.objects.create(
+            brand_name="Montale",
+            normalized_brand_name="montale",
+            name="ROSE & BLACK PEPPER",
+            normalized_name="rose and black pepper",
+            collection_name="L'ATELIER",
+            audience="Women",
+            release_year=2024,
+            source_path="/perfume/Montale/Rose-Black-Pepper.html",
+            match_status=FragranticaProduct.STATUS_LINKED,
+        )
+
+        changed_fields = apply_fragrantica_identity_to_perfume(
+            source,
+            self.perfume,
+            update_name=False,
+        )
+
+        self.perfume.refresh_from_db()
+        self.assertNotIn("name", changed_fields)
+        self.assertEqual(self.perfume.name, "Vanilla Extasy")
+        self.assertEqual(self.perfume.collection_name, "L'Atelier")
+        self.assertEqual(self.perfume.audience, "Women")
+        self.assertEqual(self.perfume.release_year, 2024)
+
     def test_catalogue_perfume_name_title_normalization_is_conservative(self):
         self.assertEqual(
             normalize_catalogue_perfume_name("ROSE & BLACK PEPPER"),
@@ -290,6 +316,35 @@ class FragranticaCataloguePromotionTests(TestCase):
         source.refresh_from_db()
         self.assertEqual(result.level, "error")
         self.assertEqual(source.matched_perfume, self.perfume)
+
+    def test_link_action_can_preserve_local_name(self):
+        source = FragranticaProduct.objects.create(
+            brand_name="Montale",
+            normalized_brand_name="montale",
+            name="Rose & Black Pepper",
+            normalized_name="rose and black pepper",
+            collection_name="L'Atelier",
+            audience="Women",
+            release_year=2024,
+            source_path="/perfume/Montale/Rose-Black-Pepper.html",
+        )
+
+        result = run_fragrantica_catalogue_link_action(
+            source.id,
+            {
+                "perfume_id": str(self.perfume.id),
+                "next": "/admin/our-products/linking/",
+                "update_name": "0",
+            },
+        )
+
+        self.perfume.refresh_from_db()
+        source.refresh_from_db()
+        self.assertEqual(result.level, "success")
+        self.assertEqual(source.matched_perfume, self.perfume)
+        self.assertEqual(self.perfume.name, "Vanilla Extasy")
+        self.assertEqual(self.perfume.collection_name, "L'Atelier")
+        self.assertIn("Local product name was preserved.", result.message)
 
     def _write_bundle(self, path: Path) -> Path:
         bundle = {

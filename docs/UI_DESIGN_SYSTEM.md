@@ -284,6 +284,7 @@ History-back/cancel controls should be buttons with `data-history-back` and an o
 - Use `.card-label`, `.card-title`, and `.card-desc` inside cards/panels.
 - Import dashboard summaries use `.import-summary-card` variants in `imports.css`; product/catalog cards use existing `our-products-*` classes.
 - For bidirectional catalogue matching, extend the existing `.catalogue-linking-*` two-column workbench pattern instead of adding another one-off link list.
+- Catalogue linking workbench height changes must update the desktop `.catalogue-linking-layout` and its internal scroll panels (`.catalogue-linking-list`, `.catalogue-linking-candidates`), then verify against a real desktop viewport. Do not assume changing the outer card alone improves visible working height.
 - Do not nest decorative cards inside cards.
 
 ## Alerts, empty states, and status

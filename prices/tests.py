@@ -8390,7 +8390,7 @@ class OurProductCatalogueListTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Dolce &amp; Gabbana / Light Blue")
-        self.assertContains(response, "Exact brand and scent identity match")
+        self.assertContains(response, "Exact brand, scent, and concentration match")
         self.assertContains(
             response,
             reverse("prices:fragrantica_product_link", args=[source.pk]),
@@ -8427,7 +8427,7 @@ class OurProductCatalogueListTests(TestCase):
         self.assertContains(
             response, "Dolce &amp; Gabbana / Light Blue Capri In Love Pour Femme"
         )
-        self.assertContains(response, "Exact brand and scent identity match")
+        self.assertContains(response, "Exact brand, scent, and concentration match")
         self.assertContains(
             response,
             reverse("prices:fragrantica_product_link", args=[source.pk]),
@@ -8468,7 +8468,7 @@ class OurProductCatalogueListTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Dolce &amp; Gabbana / Light Blue Pour Homme")
-        self.assertContains(response, "Exact brand and scent identity match")
+        self.assertContains(response, "Exact brand, scent, and concentration match")
         self.assertContains(
             response,
             reverse("prices:fragrantica_product_link", args=[source.pk]),
@@ -8720,6 +8720,78 @@ class OurProductCatalogueListTests(TestCase):
         self.assertContains(response, "100 Bon / Ambre &amp; Tonka")
         self.assertContains(response, "L&#x27;Atelier")
         self.assertContains(response, "Exact brand and scent identity match")
+        self.assertContains(
+            response,
+            reverse("prices:fragrantica_product_link", args=[source.pk]),
+        )
+        self.assertNotEqual(perfume.pk, self.perfume.pk)
+
+    def test_catalogue_linking_workbench_matches_compact_ampersand_brand(self):
+        brand = Brand.objects.create(name="Dolce & Gabbana")
+        perfume = Perfume.objects.create(
+            brand=brand,
+            name="Light Blue",
+            concentration="Eau de Toilette",
+            audience="Women",
+        )
+        source = FragranticaProduct.objects.create(
+            brand_name="Dolce&Gabbana",
+            normalized_brand_name="dolceandgabbana",
+            name="Light Blue Eau de Toilette",
+            normalized_name="light blue eau de toilette",
+            collection_name="Light Blue",
+            audience="Women",
+            source_path="/perfume/Dolce-Gabbana/Light-Blue-Eau-de-Toilette.html",
+        )
+
+        response = self.client.get(
+            reverse("prices:catalogue_linking_workbench"),
+            {"q": "light blue"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Dolce &amp; Gabbana / Light Blue")
+        self.assertContains(response, "Dolce&amp;Gabbana / Light Blue Eau de Toilette")
+        self.assertContains(response, "Exact brand, scent, and concentration match")
+        self.assertContains(
+            response,
+            reverse("prices:fragrantica_product_link", args=[source.pk]),
+        )
+        self.assertNotEqual(perfume.pk, self.perfume.pk)
+
+    def test_catalogue_linking_workbench_uses_brand_alias_for_fragrantica_brand(self):
+        brand = Brand.objects.create(name="Dolce & Gabbana")
+        BrandAlias.objects.create(
+            brand=brand,
+            alias_text="D&G",
+            normalized_alias="d&g",
+            active=True,
+        )
+        perfume = Perfume.objects.create(
+            brand=brand,
+            name="Light Blue",
+            concentration="Eau de Toilette",
+            audience="Women",
+        )
+        source = FragranticaProduct.objects.create(
+            brand_name="D&G",
+            normalized_brand_name="dandg",
+            name="Light Blue Eau de Toilette",
+            normalized_name="light blue eau de toilette",
+            collection_name="Light Blue",
+            audience="Women",
+            source_path="/perfume/Dolce-Gabbana/Light-Blue-Eau-de-Toilette.html",
+        )
+
+        response = self.client.get(
+            reverse("prices:catalogue_linking_workbench"),
+            {"q": "light blue"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Dolce &amp; Gabbana / Light Blue")
+        self.assertContains(response, "D&amp;G / Light Blue Eau de Toilette")
+        self.assertContains(response, "Exact brand, scent, and concentration match")
         self.assertContains(
             response,
             reverse("prices:fragrantica_product_link", args=[source.pk]),
@@ -9130,6 +9202,55 @@ class OurProductCatalogueListTests(TestCase):
         self.assertEqual(
             exact_payload["candidates"][0]["source_id"],
             matching_source.pk,
+        )
+
+    def test_catalogue_linking_prefers_explicit_concentration_match_over_generic(self):
+        brand = Brand.objects.create(name="Alfred Dunhill")
+        perfume = Perfume.objects.create(
+            brand=brand,
+            name="Driven",
+            concentration="Eau de Toilette",
+            collection_name="Driven",
+        )
+        generic_source = FragranticaProduct.objects.create(
+            brand_name="Alfred Dunhill",
+            normalized_brand_name="alfred dunhill",
+            name="Driven",
+            normalized_name="driven",
+            collection_name="Driven",
+            audience="Men",
+            release_year=2021,
+            source_path="/perfume/Alfred-Dunhill/Driven.html",
+        )
+        concentration_source = FragranticaProduct.objects.create(
+            brand_name="Alfred Dunhill",
+            normalized_brand_name="alfred dunhill",
+            name="Driven Eau de Toilette",
+            normalized_name="driven eau de toilette",
+            collection_name="Driven",
+            audience="Men",
+            release_year=2021,
+            source_path="/perfume/Alfred-Dunhill/Driven-Eau-de-Toilette.html",
+        )
+
+        response = self.client.get(
+            reverse("prices:catalogue_linking_candidates"),
+            {"perfume": perfume.pk, "min_score": "100"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(
+            payload["candidates"][0]["source_id"],
+            concentration_source.pk,
+        )
+        self.assertEqual(
+            payload["candidates"][0]["reason"],
+            "Exact brand, scent, and concentration match",
+        )
+        self.assertEqual(
+            payload["candidates"][1]["source_id"],
+            generic_source.pk,
         )
 
     def test_catalogue_linking_candidate_endpoint_returns_linked_state_only(self):

@@ -280,6 +280,7 @@
                                 <input type="hidden" name="perfume_id" value="{{ selected_row.perfume.pk }}">
                                 <input type="hidden" name="create_alias" value="{% if candidate.creates_alias %}1{% else %}0{% endif %}">
                                 <input type="hidden" name="apply_identity_group" value="1">
+                                <input type="hidden" name="update_name" value="0">
                                 {% if candidate.manual_review_reason %}
                                     <input type="hidden" name="manual_review_link" value="1">
                                 {% endif %}
@@ -301,6 +302,10 @@
                                     </span>
                                 </div>
                                 <div class="catalogue-linking-candidate-actions">
+                                    <label class="catalogue-linking-option">
+                                        <input type="checkbox" name="update_name" value="1" checked>
+                                        Use Fragrantica name
+                                    </label>
                                     <span class="score-badge score-badge--{% if candidate.score >= 95 %}success{% elif candidate.score >= 90 %}strong{% else %}warning{% endif %}">
                                         {% if candidate.manual_review_reason %}Review{% else %}{{ candidate.score }}{% endif %}
                                     </span>
