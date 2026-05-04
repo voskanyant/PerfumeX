@@ -16,7 +16,7 @@ from urllib.parse import urlencode
 import regex
 from django.core.paginator import Paginator
 from django.db import IntegrityError
-from django.db.models import Count, Q
+from django.db.models import Count, Q, Subquery
 from django.http import Http404
 from django.shortcuts import get_object_or_404
 from django.urls import reverse, reverse_lazy
@@ -2149,6 +2149,9 @@ def build_catalogue_linking_perfume_queryset(
             linked_fragrantica_count=0,
             reviewed_fragrantica_link_count=0,
         )
+    if _catalogue_linking_request_uses_strict_exact_filter(request):
+        exact_perfume_ids = _catalogue_linking_strict_exact_perfume_ids(queryset)
+        queryset = queryset.filter(pk__in=exact_perfume_ids)
     return queryset.order_by("brand__name", "collection_name", "name", "concentration")
 
 
@@ -2247,6 +2250,10 @@ def _catalogue_linking_sequence_slice(sequence, start: int, stop: int):
 
 
 def _catalogue_linking_lightweight_perfume_rows(sequence) -> list[dict]:
+    if getattr(sequence, "model", None) is CatalogPerfume:
+        sequence = CatalogPerfume.objects.filter(
+            pk__in=Subquery(sequence.values("pk"))
+        ).select_related("brand")
     if hasattr(sequence, "values"):
         return list(
             sequence.values(
@@ -2320,27 +2327,49 @@ def _catalogue_linking_strict_exact_perfume_ids(sequence) -> set[int]:
             normalized_brand_name__in=brand_keys,
             match_status=FragranticaProduct.STATUS_UNLINKED,
         )
-        .only("brand_name", "normalized_brand_name", "normalized_name")
+        .values_list("brand_name", "normalized_brand_name", "normalized_name", "name")
         .iterator(chunk_size=1000)
     )
-    for source in source_rows:
-        source_brand_ids = _source_brand_ids(
-            source,
-            brand_key_to_ids,
+    for (
+        source_brand_name,
+        source_normalized_brand_name,
+        source_normalized_name,
+        source_name,
+    ) in source_rows:
+        source_brand_ids = set()
+        for key in fragrance_match_key_variants(
+            source_brand_name,
+            source_normalized_brand_name,
             regex_preprocess_rules=regex_preprocess_rules,
-        )
+        ):
+            source_brand_ids.update(brand_key_to_ids.get(key, set()))
         if not source_brand_ids:
             continue
-        source_name = source.normalized_name or normalized_fragrance_key(
-            fragrantica_source_catalogue_name(source)
+        source_name_key = source_normalized_name or normalized_fragrance_key(
+            strip_leading_fragrantica_brand_name(source_brand_name, source_name)
         )
-        if not source_name:
+        if not source_name_key:
             continue
         for brand_id in source_brand_ids:
             matched_perfume_ids.update(
-                perfume_ids_by_brand_name.get((brand_id, source_name), set())
+                perfume_ids_by_brand_name.get((brand_id, source_name_key), set())
             )
     return matched_perfume_ids
+
+
+def _catalogue_linking_request_uses_strict_exact_filter(request) -> bool:
+    confidence_filter = normalize_catalogue_linking_confidence_filter(
+        request.GET.get("confidence")
+    )
+    suggestion_filter = normalize_catalogue_linking_suggestion_filter(
+        request.GET.get("suggestions")
+    )
+    status_filter = normalize_catalogue_linking_status(request.GET.get("status"))
+    return (
+        confidence_filter == "100"
+        and suggestion_filter in {"all", "with"}
+        and status_filter != "linked"
+    )
 
 
 def _build_catalogue_linking_strict_exact_page_rows(
@@ -2478,6 +2507,11 @@ def build_catalogue_linking_context(
             min_score=min_score,
             confidence_filter=confidence_filter,
             suggestion_filter=suggestion_filter,
+            max_scan_rows=(
+                page_obj.paginator.per_page
+                if _catalogue_linking_request_uses_strict_exact_filter(request)
+                else None
+            ),
         )
     else:
         visible_rows = build_catalogue_linking_rows(

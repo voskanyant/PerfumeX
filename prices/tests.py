@@ -9141,7 +9141,7 @@ class OurProductCatalogueListTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Ready Match 00")
-        self.assertContains(response, "5 shown / 45 visible")
+        self.assertContains(response, "5 shown / 5 visible")
         self.assertNotContains(response, "No Our Products rows match these filters.")
         self.assertNotContains(response, "No Suggestion 00")
 
@@ -9197,46 +9197,47 @@ class OurProductCatalogueListTests(TestCase):
             catalogue_linking_perfume_label(collection_perfume),
         )
         self.assertNotContains(response, catalogue_linking_perfume_label(quiet))
-        self.assertContains(response, "2 shown / 3 visible")
+        self.assertContains(response, "2 shown / 2 visible")
 
-    def test_catalogue_linking_strict_filter_uses_bounded_page_scan(self):
-        brand = Brand.objects.create(name="Bounded Strict Brand")
+    def test_catalogue_linking_strict_filter_prefilters_exact_matches_before_pagination(
+        self,
+    ):
+        brand = Brand.objects.create(name="Prefilter Strict Brand")
         for index in range(45):
             Perfume.objects.create(
                 brand=brand,
                 name=f"Quiet Scent {index:02d}",
                 concentration="Eau de Parfum",
             )
-        perfume = Perfume.objects.create(
-            brand=brand,
-            name="Ready Scent",
-            concentration="Eau de Parfum",
-        )
-        source = FragranticaProduct.objects.create(
-            brand_name="Bounded Strict Brand",
-            normalized_brand_name="bounded strict brand",
-            name="Ready Scent Eau de Parfum",
-            normalized_name="ready scent eau de parfum",
-            source_path="/perfume/Bounded-Strict-Brand/Ready-Scent.html",
-        )
-
-        with patch(
-            "prices.services.catalog_review._catalogue_linking_strict_exact_perfume_ids",
-            side_effect=AssertionError("global strict scan should not run"),
-        ):
-            response = self.client.get(
-                reverse("prices:catalogue_linking_workbench"),
-                {
-                    "brand": str(brand.pk),
-                    "status": "unlinked",
-                    "suggestions": "with",
-                    "confidence": "100",
-                },
+        for index in range(35):
+            name = f"Ready Scent {index:02d}"
+            Perfume.objects.create(
+                brand=brand,
+                name=name,
+                concentration="Eau de Parfum",
+            )
+            FragranticaProduct.objects.create(
+                brand_name="Prefilter Strict Brand",
+                normalized_brand_name="prefilter strict brand",
+                name=f"{name} Eau de Parfum",
+                normalized_name=f"{name.lower()} eau de parfum",
+                source_path=f"/perfume/Prefilter-Strict-Brand/Ready-Scent-{index}.html",
             )
 
+        response = self.client.get(
+            reverse("prices:catalogue_linking_workbench"),
+            {
+                "brand": str(brand.pk),
+                "status": "unlinked",
+                "suggestions": "with",
+                "confidence": "100",
+            },
+        )
+
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, catalogue_linking_perfume_label(perfume))
-        self.assertContains(response, source.name)
+        self.assertContains(response, "Ready Scent 00")
+        self.assertContains(response, "Ready Scent 34")
+        self.assertContains(response, "35 shown / 35 visible")
         self.assertNotContains(response, "Quiet Scent 00")
 
     def test_catalogue_linking_workbench_filters_visible_rows_by_confidence(self):
@@ -9284,7 +9285,7 @@ class OurProductCatalogueListTests(TestCase):
         )
         self.assertNotContains(exact_response, quiet.name)
         self.assertNotContains(exact_response, fuzzy_perfume.name)
-        self.assertContains(exact_response, "1 shown / 3 visible")
+        self.assertContains(exact_response, "1 shown / 1 visible")
         self.assertContains(exact_response, "data-linking-payload=")
         self.assertContains(exact_response, "&quot;candidates&quot;")
         self.assertContains(exact_response, "&quot;score&quot;:100")
