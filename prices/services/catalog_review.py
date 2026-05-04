@@ -25,6 +25,7 @@ from django.utils.http import url_has_allowed_host_and_scheme
 from assistant_linking.models import BrandAlias
 from assistant_linking.models import FragranticaProduct
 from assistant_linking.models import FragranticaProductLink
+from assistant_linking.models import normalized_fragrantica_product_name
 from assistant_linking.models import ParsedSupplierProduct
 from assistant_linking.models import ProductAlias
 from assistant_linking.models import TITLECASE_APOSTROPHE_SUFFIXES
@@ -1311,6 +1312,36 @@ def _perfumes_for_brand_ids(perfumes_by_brand_id: dict[int, list], brand_ids: se
         yield from perfumes_by_brand_id.get(brand_id, [])
 
 
+def _fragrantica_normalized_name_candidates_for_perfume(perfume) -> set[str]:
+    brand_name = getattr(getattr(perfume, "brand", None), "name", "")
+    names = {getattr(perfume, "name", "")}
+    collection_name = getattr(perfume, "collection_name", "") or ""
+    if collection_name:
+        names.add(f"{collection_name} {perfume.name}")
+
+    concentration_key = fragrance_concentration_identity_key(
+        getattr(perfume, "concentration", "")
+    )
+    concentration_terms = {
+        term
+        for term, canonical_key in FRAGRANCE_CONCENTRATION_TERM_KEYS.items()
+        if concentration_key and canonical_key == concentration_key
+    }
+    expanded_names = set(names)
+    for name in names:
+        for term in concentration_terms:
+            expanded_names.add(f"{name} {term}")
+
+    normalized_names: set[str] = set()
+    for name in expanded_names:
+        if not name:
+            continue
+        normalized_names.add(normalized_fragrantica_product_name(brand_name, name))
+        normalized_names.add(normalized_fragrance_key(name))
+    normalized_names.discard("")
+    return normalized_names
+
+
 def _product_alias_supports_fragrantica_source(
     source,
     perfume,
@@ -1786,11 +1817,29 @@ def build_catalogue_fragrantica_candidates_for_perfumes(
     if not brand_keys:
         return {perfume.id: [] for perfume in perfumes}
 
-    source_rows = list(
+    source_queryset = (
         fragrantica_manager.select_related("matched_perfume", "collection")
         .filter(normalized_brand_name__in=brand_keys)
         .exclude(match_status=FragranticaProduct.STATUS_IGNORED)
-        .order_by("match_status", "brand_name", "collection_name", "name", "id")
+    )
+    if min_score >= 100:
+        source_name_candidates = set()
+        for perfume in perfumes:
+            source_name_candidates.update(
+                _fragrantica_normalized_name_candidates_for_perfume(perfume)
+            )
+        if source_name_candidates:
+            source_queryset = source_queryset.filter(
+                normalized_name__in=source_name_candidates
+            )
+    source_rows = list(
+        source_queryset.order_by(
+            "match_status",
+            "brand_name",
+            "collection_name",
+            "name",
+            "id",
+        )
     )
     brand_ids = {perfume.brand_id for perfume in perfumes if perfume.brand_id}
     aliases = list(

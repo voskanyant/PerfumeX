@@ -52,6 +52,7 @@ from prices.services.background import run_in_background
 from prices.services.autoimport_status import (
     build_autoimport_scan_status as _build_autoimport_scan_status,
 )
+from prices.services.catalog_review import catalogue_linking_perfume_label
 from prices.services.import_scheduler import (
     build_cron_line as _build_cron_line,
     get_cron_status as _get_cron_status,
@@ -9030,6 +9031,60 @@ class OurProductCatalogueListTests(TestCase):
         self.assertContains(response, "5 shown / 45 visible")
         self.assertNotContains(response, "No Our Products rows match these filters.")
         self.assertNotContains(response, "No Suggestion 00")
+
+    def test_catalogue_linking_strict_filter_uses_exact_source_name_prefilter(self):
+        brand = Brand.objects.create(name="Strict Filter Brand")
+        perfume = Perfume.objects.create(
+            brand=brand,
+            name="Ambre Et Tonka",
+            concentration="Eau de Parfum",
+        )
+        collection_perfume = Perfume.objects.create(
+            brand=brand,
+            name="Arancia di Capri",
+            concentration="Eau de Toilette",
+            collection_name="Blu Mediterraneo",
+        )
+        quiet = Perfume.objects.create(
+            brand=brand,
+            name="Quiet Scent",
+            concentration="Eau de Parfum",
+        )
+        FragranticaProduct.objects.create(
+            brand_name="Strict Filter Brand",
+            name="Ambre Et Tonka Eau de Parfum",
+            source_path="/perfume/Strict-Filter-Brand/Ambre-Et-Tonka.html",
+        )
+        FragranticaProduct.objects.create(
+            brand_name="Strict Filter Brand",
+            name="Blu Mediterraneo Arancia di Capri Eau de Toilette",
+            collection_name="Blu Mediterraneo",
+            source_path="/perfume/Strict-Filter-Brand/Arancia-di-Capri.html",
+        )
+        FragranticaProduct.objects.create(
+            brand_name="Strict Filter Brand",
+            name="Unrelated Eau de Parfum",
+            source_path="/perfume/Strict-Filter-Brand/Unrelated.html",
+        )
+
+        response = self.client.get(
+            reverse("prices:catalogue_linking_workbench"),
+            {
+                "brand": str(brand.pk),
+                "status": "unlinked",
+                "suggestions": "with",
+                "confidence": "100",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, catalogue_linking_perfume_label(perfume))
+        self.assertContains(
+            response,
+            catalogue_linking_perfume_label(collection_perfume),
+        )
+        self.assertNotContains(response, catalogue_linking_perfume_label(quiet))
+        self.assertContains(response, "2 shown / 3 visible")
 
     def test_catalogue_linking_workbench_filters_visible_rows_by_confidence(self):
         FragranticaProduct.objects.create(
