@@ -98,11 +98,11 @@
                                     {% if variant.perfume.collection_name %}
                                         <span><span>Collection</span>{{ variant.perfume.collection_name }}</span>
                                     {% endif %}
-                                    {% if variant.perfume.audience %}
-                                        <span><span>Audience</span>{{ variant.perfume.audience }}</span>
-                                    {% endif %}
                                     {% if variant.perfume.release_year %}
                                         <span><span>Year</span>{{ variant.perfume.release_year }}</span>
+                                    {% endif %}
+                                    {% if variant.perfume.audience %}
+                                        <span><span>Audience</span>{{ variant.perfume.audience }}</span>
                                     {% endif %}
                                 </div>
                             {% endif %}
@@ -110,7 +110,7 @@
                                 <div class="fragrantica-linked-inline"
                                      aria-label="Linked Fragrantica">
                                     {% for source in variant.fragrantica_linked_sources %}
-                                        <span>Linked Fragrantica: {{ source.brand_name }} / {{ source.catalogue_display_name }}{% if source.collection_name %} / {{ source.collection_name }}{% endif %}{% if source.audience %} / {{ source.audience }}{% endif %}{% if source.release_year %} / {{ source.release_year }}{% endif %}</span>
+                                        <span>Linked Fragrantica: {{ source.brand_name }} / {{ source.catalogue_display_name }}{% if source.collection_name %} / {{ source.collection_name }}{% endif %}{% if source.release_year %} / {{ source.release_year }}{% endif %}{% if source.audience %} / {{ source.audience }}{% endif %}</span>
                                     {% endfor %}
                                 </div>
                             {% elif variant.fragrantica_candidates %}
@@ -151,6 +151,7 @@
                                                         name="create_alias"
                                                         value="{% if candidate.creates_alias %}1{% else %}0{% endif %}"
                                                         formaction="{% url 'prices:fragrantica_product_link' candidate.source.pk %}"
+                                                        data-fragrantica-link-submit
                                                         title="{{ candidate.reason }}">Link</button>
                                             {% endif %}
                                         </div>

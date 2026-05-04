@@ -274,7 +274,8 @@
                         {% for candidate in selected_row.candidates %}
                             <form method="post"
                                   action="{% url 'prices:fragrantica_product_link' candidate.source.pk %}"
-                                  class="catalogue-linking-candidate">
+                                  class="catalogue-linking-candidate"
+                                  data-fragrantica-link-form>
                                 {% csrf_token %}
                                 <input type="hidden" name="next" value="{{ request.get_full_path }}">
                                 <input type="hidden" name="perfume_id" value="{{ selected_row.perfume.pk }}">
@@ -319,7 +320,9 @@
                                         <a class="button secondary"
                                            href="{% url 'prices:fragrantica_product_review' %}?q={{ candidate.source.name|urlencode }}">Linked</a>
                                     {% else %}
-                                        <button class="button primary" type="submit">Link</button>
+                                        <button class="button primary"
+                                                type="submit"
+                                                data-fragrantica-link-submit>Link</button>
                                     {% endif %}
                                 </div>
                             </form>

@@ -1426,8 +1426,8 @@ select:focus {
   box-shadow: inset 2px 0 0 var(--black);
 }
 .our-products-card.is-linked {
-  background: #f7fbf8;
-  box-shadow: inset 2px 0 0 #2f7d46;
+  background: transparent;
+  box-shadow: none;
 }
 .our-products-card .catalogue-row-form {
   display: block;

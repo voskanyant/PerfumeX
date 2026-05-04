@@ -78,6 +78,7 @@
         form.method = "post";
         form.action = candidate.link_url;
         form.className = "catalogue-linking-candidate";
+        form.setAttribute("data-fragrantica-link-form", "1");
 
         appendHidden(form, "csrfmiddlewaretoken", csrfToken());
         appendHidden(form, "next", panel.getAttribute("data-next-url") || window.location.pathname);
@@ -140,6 +141,7 @@
             var button = document.createElement("button");
             button.className = "button primary";
             button.type = "submit";
+            button.setAttribute("data-fragrantica-link-submit", "1");
             button.textContent = "Link";
             actions.appendChild(button);
         }
@@ -233,6 +235,86 @@
         }
     }
 
+    function linkingPayloadFromResponse(data) {
+        return {
+            selected: data.selected,
+            linked_sources: data.linked_source ? [data.linked_source] : [],
+            candidates: []
+        };
+    }
+
+    function updateRowAfterLink(data) {
+        if (!data || !data.selected || !data.linked_source) return;
+        var row = rows.find(function (item) {
+            return item.getAttribute("data-perfume-id") === String(data.selected.id);
+        });
+        if (!row) return;
+        var payload = linkingPayloadFromResponse(data);
+        row.classList.add("is-linked");
+        row.removeAttribute("data-catalogue-link-pair");
+        row.setAttribute("data-linking-payload", JSON.stringify(payload));
+
+        var title = row.querySelector(".catalogue-linking-row-title");
+        if (title) {
+            title.textContent = data.selected.label;
+        }
+
+        var suggestion = row.querySelector(".catalogue-linking-row-suggestion");
+        if (!suggestion) return;
+        clearNode(suggestion);
+        suggestion.classList.add("catalogue-linking-row-linked");
+        var badge = document.createElement("span");
+        badge.className = "score-badge score-badge--success";
+        badge.textContent = "Linked";
+        suggestion.appendChild(badge);
+        suggestion.appendChild(document.createTextNode(data.linked_source.label));
+    }
+
+    function setSubmitterBusy(button, busy) {
+        if (!button) return;
+        if (busy) {
+            button.dataset.originalText = button.textContent || "";
+            button.disabled = true;
+            button.textContent = "Linking...";
+            return;
+        }
+        button.disabled = false;
+        button.textContent = button.dataset.originalText || "Link";
+    }
+
+    function submitFragranticaLink(form, submitter) {
+        var action = (submitter && submitter.formAction) || form.action;
+        if (!action) return;
+        var formData = new FormData(form);
+        if (submitter && submitter.name) {
+            formData.append(submitter.name, submitter.value || "");
+        }
+        setSubmitterBusy(submitter, true);
+        fetch(action, {
+            method: "POST",
+            body: formData,
+            headers: { "X-Requested-With": "XMLHttpRequest" }
+        })
+            .then(function (response) {
+                return response.json().then(function (data) {
+                    if (!response.ok || !data.ok) throw data;
+                    return data;
+                });
+            })
+            .then(function (data) {
+                var payload = linkingPayloadFromResponse(data);
+                updateRowAfterLink(data);
+                renderPayload(payload);
+            })
+            .catch(function (data) {
+                renderEmpty((data && data.message) || "Link failed. Reload and try again.");
+            })
+            .finally(function () {
+                delete form.dataset.noSubmitDisable;
+                setSubmitterBusy(submitter, false);
+            });
+    }
+
     function selectRow(row) {
         rows.forEach(function (item) {
             item.classList.toggle("is-selected", item === row);
@@ -259,6 +341,15 @@
                 renderEmpty("Reload the page or loosen the confidence filter.");
             });
     }
+
+    candidatesNode.addEventListener("submit", function (event) {
+        var form = event.target;
+        if (!(form instanceof HTMLFormElement) || !form.matches("[data-fragrantica-link-form]")) return;
+        event.preventDefault();
+        event.stopPropagation();
+        form.dataset.noSubmitDisable = "1";
+        submitFragranticaLink(form, event.submitter);
+    });
 
     if (selectionRoot) {
         selectionRoot.addEventListener("catalogue-selection:row-selected", function (event) {

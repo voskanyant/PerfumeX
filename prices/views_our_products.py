@@ -11,6 +11,7 @@ from catalog.models import PerfumeVariant as CatalogPerfumeVariant
 
 from . import forms, models
 from .services.catalog_review import (
+    build_fragrantica_catalogue_link_response_payload,
     build_catalogue_linking_candidate_payload,
     build_catalogue_linking_context,
     build_catalogue_linking_perfume_queryset,
@@ -70,6 +71,16 @@ class FragranticaProductLinkView(LoginRequiredMixin, View):
             request.POST,
             host=request.get_host(),
         )
+        if request.headers.get("x-requested-with") == "XMLHttpRequest":
+            payload = build_fragrantica_catalogue_link_response_payload(
+                result,
+                source_id=pk,
+                perfume_id=request.POST.get("perfume_id"),
+            )
+            return JsonResponse(
+                payload,
+                status=200 if payload["ok"] else 400,
+            )
         getattr(messages, result.level)(request, result.message)
         return redirect(result.redirect_url)
 

@@ -1949,6 +1949,40 @@ def catalogue_linking_row_payload_json(row: dict) -> str:
     return json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
 
 
+def build_fragrantica_catalogue_link_response_payload(
+    result: FragranticaCatalogueLinkResult,
+    *,
+    source_id,
+    perfume_id,
+    source_manager=None,
+    perfume_manager=None,
+) -> dict:
+    payload = {
+        "ok": result.level != "error",
+        "level": result.level,
+        "message": result.message,
+        "redirect_url": result.redirect_url,
+    }
+    if not source_id or not perfume_id:
+        return payload
+
+    source_manager = source_manager or FragranticaProduct.objects
+    perfume_manager = perfume_manager or CatalogPerfume.objects
+    try:
+        source = source_manager.get(pk=source_id)
+        perfume = perfume_manager.select_related("brand").get(pk=perfume_id)
+    except (FragranticaProduct.DoesNotExist, CatalogPerfume.DoesNotExist, ValueError):
+        return payload
+
+    payload.update(
+        {
+            "selected": serialize_catalogue_linking_selected_perfume(perfume),
+            "linked_source": serialize_catalogue_linking_source(source),
+        }
+    )
+    return payload
+
+
 def build_catalogue_linking_perfume_queryset(
     request,
     *,

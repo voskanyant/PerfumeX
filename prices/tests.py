@@ -8095,7 +8095,7 @@ class OurProductCatalogueListTests(TestCase):
         self.assertContains(response, "Linked Fragrantica:")
         self.assertContains(
             response,
-            "Montale / Vanilla Extasy / Fragrantica Collection / Women / 2008",
+            "Montale / Vanilla Extasy / Fragrantica Collection / 2008 / Women",
         )
         self.assertContains(response, "Fragrantica Collection")
         self.assertContains(response, "Linked")
@@ -9816,6 +9816,41 @@ class OurProductCatalogueListTests(TestCase):
             ).count(),
             1,
         )
+
+    def test_staff_can_link_fragrantica_row_without_full_page_redirect(self):
+        source = FragranticaProduct.objects.create(
+            brand_name="Montale",
+            normalized_brand_name="montale",
+            name="Vanilla Extasy Source",
+            normalized_name="vanilla extasy source",
+            collection_name="Fragrantica Collection",
+            audience="Women",
+            release_year=2008,
+            source_path="/perfume/Montale/Vanilla-Extasy-1.html",
+        )
+
+        response = self.client.post(
+            reverse("prices:fragrantica_product_link", args=[source.pk]),
+            {
+                "perfume_id": self.perfume.pk,
+                "next": reverse("prices:catalogue_linking_workbench"),
+                "apply_identity_group": "1",
+                "update_name": "0",
+            },
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        source.refresh_from_db()
+        self.perfume.refresh_from_db()
+        self.assertTrue(payload["ok"])
+        self.assertEqual(source.matched_perfume, self.perfume)
+        self.assertEqual(source.match_status, FragranticaProduct.STATUS_LINKED)
+        self.assertEqual(payload["selected"]["id"], self.perfume.pk)
+        self.assertEqual(payload["linked_source"]["source_id"], source.pk)
+        self.assertEqual(payload["linked_source"]["collection"], "Fragrantica Collection")
+        self.assertEqual(self.perfume.name, "Vanilla Extasy")
 
     def test_our_products_search_matches_multi_word_scent(self):
         clive = Brand.objects.create(name="Clive Christian")
