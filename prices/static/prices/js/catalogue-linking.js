@@ -127,13 +127,7 @@
             actions.appendChild(open);
         }
 
-        if (candidate.manual_review_reason) {
-            var manual = document.createElement("a");
-            manual.className = "button secondary";
-            manual.href = candidate.review_url || "#";
-            manual.textContent = "Review manually";
-            actions.appendChild(manual);
-        } else if (candidate.match_status === "linked") {
+        if (candidate.match_status === "linked") {
             var linked = document.createElement("a");
             linked.className = "button secondary";
             linked.href = candidate.review_url || "#";

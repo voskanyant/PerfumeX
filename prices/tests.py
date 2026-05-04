@@ -8533,6 +8533,40 @@ class OurProductCatalogueListTests(TestCase):
             [candidate.perfume for candidate in choices[femme_source.pk]],
         )
 
+    def test_fragrantica_review_suggestions_score_only_resolved_source_brand(self):
+        from prices.services.catalog_review import build_fragrantica_candidate_choices
+
+        montale = Brand.objects.create(name="Performance Brand A")
+        other_brand = Brand.objects.create(name="Performance Other A")
+        montale_perfume = Perfume.objects.create(
+            brand=montale,
+            name="Vanilla Extasy",
+            concentration="Eau de Parfum",
+        )
+        other_perfume = Perfume.objects.create(
+            brand=other_brand,
+            name="Vanilla Extasy",
+            concentration="Eau de Parfum",
+        )
+        source = FragranticaProduct.objects.create(
+            brand_name="Performance Brand A",
+            normalized_brand_name="performance brand a",
+            name="Vanilla Extasy",
+            normalized_name="vanilla extasy",
+            source_path="/perfume/Performance-Brand-A/Vanilla-Extasy-1.html",
+        )
+
+        with patch(
+            "prices.services.catalog_review._fragrantica_perfume_candidate_score",
+            return_value=(100, "Mock match"),
+        ) as scorer:
+            choices = build_fragrantica_candidate_choices([source])
+
+        self.assertEqual(choices[source.pk][0].perfume, montale_perfume)
+        scored_perfumes = [call_args.args[1] for call_args in scorer.call_args_list]
+        self.assertEqual(scored_perfumes, [montale_perfume])
+        self.assertNotIn(other_perfume, scored_perfumes)
+
     def test_fragrantica_products_treats_et_and_ampersand_as_identity_connectors(
         self,
     ):
@@ -8727,6 +8761,45 @@ class OurProductCatalogueListTests(TestCase):
         )
         self.assertNotContains(strict_response, "Similar same-brand scent name")
 
+    def test_catalogue_linking_scores_only_resolved_source_brand(self):
+        from prices.services.catalog_review import (
+            build_catalogue_fragrantica_candidates_for_perfumes,
+        )
+
+        montale = Brand.objects.create(name="Performance Brand B")
+        other_brand = Brand.objects.create(name="Performance Other B")
+        montale_perfume = Perfume.objects.create(
+            brand=montale,
+            name="Vanilla Extasy",
+            concentration="Eau de Parfum",
+        )
+        other_perfume = Perfume.objects.create(
+            brand=other_brand,
+            name="Vanilla Extasy",
+            concentration="Eau de Parfum",
+        )
+        FragranticaProduct.objects.create(
+            brand_name="Performance Brand B",
+            normalized_brand_name="performance brand b",
+            name="Vanilla Extasy",
+            normalized_name="vanilla extasy",
+            source_path="/perfume/Performance-Brand-B/Vanilla-Extasy-1.html",
+        )
+
+        with patch(
+            "prices.services.catalog_review._fragrantica_perfume_candidate_score",
+            return_value=(100, "Mock match"),
+        ) as scorer:
+            candidate_map = build_catalogue_fragrantica_candidates_for_perfumes(
+                [montale_perfume, other_perfume],
+                min_score=80,
+            )
+
+        self.assertEqual(candidate_map[montale_perfume.pk][0].score, 100)
+        self.assertEqual(candidate_map[other_perfume.pk], [])
+        scored_perfumes = [call_args.args[1] for call_args in scorer.call_args_list]
+        self.assertEqual(scored_perfumes, [montale_perfume])
+
     def test_catalogue_linking_workbench_lists_two_column_suggestions(self):
         self.perfume.audience = "Women"
         self.perfume.release_year = 2008
@@ -8901,6 +8974,62 @@ class OurProductCatalogueListTests(TestCase):
         self.assertContains(lower_response, "100 Bon / Ambre Et Tonka")
         self.assertNotContains(lower_response, quiet.name)
         self.assertContains(lower_response, "2 shown / 3 visible")
+
+    def test_catalogue_linking_workbench_filters_manual_review_separately(self):
+        brand = Brand.objects.create(name="Manual Review Brand")
+        Perfume.objects.create(
+            brand=brand,
+            name="Shared Mirage",
+            concentration="Eau de Parfum",
+        )
+        Perfume.objects.create(
+            brand=brand,
+            name="Shared Mirage",
+            concentration="Eau de Toilette",
+        )
+        source = FragranticaProduct.objects.create(
+            brand_name="Manual Review Brand",
+            normalized_brand_name="manual review brand",
+            name="Shared Mirage",
+            normalized_name="shared mirage",
+            source_path="/perfume/Manual-Review-Brand/Shared-Mirage.html",
+        )
+
+        exact_response = self.client.get(
+            reverse("prices:catalogue_linking_workbench"),
+            {
+                "brand": str(brand.pk),
+                "suggestions": "with",
+                "confidence": "100",
+            },
+        )
+        review_response = self.client.get(
+            reverse("prices:catalogue_linking_workbench"),
+            {
+                "brand": str(brand.pk),
+                "suggestions": "with",
+                "confidence": "review",
+            },
+        )
+
+        self.assertEqual(exact_response.status_code, 200)
+        self.assertNotContains(exact_response, "Shared Mirage")
+
+        self.assertEqual(review_response.status_code, 200)
+        self.assertContains(review_response, "Needs review")
+        self.assertContains(review_response, "Shared Mirage")
+        self.assertContains(
+            review_response,
+            "Manual review: same Fragrantica row is an equal top match",
+        )
+        self.assertContains(
+            review_response,
+            reverse("prices:fragrantica_product_link", args=[source.pk]),
+        )
+        self.assertContains(
+            review_response, '<button class="button primary" type="submit">Link</button>'
+        )
+        self.assertNotContains(review_response, "Review manually")
 
     def test_catalogue_linking_candidate_endpoint_returns_fragrantica_matches(self):
         self.perfume.audience = "Women"

@@ -54,6 +54,7 @@
                     <option value="90" {% if confidence_filter == "90" %}selected{% endif %}>90+</option>
                     <option value="80" {% if confidence_filter == "80" %}selected{% endif %}>80+</option>
                     <option value="0" {% if confidence_filter == "0" %}selected{% endif %}>Any suggestion</option>
+                    <option value="review" {% if confidence_filter == "review" %}selected{% endif %}>Needs review</option>
                 </select>
             </label>
             <button class="button ghost" type="submit">Apply filters</button>
@@ -305,10 +306,7 @@
                                            target="_blank"
                                            rel="noopener">Open</a>
                                     {% endif %}
-                                    {% if candidate.manual_review_reason %}
-                                        <a class="button secondary"
-                                           href="{% url 'prices:fragrantica_product_review' %}?q={{ candidate.source.name|urlencode }}">Review manually</a>
-                                    {% elif candidate.source.match_status == "linked" %}
+                                    {% if candidate.source.match_status == "linked" %}
                                         <a class="button secondary"
                                            href="{% url 'prices:fragrantica_product_review' %}?q={{ candidate.source.name|urlencode }}">Linked</a>
                                     {% else %}

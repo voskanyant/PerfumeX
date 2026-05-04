@@ -62,7 +62,7 @@ ROMAN_NUMERAL_RE = re.compile(r"^[IVXLCDM]+$")
 TITLE_WORD_RE = re.compile(r"[A-Za-zÀ-ÖØ-öø-ÿ]+(?:'[A-Za-zÀ-ÖØ-öø-ÿ]+)?")
 CATALOGUE_LINKING_STATUSES = {"all", "unlinked", "linked"}
 CATALOGUE_LINKING_SUGGESTION_FILTERS = {"all", "with", "without"}
-CATALOGUE_LINKING_CONFIDENCE_FILTERS = {"all", "0", "80", "90", "95", "100"}
+CATALOGUE_LINKING_CONFIDENCE_FILTERS = {"all", "review", "0", "80", "90", "95", "100"}
 CATALOG_VARIANT_SEARCH_FIELDS = (
     "perfume__name",
     "perfume__brand__name",
@@ -1139,6 +1139,78 @@ def _source_brand_ids(
     return brand_ids
 
 
+def _fragrantica_source_brand_keys(
+    source,
+    regex_preprocess_rules: tuple[tuple[str, str], ...] = (),
+) -> set[str]:
+    return {
+        key
+        for key in fragrance_match_key_variants(
+            getattr(source, "brand_name", ""),
+            getattr(source, "normalized_brand_name", ""),
+            regex_preprocess_rules=regex_preprocess_rules,
+        )
+        if key
+    }
+
+
+def _build_fragrantica_source_brand_id_map(
+    sources,
+    *,
+    brand_manager=None,
+    brand_alias_manager=None,
+    regex_preprocess_rules: tuple[tuple[str, str], ...] = (),
+) -> dict[str, set[int]]:
+    source_keys = set()
+    for source in sources:
+        source_keys.update(
+            _fragrantica_source_brand_keys(
+                source,
+                regex_preprocess_rules=regex_preprocess_rules,
+            )
+        )
+    if not source_keys:
+        return {}
+
+    brand_key_to_ids: dict[str, set[int]] = defaultdict(set)
+    brand_manager = brand_manager or CatalogBrand.objects
+    brands = brand_manager.all()
+    if hasattr(brands, "only"):
+        brands = brands.only("id", "name")
+    for brand in brands:
+        matching_keys = source_keys & fragrance_match_key_variants(
+            getattr(brand, "name", ""),
+            regex_preprocess_rules=regex_preprocess_rules,
+        )
+        for key in matching_keys:
+            brand_key_to_ids[key].add(brand.id)
+
+    brand_alias_manager = brand_alias_manager or BrandAlias.objects
+    for alias in brand_alias_manager.filter(active=True):
+        matching_keys = source_keys & fragrance_match_key_variants(
+            alias.normalized_alias or alias.alias_text,
+            alias.alias_text,
+            regex_preprocess_rules=regex_preprocess_rules,
+        )
+        for key in matching_keys:
+            brand_key_to_ids[key].add(alias.brand_id)
+    return brand_key_to_ids
+
+
+def _group_perfumes_by_brand_id(perfumes) -> dict[int, list]:
+    grouped: dict[int, list] = defaultdict(list)
+    for perfume in perfumes:
+        brand_id = getattr(perfume, "brand_id", None)
+        if brand_id:
+            grouped[brand_id].append(perfume)
+    return grouped
+
+
+def _perfumes_for_brand_ids(perfumes_by_brand_id: dict[int, list], brand_ids: set[int]):
+    for brand_id in sorted(brand_ids):
+        yield from perfumes_by_brand_id.get(brand_id, [])
+
+
 def _product_alias_supports_fragrantica_source(
     source,
     perfume,
@@ -1414,10 +1486,12 @@ def build_fragrantica_candidate_choices(
     fragrantica_rows,
     *,
     perfume_manager=None,
+    brand_manager=None,
     brand_alias_manager=None,
     product_alias_manager=None,
     limit: int = 4,
 ) -> dict:
+    provided_perfume_manager = perfume_manager is not None
     perfume_manager = perfume_manager or CatalogPerfume.objects
     product_alias_manager = product_alias_manager or ProductAlias.objects
     fragrantica_rows = list(fragrantica_rows)
@@ -1425,10 +1499,27 @@ def build_fragrantica_candidate_choices(
         return {}
     candidates = perfume_manager.select_related("brand").filter(name__isnull=False)
     candidates = candidates.filter(brand__name__isnull=False)
+    if not provided_perfume_manager:
+        regex_preprocess_rules = get_regex_preprocess_rules()
+        source_brand_key_to_ids = _build_fragrantica_source_brand_id_map(
+            fragrantica_rows,
+            brand_manager=brand_manager,
+            brand_alias_manager=brand_alias_manager,
+            regex_preprocess_rules=regex_preprocess_rules,
+        )
+        source_brand_ids = {
+            brand_id
+            for brand_ids in source_brand_key_to_ids.values()
+            for brand_id in brand_ids
+        }
+        if not source_brand_ids:
+            return {}
+        candidates = candidates.filter(brand_id__in=source_brand_ids)
     perfumes = list(candidates)
     if not perfumes:
         return {}
-    regex_preprocess_rules = get_regex_preprocess_rules()
+    if provided_perfume_manager:
+        regex_preprocess_rules = get_regex_preprocess_rules()
     brand_key_to_ids = _build_fragrantica_brand_id_map(
         perfumes,
         brand_alias_manager=brand_alias_manager,
@@ -1444,6 +1535,7 @@ def build_fragrantica_candidate_choices(
     for alias in aliases:
         aliases_by_brand_id[getattr(alias, "brand_id", None)].append(alias)
 
+    perfumes_by_brand_id = _group_perfumes_by_brand_id(perfumes)
     candidate_choices: dict[object, list[FragranticaPerfumeCandidate]] = {}
     for source in fragrantica_rows:
         source_brand_ids = _source_brand_ids(
@@ -1454,9 +1546,7 @@ def build_fragrantica_candidate_choices(
         if not source_brand_ids:
             continue
         scored_candidates = []
-        for perfume in perfumes:
-            if perfume.brand_id not in source_brand_ids:
-                continue
+        for perfume in _perfumes_for_brand_ids(perfumes_by_brand_id, source_brand_ids):
             if not fragrantica_source_is_available_for_perfume(source, perfume):
                 continue
             candidate_aliases = aliases_by_brand_id.get(
@@ -1607,6 +1697,7 @@ def build_catalogue_fragrantica_candidates_for_perfumes(
     for alias in aliases:
         aliases_by_brand_id[getattr(alias, "brand_id", None)].append(alias)
 
+    perfumes_by_brand_id = _group_perfumes_by_brand_id(perfumes)
     candidates_by_perfume: dict[int, dict[int, FragranticaMatchCandidate]] = {
         perfume.id: {} for perfume in perfumes
     }
@@ -1618,9 +1709,7 @@ def build_catalogue_fragrantica_candidates_for_perfumes(
         )
         if not source_brand_ids:
             continue
-        for perfume in perfumes:
-            if perfume.brand_id not in source_brand_ids:
-                continue
+        for perfume in _perfumes_for_brand_ids(perfumes_by_brand_id, source_brand_ids):
             if not fragrantica_source_is_available_for_perfume(source, perfume):
                 continue
             candidate_aliases = aliases_by_brand_id.get(
@@ -1858,11 +1947,18 @@ def filter_catalogue_linking_rows_by_confidence(
 ) -> list[dict]:
     if confidence_filter == "all":
         return rows
+    if confidence_filter == "review":
+        return [
+            row
+            for row in rows
+            if row["top_candidate"] and row["top_candidate"].manual_review_reason
+        ]
     min_score = normalize_catalogue_linking_min_score(confidence_filter)
     return [
         row
         for row in rows
         if row["top_candidate"] and row["top_candidate"].score >= min_score
+        and not row["top_candidate"].manual_review_reason
     ]
 
 
