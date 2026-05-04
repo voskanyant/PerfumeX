@@ -1461,9 +1461,37 @@ select:focus {
   padding-top: 5px;
 }
 .catalogue-row-check input[type=checkbox] {
-  width: 15px;
-  height: 15px;
+  position: relative;
+  width: 16px;
+  height: 16px;
   margin: 0;
+  border: 1.5px solid var(--grey-400);
+  border-radius: 4px;
+  appearance: none;
+  background: var(--white);
+  cursor: pointer;
+}
+.catalogue-row-check input[type=checkbox]:hover {
+  border-color: var(--grey-700);
+}
+.catalogue-row-check input[type=checkbox]:focus-visible {
+  outline: 2px solid var(--black);
+  outline-offset: 3px;
+}
+.catalogue-row-check input[type=checkbox]:checked {
+  border-color: var(--black);
+  background: var(--black);
+}
+.catalogue-row-check input[type=checkbox]:checked::after {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: 1px;
+  width: 5px;
+  height: 9px;
+  border: solid var(--white);
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
 }
 .our-products-full-name {
   display: flex;
@@ -1826,8 +1854,44 @@ select:focus {
 .fragrantica-match-panel {
   display: grid;
   gap: 8px;
-  margin-top: 12px;
+  margin-top: 7px;
   max-width: 920px;
+}
+.fragrantica-match-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  max-width: 100%;
+  color: var(--grey-600);
+  cursor: pointer;
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  line-height: 1.35;
+  list-style: none;
+  text-transform: uppercase;
+}
+.fragrantica-match-toggle::-webkit-details-marker {
+  display: none;
+}
+.fragrantica-match-toggle::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(-45deg);
+  transition: transform var(--transition);
+}
+.fragrantica-match-panel[open] .fragrantica-match-toggle::before {
+  transform: rotate(45deg);
+}
+.fragrantica-match-toggle:hover {
+  color: var(--black);
+}
+.fragrantica-match-toggle:focus-visible {
+  outline: 2px solid var(--black);
+  outline-offset: 3px;
 }
 .fragrantica-linked-inline {
   display: grid;

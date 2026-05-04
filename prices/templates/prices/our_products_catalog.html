@@ -114,8 +114,11 @@
                                     {% endfor %}
                                 </div>
                             {% elif variant.fragrantica_candidates %}
-                                <div class="fragrantica-match-panel"
-                                     aria-label="Suggested Fragrantica matches">
+                                <details class="fragrantica-match-panel"
+                                         aria-label="Suggested Fragrantica matches">
+                                    <summary class="fragrantica-match-toggle">
+                                        <span>{{ variant.fragrantica_candidates|length }} Fragrantica suggestion{{ variant.fragrantica_candidates|length|pluralize }}</span>
+                                    </summary>
                                     <div class="fragrantica-match-panel-head">
                                         <span>Suggested Fragrantica matches</span>
                                         <div class="fragrantica-match-head-actions">
@@ -156,7 +159,7 @@
                                             {% endif %}
                                         </div>
                                     {% endfor %}
-                                </div>
+                                </details>
                             {% endif %}
                         </div>
                         <div class="layout-inline gap-sm">
