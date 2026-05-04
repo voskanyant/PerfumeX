@@ -1913,9 +1913,9 @@ select:focus {
   grid-template-columns: minmax(0, 1.05fr) minmax(360px, 0.95fr);
   gap: 16px;
   align-items: stretch;
-  min-height: 820px;
-  height: clamp(820px, calc(100vh - 96px), 1180px);
-  height: clamp(820px, calc(100dvh - 96px), 1180px);
+  min-height: 1080px;
+  height: max(1080px, calc(100vh - 96px));
+  height: max(1080px, calc(100dvh - 96px));
 }
 .catalogue-linking-panel {
   min-width: 0;
@@ -2000,6 +2000,7 @@ select:focus {
 }
 .catalogue-linking-list {
   display: grid;
+  align-content: start;
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
@@ -2082,6 +2083,7 @@ select:focus {
 }
 .catalogue-linking-candidates {
   display: grid;
+  align-content: start;
   flex: 1 1 auto;
   gap: 10px;
   min-height: 0;
