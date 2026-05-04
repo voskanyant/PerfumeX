@@ -9,13 +9,15 @@ from django.db import transaction
 from django.utils import timezone
 
 from assistant_linking.models import FragranticaProduct
+from assistant_linking.models import FragranticaProductLink
 from assistant_linking.utils.text import normalize_alias_value
 from catalog.models import Brand, Perfume, get_or_create_collection
 from prices.services.catalog_review import apply_fragrantica_identity_to_perfume
 from prices.services.catalog_review import normalize_catalogue_collection_name
 
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
+SUPPORTED_SCHEMA_VERSIONS = {1, 2}
 
 
 @dataclass
@@ -101,9 +103,39 @@ def build_fragrantica_catalogue_link_export(
         {
             "fragrantica": _source_payload(source),
             "target": _target_payload(source.matched_perfume),
+            "link_type": FragranticaProductLink.LINK_TYPE_PRIMARY,
         }
         for source in queryset
     ]
+    source_ids = [source.id for source in queryset]
+    extra_links = (
+        FragranticaProductLink.objects.select_related(
+            "source",
+            "source__matched_perfume",
+            "perfume",
+            "perfume__brand",
+        )
+        .filter(
+            source_id__in=source_ids,
+            link_type=FragranticaProductLink.LINK_TYPE_MANUAL_EXTRA,
+        )
+        .order_by(
+            "source__brand_name",
+            "source__collection_name",
+            "source__name",
+            "perfume__brand__name",
+            "perfume__name",
+            "perfume__concentration",
+        )
+    )
+    rows.extend(
+        {
+            "fragrantica": _source_payload(link.source),
+            "target": _target_payload(link.perfume),
+            "link_type": FragranticaProductLink.LINK_TYPE_MANUAL_EXTRA,
+        }
+        for link in extra_links
+    )
     return {
         "schema_version": SCHEMA_VERSION,
         "kind": "perfumex.fragrantica_catalogue_links",
@@ -135,7 +167,7 @@ def write_fragrantica_catalogue_link_export(
 
 def load_fragrantica_catalogue_link_export(path: str | Path) -> dict[str, Any]:
     bundle = json.loads(Path(path).read_text(encoding="utf-8"))
-    if bundle.get("schema_version") != SCHEMA_VERSION:
+    if bundle.get("schema_version") not in SUPPORTED_SCHEMA_VERSIONS:
         raise ValueError(
             f"Unsupported Fragrantica catalogue link export schema: "
             f"{bundle.get('schema_version')!r}"
@@ -192,6 +224,8 @@ def _resolve_target_perfume(
 def _upsert_fragrantica_source(
     source_payload: dict[str, Any],
     target_perfume: Perfume,
+    *,
+    set_primary_link: bool = True,
 ) -> tuple[FragranticaProduct, bool, bool]:
     normalized_brand = source_payload.get(
         "normalized_brand_name"
@@ -211,7 +245,7 @@ def _upsert_fragrantica_source(
             "release_year": source_payload.get("release_year"),
             "source_url": source_payload.get("source_url", ""),
             "source_domain": source_payload.get("source_domain", "fragrantica.com"),
-            "matched_perfume": target_perfume,
+            "matched_perfume": target_perfume if set_primary_link else None,
             "match_status": FragranticaProduct.STATUS_LINKED,
         },
     )
@@ -241,7 +275,7 @@ def _upsert_fragrantica_source(
     if collection and source.collection_id != collection.id:
         source.collection = collection
         changed_fields.append("collection")
-    if source.matched_perfume_id != target_perfume.id:
+    if set_primary_link and source.matched_perfume_id != target_perfume.id:
         source.matched_perfume = target_perfume
         changed_fields.append("matched_perfume")
     if source.match_status != FragranticaProduct.STATUS_LINKED:
@@ -273,6 +307,10 @@ def import_fragrantica_catalogue_link_export(
             if source_payload.get("match_status") != FragranticaProduct.STATUS_LINKED:
                 summary.skipped += 1
                 continue
+            link_type = row.get("link_type") or FragranticaProductLink.LINK_TYPE_PRIMARY
+            set_primary_link = (
+                link_type != FragranticaProductLink.LINK_TYPE_MANUAL_EXTRA
+            )
 
             perfume, perfume_created = _resolve_target_perfume(
                 target_payload,
@@ -294,6 +332,23 @@ def import_fragrantica_catalogue_link_export(
             source, source_created, source_updated = _upsert_fragrantica_source(
                 source_payload,
                 perfume,
+                set_primary_link=set_primary_link,
+            )
+            FragranticaProductLink.objects.update_or_create(
+                source=source,
+                perfume=perfume,
+                defaults={
+                    "link_type": (
+                        FragranticaProductLink.LINK_TYPE_MANUAL_EXTRA
+                        if link_type == FragranticaProductLink.LINK_TYPE_MANUAL_EXTRA
+                        else FragranticaProductLink.LINK_TYPE_PRIMARY
+                    ),
+                    "note": (
+                        "Promoted reviewed rare second Our Products link."
+                        if link_type == FragranticaProductLink.LINK_TYPE_MANUAL_EXTRA
+                        else ""
+                    ),
+                },
             )
             changed_fields = apply_fragrantica_identity_to_perfume(source, perfume)
             if perfume_created:

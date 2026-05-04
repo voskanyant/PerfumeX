@@ -118,6 +118,7 @@
                                      data-catalogue-row-id="{{ row.perfume.pk }}"
                                      {% if row.ready_for_bulk %}data-catalogue-link-pair="{{ row.top_candidate.source.pk }}:{{ row.perfume.pk }}:{% if row.top_candidate.creates_alias %}1{% else %}0{% endif %}"{% endif %}
                                      data-perfume-id="{{ row.perfume.pk }}"
+                                     data-linking-payload="{{ row.payload_json }}"
                                      data-candidates-url="{% url 'prices:catalogue_linking_candidates' %}?perfume={{ row.perfume.pk }}&min_score={{ min_score }}">
                                 <div class="catalogue-linking-row-check">
                                     <input type="checkbox"
@@ -279,6 +280,9 @@
                                 <input type="hidden" name="perfume_id" value="{{ selected_row.perfume.pk }}">
                                 <input type="hidden" name="create_alias" value="{% if candidate.creates_alias %}1{% else %}0{% endif %}">
                                 <input type="hidden" name="apply_identity_group" value="1">
+                                {% if candidate.manual_review_reason %}
+                                    <input type="hidden" name="manual_review_link" value="1">
+                                {% endif %}
                                 <div class="catalogue-linking-candidate-main">
                                     <span class="catalogue-linking-candidate-title">
                                         {{ candidate.source_label }}
@@ -306,7 +310,7 @@
                                            target="_blank"
                                            rel="noopener">Open</a>
                                     {% endif %}
-                                    {% if candidate.source.match_status == "linked" %}
+                                    {% if candidate.source.match_status == "linked" and not candidate.manual_review_reason %}
                                         <a class="button secondary"
                                            href="{% url 'prices:fragrantica_product_review' %}?q={{ candidate.source.name|urlencode }}">Linked</a>
                                     {% else %}

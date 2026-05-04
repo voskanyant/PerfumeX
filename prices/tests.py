@@ -27,6 +27,7 @@ from django.utils import timezone
 from assistant_linking.models import (
     BrandAlias,
     FragranticaProduct,
+    FragranticaProductLink,
     ParsedSupplierProduct,
 )
 from assistant_linking.models import ProductAlias
@@ -8968,6 +8969,9 @@ class OurProductCatalogueListTests(TestCase):
         self.assertNotContains(exact_response, quiet.name)
         self.assertNotContains(exact_response, fuzzy_perfume.name)
         self.assertContains(exact_response, "1 shown / 3 visible")
+        self.assertContains(exact_response, "data-linking-payload=")
+        self.assertContains(exact_response, "&quot;candidates&quot;")
+        self.assertContains(exact_response, "&quot;score&quot;:100")
 
         self.assertEqual(lower_response.status_code, 200)
         self.assertContains(lower_response, "Montale / Vanilla Extasy")
@@ -9027,7 +9031,8 @@ class OurProductCatalogueListTests(TestCase):
             reverse("prices:fragrantica_product_link", args=[source.pk]),
         )
         self.assertContains(
-            review_response, '<button class="button primary" type="submit">Link</button>'
+            review_response,
+            '<button class="button primary" type="submit">Link</button>',
         )
         self.assertNotContains(review_response, "Review manually")
 
@@ -9166,6 +9171,89 @@ class OurProductCatalogueListTests(TestCase):
             payload["linked_sources"][0]["collection"],
             "Fragrantica Collection",
         )
+
+    def test_catalogue_linking_candidate_endpoint_allows_reviewed_second_link(self):
+        other_perfume = Perfume.objects.create(
+            brand=self.perfume.brand,
+            name="Vanilla Extasy",
+            concentration="Eau de Toilette",
+        )
+        linked_source = FragranticaProduct.objects.create(
+            brand_name="Montale",
+            normalized_brand_name="montale",
+            name="Vanilla Extasy",
+            normalized_name="vanilla extasy",
+            collection_name="Fragrantica Collection",
+            audience="Women",
+            release_year=2008,
+            matched_perfume=self.perfume,
+            match_status=FragranticaProduct.STATUS_LINKED,
+            source_path="/perfume/Montale/Vanilla-Extasy-1.html",
+        )
+
+        response = self.client.get(
+            reverse("prices:catalogue_linking_candidates"),
+            {"perfume": other_perfume.pk, "min_score": "95"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["candidates"][0]["source_id"], linked_source.pk)
+        self.assertTrue(payload["candidates"][0]["manual_review_link"])
+        self.assertTrue(payload["candidates"][0]["can_link"])
+        self.assertIn(
+            "already linked",
+            payload["candidates"][0]["manual_review_reason"],
+        )
+
+    def test_manual_review_can_add_second_fragrantica_link(self):
+        from prices.services.catalog_review import (
+            build_linked_fragrantica_sources_by_perfume_ids,
+        )
+
+        other_perfume = Perfume.objects.create(
+            brand=self.perfume.brand,
+            name="Vanilla Extasy",
+            concentration="Eau de Toilette",
+        )
+        source = FragranticaProduct.objects.create(
+            brand_name="Montale",
+            normalized_brand_name="montale",
+            name="Vanilla Extasy",
+            normalized_name="vanilla extasy",
+            collection_name="Fragrantica Collection",
+            audience="Women",
+            release_year=2008,
+            matched_perfume=self.perfume,
+            match_status=FragranticaProduct.STATUS_LINKED,
+            source_path="/perfume/Montale/Vanilla-Extasy-1.html",
+        )
+
+        response = self.client.post(
+            reverse("prices:fragrantica_product_link", args=[source.pk]),
+            {
+                "perfume_id": other_perfume.pk,
+                "next": reverse("prices:catalogue_linking_workbench"),
+                "manual_review_link": "1",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        source.refresh_from_db()
+        other_perfume.refresh_from_db()
+        self.assertEqual(source.matched_perfume, self.perfume)
+        self.assertTrue(
+            FragranticaProductLink.objects.filter(
+                source=source,
+                perfume=other_perfume,
+                link_type=FragranticaProductLink.LINK_TYPE_MANUAL_EXTRA,
+            ).exists()
+        )
+        linked_map = build_linked_fragrantica_sources_by_perfume_ids(
+            [self.perfume.id, other_perfume.id],
+        )
+        self.assertEqual(linked_map[self.perfume.id][0], source)
+        self.assertEqual(linked_map[other_perfume.id][0], source)
 
     def test_catalogue_linking_workbench_bulk_links_checked_suggestions(self):
         source = FragranticaProduct.objects.create(
@@ -9773,7 +9861,9 @@ class OurProductCatalogueListTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Montale")
         self.assertContains(response, "Other House")
-        self.assertContains(response, f'name="brand_id" value="{self.perfume.brand_id}"')
+        self.assertContains(
+            response, f'name="brand_id" value="{self.perfume.brand_id}"'
+        )
         self.assertContains(response, f'name="brand_id" value="{other_brand.id}"')
 
     def test_our_products_concentration_tab_renames_concentration(self):

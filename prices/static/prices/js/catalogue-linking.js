@@ -84,6 +84,9 @@
         appendHidden(form, "perfume_id", String(selected.id));
         appendHidden(form, "create_alias", candidate.creates_alias ? "1" : "0");
         appendHidden(form, "apply_identity_group", "1");
+        if (candidate.manual_review_link) {
+            appendHidden(form, "manual_review_link", "1");
+        }
 
         var main = document.createElement("div");
         main.className = "catalogue-linking-candidate-main";
@@ -127,7 +130,7 @@
             actions.appendChild(open);
         }
 
-        if (candidate.match_status === "linked") {
+        if (candidate.match_status === "linked" && !candidate.can_link) {
             var linked = document.createElement("a");
             linked.className = "button secondary";
             linked.href = candidate.review_url || "#";
@@ -197,10 +200,48 @@
         candidatesNode.appendChild(card);
     }
 
+    function renderPayload(data) {
+        renderSelected(data.selected);
+        clearNode(candidatesNode);
+        if (data.linked_sources && data.linked_sources.length) {
+            if (countNode) {
+                countNode.textContent = data.linked_sources.length + " linked";
+            }
+            data.linked_sources.forEach(renderLinkedSource);
+            return;
+        }
+        var candidates = data.candidates || [];
+        if (countNode) {
+            countNode.textContent = candidates.length + " candidate" + (candidates.length === 1 ? "" : "s");
+        }
+        if (!candidates.length) {
+            renderEmpty("No Fragrantica suggestions meet the current confidence filter.");
+            return;
+        }
+        candidates.forEach(function (candidate) {
+            renderCandidate(data.selected, candidate);
+        });
+    }
+
+    function rowPayload(row) {
+        var rawPayload = row.getAttribute("data-linking-payload");
+        if (!rawPayload) return null;
+        try {
+            return JSON.parse(rawPayload);
+        } catch (error) {
+            return null;
+        }
+    }
+
     function selectRow(row) {
         rows.forEach(function (item) {
             item.classList.toggle("is-selected", item === row);
         });
+        var preloaded = rowPayload(row);
+        if (preloaded) {
+            renderPayload(preloaded);
+            return;
+        }
         selectedNode.textContent = "Loading Fragrantica suggestions...";
         if (countNode) countNode.textContent = "Loading";
         renderEmpty("Searching Fragrantica matches for the selected product.");
@@ -210,25 +251,7 @@
                 return response.json();
             })
             .then(function (data) {
-                renderSelected(data.selected);
-                clearNode(candidatesNode);
-                if (data.linked_sources && data.linked_sources.length) {
-                    if (countNode) {
-                        countNode.textContent = data.linked_sources.length + " linked";
-                    }
-                    data.linked_sources.forEach(renderLinkedSource);
-                    return;
-                }
-                if (countNode) {
-                    countNode.textContent = data.candidates.length + " candidate" + (data.candidates.length === 1 ? "" : "s");
-                }
-                if (!data.candidates.length) {
-                    renderEmpty("No Fragrantica suggestions meet the current confidence filter.");
-                    return;
-                }
-                data.candidates.forEach(function (candidate) {
-                    renderCandidate(data.selected, candidate);
-                });
+                renderPayload(data);
             })
             .catch(function () {
                 selectedNode.textContent = "Candidate search failed.";

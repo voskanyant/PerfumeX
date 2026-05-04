@@ -180,3 +180,13 @@ Context: Focused corrections were paying the cost of full test and repository ch
 Decision: `make deploy-gate` runs the fast deploy gate by default: Django check, migration generation check, and migration plan. Add `DEPLOY_GATE_ARGS="--ui --test ..."` for UI syntax checks and targeted tests. Use `make deploy-gate-full` before big merges, schema changes, parser/linking logic changes, import/deletion behavior, shared service refactors, or batched releases.
 
 Consequences: Do not require full Django tests for every small deploy. Pick the gate based on blast radius, and document any skipped high-risk checks in the task summary.
+
+## 2026-05-04 - Fragrantica links stay primary-first
+
+Status: Accepted
+
+Context: Some local Our Products perfumes may rarely represent the same external Fragrantica product, but broad many-to-many linking would make normal matching and bulk actions less safe.
+
+Decision: Keep `FragranticaProduct.matched_perfume` as the primary reviewed link and store rare second reviewed links in `assistant_linking.FragranticaProductLink`. The workbench may expose these only as manual-review candidates, never as bulk-ready numeric-confidence matches.
+
+Consequences: Preserve one Fragrantica row to one Our Products perfume as the default. Promotion export/import must carry both primary and manual-extra links.

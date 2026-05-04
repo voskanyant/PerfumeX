@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import logging
 import re
 import unicodedata
@@ -23,6 +24,7 @@ from django.utils.http import url_has_allowed_host_and_scheme
 
 from assistant_linking.models import BrandAlias
 from assistant_linking.models import FragranticaProduct
+from assistant_linking.models import FragranticaProductLink
 from assistant_linking.models import ParsedSupplierProduct
 from assistant_linking.models import ProductAlias
 from assistant_linking.models import TITLECASE_APOSTROPHE_SUFFIXES
@@ -665,11 +667,37 @@ def loose_fragrance_name_without_audience_or_concentration(value: str) -> str:
     return loose_fragrance_key(fragrance_name_without_audience_or_concentration(value))
 
 
-def fragrantica_source_is_available_for_perfume(source, perfume) -> bool:
+def fragrantica_source_is_available_for_perfume(
+    source,
+    perfume,
+    *,
+    allow_manual_extra_link: bool = False,
+) -> bool:
     matched_perfume_id = getattr(source, "matched_perfume_id", None)
     if matched_perfume_id is None and getattr(source, "matched_perfume", None):
         matched_perfume_id = source.matched_perfume.id
-    return not matched_perfume_id or matched_perfume_id == perfume.id
+    if not matched_perfume_id or matched_perfume_id == perfume.id:
+        return True
+    return (
+        allow_manual_extra_link
+        and getattr(source, "match_status", "") == FragranticaProduct.STATUS_LINKED
+    )
+
+
+def _manual_extra_fragrantica_link_reason(source, perfume) -> str:
+    matched_perfume_id = getattr(source, "matched_perfume_id", None)
+    if not matched_perfume_id or matched_perfume_id == perfume.id:
+        return ""
+    linked_name = (
+        catalogue_linking_perfume_label(source.matched_perfume)
+        if getattr(source, "matched_perfume", None)
+        else "another Our Products row"
+    )
+    return (
+        "Manual review: Fragrantica row is already linked to "
+        f"{linked_name}. Add this second link only when both Our Products rows "
+        "share the same external Fragrantica product."
+    )
 
 
 def _candidate_sort_key(candidate: FragranticaMatchCandidate):
@@ -690,6 +718,7 @@ def add_fragrantica_candidate(
     score: int,
     reason: str,
     creates_alias: bool,
+    manual_review_reason: str = "",
 ) -> None:
     existing = candidates.get(source.id)
     candidate = FragranticaMatchCandidate(
@@ -698,6 +727,7 @@ def add_fragrantica_candidate(
         score=score,
         reason=reason,
         creates_alias=creates_alias,
+        manual_review_reason=manual_review_reason,
     )
     if not existing or _candidate_sort_key(candidate) < _candidate_sort_key(existing):
         candidates[source.id] = candidate
@@ -832,10 +862,7 @@ def build_fragrantica_candidates_for_perfume(
             if not fragrantica_source_is_available_for_perfume(source, perfume):
                 continue
             source_names = _fragrantica_source_match_names(source)
-            source_name_keys = {
-                normalized_fragrance_key(name)
-                for name in source_names
-            }
+            source_name_keys = {normalized_fragrance_key(name) for name in source_names}
             if source_name_keys & expected_source_keys:
                 score, reason = _score_with_fragrantica_concentration_guard(
                     96,
@@ -893,11 +920,13 @@ def build_linked_fragrantica_sources_by_perfume_ids(
     perfume_ids,
     *,
     fragrantica_manager=None,
+    link_manager=None,
 ) -> dict[int, list]:
     clean_ids = [int(perfume_id) for perfume_id in perfume_ids if perfume_id]
     if not clean_ids:
         return {}
     fragrantica_manager = fragrantica_manager or FragranticaProduct.objects
+    link_manager = link_manager or FragranticaProductLink.objects
     linked_sources = (
         fragrantica_manager.filter(
             matched_perfume_id__in=clean_ids,
@@ -907,9 +936,32 @@ def build_linked_fragrantica_sources_by_perfume_ids(
         .order_by("brand_name", "collection_name", "name", "release_year", "id")
     )
     source_map: dict[int, list] = defaultdict(list)
+    seen_source_ids_by_perfume_id: dict[int, set[int]] = defaultdict(set)
     for source in linked_sources:
         source.catalogue_display_name = fragrantica_source_catalogue_name(source)
         source_map[source.matched_perfume_id].append(source)
+        seen_source_ids_by_perfume_id[source.matched_perfume_id].add(source.id)
+    review_links = (
+        link_manager.filter(perfume_id__in=clean_ids)
+        .select_related(
+            "source", "source__matched_perfume", "source__matched_perfume__brand"
+        )
+        .order_by(
+            "source__brand_name",
+            "source__collection_name",
+            "source__name",
+            "source__release_year",
+            "source_id",
+        )
+    )
+    for link in review_links:
+        source = link.source
+        if source.id in seen_source_ids_by_perfume_id[link.perfume_id]:
+            continue
+        source.catalogue_display_name = fragrantica_source_catalogue_name(source)
+        source.review_link_type = link.link_type
+        source_map[link.perfume_id].append(source)
+        seen_source_ids_by_perfume_id[link.perfume_id].add(source.id)
     return source_map
 
 
@@ -1547,7 +1599,11 @@ def build_fragrantica_candidate_choices(
             continue
         scored_candidates = []
         for perfume in _perfumes_for_brand_ids(perfumes_by_brand_id, source_brand_ids):
-            if not fragrantica_source_is_available_for_perfume(source, perfume):
+            if not fragrantica_source_is_available_for_perfume(
+                source,
+                perfume,
+                allow_manual_extra_link=True,
+            ):
                 continue
             candidate_aliases = aliases_by_brand_id.get(
                 perfume.brand_id, []
@@ -1710,7 +1766,11 @@ def build_catalogue_fragrantica_candidates_for_perfumes(
         if not source_brand_ids:
             continue
         for perfume in _perfumes_for_brand_ids(perfumes_by_brand_id, source_brand_ids):
-            if not fragrantica_source_is_available_for_perfume(source, perfume):
+            if not fragrantica_source_is_available_for_perfume(
+                source,
+                perfume,
+                allow_manual_extra_link=True,
+            ):
                 continue
             candidate_aliases = aliases_by_brand_id.get(
                 perfume.brand_id, []
@@ -1732,6 +1792,10 @@ def build_catalogue_fragrantica_candidates_for_perfumes(
                 creates_alias=(
                     normalized_fragrance_key(fragrantica_source_catalogue_name(source))
                     != normalized_fragrance_key(perfume.name)
+                ),
+                manual_review_reason=_manual_extra_fragrantica_link_reason(
+                    source,
+                    perfume,
                 ),
             )
 
@@ -1782,9 +1846,7 @@ def _mark_shared_fragrantica_source_conflicts(
                 "Manual review: same Fragrantica row is an equal top match for "
                 + "; ".join(competing_labels)
             )
-            current = candidates_by_perfume.get(perfume.id, {}).get(
-                candidate.source.id
-            )
+            current = candidates_by_perfume.get(perfume.id, {}).get(candidate.source.id)
             if not current:
                 continue
             candidates_by_perfume[perfume.id][candidate.source.id] = replace(
@@ -1832,6 +1894,9 @@ def serialize_catalogue_linking_source(source) -> dict:
 
 def serialize_catalogue_linking_candidate(candidate: FragranticaMatchCandidate) -> dict:
     source = candidate.source
+    can_link = source.match_status != FragranticaProduct.STATUS_LINKED or bool(
+        candidate.manual_review_reason
+    )
     serialized = serialize_catalogue_linking_source(source)
     serialized.update(
         {
@@ -1840,10 +1905,40 @@ def serialize_catalogue_linking_candidate(candidate: FragranticaMatchCandidate) 
             "match_type": candidate.match_type,
             "creates_alias": candidate.creates_alias,
             "manual_review_reason": candidate.manual_review_reason,
+            "manual_review_link": bool(candidate.manual_review_reason),
+            "can_link": can_link,
             "link_url": reverse("prices:fragrantica_product_link", args=[source.pk]),
         }
     )
     return serialized
+
+
+def serialize_catalogue_linking_selected_perfume(perfume) -> dict:
+    return {
+        "id": perfume.id,
+        "label": catalogue_linking_perfume_label(perfume),
+        "brand": perfume.brand.name,
+        "name": perfume.name,
+        "collection": perfume.collection_name,
+        "concentration": perfume.concentration,
+        "audience": perfume.audience,
+        "release_year": perfume.release_year,
+    }
+
+
+def catalogue_linking_row_payload_json(row: dict) -> str:
+    payload = {
+        "selected": serialize_catalogue_linking_selected_perfume(row["perfume"]),
+        "linked_sources": [
+            serialize_catalogue_linking_source(source)
+            for source in row["linked_sources"]
+        ],
+        "candidates": [
+            serialize_catalogue_linking_candidate(candidate)
+            for candidate in row["candidates"]
+        ],
+    }
+    return json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
 
 
 def build_catalogue_linking_perfume_queryset(
@@ -1859,6 +1954,10 @@ def build_catalogue_linking_perfume_queryset(
             filter=Q(
                 fragrantica_products__match_status=FragranticaProduct.STATUS_LINKED
             ),
+            distinct=True,
+        ),
+        reviewed_fragrantica_link_count=Count(
+            "fragrantica_review_links",
             distinct=True,
         ),
     )
@@ -1889,9 +1988,14 @@ def build_catalogue_linking_perfume_queryset(
             )
         queryset = queryset.filter(phrase_filter | token_filter)
     if status_filter == "linked":
-        queryset = queryset.filter(linked_fragrantica_count__gt=0)
+        queryset = queryset.filter(
+            Q(linked_fragrantica_count__gt=0) | Q(reviewed_fragrantica_link_count__gt=0)
+        )
     elif status_filter == "unlinked":
-        queryset = queryset.filter(linked_fragrantica_count=0)
+        queryset = queryset.filter(
+            linked_fragrantica_count=0,
+            reviewed_fragrantica_link_count=0,
+        )
     return queryset.order_by("brand__name", "collection_name", "name", "concentration")
 
 
@@ -1910,23 +2014,23 @@ def build_catalogue_linking_rows(perfumes, *, min_score: int) -> list[dict]:
         linked_sources = linked_source_map.get(perfume.id, [])
         candidates = [] if linked_sources else candidate_map.get(perfume.id, [])
         top_candidate = candidates[0] if candidates else None
-        rows.append(
-            {
-                "perfume": perfume,
-                "label": catalogue_linking_perfume_label(perfume),
-                "linked_sources": linked_sources,
-                "top_linked_source": linked_sources[0] if linked_sources else None,
-                "candidates": candidates,
-                "top_candidate": top_candidate,
-                "ready_for_bulk": bool(
-                    top_candidate
-                    and top_candidate.score >= min_score
-                    and not top_candidate.manual_review_reason
-                    and top_candidate.source.match_status
-                    != FragranticaProduct.STATUS_LINKED
-                ),
-            }
-        )
+        row = {
+            "perfume": perfume,
+            "label": catalogue_linking_perfume_label(perfume),
+            "linked_sources": linked_sources,
+            "top_linked_source": linked_sources[0] if linked_sources else None,
+            "candidates": candidates,
+            "top_candidate": top_candidate,
+            "ready_for_bulk": bool(
+                top_candidate
+                and top_candidate.score >= min_score
+                and not top_candidate.manual_review_reason
+                and top_candidate.source.match_status
+                != FragranticaProduct.STATUS_LINKED
+            ),
+        }
+        row["payload_json"] = catalogue_linking_row_payload_json(row)
+        rows.append(row)
     return rows
 
 
@@ -1957,7 +2061,8 @@ def filter_catalogue_linking_rows_by_confidence(
     return [
         row
         for row in rows
-        if row["top_candidate"] and row["top_candidate"].score >= min_score
+        if row["top_candidate"]
+        and row["top_candidate"].score >= min_score
         and not row["top_candidate"].manual_review_reason
     ]
 
@@ -2107,20 +2212,11 @@ def build_catalogue_linking_candidate_payload(
     if linked_sources:
         return (
             {
-                "selected": {
-                    "id": perfume.id,
-                    "label": catalogue_linking_perfume_label(perfume),
-                "brand": perfume.brand.name,
-                "name": perfume.name,
-                "collection": perfume.collection_name,
-                "concentration": perfume.concentration,
-                "audience": perfume.audience,
-                "release_year": perfume.release_year,
-            },
-            "linked_sources": [
-                serialize_catalogue_linking_source(source)
-                for source in linked_sources
-            ],
+                "selected": serialize_catalogue_linking_selected_perfume(perfume),
+                "linked_sources": [
+                    serialize_catalogue_linking_source(source)
+                    for source in linked_sources
+                ],
                 "candidates": [],
             },
             200,
@@ -2137,16 +2233,7 @@ def build_catalogue_linking_candidate_payload(
     )
     return (
         {
-            "selected": {
-                "id": perfume.id,
-                "label": catalogue_linking_perfume_label(perfume),
-                "brand": perfume.brand.name,
-                "name": perfume.name,
-                "collection": perfume.collection_name,
-                "concentration": perfume.concentration,
-                "audience": perfume.audience,
-                "release_year": perfume.release_year,
-            },
+            "selected": serialize_catalogue_linking_selected_perfume(perfume),
             "candidates": [
                 serialize_catalogue_linking_candidate(candidate)
                 for candidate in candidate_map.get(perfume.id, [])
@@ -2206,6 +2293,7 @@ def run_catalogue_linking_bulk_action(
             matched_perfume=None,
             match_status=FragranticaProduct.STATUS_UNLINKED,
         )
+        FragranticaProductLink.objects.filter(perfume_id__in=clean_ids).delete()
         queryset.delete()
         return CatalogueLinkingBulkResult(
             "success",
@@ -2516,7 +2604,9 @@ def fragrantica_source_same_base_audience_context(
     brand_key = normalized_fragrance_key(source.brand_name or perfume.brand.name)
     source_queryset = fragrantica_manager.filter(normalized_brand_name=brand_key)
     if not source_queryset.exists():
-        source_queryset = fragrantica_manager.filter(brand_name__iexact=source.brand_name)
+        source_queryset = fragrantica_manager.filter(
+            brand_name__iexact=source.brand_name
+        )
     for candidate_source in source_queryset.only(
         "brand_name",
         "name",
@@ -2602,7 +2692,9 @@ def build_fragrantica_identity_perfume_group(
     perfume_manager = perfume_manager or CatalogPerfume.objects
     name_key = normalized_fragrance_key(perfume.name)
     source_group = (
-        audience_group_from_text(source.audience, fragrantica_source_catalogue_name(source))
+        audience_group_from_text(
+            source.audience, fragrantica_source_catalogue_name(source)
+        )
         if source
         else ""
     )
@@ -2687,6 +2779,23 @@ def create_fragrantica_product_alias_if_needed(source, perfume, old_name: str) -
     return True
 
 
+def record_fragrantica_review_link(
+    source,
+    perfume,
+    *,
+    link_type: str,
+    note: str = "",
+) -> None:
+    FragranticaProductLink.objects.update_or_create(
+        source=source,
+        perfume=perfume,
+        defaults={
+            "link_type": link_type,
+            "note": note,
+        },
+    )
+
+
 def run_fragrantica_catalogue_link_action(
     source_id,
     post_data,
@@ -2724,7 +2833,10 @@ def run_fragrantica_catalogue_link_action(
             redirect_url,
         )
     perfume = perfume_getter(perfume_id)
-    if source.matched_perfume_id and source.matched_perfume_id != perfume.id:
+    is_manual_extra_link = (
+        source.matched_perfume_id and source.matched_perfume_id != perfume.id
+    )
+    if is_manual_extra_link and post_data.get("manual_review_link") != "1":
         linked_name = (
             catalogue_linking_perfume_label(source.matched_perfume)
             if getattr(source, "matched_perfume", None)
@@ -2732,7 +2844,7 @@ def run_fragrantica_catalogue_link_action(
         )
         return FragranticaCatalogueLinkResult(
             "error",
-            f"This Fragrantica row is already linked to {linked_name}. Review manually before changing it.",
+            f"This Fragrantica row is already linked to {linked_name}. Review manually before adding a second link.",
             redirect_url,
         )
     old_name = perfume.name
@@ -2743,9 +2855,22 @@ def run_fragrantica_catalogue_link_action(
         if apply_identity_group
         else [perfume]
     )
-    source.matched_perfume = perfume
-    source.match_status = FragranticaProduct.STATUS_LINKED
-    source.save(update_fields=["matched_perfume", "match_status", "updated_at"])
+    if is_manual_extra_link:
+        record_fragrantica_review_link(
+            source,
+            perfume,
+            link_type=FragranticaProductLink.LINK_TYPE_MANUAL_EXTRA,
+            note="Approved rare second Our Products link to one Fragrantica row.",
+        )
+    else:
+        source.matched_perfume = perfume
+        source.match_status = FragranticaProduct.STATUS_LINKED
+        source.save(update_fields=["matched_perfume", "match_status", "updated_at"])
+        record_fragrantica_review_link(
+            source,
+            perfume,
+            link_type=FragranticaProductLink.LINK_TYPE_PRIMARY,
+        )
     changed_field_names = set()
     source_count = 0
     for group_perfume in perfume_group:
@@ -2777,9 +2902,14 @@ def run_fragrantica_catalogue_link_action(
         else ""
     )
     alias_note = " Saved old local name as a product alias." if alias_created else ""
+    link_message = (
+        "Added reviewed second Fragrantica link"
+        if is_manual_extra_link
+        else "Linked Fragrantica row"
+    )
     return FragranticaCatalogueLinkResult(
         "success",
-        f"Linked Fragrantica row to {perfume.brand.name} / {perfume.name}."
+        f"{link_message} to {perfume.brand.name} / {perfume.name}."
         f"{changed_note}{group_note}{source_note}{alias_note}{preserved_note}",
         redirect_url,
     )

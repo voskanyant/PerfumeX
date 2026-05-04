@@ -8,6 +8,7 @@ from django.core.management import call_command
 from django.test import TestCase
 
 from assistant_linking.models import FragranticaProduct
+from assistant_linking.models import FragranticaProductLink
 from assistant_linking.services.catalogue_promotion import (
     import_fragrantica_catalogue_link_export,
 )
@@ -33,7 +34,7 @@ class FragranticaCataloguePromotionTests(TestCase):
         )
 
     def test_export_command_writes_only_reviewed_linked_rows(self):
-        FragranticaProduct.objects.create(
+        source = FragranticaProduct.objects.create(
             brand_name="Montale",
             normalized_brand_name="montale",
             name="Vanilla Extasy",
@@ -44,6 +45,16 @@ class FragranticaCataloguePromotionTests(TestCase):
             source_path="/perfume/Montale/Vanilla-Extasy-1.html",
             matched_perfume=self.perfume,
             match_status=FragranticaProduct.STATUS_LINKED,
+        )
+        extra_perfume = Perfume.objects.create(
+            brand=self.brand,
+            name="Vanilla Extasy",
+            concentration="Eau de Toilette",
+        )
+        FragranticaProductLink.objects.create(
+            source=source,
+            perfume=extra_perfume,
+            link_type=FragranticaProductLink.LINK_TYPE_MANUAL_EXTRA,
         )
         FragranticaProduct.objects.create(
             brand_name="Montale",
@@ -64,9 +75,16 @@ class FragranticaCataloguePromotionTests(TestCase):
 
             bundle = json.loads(path.read_text(encoding="utf-8"))
         self.assertEqual(bundle["kind"], "perfumex.fragrantica_catalogue_links")
-        self.assertEqual(bundle["row_count"], 1)
+        self.assertEqual(bundle["schema_version"], 2)
+        self.assertEqual(bundle["row_count"], 2)
         self.assertEqual(bundle["rows"][0]["fragrantica"]["name"], "Vanilla Extasy")
         self.assertEqual(bundle["rows"][0]["target"]["perfume_id"], self.perfume.id)
+        self.assertEqual(bundle["rows"][0]["link_type"], "primary")
+        self.assertEqual(bundle["rows"][1]["link_type"], "manual_extra")
+        self.assertEqual(
+            bundle["rows"][1]["target"]["perfume_id"],
+            extra_perfume.id,
+        )
 
     def test_import_dry_run_reports_link_without_writing(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -98,6 +116,89 @@ class FragranticaCataloguePromotionTests(TestCase):
         self.assertEqual(self.perfume.audience, "Women")
         self.assertEqual(self.perfume.release_year, 2008)
         self.assertEqual(self.perfume.concentration, "Eau de Parfum")
+
+    def test_import_apply_preserves_manual_extra_fragrantica_links(self):
+        extra_perfume = Perfume.objects.create(
+            brand=self.brand,
+            name="Vanilla Extasy",
+            concentration="Eau de Toilette",
+        )
+        bundle = {
+            "schema_version": 2,
+            "kind": "perfumex.fragrantica_catalogue_links",
+            "generated_at": "2026-05-04T00:00:00+00:00",
+            "row_count": 2,
+            "rows": [
+                {
+                    "fragrantica": {
+                        "brand_name": "Montale",
+                        "normalized_brand_name": "montale",
+                        "name": "Vanilla Extasy",
+                        "normalized_name": "vanilla extasy",
+                        "collection_name": "Fragrantica Collection",
+                        "audience": "Women",
+                        "release_year": 2008,
+                        "source_path": "/perfume/Montale/Vanilla-Extasy-1.html",
+                        "source_url": "https://www.fragrantica.com/perfume/Montale/Vanilla-Extasy-1.html",
+                        "source_domain": "fragrantica.com",
+                        "match_status": FragranticaProduct.STATUS_LINKED,
+                    },
+                    "target": {
+                        "perfume_id": self.perfume.id,
+                        "brand_id": self.brand.id,
+                        "brand_name": "Montale",
+                        "name": "Vanilla Extasy",
+                        "concentration": "Eau de Parfum",
+                        "collection_name": "Classic",
+                        "audience": "",
+                        "release_year": None,
+                    },
+                    "link_type": FragranticaProductLink.LINK_TYPE_PRIMARY,
+                },
+                {
+                    "fragrantica": {
+                        "brand_name": "Montale",
+                        "normalized_brand_name": "montale",
+                        "name": "Vanilla Extasy",
+                        "normalized_name": "vanilla extasy",
+                        "collection_name": "Fragrantica Collection",
+                        "audience": "Women",
+                        "release_year": 2008,
+                        "source_path": "/perfume/Montale/Vanilla-Extasy-1.html",
+                        "source_url": "https://www.fragrantica.com/perfume/Montale/Vanilla-Extasy-1.html",
+                        "source_domain": "fragrantica.com",
+                        "match_status": FragranticaProduct.STATUS_LINKED,
+                    },
+                    "target": {
+                        "perfume_id": extra_perfume.id,
+                        "brand_id": self.brand.id,
+                        "brand_name": "Montale",
+                        "name": "Vanilla Extasy",
+                        "concentration": "Eau de Toilette",
+                        "collection_name": "",
+                        "audience": "",
+                        "release_year": None,
+                    },
+                    "link_type": FragranticaProductLink.LINK_TYPE_MANUAL_EXTRA,
+                },
+            ],
+        }
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "fragrantica-links.json"
+            path.write_text(json.dumps(bundle), encoding="utf-8")
+
+            summary = import_fragrantica_catalogue_link_export(path, apply=True)
+
+        self.assertEqual(summary.linked_sources, 2)
+        source = FragranticaProduct.objects.get()
+        self.assertEqual(source.matched_perfume, self.perfume)
+        self.assertTrue(
+            FragranticaProductLink.objects.filter(
+                source=source,
+                perfume=extra_perfume,
+                link_type=FragranticaProductLink.LINK_TYPE_MANUAL_EXTRA,
+            ).exists()
+        )
 
     def test_reviewed_uppercase_source_name_is_title_normalized(self):
         source = FragranticaProduct.objects.create(

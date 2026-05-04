@@ -331,6 +331,51 @@ class FragranticaProduct(TimeStampedModel):
         return self.source_path
 
 
+class FragranticaProductLink(TimeStampedModel):
+    LINK_TYPE_PRIMARY = "primary"
+    LINK_TYPE_MANUAL_EXTRA = "manual_extra"
+    LINK_TYPE_CHOICES = (
+        (LINK_TYPE_PRIMARY, "Primary"),
+        (LINK_TYPE_MANUAL_EXTRA, "Manual extra"),
+    )
+
+    source = models.ForeignKey(
+        FragranticaProduct,
+        on_delete=models.CASCADE,
+        related_name="review_links",
+        db_index=True,
+    )
+    perfume = models.ForeignKey(
+        "catalog.Perfume",
+        on_delete=models.CASCADE,
+        related_name="fragrantica_review_links",
+        db_index=True,
+    )
+    link_type = models.CharField(
+        max_length=20,
+        choices=LINK_TYPE_CHOICES,
+        default=LINK_TYPE_MANUAL_EXTRA,
+        db_index=True,
+    )
+    note = models.CharField(max_length=255, blank=True)
+
+    class Meta:
+        ordering = ("source__brand_name", "source__collection_name", "source__name")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["source", "perfume"],
+                name="uniq_fragrantica_product_review_link",
+            )
+        ]
+        indexes = [
+            models.Index(fields=["perfume", "link_type"]),
+            models.Index(fields=["source", "link_type"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.source} -> {self.perfume}"
+
+
 class ConcentrationAlias(TimeStampedModel):
     concentration = models.CharField(max_length=80, db_index=True)
     alias_text = models.CharField(max_length=255, db_index=True)
