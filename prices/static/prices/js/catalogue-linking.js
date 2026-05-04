@@ -333,6 +333,7 @@
                 return response.json();
             })
             .then(function (data) {
+                row.setAttribute("data-linking-payload", JSON.stringify(data));
                 renderPayload(data);
             })
             .catch(function () {

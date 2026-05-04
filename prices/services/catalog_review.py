@@ -363,7 +363,7 @@ def build_our_product_catalog_list_context(
     )
 
     visible_variants = list(variants)
-    attach_fragrantica_candidates_to_variants(visible_variants)
+    attach_linked_fragrantica_sources_to_variants(visible_variants)
 
     return {
         "variants": visible_variants,
@@ -606,6 +606,15 @@ def _score_with_fragrantica_concentration_guard(
         and score >= 98
     ):
         return score, "Exact brand, scent, and concentration match"
+    if (
+        not source_concentration_keys
+        and perfume_concentration_key
+        and score >= 98
+    ):
+        return (
+            min(score, 98),
+            "Exact brand and scent identity match; source concentration unspecified",
+        )
     return score, reason
 
 
@@ -895,18 +904,19 @@ def attach_fragrantica_candidates_to_variants(
     fragrantica_manager=None,
     product_alias_manager=None,
 ) -> list:
-    variants = list(variants)
+    variants = attach_linked_fragrantica_sources_to_variants(
+        variants,
+        fragrantica_manager=fragrantica_manager,
+    )
     perfumes = {
         variant.perfume_id: variant.perfume
         for variant in variants
-        if getattr(variant, "perfume_id", None) and getattr(variant, "perfume", None)
+        if getattr(variant, "perfume_id", None)
+        and getattr(variant, "perfume", None)
+        and not getattr(variant, "fragrantica_linked_sources", [])
     }
     if not perfumes:
         return variants
-    linked_source_map = build_linked_fragrantica_sources_by_perfume_ids(
-        perfumes.keys(),
-        fragrantica_manager=fragrantica_manager,
-    )
     candidate_map = build_catalogue_fragrantica_candidates_for_perfumes(
         perfumes.values(),
         fragrantica_manager=fragrantica_manager,
@@ -915,11 +925,33 @@ def attach_fragrantica_candidates_to_variants(
         limit=3,
     )
     for variant in variants:
-        linked_sources = linked_source_map.get(variant.perfume_id, [])
-        variant.fragrantica_linked_sources = linked_sources
-        variant.fragrantica_candidates = (
-            [] if linked_sources else candidate_map.get(variant.perfume_id, [])
+        if not getattr(variant, "fragrantica_linked_sources", []):
+            variant.fragrantica_candidates = candidate_map.get(variant.perfume_id, [])
+    return variants
+
+
+def attach_linked_fragrantica_sources_to_variants(
+    variants,
+    *,
+    fragrantica_manager=None,
+) -> list:
+    variants = list(variants)
+    perfume_ids = [
+        variant.perfume_id
+        for variant in variants
+        if getattr(variant, "perfume_id", None)
+    ]
+    linked_source_map = build_linked_fragrantica_sources_by_perfume_ids(
+        perfume_ids,
+        fragrantica_manager=fragrantica_manager,
+    )
+    for variant in variants:
+        linked_sources = linked_source_map.get(
+            getattr(variant, "perfume_id", None),
+            [],
         )
+        variant.fragrantica_linked_sources = linked_sources
+        variant.fragrantica_candidates = []
     return variants
 
 
@@ -2059,27 +2091,38 @@ def build_catalogue_linking_perfume_queryset(
     return queryset.order_by("brand__name", "collection_name", "name", "concentration")
 
 
-def build_catalogue_linking_rows(perfumes, *, min_score: int) -> list[dict]:
+def build_catalogue_linking_rows(
+    perfumes,
+    *,
+    min_score: int,
+    include_candidates: bool = True,
+) -> list[dict]:
     perfumes = list(perfumes)
     linked_source_map = build_linked_fragrantica_sources_by_perfume_ids(
         [perfume.id for perfume in perfumes]
     )
-    candidate_map = build_catalogue_fragrantica_candidates_for_perfumes(
-        perfumes,
-        min_score=min_score,
-        limit=5,
+    candidate_map = (
+        build_catalogue_fragrantica_candidates_for_perfumes(
+            perfumes,
+            min_score=min_score,
+            limit=5,
+        )
+        if include_candidates
+        else {}
     )
     rows = []
     for perfume in perfumes:
         linked_sources = linked_source_map.get(perfume.id, [])
         candidates = [] if linked_sources else candidate_map.get(perfume.id, [])
         top_candidate = candidates[0] if candidates else None
+        candidates_deferred = not include_candidates and not linked_sources
         row = {
             "perfume": perfume,
             "label": catalogue_linking_perfume_label(perfume),
             "linked_sources": linked_sources,
             "top_linked_source": linked_sources[0] if linked_sources else None,
             "candidates": candidates,
+            "candidates_deferred": candidates_deferred,
             "top_candidate": top_candidate,
             "ready_for_bulk": bool(
                 top_candidate
@@ -2089,7 +2132,11 @@ def build_catalogue_linking_rows(perfumes, *, min_score: int) -> list[dict]:
                 != FragranticaProduct.STATUS_LINKED
             ),
         }
-        row["payload_json"] = catalogue_linking_row_payload_json(row)
+        row["payload_json"] = (
+            catalogue_linking_row_payload_json(row)
+            if include_candidates or linked_sources
+            else ""
+        )
         rows.append(row)
     return rows
 
@@ -2158,7 +2205,11 @@ def _build_catalogue_linking_filtered_page_rows(
         perfumes = list(
             _catalogue_linking_sequence_slice(sequence, start, start + scan_size)
         )
-        visible_rows = build_catalogue_linking_rows(perfumes, min_score=min_score)
+        visible_rows = build_catalogue_linking_rows(
+            perfumes,
+            min_score=min_score,
+            include_candidates=True,
+        )
         filtered_rows = filter_catalogue_linking_rows_by_confidence(
             visible_rows,
             confidence_filter,
@@ -2208,7 +2259,11 @@ def build_catalogue_linking_context(
             suggestion_filter=suggestion_filter,
         )
     else:
-        visible_rows = build_catalogue_linking_rows(perfumes, min_score=min_score)
+        visible_rows = build_catalogue_linking_rows(
+            perfumes,
+            min_score=min_score,
+            include_candidates=False,
+        )
         visible_count = len(visible_rows)
         rows = filter_catalogue_linking_rows_by_confidence(
             visible_rows,
@@ -2282,9 +2337,7 @@ def build_catalogue_linking_candidate_payload(
             200,
         )
     conflict_scope_perfumes = list(
-        perfume_manager.select_related("brand", "collection").filter(
-            brand=perfume.brand
-        )
+        _catalogue_linking_candidate_conflict_scope(perfume, perfume_manager)
     )
     candidate_map = build_catalogue_fragrantica_candidates_for_perfumes(
         conflict_scope_perfumes,
@@ -2302,6 +2355,18 @@ def build_catalogue_linking_candidate_payload(
         },
         200,
     )
+
+
+def _catalogue_linking_candidate_conflict_scope(perfume, perfume_manager):
+    queryset = perfume_manager.select_related("brand", "collection").filter(
+        brand=perfume.brand,
+        name__iexact=perfume.name,
+    )
+    if not queryset.filter(pk=perfume.pk).exists():
+        queryset = perfume_manager.select_related("brand", "collection").filter(
+            Q(pk=perfume.pk) | Q(brand=perfume.brand, name__iexact=perfume.name)
+        )
+    return queryset
 
 
 def run_catalogue_linking_bulk_action(

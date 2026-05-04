@@ -118,7 +118,7 @@
                                      data-catalogue-row-id="{{ row.perfume.pk }}"
                                      {% if row.ready_for_bulk %}data-catalogue-link-pair="{{ row.top_candidate.source.pk }}:{{ row.perfume.pk }}:{% if row.top_candidate.creates_alias %}1{% else %}0{% endif %}"{% endif %}
                                      data-perfume-id="{{ row.perfume.pk }}"
-                                     data-linking-payload="{{ row.payload_json }}"
+                                     {% if row.payload_json %}data-linking-payload="{{ row.payload_json }}"{% endif %}
                                      data-candidates-url="{% url 'prices:catalogue_linking_candidates' %}?perfume={{ row.perfume.pk }}&min_score={{ min_score }}">
                                 <div class="catalogue-linking-row-check">
                                     <input type="checkbox"
@@ -179,6 +179,8 @@
                                                 {{ row.top_candidate.source.collection_name }}
                                             </span>
                                         {% endif %}
+                                    {% elif row.candidates_deferred %}
+                                        <span class="catalogue-linking-row-suggestion tone-muted">Select row to load Fragrantica suggestions</span>
                                     {% else %}
                                         <span class="catalogue-linking-row-suggestion tone-muted">No confident Fragrantica suggestion</span>
                                     {% endif %}
@@ -327,6 +329,8 @@
                                 </div>
                             </form>
                         {% endfor %}
+                    {% elif selected_row and selected_row.candidates_deferred %}
+                        {% include "includes/empty_state.html" with message="Select this row to load Fragrantica suggestions." %}
                     {% elif selected_row %}
                         {% include "includes/empty_state.html" with message="No Fragrantica suggestions meet the current confidence filter." %}
                     {% else %}
