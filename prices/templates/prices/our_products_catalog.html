@@ -108,9 +108,9 @@
                             {% endif %}
                             {% if variant.fragrantica_linked_sources %}
                                 <div class="fragrantica-linked-inline"
-                                     aria-label="Linked Fragrantica">
+                                    aria-label="Linked Fragrantica">
                                     {% for source in variant.fragrantica_linked_sources %}
-                                        <span>Linked Fragrantica: {{ source.brand_name }} / {{ source.catalogue_display_name }}{% if source.collection_name %} / {{ source.collection_name }}{% endif %}{% if source.release_year %} / {{ source.release_year }}{% endif %}{% if source.audience %} / {{ source.audience }}{% endif %}</span>
+                                        <span>Linked Fragrantica: {{ source.brand_name }} / {{ source.catalogue_display_name }}{% if source.collection_name %} / {{ source.collection_name }}{% endif %}{% if source.release_year %} / {{ source.release_year }}{% endif %}{% if source.fragrantica_display_audience %} / {{ source.fragrantica_display_audience }}{% endif %}</span>
                                     {% endfor %}
                                 </div>
                             {% elif variant.fragrantica_candidates %}

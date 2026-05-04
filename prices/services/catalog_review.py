@@ -946,12 +946,20 @@ def build_linked_fragrantica_sources_by_perfume_ids(
     seen_source_ids_by_perfume_id: dict[int, set[int]] = defaultdict(set)
     for source in linked_sources:
         source.catalogue_display_name = fragrantica_source_catalogue_name(source)
+        source.fragrantica_display_audience = source.audience or (
+            source.matched_perfume.audience
+            if getattr(source, "matched_perfume", None)
+            else ""
+        )
         source_map[source.matched_perfume_id].append(source)
         seen_source_ids_by_perfume_id[source.matched_perfume_id].add(source.id)
     review_links = (
         link_manager.filter(perfume_id__in=clean_ids)
         .select_related(
-            "source", "source__matched_perfume", "source__matched_perfume__brand"
+            "perfume",
+            "source",
+            "source__matched_perfume",
+            "source__matched_perfume__brand",
         )
         .order_by(
             "source__brand_name",
@@ -966,6 +974,7 @@ def build_linked_fragrantica_sources_by_perfume_ids(
         if source.id in seen_source_ids_by_perfume_id[link.perfume_id]:
             continue
         source.catalogue_display_name = fragrantica_source_catalogue_name(source)
+        source.fragrantica_display_audience = source.audience or link.perfume.audience
         source.review_link_type = link.link_type
         source_map[link.perfume_id].append(source)
         seen_source_ids_by_perfume_id[link.perfume_id].add(source.id)
@@ -1883,13 +1892,21 @@ def catalogue_linking_source_label(source) -> str:
 
 
 def serialize_catalogue_linking_source(source) -> dict:
+    display_audience = getattr(source, "fragrantica_display_audience", "") or (
+        source.audience
+        or (
+            source.matched_perfume.audience
+            if getattr(source, "matched_perfume", None)
+            else ""
+        )
+    )
     return {
         "source_id": source.id,
         "label": catalogue_linking_source_label(source),
         "brand": source.brand_name,
         "name": fragrantica_source_catalogue_name(source),
         "collection": source.collection_name,
-        "audience": source.audience,
+        "audience": display_audience,
         "release_year": source.release_year,
         "match_status": source.match_status,
         "source_href": source.source_href,
@@ -1974,6 +1991,7 @@ def build_fragrantica_catalogue_link_response_payload(
     except (FragranticaProduct.DoesNotExist, CatalogPerfume.DoesNotExist, ValueError):
         return payload
 
+    source.fragrantica_display_audience = source.audience or perfume.audience
     payload.update(
         {
             "selected": serialize_catalogue_linking_selected_perfume(perfume),

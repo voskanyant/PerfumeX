@@ -8114,6 +8114,29 @@ class OurProductCatalogueListTests(TestCase):
         )
         self.assertNotContains(response, "Vanilla Extasy Intense")
 
+    def test_our_products_linked_fragrantica_falls_back_to_catalogue_audience(self):
+        self.perfume.audience = "Unisex"
+        self.perfume.save(update_fields=["audience", "updated_at"])
+        FragranticaProduct.objects.create(
+            brand_name="Montale",
+            normalized_brand_name="montale",
+            name="Vanilla Extasy",
+            normalized_name="vanilla extasy",
+            collection_name="Fragrantica Collection",
+            release_year=2008,
+            matched_perfume=self.perfume,
+            match_status=FragranticaProduct.STATUS_LINKED,
+            source_path="/perfume/Montale/Vanilla-Extasy-1.html",
+        )
+
+        response = self.client.get(reverse("prices:our_product_list"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            "Montale / Vanilla Extasy / Fragrantica Collection / 2008 / Unisex",
+        )
+
     def test_fragrantica_products_lists_fragrantica_rows_only(self):
         supplier = models.Supplier.objects.create(name="Antonina")
         supplier_product = models.SupplierProduct.objects.create(
@@ -9850,6 +9873,7 @@ class OurProductCatalogueListTests(TestCase):
         self.assertEqual(payload["selected"]["id"], self.perfume.pk)
         self.assertEqual(payload["linked_source"]["source_id"], source.pk)
         self.assertEqual(payload["linked_source"]["collection"], "Fragrantica Collection")
+        self.assertEqual(payload["linked_source"]["audience"], "Women")
         self.assertEqual(self.perfume.name, "Vanilla Extasy")
 
     def test_our_products_search_matches_multi_word_scent(self):
