@@ -150,6 +150,7 @@ Standard classes:
 
 - Use the shared pagination component for new screens.
 - Preserve current query parameters in pagination forms/links.
+- Shared pagination must use an elided page range for large datasets; do not loop over every page number in templates and hide most of them with conditionals.
 - If JavaScript needs a stable pagination container, pass `html_id` to the shared include instead of hand-writing pagination markup.
 - If JavaScript updates pagination in place, render the standard children (`.pagination-list`, `.page-link`, `.page-link.is-active`, `.pagination-summary`) inside the shared `.pagination-shell` container; do not append a second nested `<nav>`.
 - Existing manual/specialized paginators should be migrated only when the page is already being touched and the replacement is obvious.

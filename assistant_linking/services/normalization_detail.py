@@ -16,7 +16,11 @@ from assistant_linking.services.catalog_matcher import (
 from assistant_linking.services.garbage import GARBAGE_MODIFIER
 from assistant_linking.services.garbage import clear_garbage_keyword_cache
 from assistant_linking.services.garbage import normalize_garbage_keyword
-from assistant_linking.services.normalizer import parse_supplier_product, save_parse
+from assistant_linking.services.normalizer import (
+    PARSER_VERSION,
+    parse_supplier_product,
+    save_parse,
+)
 from assistant_linking.services.smart_search import normalize_query
 from catalog.models import Brand, Perfume, PerfumeVariant, compact_decimal_text
 from prices.models import SupplierProduct
@@ -236,8 +240,15 @@ def get_saved_or_preview_parse(
     product,
     *,
     parse_preview_builder=parse_supplier_product,
+    parse_saver=save_parse,
 ):
     existing = getattr(product, "assistant_parse", None)
+    if (
+        existing
+        and not existing.locked_by_human
+        and existing.parser_version != PARSER_VERSION
+    ):
+        return parse_saver(product, force=True)
     return existing or parse_preview_builder(product)
 
 

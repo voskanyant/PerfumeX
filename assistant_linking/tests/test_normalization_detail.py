@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 
 from django.test import SimpleTestCase, TestCase
 
-from assistant_linking.models import ParsedSupplierProduct
+from assistant_linking.models import BrandAlias, ParsedSupplierProduct
 from assistant_linking.services.normalization_detail import (
     accept_catalog_candidate,
     apply_teaching_to_parsed,
@@ -24,6 +24,8 @@ from assistant_linking.services.normalization_detail import (
     suggested_catalog_candidate,
     teach_parse_for_product,
 )
+from assistant_linking.services.normalizer import PARSER_VERSION, save_parse
+from catalog.models import Brand
 from prices.models import Supplier, SupplierProduct
 
 
@@ -725,3 +727,57 @@ class NormalizationDetailDatabaseTests(TestCase):
         self.assertFalse(
             ParsedSupplierProduct.objects.filter(supplier_product=product).exists()
         )
+
+    def test_detail_context_refreshes_stale_saved_parse(self):
+        supplier = Supplier.objects.create(name="Supplier", code="supplier")
+        brand = Brand.objects.create(name="100 Bon")
+        BrandAlias.objects.create(
+            brand=brand,
+            alias_text="100 Bon",
+            normalized_alias="100 bon",
+        )
+        product = SupplierProduct.objects.create(
+            supplier=supplier,
+            identity_key="100-bon-ru-stale",
+            name="100 Bon Bois De Mangrove парфюмированная вода тестер 50 мл. уни",
+        )
+        parsed = save_parse(product)
+        parsed.product_name_text = "100 bon bois de mangrove парфюмированная вода тестер уни"
+        parsed.concentration = ""
+        parsed.supplier_gender_hint = ""
+        parsed.warnings = ["brand missing", "concentration missing", "gender missing"]
+        parsed.parser_version = "deterministic-v1"
+        parsed.save()
+
+        refreshed = get_saved_or_preview_parse(product)
+
+        self.assertIsInstance(refreshed, ParsedSupplierProduct)
+        self.assertEqual(refreshed.parser_version, PARSER_VERSION)
+        self.assertEqual(refreshed.normalized_brand, brand)
+        self.assertEqual(refreshed.product_name_text, "bois de mangrove")
+        self.assertEqual(refreshed.concentration, "Eau de Parfum")
+        self.assertEqual(refreshed.supplier_gender_hint, "Unisex")
+        self.assertTrue(refreshed.is_tester)
+        self.assertEqual(refreshed.warnings, [])
+
+    def test_detail_context_preserves_locked_stale_parse(self):
+        supplier = Supplier.objects.create(name="Supplier", code="supplier")
+        product = SupplierProduct.objects.create(
+            supplier=supplier,
+            identity_key="locked-stale",
+            name="Unknown Scent 50ml EDP",
+        )
+        parsed = ParsedSupplierProduct.objects.create(
+            supplier_product=product,
+            raw_name=product.name,
+            normalized_text="unknown scent 50ml edp",
+            product_name_text="locked name",
+            parser_version="deterministic-v1",
+            locked_by_human=True,
+        )
+
+        result = get_saved_or_preview_parse(product)
+
+        self.assertEqual(result.pk, parsed.pk)
+        self.assertEqual(result.product_name_text, "locked name")
+        self.assertEqual(result.parser_version, "deterministic-v1")

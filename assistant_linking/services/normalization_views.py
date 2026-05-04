@@ -144,11 +144,19 @@ def exclude_vintage_parses(queryset):
     )
 
 
+def exclude_atomizer_parses(queryset):
+    return queryset.exclude(modifiers__contains=[models.ATOMIZER_MODIFIER]).exclude(
+        variant_type=models.ATOMIZER_MODIFIER
+    )
+
+
 def exclude_non_perfume_parses(queryset):
-    return exclude_vintage_parses(
-        exclude_decant_parses(
-            exclude_deodorant_parses(
-                exclude_cosmetic_parses(exclude_bag_parses(queryset))
+    return exclude_atomizer_parses(
+        exclude_vintage_parses(
+            exclude_decant_parses(
+                exclude_deodorant_parses(
+                    exclude_cosmetic_parses(exclude_bag_parses(queryset))
+                )
             )
         )
     )
@@ -198,6 +206,13 @@ def vintage_parses(queryset):
     return queryset.filter(
         Q(modifiers__contains=[models.VINTAGE_MODIFIER])
         | Q(variant_type=models.VINTAGE_MODIFIER)
+    )
+
+
+def atomizer_parses(queryset):
+    return queryset.filter(
+        Q(modifiers__contains=[models.ATOMIZER_MODIFIER])
+        | Q(variant_type=models.ATOMIZER_MODIFIER)
     )
 
 
@@ -274,17 +289,22 @@ def refresh_visible_unparsed_context(
     context,
     *,
     force_refresh=False,
+    preview=False,
     supplier_product_model=SupplierProduct,
     parse_saver=save_parse,
     parse_preview_builder=parse_supplier_product,
 ):
     context["allow_refresh_visible"] = True
     visible_products = list(context.get("products", []))
+    if not force_refresh and not preview:
+        context["unparsed_preview_deferred"] = True
+        return context
     if not force_refresh:
         attach_unparsed_parse_previews(
             visible_products,
             parse_preview_builder=parse_preview_builder,
         )
+        context["preview_visible"] = True
         return context
 
     refreshed_count = 0
@@ -504,6 +524,17 @@ def build_vintage_queryset(
     hider=hide_parsed_products,
 ):
     queryset = vintage_parses(parsed_supplier_product_queryset(parsed_model))
+    return _category_issue_queryset(queryset, query, hidden_keywords, hider=hider)
+
+
+def build_atomizer_queryset(
+    query: str,
+    hidden_keywords: list[str],
+    *,
+    parsed_model=models.ParsedSupplierProduct,
+    hider=hide_parsed_products,
+):
+    queryset = atomizer_parses(parsed_supplier_product_queryset(parsed_model))
     return _category_issue_queryset(queryset, query, hidden_keywords, hider=hider)
 
 

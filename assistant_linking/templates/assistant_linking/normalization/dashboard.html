@@ -89,6 +89,11 @@
             <div class="metric-value">{{ vintage_count }}</div>
         </a>
         <a class="metric-card"
+           href="{% url 'assistant_linking:normalization_atomizers' %}">
+            <div class="metric-label">Atomizers</div>
+            <div class="metric-value">{{ atomizer_count }}</div>
+        </a>
+        <a class="metric-card"
            href="{% url 'assistant_linking:normalization_garbage' %}">
             <div class="metric-label">Garbage</div>
             <div class="metric-value">{{ garbage_count }}</div>

@@ -350,6 +350,24 @@ class SharedUiPartialRenderTests(SimpleTestCase):
         self.assertIn('class="page-link is-disabled"', html)
         self.assertIn('aria-hidden="true">...</span>', html)
 
+    def test_pagination_include_uses_elided_page_range_for_large_queues(self):
+        request = RequestFactory().get("/products/", {"page": "500"})
+        page_obj = Paginator(list(range(10000)), 10).page(500)
+
+        html = self.render_include(
+            "includes/pagination.html",
+            {
+                "request": request,
+                "page_obj": page_obj,
+            },
+        )
+
+        self.assertIn('class="page-link is-active">500</span>', html)
+        self.assertIn("Page 500 of 1000", html)
+        self.assertIn('aria-hidden="true">...</span>', html)
+        self.assertNotIn(">250</a>", html)
+        self.assertNotIn(">750</a>", html)
+
     def test_pagination_include_can_drop_action_only_query_params(self):
         request = RequestFactory().get(
             "/admin/assistant/normalization/issues/",

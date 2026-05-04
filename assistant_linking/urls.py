@@ -22,6 +22,7 @@ urlpatterns = [
     path("normalization/deodorants/", views.DeodorantListView.as_view(), name="normalization_deodorants"),
     path("normalization/decants/", views.DecantListView.as_view(), name="normalization_decants"),
     path("normalization/vintage/", views.VintageListView.as_view(), name="normalization_vintage"),
+    path("normalization/atomizers/", views.AtomizerListView.as_view(), name="normalization_atomizers"),
     path("normalization/manual-approval/", views.ManualReviewListView.as_view(), name="normalization_manual_review"),
     path("normalization/modifiers/", views.ModifierConflictListView.as_view(), name="normalization_modifiers"),
     path("normalization/garbage/", views.GarbageListView.as_view(), name="normalization_garbage"),

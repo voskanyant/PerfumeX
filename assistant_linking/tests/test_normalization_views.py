@@ -113,7 +113,7 @@ class NormalizationViewServiceTests(SimpleTestCase):
             SUPPLIER_PRODUCT_HIDDEN_FIELDS, ("name", "brand", "supplier_sku")
         )
 
-    def test_refresh_visible_unparsed_context_keeps_rows_when_not_forced(self):
+    def test_refresh_visible_unparsed_context_defers_preview_by_default(self):
         product = SimpleNamespace(pk=1)
         context = {"products": [product]}
         parse_saver = MagicMock()
@@ -131,6 +131,33 @@ class NormalizationViewServiceTests(SimpleTestCase):
 
         self.assertIs(returned, context)
         self.assertTrue(context["allow_refresh_visible"])
+        self.assertTrue(context["unparsed_preview_deferred"])
+        self.assertEqual(context["products"], [product])
+        self.assertFalse(hasattr(product, "parsed_preview"))
+        parse_saver.assert_not_called()
+        parse_preview_builder.assert_not_called()
+        supplier_product_model.objects.filter.assert_not_called()
+
+    def test_refresh_visible_unparsed_context_can_preview_visible_rows(self):
+        product = SimpleNamespace(pk=1)
+        context = {"products": [product]}
+        parse_saver = MagicMock()
+        preview = SimpleNamespace(display_identity="Preview")
+        parse_preview_builder = MagicMock(return_value=preview)
+        supplier_product_model = SimpleNamespace(objects=MagicMock())
+
+        returned = refresh_visible_unparsed_context(
+            context,
+            force_refresh=False,
+            preview=True,
+            supplier_product_model=supplier_product_model,
+            parse_saver=parse_saver,
+            parse_preview_builder=parse_preview_builder,
+        )
+
+        self.assertIs(returned, context)
+        self.assertTrue(context["allow_refresh_visible"])
+        self.assertTrue(context["preview_visible"])
         self.assertEqual(context["products"], [product])
         self.assertIs(product.parsed_preview, preview)
         parse_saver.assert_not_called()

@@ -75,6 +75,17 @@ def pagination_hidden_inputs(context, page_param="page", exclude=""):
     return mark_safe("\n".join(str(input_html) for input_html in inputs))
 
 
+@register.simple_tag
+def elided_page_range(page_obj):
+    if not page_obj:
+        return []
+    return page_obj.paginator.get_elided_page_range(
+        number=page_obj.number,
+        on_each_side=1,
+        on_ends=2,
+    )
+
+
 @register.filter
 @stringfilter
 def active_class(value, expected):

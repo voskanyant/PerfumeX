@@ -7,6 +7,7 @@ from django.db.models import Count, Q
 from django.utils import timezone
 
 from assistant_linking.models import (
+    ATOMIZER_MODIFIER,
     BAG_MODIFIER,
     COSMETIC_PUDRE_MODIFIER,
     DECANT_MODIFIER,
@@ -45,6 +46,7 @@ COUNT_KEYS = (
     "deodorant_count",
     "decant_count",
     "vintage_count",
+    "atomizer_count",
     "manual_review_count",
 )
 
@@ -59,6 +61,8 @@ NON_PERFUME_QUERY = (
     | Q(variant_type=DECANT_MODIFIER)
     | Q(modifiers__contains=[VINTAGE_MODIFIER])
     | Q(variant_type=VINTAGE_MODIFIER)
+    | Q(modifiers__contains=[ATOMIZER_MODIFIER])
+    | Q(variant_type=ATOMIZER_MODIFIER)
 )
 MANUAL_REVIEW_QUERY = Q(modifiers__contains=[MANUAL_REVIEW_MODIFIER])
 
@@ -139,6 +143,9 @@ def refresh_stats_snapshot(*, hidden_keywords: list[str] | None = None) -> Norma
     vintage_queryset = non_garbage_queryset.filter(
         Q(modifiers__contains=[VINTAGE_MODIFIER]) | Q(variant_type=VINTAGE_MODIFIER)
     )
+    atomizer_queryset = non_garbage_queryset.filter(
+        Q(modifiers__contains=[ATOMIZER_MODIFIER]) | Q(variant_type=ATOMIZER_MODIFIER)
+    )
     manual_review_queryset = non_garbage_queryset.filter(MANUAL_REVIEW_QUERY)
     normal_product_queryset = non_garbage_queryset.exclude(is_set=True).exclude(NON_PERFUME_QUERY).exclude(
         MANUAL_REVIEW_QUERY
@@ -169,6 +176,7 @@ def refresh_stats_snapshot(*, hidden_keywords: list[str] | None = None) -> Norma
     counts["deodorant_count"] = deodorant_queryset.count()
     counts["decant_count"] = decant_queryset.count()
     counts["vintage_count"] = vintage_queryset.count()
+    counts["atomizer_count"] = atomizer_queryset.count()
     counts["manual_review_count"] = manual_review_queryset.count()
     counts["unparsed_count"] = unparsed_queryset.filter(assistant_parse__isnull=True).count()
     counts["recent_parse_ids"] = list(

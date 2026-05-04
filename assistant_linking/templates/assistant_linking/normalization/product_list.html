@@ -19,6 +19,7 @@
         {% if search_query %}
             <a class="button ghost" href="{% url 'assistant_linking:normalization_unparsed' %}">Reset</a>
         {% endif %}
+        <a class="button ghost" href="?{% if search_query %}q={{ search_query|urlencode }}&amp;{% endif %}{% if page_obj %}page={{ page_obj.number }}&amp;{% endif %}preview=1">Preview visible rows</a>
     </form>
     <form method="post" action="{% url 'assistant_linking:normalization_parse_unparsed' %}" class="page-actions">
         {% csrf_token %}
@@ -26,6 +27,10 @@
     </form>
     {% if moved_visible_count %}
         <p class="form-help">{{ moved_visible_count }} visible row{{ moved_visible_count|pluralize }} parsed and moved to the normalisation queues.</p>
+    {% elif preview_visible %}
+        <p class="form-help">Previewed visible rows without saving parses.</p>
+    {% elif unparsed_preview_deferred %}
+        <p class="form-help">Parser previews are deferred on normal loads to keep this large queue fast.</p>
     {% endif %}
 </div>
 
@@ -46,12 +51,20 @@
             <tr>
                 <td data-label="Supplier">{{ product.supplier }}</td>
                 <td data-label="Product"><a href="{% url 'assistant_linking:normalization_detail' product.pk %}">{{ product.name }}</a></td>
-                <td data-label="Parsed">{{ product.parsed_preview.display_identity|default:"-" }}</td>
+                <td data-label="Parsed">
+                    {% if product.parsed_preview %}
+                        {{ product.parsed_preview.display_identity|default:"-" }}
+                    {% else %}
+                        <span class="muted">Preview deferred</span>
+                    {% endif %}
+                </td>
                 <td data-label="Flags">
                     {% if product.parsed_preview.warnings %}
                         {{ product.parsed_preview.warnings|join:", " }}
-                    {% else %}
+                    {% elif product.parsed_preview %}
                         preview only
+                    {% else %}
+                        -
                     {% endif %}
                 </td>
                 <td data-label="Confidence">{{ product.parsed_preview.confidence|default:"-" }}</td>

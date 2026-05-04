@@ -17,6 +17,7 @@ COSMETIC_PUDRE_MODIFIER = "cosmetic_poudre"
 DEODORANT_MODIFIER = "deodorant"
 DECANT_MODIFIER = "decant"
 VINTAGE_MODIFIER = "vintage"
+ATOMIZER_MODIFIER = "atomizer"
 MANUAL_REVIEW_MODIFIER = "manual_review"
 PERFUME_CATEGORY_CONCENTRATIONS = {
     "Eau de Parfum",
@@ -423,7 +424,9 @@ class ParsedSupplierProduct(TimeStampedModel):
 
     @property
     def display_size(self) -> str:
-        if self.raw_size_text and "*" in self.raw_size_text:
+        if self.raw_size_text and any(
+            separator in self.raw_size_text for separator in {"*", "+"}
+        ):
             return self.raw_size_text
         if self.size_ml is None:
             return ""
@@ -461,6 +464,11 @@ class ParsedSupplierProduct(TimeStampedModel):
             or self.variant_type == VINTAGE_MODIFIER
         ):
             return "Vintage"
+        if (
+            ATOMIZER_MODIFIER in (self.modifiers or [])
+            or self.variant_type == ATOMIZER_MODIFIER
+        ):
+            return "Atomizer"
         if self.variant_type == "decoded":
             return "Decoded"
         if self.is_tester or self.variant_type == "tester":
@@ -499,6 +507,11 @@ class ParsedSupplierProduct(TimeStampedModel):
             or self.variant_type == VINTAGE_MODIFIER
         ):
             return "Vintage"
+        if (
+            ATOMIZER_MODIFIER in (self.modifiers or [])
+            or self.variant_type == ATOMIZER_MODIFIER
+        ):
+            return "Atomizers"
         if self.concentration in HAIR_CARE_CATEGORY_CONCENTRATIONS:
             return "Hair Care"
         if self.concentration in PERFUME_CATEGORY_CONCENTRATIONS:
@@ -578,6 +591,7 @@ class NormalizationStatsSnapshot(TimeStampedModel):
     deodorant_count = models.PositiveIntegerField(default=0)
     decant_count = models.PositiveIntegerField(default=0)
     vintage_count = models.PositiveIntegerField(default=0)
+    atomizer_count = models.PositiveIntegerField(default=0)
     manual_review_count = models.PositiveIntegerField(default=0)
     recent_parse_ids = models.JSONField(default=list, blank=True)
     generated_at = models.DateTimeField(null=True, blank=True, db_index=True)

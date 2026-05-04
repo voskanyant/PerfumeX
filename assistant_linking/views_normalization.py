@@ -19,6 +19,7 @@ from assistant_linking.services.normalization_detail import (
     teach_parse_for_product,
 )
 from assistant_linking.services.normalization_views import (
+    build_atomizer_queryset,
     build_bag_queryset,
     build_complete_parsed_queryset,
     build_cosmetic_queryset,
@@ -99,6 +100,7 @@ class UnparsedListView(NormalizationSearchMixin, StaffAssistantMixin, ListView):
         return refresh_visible_unparsed_context(
             context,
             force_refresh=self.request.GET.get(self.refresh_param) == "1",
+            preview=self.request.GET.get("preview") == "1",
         )
 
 
@@ -228,6 +230,16 @@ class VintageListView(NormalizationIssueListView):
 
     def get_queryset(self):
         return build_vintage_queryset(
+            self.get_search_query(),
+            _hidden_product_keywords(self.request),
+        )
+
+
+class AtomizerListView(NormalizationIssueListView):
+    issue_title = "Atomizer rows"
+
+    def get_queryset(self):
+        return build_atomizer_queryset(
             self.get_search_query(),
             _hidden_product_keywords(self.request),
         )

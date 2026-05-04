@@ -74,10 +74,22 @@ PARSER_RULE_KIND_OPTIONS = (
         "example": "vintage",
     },
     {
+        "key": "parser_atomizer_term",
+        "label": "Atomizer term",
+        "description": "Routes supplier atomizer rows to Atomizers and removes the marker from the scent name.",
+        "example": "atomiser",
+    },
+    {
         "key": "parser_refill_term",
         "label": "Refill term",
         "description": "Adds the refill modifier to matching rows.",
         "example": "refill",
+    },
+    {
+        "key": "parser_no_box_packaging_term",
+        "label": "No-box packaging term",
+        "description": "Marks supplier no-box notes as packaging metadata and removes them from the scent name.",
+        "example": "\u0441\u0442\u0435\u043a\u043b\u043e",
     },
     {
         "key": "parser_refillable_packaging_term",

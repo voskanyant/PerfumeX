@@ -13,6 +13,7 @@ from assistant_linking.views_linking import (
 )
 from assistant_linking.views_normalization import (
     AcceptCatalogCandidateView as AcceptCatalogCandidateView,
+    AtomizerListView as AtomizerListView,
     BagListView as BagListView,
     CosmeticListView as CosmeticListView,
     DecantListView as DecantListView,
