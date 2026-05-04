@@ -18,6 +18,8 @@ from assistant_linking.services.normalization_views import (
     build_normalization_dashboard_context,
     build_unparsed_queryset,
     dispatch_parse_unparsed_products,
+    dispatch_reparse_visible_products,
+    parse_visible_product_ids,
     refresh_visible_parsed_context,
     refresh_visible_unparsed_context,
 )
@@ -249,6 +251,47 @@ class NormalizationViewServiceTests(SimpleTestCase):
         self.assertFalse(result.success)
         self.assertEqual(result.message_level, "error")
         self.assertIn("Redis unavailable", result.message)
+
+    def test_parse_visible_product_ids_sanitizes_and_limits_values(self):
+        result = parse_visible_product_ids(
+            ["7", "bad", "7", "-1", "9", "11"],
+            limit=2,
+        )
+
+        self.assertEqual(result, [7, 9])
+
+    def test_dispatch_reparse_visible_products_runs_exact_id_refresh(self):
+        dispatcher = MagicMock(
+            return_value=JobDispatchResult(
+                job_id="",
+                queue_name="perfumex",
+                status="finished",
+                queued=False,
+                description="Refresh 2 visible normalization rows",
+            )
+        )
+
+        result = dispatch_reparse_visible_products(
+            ["4", "6"],
+            dispatcher=dispatcher,
+        )
+
+        self.assertTrue(result.success)
+        self.assertEqual(result.message_level, "success")
+        dispatcher.assert_called_once_with(
+            "reparse_supplier_products",
+            product_ids=[4, 6],
+            description="Refresh 2 visible normalization rows",
+        )
+
+    def test_dispatch_reparse_visible_products_reports_empty_selection(self):
+        dispatcher = MagicMock()
+
+        result = dispatch_reparse_visible_products(["bad"], dispatcher=dispatcher)
+
+        self.assertFalse(result.success)
+        self.assertEqual(result.message_level, "warning")
+        dispatcher.assert_not_called()
 
     def test_build_low_confidence_queryset_applies_visibility_filters_and_order(self):
         result = object()

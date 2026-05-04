@@ -1899,9 +1899,9 @@ select:focus {
   grid-template-columns: minmax(0, 1.05fr) minmax(360px, 0.95fr);
   gap: 16px;
   align-items: stretch;
-  min-height: 520px;
-  height: calc(100vh - 290px);
-  height: calc(100dvh - 290px);
+  min-height: 680px;
+  height: clamp(680px, calc(100vh - 220px), 960px);
+  height: clamp(680px, calc(100dvh - 220px), 960px);
 }
 .catalogue-linking-panel {
   min-width: 0;

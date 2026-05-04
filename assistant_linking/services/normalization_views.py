@@ -39,6 +39,13 @@ class ParseUnparsedProductsResult:
     message: str
 
 
+@dataclass(frozen=True)
+class ReparseVisibleProductsResult:
+    success: bool
+    message_level: str
+    message: str
+
+
 def normalization_dashboard_stats(
     request, hidden_keywords: list[str]
 ) -> dict[str, object]:
@@ -365,6 +372,68 @@ def dispatch_parse_unparsed_products(
         success=True,
         message_level="success",
         message="Unparsed product parsing completed. Refresh stats to update dashboard counts.",
+    )
+
+
+def parse_visible_product_ids(raw_values, *, limit=100) -> list[int]:
+    product_ids: list[int] = []
+    seen: set[int] = set()
+    for raw_value in raw_values:
+        try:
+            product_id = int(raw_value)
+        except (TypeError, ValueError):
+            continue
+        if product_id <= 0 or product_id in seen:
+            continue
+        seen.add(product_id)
+        product_ids.append(product_id)
+        if len(product_ids) >= limit:
+            break
+    return product_ids
+
+
+def dispatch_reparse_visible_products(
+    product_ids,
+    *,
+    dispatcher=enqueue_management_command,
+) -> ReparseVisibleProductsResult:
+    product_ids = parse_visible_product_ids(product_ids)
+    if not product_ids:
+        return ReparseVisibleProductsResult(
+            success=False,
+            message_level="warning",
+            message="No visible rows were selected for background refresh.",
+        )
+    try:
+        result = dispatcher(
+            "reparse_supplier_products",
+            product_ids=product_ids,
+            description=f"Refresh {len(product_ids)} visible normalization rows",
+        )
+    except Exception as exc:
+        return ReparseVisibleProductsResult(
+            success=False,
+            message_level="error",
+            message=f"Could not start visible row refresh: {exc}",
+        )
+
+    if result.queued:
+        return ReparseVisibleProductsResult(
+            success=True,
+            message_level="success",
+            message=(
+                f"Queued background refresh for {len(product_ids)} visible row"
+                f"{'' if len(product_ids) == 1 else 's'}. Refresh this page after "
+                "the job finishes."
+            ),
+        )
+    return ReparseVisibleProductsResult(
+        success=True,
+        message_level="success",
+        message=(
+            f"Refreshed {len(product_ids)} visible row"
+            f"{'' if len(product_ids) == 1 else 's'}."
+        ),
     )
 
 

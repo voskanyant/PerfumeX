@@ -25,6 +25,19 @@
     {% if refreshed_visible %}
         <p class="form-help">{{ refreshed_visible_count }} visible row{{ refreshed_visible_count|pluralize }} reparsed.</p>
     {% endif %}
+    {% if parses %}
+        <form method="post"
+              action="{% url 'assistant_linking:normalization_refresh_visible' %}"
+              class="page-actions">
+            {% csrf_token %}
+            <input type="hidden" name="next" value="{{ request.get_full_path }}">
+            {% for parsed in parses %}
+                <input type="hidden" name="supplier_product_ids" value="{{ parsed.supplier_product_id }}">
+            {% endfor %}
+            <button class="button secondary" type="submit">Refresh visible in background</button>
+            <span class="form-help">Reparse this page's rows, then reload to remove fixed items.</span>
+        </form>
+    {% endif %}
 </div>
 
 <div class="workspace-block">

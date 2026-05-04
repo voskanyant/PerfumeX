@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from django.contrib import messages
 from django.shortcuts import redirect, render
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import never_cache
 from django.views.generic import DetailView, ListView, TemplateView, View
@@ -39,6 +40,7 @@ from assistant_linking.services.normalization_views import (
     build_unparsed_queryset,
     build_vintage_queryset,
     dispatch_parse_unparsed_products,
+    dispatch_reparse_visible_products,
     refresh_visible_parsed_context,
     refresh_visible_unparsed_context,
 )
@@ -288,6 +290,22 @@ class ParseUnparsedProductsView(StaffAssistantMixin, View):
         result = dispatch_parse_unparsed_products()
         getattr(messages, result.message_level)(request, result.message)
         return redirect("assistant_linking:normalization_unparsed")
+
+
+class RefreshVisibleParsesView(StaffAssistantMixin, View):
+    def post(self, request):
+        result = dispatch_reparse_visible_products(
+            request.POST.getlist("supplier_product_ids")
+        )
+        getattr(messages, result.message_level)(request, result.message)
+        next_url = request.POST.get("next") or ""
+        if not url_has_allowed_host_and_scheme(
+            next_url,
+            allowed_hosts={request.get_host()},
+            require_https=request.is_secure(),
+        ):
+            next_url = "assistant_linking:normalization_dashboard"
+        return redirect(next_url)
 
 
 class GarbageListView(NormalizationIssueListView):
