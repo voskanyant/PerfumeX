@@ -1391,7 +1391,7 @@ select:focus {
 }
 .our-products-list-head {
   display: grid;
-  grid-template-columns: 34px minmax(0, 1fr) minmax(160px, 260px) minmax(130px, 190px);
+  grid-template-columns: 34px minmax(0, 1fr) minmax(130px, 190px);
   gap: 18px;
   align-items: center;
   min-height: 42px;
@@ -1435,7 +1435,7 @@ select:focus {
 }
 .our-products-card-main {
   display: grid;
-  grid-template-columns: 34px minmax(0, 1fr) minmax(160px, 260px) minmax(130px, 190px);
+  grid-template-columns: 34px minmax(0, 1fr) minmax(130px, 190px);
   gap: 18px;
   align-items: center;
   min-height: 70px;
@@ -1520,13 +1520,29 @@ select:focus {
   letter-spacing: 0.12em;
   text-transform: uppercase;
 }
-.our-products-row-flags {
+.catalogue-identity-meta {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  justify-content: flex-end;
+  gap: 5px 14px;
+  margin-top: 3px;
+  color: var(--grey-600);
+  font-size: 12px;
+  line-height: 1.35;
+}
+.catalogue-identity-meta > span {
+  display: inline-flex;
+  align-items: baseline;
   gap: 6px;
   min-width: 0;
-  flex-wrap: wrap;
+  overflow-wrap: anywhere;
+}
+.catalogue-identity-meta > span > span {
+  color: var(--grey-400);
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
 }
 .catalogue-chip {
   display: inline-flex;
@@ -1806,6 +1822,17 @@ select:focus {
   gap: 8px;
   margin-top: 12px;
   max-width: 920px;
+}
+.fragrantica-linked-inline {
+  display: grid;
+  gap: 3px;
+  margin-top: 7px;
+  color: #245c35;
+  font-size: 13px;
+  line-height: 1.4;
+}
+.fragrantica-linked-inline span {
+  overflow-wrap: anywhere;
 }
 .fragrantica-match-panel-head {
   display: flex;
@@ -2914,12 +2941,6 @@ pre, code {
     grid-template-columns: minmax(0, 1fr);
     gap: 10px;
     padding: 16px 0;
-  }
-
-  .our-products-row-flags {
-    grid-column: 1 / -1;
-    justify-content: flex-start;
-    order: 3;
   }
 
   .fragrantica-source-action {

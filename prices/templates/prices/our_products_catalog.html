@@ -42,7 +42,6 @@
         <div class="our-products-list-head" aria-hidden="true">
             <span></span>
             <span>Parsed</span>
-            <span>Flags</span>
             <span>Edit</span>
         </div>
         {% for variant in variants %}
@@ -94,49 +93,24 @@
                                     <span class="catalogue-cell-value">{{ variant.variant_type }}</span>
                                 {% endif %}
                             </button>
-                            {% if variant.perfume.collection_name %}
-                                <div class="catalogue-identity-subname">
-                                    <span>Collection</span>
-                                    {{ variant.perfume.collection_name }}
-                                </div>
-                            {% endif %}
-                            {% if variant.perfume.audience %}
-                                <div class="catalogue-identity-subname">
-                                    <span>Audience</span>
-                                    {{ variant.perfume.audience }}
-                                </div>
-                            {% endif %}
-                            {% if variant.perfume.release_year %}
-                                <div class="catalogue-identity-subname">
-                                    <span>Year</span>
-                                    {{ variant.perfume.release_year }}
+                            {% if variant.perfume.collection_name or variant.perfume.audience or variant.perfume.release_year %}
+                                <div class="catalogue-identity-meta">
+                                    {% if variant.perfume.collection_name %}
+                                        <span><span>Collection</span>{{ variant.perfume.collection_name }}</span>
+                                    {% endif %}
+                                    {% if variant.perfume.audience %}
+                                        <span><span>Audience</span>{{ variant.perfume.audience }}</span>
+                                    {% endif %}
+                                    {% if variant.perfume.release_year %}
+                                        <span><span>Year</span>{{ variant.perfume.release_year }}</span>
+                                    {% endif %}
                                 </div>
                             {% endif %}
                             {% if variant.fragrantica_linked_sources %}
-                                <div class="fragrantica-match-panel fragrantica-match-panel-linked"
-                                     aria-label="Linked Fragrantica match">
-                                    <div class="fragrantica-match-panel-head">
-                                        <span>Linked Fragrantica match</span>
-                                        <span>Catalogue fields applied on link</span>
-                                    </div>
+                                <div class="fragrantica-linked-inline"
+                                     aria-label="Linked Fragrantica">
                                     {% for source in variant.fragrantica_linked_sources %}
-                                        <div class="fragrantica-match-option fragrantica-match-option-linked">
-                                            <div class="fragrantica-match-summary">
-                                                <span class="fragrantica-match-name">
-                                                    {{ source.brand_name }} / {{ source.catalogue_display_name }}{% if source.audience %} / {{ source.audience }}{% endif %}{% if source.release_year %} / {{ source.release_year }}{% endif %}
-                                                </span>
-                                                {% if source.collection_name %}
-                                                    <span class="catalogue-identity-subname">
-                                                        <span>Collection</span>
-                                                        {{ source.collection_name }}
-                                                    </span>
-                                                {% endif %}
-                                                <span class="fragrantica-match-reason">
-                                                    Linked. Fragrantica collection and year are stored on this Our Products perfume when present.
-                                                </span>
-                                            </div>
-                                            <span class="score-badge score-badge--success">Linked</span>
-                                        </div>
+                                        <span>Linked Fragrantica: {{ source.brand_name }} / {{ source.catalogue_display_name }}{% if source.collection_name %} / {{ source.collection_name }}{% endif %}{% if source.audience %} / {{ source.audience }}{% endif %}{% if source.release_year %} / {{ source.release_year }}{% endif %}</span>
                                     {% endfor %}
                                 </div>
                             {% elif variant.fragrantica_candidates %}
@@ -183,42 +157,6 @@
                                     {% endfor %}
                                 </div>
                             {% endif %}
-                        </div>
-                        <div class="our-products-row-flags" aria-label="Flags">
-                            {% if variant.is_tester %}
-                                <span class="catalogue-chip">Tester</span>
-                            {% endif %}
-                            {% if variant.packaging and variant.packaging != 'standard' %}
-                                <span class="catalogue-chip">{{ variant.packaging }}</span>
-                            {% endif %}
-                            <span class="catalogue-chip">{{ variant.variant_type|default:"standard" }}</span>
-                            {% for source in variant.fragrantica_linked_sources|slice:":1" %}
-                                <span class="catalogue-chip catalogue-chip-success">Linked</span>
-                                {% if source.collection_name %}
-                                    <span class="catalogue-chip">{{ source.collection_name }}</span>
-                                {% endif %}
-                                {% if source.audience %}
-                                    <span class="catalogue-chip">{{ source.audience }}</span>
-                                {% endif %}
-                                {% if source.release_year %}
-                                    <span class="catalogue-chip">{{ source.release_year }}</span>
-                                {% endif %}
-                            {% empty %}
-                            {% for candidate in variant.fragrantica_candidates|slice:":1" %}
-                                <span class="catalogue-chip">{{ candidate.match_type }} {{ candidate.score }}</span>
-                                {% if candidate.source.collection_name %}
-                                    <span class="catalogue-chip">{{ candidate.source.collection_name }}</span>
-                                {% endif %}
-                                {% if candidate.source.audience %}
-                                    <span class="catalogue-chip">{{ candidate.source.audience }}</span>
-                                {% endif %}
-                                {% if candidate.source.release_year %}
-                                    <span class="catalogue-chip">{{ candidate.source.release_year }}</span>
-                                {% endif %}
-                            {% empty %}
-                                <span class="catalogue-chip">No Fragrantica</span>
-                            {% endfor %}
-                            {% endfor %}
                         </div>
                         <div class="layout-inline gap-sm">
                             {% for source in variant.fragrantica_linked_sources|slice:":1" %}

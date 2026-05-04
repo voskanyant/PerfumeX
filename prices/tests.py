@@ -8092,11 +8092,21 @@ class OurProductCatalogueListTests(TestCase):
         response = self.client.get(reverse("prices:our_product_list"))
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Linked Fragrantica match")
-        self.assertContains(response, "Catalogue fields applied on link")
-        self.assertContains(response, "Montale / Vanilla Extasy / Women / 2008")
+        self.assertContains(response, "Linked Fragrantica:")
+        self.assertContains(
+            response,
+            "Montale / Vanilla Extasy / Fragrantica Collection / Women / 2008",
+        )
         self.assertContains(response, "Fragrantica Collection")
         self.assertContains(response, "Linked")
+        self.assertNotContains(response, ">Flags<")
+        self.assertNotContains(response, "our-products-row-flags")
+        self.assertNotContains(response, "Linked Fragrantica match")
+        self.assertNotContains(response, "Catalogue fields applied on link")
+        self.assertNotContains(
+            response,
+            "Linked. Fragrantica collection and year are stored",
+        )
         self.assertNotContains(response, "Suggested Fragrantica matches")
         self.assertNotContains(
             response,
