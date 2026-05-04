@@ -373,6 +373,26 @@ def attach_supplier_product_list_display(products, currency: str) -> None:
         )
 
 
+def attach_supplier_product_search_display(products, currency: str) -> None:
+    if currency:
+        attach_display_prices(products, currency, get_latest_rates())
+
+    for product in products:
+        if getattr(product, "display_currency", None) is None:
+            product.display_currency = product.currency
+        if getattr(product, "display_price", None) is None:
+            product.display_price = product.current_price
+        product.price_delta_direction = ""
+        product.price_delta_value = None
+        product.price_delta_percent = None
+        product.sparkline_values = []
+        product.original_price_display = (
+            format_price(product.current_price, product.currency)
+            if product.current_price is not None
+            else ""
+        )
+
+
 def parse_positive_page_number(raw) -> int:
     try:
         return max(int(raw), 1)
@@ -388,10 +408,11 @@ def build_supplier_product_search_response(
     page_size: int = 100,
 ) -> dict:
     page_number = parse_positive_page_number(page_raw)
-    paginator = Paginator(queryset, page_size)
-    page_obj = paginator.get_page(page_number)
-    visible_products = list(page_obj.object_list)
-    attach_supplier_product_list_display(visible_products, currency)
+    offset = (page_number - 1) * page_size
+    page_items = list(queryset[offset : offset + page_size + 1])
+    has_next = len(page_items) > page_size
+    visible_products = page_items[:page_size]
+    attach_supplier_product_search_display(visible_products, currency)
 
     items = [
         serialize_supplier_product_search_row(
@@ -400,19 +421,19 @@ def build_supplier_product_search_response(
         )
         for product in visible_products
     ]
+    visible_floor = offset + len(items)
+    count_display = f"{visible_floor}+" if has_next else str(visible_floor)
 
     return {
-        "count": paginator.count,
-        "count_display": str(paginator.count),
+        "count": None,
+        "count_display": count_display,
         "shown": len(items),
-        "page": page_obj.number,
-        "num_pages": paginator.num_pages,
-        "has_next": page_obj.has_next(),
-        "has_previous": page_obj.has_previous(),
-        "next_page": page_obj.next_page_number() if page_obj.has_next() else None,
-        "previous_page": (
-            page_obj.previous_page_number() if page_obj.has_previous() else None
-        ),
+        "page": page_number,
+        "num_pages": None,
+        "has_next": has_next,
+        "has_previous": page_number > 1,
+        "next_page": page_number + 1 if has_next else None,
+        "previous_page": page_number - 1 if page_number > 1 else None,
         "items": items,
     }
 
@@ -424,7 +445,11 @@ def build_supplier_product_search_payload(
     queryset_builder=build_supplier_product_queryset_for_request,
     response_builder=build_supplier_product_search_response,
 ) -> dict:
-    query_result = queryset_builder(request, rates=rates_getter())
+    query_result = queryset_builder(
+        request,
+        rates=rates_getter(),
+        fast_search_default_order=True,
+    )
     return response_builder(
         query_result.queryset,
         page_raw=request.GET.get("page", "1"),

@@ -185,7 +185,9 @@ def apply_supplier_product_token_filter(queryset, include_tokens: list[str]):
 
     for token in tokens:
         queryset = queryset.filter(
-            Q(name__icontains=token) | Q(supplier__name__icontains=token)
+            Q(name__icontains=token)
+            | Q(supplier_sku__icontains=token)
+            | Q(supplier__name__icontains=token)
         )
     return queryset
 
@@ -471,15 +473,25 @@ def build_supplier_product_queryset_for_request(
     base_queryset=None,
     rates=None,
     allowed_fields: tuple[str, ...] = SUPPLIER_PRODUCT_SORT_FIELDS,
+    fast_search_default_order: bool = False,
 ) -> SupplierProductQueryResult:
     filter_state = supplier_product_filter_state_from_request(request)
-    ordering_plan = supplier_product_ordering_plan(
-        sort_field=request.GET.get("sort"),
-        sort_dir=request.GET.get("dir", "asc"),
-        currency=filter_state.currency,
-        status_filter=filter_state.status_filter,
-        allowed_fields=allowed_fields,
-    )
+    if fast_search_default_order and not request.GET.get("sort"):
+        ordering = ("supplier__name", "name", "id")
+        if normalize_supplier_product_status(filter_state.status_filter) == "all":
+            ordering = ("-is_active", *ordering)
+        ordering_plan = SupplierProductOrderingPlan(
+            ordering=ordering,
+            display_price_currency="",
+        )
+    else:
+        ordering_plan = supplier_product_ordering_plan(
+            sort_field=request.GET.get("sort"),
+            sort_dir=request.GET.get("dir", "asc"),
+            currency=filter_state.currency,
+            status_filter=filter_state.status_filter,
+            allowed_fields=allowed_fields,
+        )
     queryset = (
         base_queryset if base_queryset is not None else supplier_product_base_queryset()
     )

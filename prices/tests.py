@@ -4223,6 +4223,46 @@ class ProductDisplayServiceTests(SimpleTestCase):
         self.assertIn("product-sparkline", str(product.sparkline_svg))
         self.assertIn('stroke="#22c55e"', str(product.sparkline_svg))
 
+    def test_attach_supplier_product_search_display_skips_history_hydration(self):
+        from prices.services.product_display import attach_supplier_product_search_display
+
+        product = SimpleNamespace(
+            id=7,
+            current_price=Decimal("10.00"),
+            currency=models.Currency.USD,
+        )
+        rates = {(models.Currency.USD, models.Currency.RUB): Decimal("100.00")}
+
+        def attach_prices(products, display_currency, rates_arg):
+            self.assertEqual(display_currency, models.Currency.RUB)
+            self.assertEqual(rates_arg, rates)
+            products[0].display_price = Decimal("1000.00")
+            products[0].display_currency = display_currency
+
+        with (
+            patch(
+                "prices.services.product_display.get_latest_rates", return_value=rates
+            ),
+            patch(
+                "prices.services.product_display.attach_display_prices",
+                side_effect=attach_prices,
+            ) as display_prices,
+            patch(
+                "prices.services.product_display.attach_previous_price_deltas"
+            ) as price_deltas,
+            patch(
+                "prices.services.product_display.build_supplier_product_sparklines"
+            ) as sparklines,
+        ):
+            attach_supplier_product_search_display([product], models.Currency.RUB)
+
+        display_prices.assert_called_once()
+        price_deltas.assert_not_called()
+        sparklines.assert_not_called()
+        self.assertEqual(product.display_price, Decimal("1000.00"))
+        self.assertEqual(product.sparkline_values, [])
+        self.assertEqual(product.price_delta_value, None)
+
     def test_supplier_product_search_row_serializer_formats_ajax_payload(self):
         from prices.services.currency import format_price
         from prices.services.product_display import (
@@ -4279,7 +4319,7 @@ class ProductDisplayServiceTests(SimpleTestCase):
 
         with (
             patch(
-                "prices.services.product_display.attach_supplier_product_list_display"
+                "prices.services.product_display.attach_supplier_product_search_display"
             ) as attach_display,
             patch(
                 "prices.services.product_display.serialize_supplier_product_search_row",
@@ -4297,11 +4337,11 @@ class ProductDisplayServiceTests(SimpleTestCase):
             )
 
         attach_display.assert_called_once_with(products[:2], models.Currency.USD)
-        self.assertEqual(response["count"], 3)
-        self.assertEqual(response["count_display"], "3")
+        self.assertEqual(response["count"], None)
+        self.assertEqual(response["count_display"], "2+")
         self.assertEqual(response["shown"], 2)
         self.assertEqual(response["page"], 1)
-        self.assertEqual(response["num_pages"], 2)
+        self.assertEqual(response["num_pages"], None)
         self.assertTrue(response["has_next"])
         self.assertFalse(response["has_previous"])
         self.assertEqual(response["next_page"], 2)
@@ -4341,8 +4381,8 @@ class ProductDisplayServiceTests(SimpleTestCase):
             calls.append(("rates",))
             return rates
 
-        def queryset_builder(request_arg, *, rates):
-            calls.append(("queryset", request_arg, rates))
+        def queryset_builder(request_arg, *, rates, fast_search_default_order=False):
+            calls.append(("queryset", request_arg, rates, fast_search_default_order))
             return query_result
 
         def response_builder(queryset, *, page_raw, currency):
@@ -4363,7 +4403,7 @@ class ProductDisplayServiceTests(SimpleTestCase):
             calls,
             [
                 ("rates",),
-                ("queryset", request, rates),
+                ("queryset", request, rates, True),
                 ("response", ["product"], "3", models.Currency.USD),
             ],
         )
@@ -7592,6 +7632,7 @@ class ProductFilterServiceTests(SimpleTestCase):
 
         self.assertIs(result, queryset)
         self.assertEqual(len(queryset.filter_calls), 6)
+        self.assertIn("supplier_sku__icontains", repr(queryset.filter_calls[0]))
 
     @patch("assistant_linking.services.smart_search.apply_smart_supplier_search")
     def test_search_filter_uses_smart_search_only_when_requested(
@@ -7873,6 +7914,78 @@ class ProductFilterServiceTests(SimpleTestCase):
         )
         self.assertEqual(
             queryset.calls[-1], ("order_by", ("-display_price_sort", "id"))
+        )
+
+    def test_build_supplier_product_queryset_for_request_uses_fast_default_order(self):
+        from django.contrib.auth.models import AnonymousUser
+
+        from prices.services.product_filters import (
+            SupplierProductFilterState,
+            build_supplier_product_queryset_for_request,
+        )
+
+        class FakeQuerySet:
+            def __init__(self):
+                self.calls = []
+
+            def annotate(self, **kwargs):
+                self.calls.append(("annotate", kwargs))
+                return self
+
+            def order_by(self, *fields):
+                self.calls.append(("order_by", fields))
+                return self
+
+        request = RequestFactory().get(
+            "/products/search/",
+            {"q": "amber", "currency": models.Currency.RUB},
+        )
+        request.user = AnonymousUser()
+        queryset = FakeQuerySet()
+        filter_state = SupplierProductFilterState(
+            query="amber",
+            include_tokens=["amber"],
+            inline_exclude_tokens=[],
+            exclude_raw="",
+            exclude_terms=[],
+            currency=models.Currency.RUB,
+            supplier_filter_ids=[],
+            include_inactive_suppliers=False,
+            status_filter="all",
+            smart_search_enabled=False,
+        )
+
+        with (
+            patch(
+                "prices.services.product_filters.supplier_product_filter_state_from_request",
+                return_value=filter_state,
+            ),
+            patch(
+                "prices.services.product_filters.apply_supplier_product_filter_state",
+                return_value=queryset,
+            ),
+            patch(
+                "prices.services.product_filters.apply_supplier_price_filter",
+                return_value=(queryset, "", ""),
+            ),
+        ):
+            result = build_supplier_product_queryset_for_request(
+                request,
+                base_queryset=queryset,
+                rates={(models.Currency.USD, models.Currency.RUB): Decimal("100")},
+                fast_search_default_order=True,
+            )
+
+        self.assertIs(result.queryset, queryset)
+        self.assertEqual(result.ordering_plan.display_price_currency, "")
+        self.assertEqual(
+            result.ordering_plan.ordering,
+            ("-is_active", "supplier__name", "name", "id"),
+        )
+        self.assertNotIn("annotate", [call[0] for call in queryset.calls])
+        self.assertEqual(
+            queryset.calls[-1],
+            ("order_by", ("-is_active", "supplier__name", "name", "id")),
         )
 
     def test_supplier_product_ordering_keeps_active_products_first_for_all_statuses(
