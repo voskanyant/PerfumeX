@@ -9199,6 +9199,46 @@ class OurProductCatalogueListTests(TestCase):
         self.assertNotContains(response, catalogue_linking_perfume_label(quiet))
         self.assertContains(response, "2 shown / 3 visible")
 
+    def test_catalogue_linking_strict_filter_uses_bounded_page_scan(self):
+        brand = Brand.objects.create(name="Bounded Strict Brand")
+        for index in range(45):
+            Perfume.objects.create(
+                brand=brand,
+                name=f"Quiet Scent {index:02d}",
+                concentration="Eau de Parfum",
+            )
+        perfume = Perfume.objects.create(
+            brand=brand,
+            name="Ready Scent",
+            concentration="Eau de Parfum",
+        )
+        source = FragranticaProduct.objects.create(
+            brand_name="Bounded Strict Brand",
+            normalized_brand_name="bounded strict brand",
+            name="Ready Scent Eau de Parfum",
+            normalized_name="ready scent eau de parfum",
+            source_path="/perfume/Bounded-Strict-Brand/Ready-Scent.html",
+        )
+
+        with patch(
+            "prices.services.catalog_review._catalogue_linking_strict_exact_perfume_ids",
+            side_effect=AssertionError("global strict scan should not run"),
+        ):
+            response = self.client.get(
+                reverse("prices:catalogue_linking_workbench"),
+                {
+                    "brand": str(brand.pk),
+                    "status": "unlinked",
+                    "suggestions": "with",
+                    "confidence": "100",
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, catalogue_linking_perfume_label(perfume))
+        self.assertContains(response, source.name)
+        self.assertNotContains(response, "Quiet Scent 00")
+
     def test_catalogue_linking_workbench_filters_visible_rows_by_confidence(self):
         FragranticaProduct.objects.create(
             brand_name="Montale",

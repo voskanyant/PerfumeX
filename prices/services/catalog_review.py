@@ -66,6 +66,7 @@ TITLE_WORD_RE = re.compile(r"[A-Za-zÀ-ÖØ-öø-ÿ]+(?:'[A-Za-zÀ-ÖØ-öø-ÿ]
 CATALOGUE_LINKING_STATUSES = {"all", "unlinked", "linked"}
 CATALOGUE_LINKING_SUGGESTION_FILTERS = {"all", "with", "without"}
 CATALOGUE_LINKING_CONFIDENCE_FILTERS = {"all", "review", "0", "80", "90", "95", "100"}
+CATALOGUE_LINKING_FILTER_SCAN_PAGES = 25
 CATALOG_VARIANT_SEARCH_FIELDS = (
     "perfume__name",
     "perfume__brand__name",
@@ -2348,33 +2349,30 @@ def _build_catalogue_linking_strict_exact_page_rows(
     page_number: int,
     page_size: int,
     min_score: int,
+    max_scan_rows: int | None = None,
 ) -> list[dict]:
     target_start = max(page_number - 1, 0) * page_size
     target_stop = target_start + page_size
-    exact_perfume_ids = _catalogue_linking_strict_exact_perfume_ids(sequence)
-    if not exact_perfume_ids:
-        return []
-
+    total_count = _catalogue_linking_sequence_count(sequence)
+    scan_size = max(page_size * 2, page_size)
+    scan_limit = max_scan_rows or page_size * CATALOGUE_LINKING_FILTER_SCAN_PAGES
+    scan_start = min(target_start, total_count)
+    scan_stop_limit = min(total_count, scan_start + scan_limit)
+    matched_seen = target_start
     page_rows: list[dict] = []
-    scan_stop = target_stop
-    matching_sequence = (
-        sequence.filter(id__in=exact_perfume_ids)
-        if hasattr(sequence, "filter")
-        else [perfume for perfume in sequence if perfume.id in exact_perfume_ids]
-    )
-    matching_count = _catalogue_linking_sequence_count(matching_sequence)
-    while len(page_rows) < page_size and target_start < matching_count:
-        candidates = list(
+
+    for start in range(scan_start, scan_stop_limit, scan_size):
+        perfumes = list(
             _catalogue_linking_sequence_slice(
-                matching_sequence,
-                target_start,
-                scan_stop,
+                sequence,
+                start,
+                min(start + scan_size, scan_stop_limit),
             )
         )
-        if not candidates:
+        if not perfumes:
             break
         visible_rows = build_catalogue_linking_rows(
-            candidates,
+            perfumes,
             min_score=min_score,
             include_candidates=True,
         )
@@ -2382,10 +2380,12 @@ def _build_catalogue_linking_strict_exact_page_rows(
             visible_rows,
             "100",
         )
-        page_rows.extend(filtered_rows[: page_size - len(page_rows)])
-        if scan_stop >= matching_count:
-            break
-        scan_stop += page_size
+        for row in filtered_rows:
+            if matched_seen >= target_start and matched_seen < target_stop:
+                page_rows.append(row)
+            matched_seen += 1
+            if matched_seen >= target_stop:
+                return page_rows
     return page_rows
 
 
@@ -2397,6 +2397,7 @@ def _build_catalogue_linking_filtered_page_rows(
     min_score: int,
     confidence_filter: str,
     suggestion_filter: str,
+    max_scan_rows: int | None = None,
 ) -> list[dict]:
     if confidence_filter == "100" and suggestion_filter in {"all", "with"}:
         return _build_catalogue_linking_strict_exact_page_rows(
@@ -2404,18 +2405,26 @@ def _build_catalogue_linking_filtered_page_rows(
             page_number=page_number,
             page_size=page_size,
             min_score=min_score,
+            max_scan_rows=max_scan_rows,
         )
 
     target_start = max(page_number - 1, 0) * page_size
     target_stop = target_start + page_size
-    matched_seen = 0
     page_rows: list[dict] = []
     total_count = _catalogue_linking_sequence_count(sequence)
     scan_size = max(page_size * 2, page_size)
+    scan_limit = max_scan_rows or page_size * CATALOGUE_LINKING_FILTER_SCAN_PAGES
+    scan_start = min(target_start, total_count)
+    scan_stop_limit = min(total_count, scan_start + scan_limit)
+    matched_seen = target_start
 
-    for start in range(0, total_count, scan_size):
+    for start in range(scan_start, scan_stop_limit, scan_size):
         perfumes = list(
-            _catalogue_linking_sequence_slice(sequence, start, start + scan_size)
+            _catalogue_linking_sequence_slice(
+                sequence,
+                start,
+                min(start + scan_size, scan_stop_limit),
+            )
         )
         visible_rows = build_catalogue_linking_rows(
             perfumes,
