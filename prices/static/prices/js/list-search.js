@@ -553,6 +553,14 @@
         return svg;
     }
 
+    function inferSparklineDirection(values) {
+        if (!values || values.length < 2) return "";
+        var first = Number(values[0]);
+        var last = Number(values[values.length - 1]);
+        if (!Number.isFinite(first) || !Number.isFinite(last) || first === last) return "";
+        return last < first ? "down" : "up";
+    }
+
     function buildProductNameCell(nameText, detailUrl) {
         var name = String(nameText || "");
         if (!detailUrl) {
@@ -616,7 +624,7 @@
         return link;
     }
 
-    function buildSupplierMobileCard(item, detailUrl, priceText, deltaDirection, deltaValue, deltaPercent) {
+    function buildSupplierMobileCard(item, detailUrl, priceText, deltaDirection, deltaValue, deltaPercent, sparklineDirection) {
         var cell = el("td", "supplier-mobile-card-cell");
         cell.colSpan = 8;
         var card = el("div", "supplier-mobile-card");
@@ -647,7 +655,7 @@
         }
         mid.appendChild(price);
         var sparkline = el("div", "supplier-mobile-card-sparkline");
-        sparkline.appendChild(buildSparkline(item.sparkline, deltaDirection, deltaPercent));
+        sparkline.appendChild(buildSparkline(item.sparkline, sparklineDirection, deltaPercent));
         mid.appendChild(sparkline);
         card.appendChild(mid);
 
@@ -767,6 +775,7 @@
             var price = String(item.current_price || "");
             var originalPrice = String(item.original_price || "");
             var deltaDirection = item.price_delta_direction || "";
+            var sparklineDirection = deltaDirection || inferSparklineDirection(item.sparkline);
             var deltaValue = String(item.price_delta_value || "");
             var deltaPercent = String(item.price_delta_percent || "");
             var originalPriceText = originalPrice ? "Original: " + originalPrice : "";
@@ -826,8 +835,8 @@
 
             var row = el("tr", item.is_active ? "" : "inactive-product-row");
             row.dataset.productId = String(item.id || "");
-            if (deltaDirection) {
-                row.dataset.delta = deltaDirection;
+            if (sparklineDirection) {
+                row.dataset.delta = sparklineDirection;
             }
             if (bulkEnabled) {
                 var checkboxCell = el("td", "select-col bulk-col");
@@ -840,13 +849,13 @@
                 checkboxCell.appendChild(checkbox);
                 row.appendChild(checkboxCell);
             }
-            row.appendChild(buildSupplierMobileCard(item, detailUrl, price, deltaDirection, deltaValue, deltaPercent));
+            row.appendChild(buildSupplierMobileCard(item, detailUrl, price, deltaDirection, deltaValue, deltaPercent, sparklineDirection));
             row.appendChild(fieldCell("supplier_sku", "SKU", el("span", "cell-sku", sku)));
             row.appendChild(fieldCell("name", "Name", buildProductNameCell(rawName, detailUrl)));
             row.appendChild(fieldCell("current_price", "Price", priceStack));
             row.appendChild(fieldCell("supplier", "Supplier", mobileSupplier));
             row.appendChild(fieldCell("last_imported_at", "Last imported", imported));
-            row.appendChild(fieldCell("sparkline", "Price trend", buildSparkline(item.sparkline, deltaDirection, deltaPercent), "sparkline-cell"));
+            row.appendChild(fieldCell("sparkline", "Price trend", buildSparkline(item.sparkline, sparklineDirection, deltaPercent), "sparkline-cell"));
             if (hasActions) {
                 row.appendChild(buildActionsCell(item.id, editPattern, deletePattern, csrfValue, nextValue));
             }

@@ -796,18 +796,19 @@ tr[data-delta="up"] {
     row-gap: 10px;
     padding: 14px 16px 12px;
     border: 1px solid var(--grey-200);
-    border-left: 3px solid transparent;
+    border-left: 3px solid var(--grey-200);
     border-radius: 14px;
     background: var(--white);
     box-shadow: 0 1px 3px rgba(10, 10, 10, 0.06), 0 1px 2px rgba(10, 10, 10, 0.04);
+    overflow: hidden;
   }
 
   .products-mobile tr[data-delta="down"] .supplier-mobile-card {
-    border-left-color: var(--success);
+    border-left-color: var(--success) !important;
   }
 
   .products-mobile tr[data-delta="up"] .supplier-mobile-card {
-    border-left-color: var(--danger);
+    border-left-color: var(--danger) !important;
   }
 
   .supplier-mobile-card-top {
@@ -858,10 +859,12 @@ tr[data-delta="up"] {
 
   .supplier-mobile-card-mid {
     display: grid;
-    grid-template-columns: minmax(0, max-content) 76px;
+    grid-template-columns: minmax(0, max-content) minmax(58px, 72px);
     gap: 12px;
     align-items: end;
     justify-content: space-between;
+    min-width: 0;
+    overflow: hidden;
   }
 
   .supplier-mobile-card-price {
@@ -880,7 +883,8 @@ tr[data-delta="up"] {
   }
 
   .supplier-mobile-card-sparkline {
-    width: 76px;
+    width: 72px;
+    max-width: 72px;
     min-width: 0;
     overflow: hidden;
     opacity: 0.75;
@@ -892,6 +896,7 @@ tr[data-delta="up"] {
     width: 100% !important;
     max-width: 100%;
     height: 28px !important;
+    overflow: hidden;
   }
 
   .products-mobile tr:not([data-delta]) .supplier-mobile-card-sparkline {
@@ -968,17 +973,17 @@ tr[data-delta="up"] {
 
   .supplier-mobile-card-time.state-fresh,
   .supplier-mobile-card-time.age-fresh {
-    color: var(--success);
+    color: var(--success) !important;
   }
 
   .supplier-mobile-card-time.state-stale,
   .supplier-mobile-card-time.age-stale {
-    color: var(--danger);
+    color: var(--danger) !important;
   }
 
   .supplier-mobile-card-time.state-warn,
   .supplier-mobile-card-time.age-warn {
-    color: var(--grey-400);
+    color: var(--grey-400) !important;
   }
 
   .products-mobile td[data-field="name"] {
