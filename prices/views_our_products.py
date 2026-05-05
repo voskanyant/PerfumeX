@@ -12,6 +12,8 @@ from catalog.models import PerfumeVariant as CatalogPerfumeVariant
 from . import forms, models
 from .services.catalog_review import (
     build_fragrantica_catalogue_link_response_payload,
+    build_catalogue_linking_ai_advice_payload,
+    build_catalogue_linking_ai_advice_review_payload,
     build_catalogue_linking_candidate_payload,
     build_catalogue_linking_context,
     build_catalogue_linking_perfume_queryset,
@@ -111,6 +113,22 @@ class CatalogueLinkingWorkbenchView(LoginRequiredMixin, ListView):
 class CatalogueLinkingCandidateView(LoginRequiredMixin, View):
     def get(self, request):
         payload, status_code = build_catalogue_linking_candidate_payload(request)
+        return JsonResponse(payload, status=status_code)
+
+
+class CatalogueLinkingAIAdviceView(LoginRequiredMixin, View):
+    def post(self, request):
+        payload, status_code = build_catalogue_linking_ai_advice_payload(request)
+        return JsonResponse(payload, status=status_code)
+
+
+class CatalogueLinkingAIAdviceReviewView(LoginRequiredMixin, View):
+    def post(self, request, pk):
+        payload, status_code = build_catalogue_linking_ai_advice_review_payload(
+            pk,
+            request.POST,
+            user=request.user,
+        )
         return JsonResponse(payload, status=status_code)
 
 

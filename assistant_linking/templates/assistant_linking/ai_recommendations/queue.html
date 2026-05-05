@@ -1,0 +1,215 @@
+{% extends "prices/base.html" %}
+{% block title %}AI Recommendations{% endblock %}
+{% block topbar_label %}Assistant / AI Recommendations{% endblock %}
+{% block content %}
+    {% include "includes/page_header.html" with kicker="Assistant" title="AI recommendations" meta="Review-only AI advice for normalization and Fragrantica linking." %}
+    <div class="workspace-block">
+        <form method="post"
+              action="{% url 'assistant_linking:ai_recommendation_find_patterns' %}"
+              class="layout-inline flex-wrap gap-sm space-bottom-md">
+            {% csrf_token %}
+            <input type="hidden" name="next" value="{{ request.get_full_path }}">
+            <button class="button secondary" type="submit">Find repeated decisions</button>
+            <span class="tone-muted text-small">Creates pending alias recommendations from repeated reviewed links.</span>
+        </form>
+        <div class="page-grid-3 space-bottom-md">
+            <div class="metric-card">
+                <span class="card-label">Pending advice</span>
+                <strong class="card-title">{{ queue_counts.pending|default:0 }}</strong>
+            </div>
+            <div class="metric-card">
+                <span class="card-label">Accepted advice</span>
+                <strong class="card-title">{{ queue_counts.accepted|default:0 }}</strong>
+            </div>
+            <div class="metric-card">
+                <span class="card-label">Ready to apply</span>
+                <strong class="card-title">{{ queue_counts.ready_apply|default:0 }}</strong>
+            </div>
+            <div class="metric-card">
+                <span class="card-label">Pending proposals</span>
+                <strong class="card-title">{{ queue_counts.pending_proposals|default:0 }}</strong>
+            </div>
+        </div>
+        <form method="get" class="search-wrap" aria-label="AI recommendation filters">
+            <select name="status" aria-label="Status">
+                {% for value, label in status_choices %}
+                    <option value="{{ value }}" {% if status_filter == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+            <select name="task" aria-label="Task">
+                <option value="">All tasks</option>
+                {% for value, label in task_choices %}
+                    <option value="{{ value }}" {% if task_filter == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+            <select name="proposal" aria-label="Proposal status">
+                {% for value, label in proposal_choices %}
+                    <option value="{{ value }}" {% if proposal_filter == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+            <select name="proposal_type" aria-label="Proposal type">
+                {% for value, label in proposal_type_choices %}
+                    <option value="{{ value }}" {% if proposal_type_filter == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+            <select name="workflow" aria-label="Workflow">
+                {% for value, label in workflow_choices %}
+                    <option value="{{ value }}" {% if workflow_filter == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+            <button class="button ghost" type="submit">Filter</button>
+            <a class="button ghost" href="{% url 'assistant_linking:ai_recommendation_queue' %}">Reset</a>
+        </form>
+        {% if visible_ready_alias_proposal_ids %}
+            <form method="post"
+                  action="{% url 'assistant_linking:ai_learning_proposal_apply_aliases' %}"
+                  class="layout-inline flex-wrap gap-sm space-bottom-md">
+                {% csrf_token %}
+                <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                {% for proposal_id in visible_ready_alias_proposal_ids %}
+                    <input type="hidden" name="proposal_ids" value="{{ proposal_id }}">
+                {% endfor %}
+                <button class="button secondary"
+                        type="submit"
+                        data-confirm="Apply accepted alias proposals visible on this page? This will create alias knowledge but will not refresh saved parses.">
+                    Apply ready alias proposals on this page
+                </button>
+                <span class="tone-muted text-small">Alias proposals only; Fragrantica links still apply one at a time.</span>
+            </form>
+        {% endif %}
+        <table class="data-table table-mobile">
+            <thead>
+                <tr>
+                    <th scope="col">Recommendation</th>
+                    <th scope="col">Target</th>
+                    <th scope="col">Status</th>
+                    <th scope="col">Risk</th>
+                    <th scope="col">Confidence</th>
+                    <th scope="col" aria-label="Actions"></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for recommendation in recommendations %}
+                    <tr>
+                        <td data-label="Recommendation">
+                            <strong>{{ recommendation.get_task_type_display }}</strong>
+                            <span class="tone-muted text-small">{{ recommendation.reasoning|default:"No reasoning saved." }}</span>
+                        </td>
+                        <td data-label="Target">
+                            {% if recommendation.perfume %}
+                                {{ recommendation.perfume }}
+                            {% elif recommendation.supplier_product %}
+                                {{ recommendation.supplier_product }}
+                            {% else %}
+                                Unknown target
+                            {% endif %}
+                            {% if recommendation.fragrantica_product %}
+                                <span class="tone-muted text-small">{{ recommendation.fragrantica_product }}</span>
+                            {% endif %}
+                            {% if recommendation.learning_proposal and recommendation.learning_proposal.impact_json.preview %}
+                                {% with preview=recommendation.learning_proposal.impact_json.preview %}
+                                    <span class="tone-muted text-small">
+                                        Impact preview:
+                                        {{ preview.saved_parse_matches|default:0 }} saved parse{{ preview.saved_parse_matches|pluralize }},
+                                        {{ preview.active_supplier_matches|default:0 }} active,
+                                        {{ preview.unlocked_parse_matches|default:0 }} unlocked.
+                                    </span>
+                                    {% if preview.sample_supplier_products %}
+                                        <span class="tone-muted text-small">
+                                            Sample:
+                                            {% for product_name in preview.sample_supplier_products %}
+                                                {{ product_name }}{% if not forloop.last %}; {% endif %}
+                                            {% endfor %}
+                                        </span>
+                                    {% endif %}
+                                    {% if recommendation.learning_proposal.impact_json.last_refresh %}
+                                        <span class="tone-muted text-small">
+                                            Last refresh:
+                                            {{ recommendation.learning_proposal.impact_json.last_refresh.refreshed|default:0 }} refreshed,
+                                            {{ recommendation.learning_proposal.impact_json.last_refresh.skipped_locked|default:0 }} locked skipped.
+                                        </span>
+                                    {% endif %}
+                                {% endwith %}
+                            {% endif %}
+                        </td>
+                        <td data-label="Status">{{ recommendation.get_status_display }}</td>
+                        <td data-label="Risk">{{ recommendation.get_risk_level_display }}</td>
+                        <td data-label="Confidence">{{ recommendation.confidence|default:"-" }}</td>
+                        <td data-label="Actions" class="actions">
+                            <a class="button ghost"
+                               href="{% url 'assistant_linking:ai_recommendation_detail' recommendation.pk %}">Details</a>
+                            <a class="button ghost" href="{{ recommendation.workbench_url }}">Open target</a>
+                            {% if recommendation.learning_proposal %}
+                                <span class="badge">Proposal {{ recommendation.learning_proposal.get_status_display }}</span>
+                                {% if recommendation.learning_proposal.status == "pending" and recommendation.status == "accepted" %}
+                                    <form method="post"
+                                          action="{% url 'assistant_linking:ai_learning_proposal_apply' recommendation.learning_proposal.pk %}">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                        <button class="button secondary" type="submit">Apply proposal</button>
+                                    </form>
+                                    {% if recommendation.learning_proposal.proposal_type == "product_alias" or recommendation.learning_proposal.proposal_type == "brand_alias" %}
+                                        <form method="post"
+                                              action="{% url 'assistant_linking:ai_learning_proposal_regenerate_preview' recommendation.learning_proposal.pk %}">
+                                            {% csrf_token %}
+                                            <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                            <button class="button ghost" type="submit">Regenerate preview</button>
+                                        </form>
+                                    {% endif %}
+                                {% elif recommendation.learning_proposal.status == "applied" %}
+                                    {% if recommendation.learning_proposal.proposal_type == "product_alias" or recommendation.learning_proposal.proposal_type == "brand_alias" %}
+                                        <form method="post"
+                                              action="{% url 'assistant_linking:ai_learning_proposal_refresh_parses' recommendation.learning_proposal.pk %}">
+                                            {% csrf_token %}
+                                            <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                            <button class="button secondary" type="submit">Refresh affected rows</button>
+                                        </form>
+                                        <form method="post"
+                                              action="{% url 'assistant_linking:ai_learning_proposal_revert_alias' recommendation.learning_proposal.pk %}">
+                                            {% csrf_token %}
+                                            <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                            <button class="button ghost"
+                                                    type="submit"
+                                                    data-confirm="Deactivate the alias created by this AI proposal? Saved parses will not be refreshed automatically.">
+                                                Deactivate alias
+                                            </button>
+                                        </form>
+                                    {% endif %}
+                                {% endif %}
+                            {% endif %}
+                            {% if recommendation.status == "pending" %}
+                                <form method="post"
+                                      action="{% url 'assistant_linking:ai_recommendation_review' recommendation.pk %}">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                    <input type="hidden" name="action" value="accept">
+                                    <button class="button secondary" type="submit">Accept</button>
+                                </form>
+                                <form method="post"
+                                      action="{% url 'assistant_linking:ai_recommendation_review' recommendation.pk %}">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                    <input type="hidden" name="action" value="reject">
+                                    <button class="button ghost" type="submit">Reject</button>
+                                </form>
+                            {% else %}
+                                <form method="post"
+                                      action="{% url 'assistant_linking:ai_recommendation_review' recommendation.pk %}">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                    <input type="hidden" name="action" value="reset">
+                                    <button class="button ghost" type="submit">Reset</button>
+                                </form>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% empty %}
+                    {% include "includes/table_empty.html" with colspan=6 message="No AI recommendations match these filters." %}
+                {% endfor %}
+            </tbody>
+        </table>
+        {% if is_paginated %}
+            {% include "includes/pagination.html" with page_obj=page_obj page_param="page" label="AI recommendation pages" jump_id="ai-recommendation-page-jump" %}
+        {% endif %}
+    </div>
+{% endblock %}

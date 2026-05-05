@@ -7,6 +7,20 @@ from django.urls import reverse_lazy
 from django.views.generic import DetailView, ListView, View
 
 from assistant_linking import models
+from assistant_linking.services.ai_recommendations import (
+    ai_recommendation_queue_queryset,
+    ai_recommendation_workbench_url,
+    apply_ai_learning_proposal,
+    apply_ai_recommendation_review,
+    apply_ready_alias_learning_proposals,
+    build_ai_proposal_quality_checks,
+    build_ai_recommendation_queue_context,
+    generate_manual_alias_recommendations,
+    regenerate_alias_learning_proposal_preview,
+    refresh_ai_learning_proposal_parses,
+    revert_ai_learning_proposal_alias,
+    safe_ai_recommendation_queue_redirect_url,
+)
 from assistant_linking.services.group_actions import (
     apply_group_action,
     rebuild_group_memberships,
@@ -52,6 +66,238 @@ class GroupQueueView(StaffAssistantMixin, ListView):
             **super().get_context_data(**kwargs),
             "last_link_action": latest_undoable_action(self.request.user),
         }
+
+
+class AIRecommendationQueueView(StaffAssistantMixin, ListView):
+    model = models.AIRecommendation
+    template_name = "assistant_linking/ai_recommendations/queue.html"
+    context_object_name = "recommendations"
+    paginate_by = 50
+
+    def get_queryset(self):
+        return ai_recommendation_queue_queryset(
+            status=self.request.GET.get("status", ""),
+            task_type=self.request.GET.get("task", ""),
+            proposal_status=self.request.GET.get("proposal", ""),
+            proposal_type=self.request.GET.get("proposal_type", ""),
+            workflow=self.request.GET.get("workflow", ""),
+        )
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update(build_ai_recommendation_queue_context(self.request))
+        visible_ready_alias_proposal_ids = []
+        for recommendation in context["recommendations"]:
+            recommendation.workbench_url = ai_recommendation_workbench_url(
+                recommendation
+            )
+            proposal = getattr(recommendation, "learning_proposal", None)
+            if (
+                proposal
+                and recommendation.status == models.AIRecommendation.STATUS_ACCEPTED
+                and proposal.status == models.AILearningProposal.STATUS_PENDING
+                and proposal.proposal_type
+                in {
+                    models.AILearningProposal.PROPOSAL_PRODUCT_ALIAS,
+                    models.AILearningProposal.PROPOSAL_BRAND_ALIAS,
+                }
+            ):
+                visible_ready_alias_proposal_ids.append(proposal.pk)
+        context["visible_ready_alias_proposal_ids"] = visible_ready_alias_proposal_ids
+        return context
+
+
+class AIRecommendationDetailView(StaffAssistantMixin, DetailView):
+    model = models.AIRecommendation
+    template_name = "assistant_linking/ai_recommendations/detail.html"
+    context_object_name = "recommendation"
+    pk_url_kwarg = "recommendation_id"
+
+    def get_queryset(self):
+        return models.AIRecommendation.objects.select_related(
+            "supplier_product",
+            "parsed_product",
+            "fragrantica_product",
+            "perfume",
+            "perfume__brand",
+            "reviewed_by",
+            "learning_proposal",
+            "learning_proposal__reviewed_by",
+        )
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        recommendation = self.object
+        proposal = getattr(recommendation, "learning_proposal", None)
+        context["workbench_url"] = ai_recommendation_workbench_url(recommendation)
+        context["proposal_quality_checks"] = build_ai_proposal_quality_checks(
+            recommendation
+        )
+        context["proposal_can_refresh"] = bool(
+            proposal
+            and proposal.status == models.AILearningProposal.STATUS_APPLIED
+            and proposal.proposal_type
+            in {
+                models.AILearningProposal.PROPOSAL_PRODUCT_ALIAS,
+                models.AILearningProposal.PROPOSAL_BRAND_ALIAS,
+            }
+        )
+        context["proposal_can_revert_alias"] = bool(
+            proposal
+            and proposal.status == models.AILearningProposal.STATUS_APPLIED
+            and proposal.proposal_type
+            in {
+                models.AILearningProposal.PROPOSAL_PRODUCT_ALIAS,
+                models.AILearningProposal.PROPOSAL_BRAND_ALIAS,
+            }
+        )
+        context["proposal_can_regenerate_preview"] = bool(
+            proposal
+            and proposal.status == models.AILearningProposal.STATUS_PENDING
+            and proposal.proposal_type
+            in {
+                models.AILearningProposal.PROPOSAL_PRODUCT_ALIAS,
+                models.AILearningProposal.PROPOSAL_BRAND_ALIAS,
+            }
+        )
+        return context
+
+
+class AIRecommendationReviewView(StaffAssistantMixin, View):
+    def post(self, request, recommendation_id):
+        redirect_url = safe_ai_recommendation_queue_redirect_url(
+            request.POST.get("next", ""),
+            host=request.get_host(),
+        )
+        try:
+            recommendation = apply_ai_recommendation_review(
+                recommendation_id=recommendation_id,
+                action=request.POST.get("action", ""),
+                user=request.user,
+            )
+        except ValueError as exc:
+            messages.error(request, str(exc))
+            return redirect(redirect_url)
+        messages.success(request, f"AI recommendation marked {recommendation.status}.")
+        return redirect(redirect_url)
+
+
+class AIRecommendationPatternScanView(StaffAssistantMixin, View):
+    def post(self, request):
+        result = generate_manual_alias_recommendations()
+        messages.success(request, result.message)
+        return redirect(
+            safe_ai_recommendation_queue_redirect_url(
+                request.POST.get("next", ""),
+                host=request.get_host(),
+            )
+        )
+
+
+class AILearningProposalApplyView(StaffAssistantMixin, View):
+    def post(self, request, proposal_id):
+        redirect_url = safe_ai_recommendation_queue_redirect_url(
+            request.POST.get("next", ""),
+            host=request.get_host(),
+        )
+        try:
+            _proposal, level, message = apply_ai_learning_proposal(
+                proposal_id=proposal_id,
+                user=request.user,
+                host=request.get_host(),
+                next_url=redirect_url,
+            )
+        except ValueError as exc:
+            messages.error(request, str(exc))
+            return redirect(redirect_url)
+
+        if level == "success":
+            messages.success(request, message)
+        else:
+            messages.error(request, message)
+        return redirect(redirect_url)
+
+
+class AILearningProposalBulkApplyAliasView(StaffAssistantMixin, View):
+    def post(self, request):
+        redirect_url = safe_ai_recommendation_queue_redirect_url(
+            request.POST.get("next", ""),
+            host=request.get_host(),
+        )
+        result = apply_ready_alias_learning_proposals(
+            proposal_ids=request.POST.getlist("proposal_ids"),
+            user=request.user,
+        )
+        if result.failed:
+            messages.error(request, result.message)
+        else:
+            messages.success(request, result.message)
+        return redirect(redirect_url)
+
+
+class AILearningProposalRefreshParsesView(StaffAssistantMixin, View):
+    def post(self, request, proposal_id):
+        redirect_url = safe_ai_recommendation_queue_redirect_url(
+            request.POST.get("next", ""),
+            host=request.get_host(),
+        )
+        try:
+            _proposal, level, message = refresh_ai_learning_proposal_parses(
+                proposal_id=proposal_id,
+            )
+        except ValueError as exc:
+            messages.error(request, str(exc))
+            return redirect(redirect_url)
+
+        if level == "success":
+            messages.success(request, message)
+        else:
+            messages.error(request, message)
+        return redirect(redirect_url)
+
+
+class AILearningProposalRegeneratePreviewView(StaffAssistantMixin, View):
+    def post(self, request, proposal_id):
+        redirect_url = safe_ai_recommendation_queue_redirect_url(
+            request.POST.get("next", ""),
+            host=request.get_host(),
+        )
+        try:
+            _proposal, level, message = regenerate_alias_learning_proposal_preview(
+                proposal_id=proposal_id,
+                user=request.user,
+            )
+        except ValueError as exc:
+            messages.error(request, str(exc))
+            return redirect(redirect_url)
+
+        if level == "success":
+            messages.success(request, message)
+        else:
+            messages.error(request, message)
+        return redirect(redirect_url)
+
+
+class AILearningProposalRevertAliasView(StaffAssistantMixin, View):
+    def post(self, request, proposal_id):
+        redirect_url = safe_ai_recommendation_queue_redirect_url(
+            request.POST.get("next", ""),
+            host=request.get_host(),
+        )
+        try:
+            _proposal, level, message = revert_ai_learning_proposal_alias(
+                proposal_id=proposal_id,
+                user=request.user,
+            )
+        except ValueError as exc:
+            messages.error(request, str(exc))
+            return redirect(redirect_url)
+
+        if level == "success":
+            messages.success(request, message)
+        else:
+            messages.error(request, message)
+        return redirect(redirect_url)
 
 
 class GroupDetailView(StaffAssistantMixin, DetailView):

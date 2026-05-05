@@ -41,6 +41,8 @@ Related docs: [AGENTS.md](../AGENTS.md), [README.md](../README.md), [docs/REPO_M
 - Manual link decision audit - record of replaced manual decisions. Model: `assistant_linking.ManualLinkDecisionAudit`.
 - Link action - undoable bulk/link operation payload. Model: `assistant_linking.LinkAction`.
 - Link suggestion - candidate link from deterministic/mock/OpenAI suggestion engines. Model: `assistant_linking.LinkSuggestion`.
+- AI recommendation - bounded review-only AI advice with input context, model, confidence, risk, reasoning, and review status. It is audit evidence, not live product data. Model: `assistant_linking.AIRecommendation`.
+- AI learning proposal - pending staff-review action created from accepted AI advice, such as a Fragrantica link-review proposal or future alias/rule proposal. Creating a proposal does not mutate links, aliases, parser rules, or catalogue facts. Model: `assistant_linking.AILearningProposal`.
 - Fragrantica product - staged external catalogue row from saved HTML or parsed catalogue JSON/CSV import; source evidence that can be linked to `catalog.Perfume` after staff review. Brand/name/brand-scoped collection/audience/year/source URL may update or support the local catalogue through that reviewed link; concentration and variants remain local catalogue data. Model: `assistant_linking.FragranticaProduct`.
 - Fragrantica product link - reviewed link record between one staged Fragrantica row and one local `catalog.Perfume`. The primary link is still stored on `FragranticaProduct.matched_perfume`; rare extra links are stored separately and require manual review. Model: `assistant_linking.FragranticaProductLink`.
 - Brand watch profile - configured research target for a brand. Model: `assistant_core.BrandWatchProfile`.

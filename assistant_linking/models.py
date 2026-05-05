@@ -953,3 +953,166 @@ class LinkSuggestion(TimeStampedModel):
 
     def __str__(self) -> str:
         return f"{self.supplier_product} / {self.confidence}"
+
+
+class AIRecommendation(TimeStampedModel):
+    TASK_FRAGRANTICA_LINK_RERANK = "fragrantica_link_rerank"
+    TASK_NORMALIZATION_REVIEW = "normalization_review"
+    TASK_KB_SUGGESTION = "kb_suggestion"
+    TASK_CHOICES = (
+        (TASK_FRAGRANTICA_LINK_RERANK, "Fragrantica link rerank"),
+        (TASK_NORMALIZATION_REVIEW, "Normalization review"),
+        (TASK_KB_SUGGESTION, "Knowledge/rule suggestion"),
+    )
+
+    STATUS_PENDING = "pending"
+    STATUS_ACCEPTED = "accepted"
+    STATUS_REJECTED = "rejected"
+    STATUS_SUPERSEDED = "superseded"
+    STATUS_CHOICES = (
+        (STATUS_PENDING, "Pending"),
+        (STATUS_ACCEPTED, "Accepted"),
+        (STATUS_REJECTED, "Rejected"),
+        (STATUS_SUPERSEDED, "Superseded"),
+    )
+
+    RISK_UNKNOWN = "unknown"
+    RISK_LOW = "low"
+    RISK_MEDIUM = "medium"
+    RISK_HIGH = "high"
+    RISK_CHOICES = (
+        (RISK_UNKNOWN, "Unknown"),
+        (RISK_LOW, "Low"),
+        (RISK_MEDIUM, "Medium"),
+        (RISK_HIGH, "High"),
+    )
+
+    task_type = models.CharField(max_length=50, choices=TASK_CHOICES, db_index=True)
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default=STATUS_PENDING,
+        db_index=True,
+    )
+    supplier_product = models.ForeignKey(
+        "prices.SupplierProduct",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="ai_recommendations",
+        db_index=True,
+    )
+    parsed_product = models.ForeignKey(
+        ParsedSupplierProduct,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="ai_recommendations",
+        db_index=True,
+    )
+    fragrantica_product = models.ForeignKey(
+        FragranticaProduct,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="ai_recommendations",
+        db_index=True,
+    )
+    perfume = models.ForeignKey(
+        "catalog.Perfume",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="assistant_ai_recommendations",
+        db_index=True,
+    )
+    input_hash = models.CharField(max_length=64, db_index=True)
+    prompt_version = models.CharField(max_length=40, db_index=True)
+    model_name = models.CharField(max_length=80, blank=True)
+    confidence = models.PositiveSmallIntegerField(null=True, blank=True, db_index=True)
+    risk_level = models.CharField(
+        max_length=20,
+        choices=RISK_CHOICES,
+        default=RISK_UNKNOWN,
+        db_index=True,
+    )
+    input_context_json = models.JSONField(default=dict, blank=True)
+    recommendation_json = models.JSONField(default=dict, blank=True)
+    reasoning = models.TextField(blank=True)
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True
+    )
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ("-created_at", "-id")
+        indexes = [
+            models.Index(
+                fields=["task_type", "status"], name="alink_ai_task_status_idx"
+            ),
+            models.Index(
+                fields=["input_hash", "task_type"], name="alink_ai_input_task_idx"
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.task_type} / {self.status} / {self.input_hash[:10]}"
+
+
+class AILearningProposal(TimeStampedModel):
+    PROPOSAL_FRAGRANTICA_LINK_REVIEW = "fragrantica_link_review"
+    PROPOSAL_PRODUCT_ALIAS = "product_alias"
+    PROPOSAL_BRAND_ALIAS = "brand_alias"
+    PROPOSAL_GLOBAL_RULE = "global_rule"
+    PROPOSAL_CHOICES = (
+        (PROPOSAL_FRAGRANTICA_LINK_REVIEW, "Fragrantica link review"),
+        (PROPOSAL_PRODUCT_ALIAS, "Product alias"),
+        (PROPOSAL_BRAND_ALIAS, "Brand alias"),
+        (PROPOSAL_GLOBAL_RULE, "Global rule"),
+    )
+
+    STATUS_PENDING = "pending"
+    STATUS_APPROVED = "approved"
+    STATUS_REJECTED = "rejected"
+    STATUS_APPLIED = "applied"
+    STATUS_REVERTED = "reverted"
+    STATUS_CHOICES = (
+        (STATUS_PENDING, "Pending"),
+        (STATUS_APPROVED, "Approved"),
+        (STATUS_REJECTED, "Rejected"),
+        (STATUS_APPLIED, "Applied"),
+        (STATUS_REVERTED, "Reverted"),
+    )
+
+    source_recommendation = models.OneToOneField(
+        AIRecommendation,
+        on_delete=models.CASCADE,
+        related_name="learning_proposal",
+        db_index=True,
+    )
+    proposal_type = models.CharField(
+        max_length=40, choices=PROPOSAL_CHOICES, db_index=True
+    )
+    status = models.CharField(
+        max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING, db_index=True
+    )
+    title = models.CharField(max_length=220)
+    summary = models.TextField(blank=True)
+    proposed_action_json = models.JSONField(default=dict, blank=True)
+    evidence_json = models.JSONField(default=dict, blank=True)
+    impact_json = models.JSONField(default=dict, blank=True)
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True
+    )
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ("-created_at", "-id")
+        indexes = [
+            models.Index(
+                fields=["proposal_type", "status"], name="alink_ai_prop_type_status"
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.proposal_type} / {self.status} / {self.title}"

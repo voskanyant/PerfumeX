@@ -20,8 +20,10 @@ from django.db.models import Count, Q, Subquery
 from django.http import Http404
 from django.shortcuts import get_object_or_404
 from django.urls import reverse, reverse_lazy
+from django.utils import timezone
 from django.utils.http import url_has_allowed_host_and_scheme
 
+from assistant_linking.models import AIRecommendation
 from assistant_linking.models import BrandAlias
 from assistant_linking.models import FragranticaProduct
 from assistant_linking.models import FragranticaProductLink
@@ -31,6 +33,17 @@ from assistant_linking.models import ProductAlias
 from assistant_linking.models import TITLECASE_APOSTROPHE_SUFFIXES
 from assistant_linking.models import TITLECASE_LOWER_WORDS
 from assistant_linking.models import strip_leading_fragrantica_brand_name
+from assistant_core.services.openai_responses import use_openai
+from assistant_linking.services.ai_advisor import (
+    create_fragrantica_rerank_recommendation,
+)
+from assistant_linking.services.ai_advisor import (
+    latest_fragrantica_rerank_recommendation,
+)
+from assistant_linking.services.ai_recommendations import (
+    learning_proposal_for_recommendation,
+    sync_learning_proposal_for_recommendation,
+)
 from assistant_linking.services.parser_rules import get_regex_preprocess_rules
 from assistant_linking.utils.text import normalize_alias_value
 from assistant_linking.utils.text import normalize_mixed_script_latin_lookalikes
@@ -2064,6 +2077,42 @@ def serialize_catalogue_linking_candidate(candidate: FragranticaMatchCandidate) 
     return serialized
 
 
+def serialize_catalogue_linking_ai_advice(recommendation) -> dict:
+    payload = recommendation.recommendation_json or {}
+    source = recommendation.fragrantica_product
+    proposal = learning_proposal_for_recommendation(recommendation)
+    return {
+        "id": recommendation.id,
+        "status": recommendation.status,
+        "model_name": recommendation.model_name,
+        "confidence": recommendation.confidence,
+        "risk_level": recommendation.risk_level,
+        "reasoning": recommendation.reasoning or payload.get("reasoning", ""),
+        "recommended_candidate_id": payload.get("recommended_candidate_id"),
+        "review_url": reverse(
+            "prices:catalogue_linking_ai_advice_review",
+            args=[recommendation.id],
+        ),
+        "can_review": recommendation.status == AIRecommendation.STATUS_PENDING,
+        "learning_proposal": (
+            {
+                "id": proposal.id,
+                "status": proposal.status,
+                "label": proposal.get_status_display(),
+                "title": proposal.title,
+            }
+            if proposal
+            else None
+        ),
+        "recommended_label": (
+            f"{source.brand_name} / {fragrantica_source_catalogue_name(source)}"
+            if source
+            else ""
+        ),
+        "candidate_notes": payload.get("candidate_notes", []),
+    }
+
+
 def serialize_catalogue_linking_selected_perfume(perfume) -> dict:
     return {
         "id": perfume.id,
@@ -2677,17 +2726,129 @@ def build_catalogue_linking_candidate_payload(
         min_score=min_score,
         limit=12,
     )
+    candidates = candidate_map.get(perfume.id, [])
+    latest_advice = (
+        latest_fragrantica_rerank_recommendation(
+            perfume=perfume,
+            candidates=candidates,
+        )
+        if candidates
+        else None
+    )
     return (
         {
             "selected": serialize_catalogue_linking_selected_perfume(perfume),
             "candidates": [
                 serialize_catalogue_linking_candidate(candidate)
-                for candidate in candidate_map.get(perfume.id, [])
+                for candidate in candidates
             ],
             "linked_sources": [],
+            "ai_advice": (
+                serialize_catalogue_linking_ai_advice(latest_advice)
+                if latest_advice
+                else None
+            ),
         },
         200,
     )
+
+
+def build_catalogue_linking_ai_advice_payload(
+    request,
+    *,
+    perfume_manager=None,
+) -> tuple[dict, int]:
+    if not use_openai():
+        return (
+            {
+                "error": (
+                    "OpenAI is not enabled. Set ASSISTANT_USE_OPENAI=true and "
+                    "OPENAI_API_KEY to generate AI advice."
+                )
+            },
+            409,
+        )
+
+    perfume_manager = perfume_manager or CatalogPerfume.objects
+    perfume_id = request.POST.get("perfume") or request.GET.get("perfume")
+    if not perfume_id:
+        return {"error": "Choose an Our Products row first."}, 400
+    perfume = first_from_queryset(
+        perfume_manager.select_related("brand", "collection").filter(pk=perfume_id)
+    )
+    if not perfume:
+        return {"error": "Our Products row was not found."}, 404
+
+    linked_sources = build_linked_fragrantica_sources_by_perfume_ids(
+        [perfume.id],
+    ).get(perfume.id, [])
+    if linked_sources:
+        return {"error": "This Our Products row is already linked."}, 409
+
+    min_score = normalize_catalogue_linking_min_score(
+        request.POST.get("min_score") or request.GET.get("min_score")
+    )
+    conflict_scope_perfumes = list(
+        _catalogue_linking_candidate_conflict_scope(perfume, perfume_manager)
+    )
+    candidate_map = build_catalogue_fragrantica_candidates_for_perfumes(
+        conflict_scope_perfumes,
+        min_score=min_score,
+        limit=12,
+    )
+    candidates = candidate_map.get(perfume.id, [])
+    if not candidates:
+        return {"error": "No Fragrantica candidates are available for AI review."}, 400
+
+    recommendation = create_fragrantica_rerank_recommendation(
+        perfume=perfume,
+        candidates=candidates,
+        call_model=True,
+    )
+    return (
+        {
+            "selected": serialize_catalogue_linking_selected_perfume(perfume),
+            "candidates": [
+                serialize_catalogue_linking_candidate(candidate)
+                for candidate in candidates
+            ],
+            "linked_sources": [],
+            "ai_advice": serialize_catalogue_linking_ai_advice(recommendation),
+        },
+        200,
+    )
+
+
+def build_catalogue_linking_ai_advice_review_payload(
+    recommendation_id,
+    post_data,
+    *,
+    user=None,
+    recommendation_manager=None,
+) -> tuple[dict, int]:
+    recommendation_manager = recommendation_manager or AIRecommendation.objects
+    recommendation = get_object_or_404(recommendation_manager, pk=recommendation_id)
+    action = post_data.get("action", "")
+    if action == "accept":
+        recommendation.status = AIRecommendation.STATUS_ACCEPTED
+    elif action == "reject":
+        recommendation.status = AIRecommendation.STATUS_REJECTED
+    else:
+        return {"error": "Choose accept or reject for the AI recommendation."}, 400
+
+    recommendation.reviewed_by = (
+        user if getattr(user, "is_authenticated", False) else None
+    )
+    recommendation.reviewed_at = timezone.now()
+    recommendation.save(
+        update_fields=["status", "reviewed_by", "reviewed_at", "updated_at"]
+    )
+    sync_learning_proposal_for_recommendation(
+        recommendation,
+        user=user,
+        action=action,
+    )
+    return {"ai_advice": serialize_catalogue_linking_ai_advice(recommendation)}, 200
 
 
 def _catalogue_linking_candidate_conflict_scope(perfume, perfume_manager):

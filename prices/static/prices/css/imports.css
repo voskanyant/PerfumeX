@@ -797,4 +797,201 @@
     white-space: normal;
     max-width: min(72vw, 220px);
   }
+
+  /* Mobile supplier price board: reuse Supplier Products card hierarchy. */
+  .import-workspace {
+    gap: 18px;
+  }
+
+  .import-control-panel,
+  .import-board,
+  .import-scan-panel,
+  .settings-panel {
+    padding: 14px;
+  }
+
+  .import-board .table-wrap {
+    margin-top: 14px;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .import-board .page-header {
+    margin-bottom: 0;
+  }
+
+  .import-board .page-title {
+    font-size: 22px;
+    line-height: 1.08;
+  }
+
+  .import-summary-strip {
+    display: flex;
+    gap: 8px;
+    margin: 14px -14px 0;
+    padding: 0 14px 2px;
+    overflow-x: auto;
+    scrollbar-width: thin;
+  }
+
+  .import-summary-card {
+    flex: 0 0 82px;
+    min-height: 58px;
+    padding: 10px 11px;
+    border-radius: 10px;
+  }
+
+  .import-summary-label {
+    font-size: 9px;
+  }
+
+  .import-summary-value {
+    font-size: 17px;
+  }
+
+  .supplier-import-table tbody tr {
+    grid-template-areas:
+      "supplier actions"
+      "last check"
+      "health health"
+      "problem problem";
+    gap: 10px 12px;
+    margin-bottom: 9px;
+    padding: 13px 14px 12px;
+    border-left: 3px solid var(--grey-200);
+    border-radius: 14px;
+    box-shadow: 0 1px 3px rgba(10, 10, 10, 0.06), 0 1px 2px rgba(10, 10, 10, 0.04);
+  }
+
+  .supplier-import-table tbody tr:has(.import-health-chip.is-success) {
+    border-left-color: var(--success);
+  }
+
+  .supplier-import-table tbody tr:has(.import-health-chip.is-warning),
+  .supplier-import-table tbody tr:has(.import-health-chip.is-stale) {
+    border-left-color: #bc832e;
+  }
+
+  .supplier-import-table tbody tr:has(.import-health-chip.is-failed),
+  .supplier-import-table tbody tr:has(.import-health-chip.is-critical),
+  .supplier-import-table tbody tr:has(.import-health-chip.is-missing) {
+    border-left-color: var(--danger);
+  }
+
+  .supplier-import-table tr.is-row-pending {
+    border-left-color: var(--black);
+    background: var(--white);
+  }
+
+  .supplier-import-table td.import-col-supplier,
+  .supplier-import-table td.import-col-last,
+  .supplier-import-table td.import-col-check,
+  .supplier-import-table td.import-col-health,
+  .supplier-import-table td.import-col-problem {
+    min-width: 0;
+  }
+
+  .import-actions-row {
+    display: grid;
+    grid-template-columns: repeat(2, 30px);
+    gap: 5px;
+    justify-content: flex-end;
+  }
+
+  .import-action-button {
+    width: 30px;
+    height: 30px;
+    min-width: 30px;
+    border-radius: 8px;
+    color: var(--grey-500);
+    opacity: 0.9;
+  }
+
+  .import-action-button .icon {
+    width: 14px;
+    height: 14px;
+  }
+
+  .import-relative-time {
+    font-size: 11.5px;
+  }
+
+  .import-supplier-name {
+    font-size: 14.5px;
+    font-weight: 600;
+    line-height: 1.25;
+  }
+
+  .import-supplier-note,
+  .import-last-note,
+  .import-status-note,
+  .import-problem-link {
+    font-size: 10.5px;
+  }
+
+  .import-col-last,
+  .import-col-check {
+    display: grid !important;
+    gap: 5px;
+    padding: 8px 9px !important;
+    border: 1px solid var(--grey-200) !important;
+    border-radius: 9px;
+    background: var(--grey-50);
+  }
+
+  .import-col-last::before,
+  .import-col-check::before {
+    display: block !important;
+    content: attr(data-label) !important;
+    font-family: 'DM Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.08em;
+    line-height: 1;
+    text-transform: uppercase;
+    color: var(--grey-400);
+  }
+
+  .import-last-note,
+  .import-status-note {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
+
+  .import-check-head {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 6px;
+    align-items: center;
+  }
+
+  .import-status-chip,
+  .import-health-chip {
+    min-height: 20px;
+    padding: 3px 7px;
+    font-size: 9px;
+    letter-spacing: 0.06em;
+  }
+
+  .import-health-stack {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .import-health-stack .import-status-note {
+    min-width: 0;
+    flex: 1;
+  }
+
+  .import-problem-link {
+    max-width: none;
+  }
+
+  .supplier-import-table td.import-col-problem:has(.import-problem-link:empty) {
+    display: none;
+  }
+
 }

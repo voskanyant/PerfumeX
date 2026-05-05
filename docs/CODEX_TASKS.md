@@ -93,6 +93,7 @@ Related docs: [AGENTS.md](../AGENTS.md), [README.md](../README.md), [docs/REPO_M
 - The canonical catalogue lives in `catalog`; supplier offers and import history live in `prices`.
 - Shared UI components already exist for page headers, tabs, pagination, and table empty states.
 - 2026-05-04 - Area: catalogue linking UI height. Source: repeated user correction after the workbench columns stayed visually cramped.
+- 2026-05-05 - Area: UI iteration feedback. Source: user correction. Treat direct feedback like "very good", "very bad", "perfect", and screenshot comparisons as reusable design signal for the next iteration, not just approval/disapproval of one patch.
 
 ## Future note format
 

@@ -190,3 +190,13 @@ Context: Some local Our Products perfumes may rarely represent the same external
 Decision: Keep `FragranticaProduct.matched_perfume` as the primary reviewed link and store rare second reviewed links in `assistant_linking.FragranticaProductLink`. The workbench may expose these only as manual-review candidates, never as bulk-ready numeric-confidence matches.
 
 Consequences: Preserve one Fragrantica row to one Our Products perfume as the default. Promotion export/import must carry both primary and manual-extra links.
+
+## 2026-05-05 - AI assistant is review-only and bounded
+
+Status: Accepted
+
+Context: AI can help with normalization and Fragrantica linking, but automatic AI mutations would make parser behavior, links, aliases, and catalogue facts hard to audit.
+
+Decision: AI outputs for normalization and linking must be stored as reviewed recommendations first. Deterministic services still generate candidate sets and business rules; AI receives only bounded context, must return strict JSON referencing existing IDs, and must not create links, aliases, parser rules, or catalogue facts by itself.
+
+Consequences: Future AI UI should expose pending recommendations with reasoning and risk. Accepted advice may create a pending learning proposal, but links, aliases, parser rules, and catalogue facts still have to be applied through the same audited mutation paths already used by deterministic workflows. A proposal apply button is a staff action, not AI auto-publishing.

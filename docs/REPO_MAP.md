@@ -147,6 +147,7 @@ Should not own:
 - Public assistant-core view exports: `assistant_core/views.py`; shared staff view mixins: `assistant_core/view_mixins.py`.
 - Assistant knowledge/rules/research/review/OpenAI behavior: `assistant_core/services/`, focused `assistant_core/views_*.py` modules, and `assistant_core/forms.py`.
 - Parser, alias, normalization, grouping, smart-search, and linking behavior: `assistant_linking/services/`.
+- Review-only AI advice and learning proposals for normalization and Fragrantica linking: `assistant_linking/services/`, storing auditable recommendation/proposal rows in `assistant_linking` while reusing the shared OpenAI wrapper in `assistant_core`.
 - Public assistant-linking view exports: `assistant_linking/views.py`; normalization UI: `assistant_linking/views_normalization.py`; group/linking/workbench UI: `assistant_linking/views_linking.py`; shared assistant staff view mixins: `assistant_linking/view_mixins.py`; forms in `assistant_linking/forms.py`; templates under `assistant_linking/templates/assistant_linking/`.
 - Management commands: the owning app's `management/commands/`.
 - Template tags: owning app's `templatetags/`; currently shared price display helpers are in `prices/templatetags/prices_extras.py`.

@@ -6,6 +6,7 @@
         <button class="button ghost" type="submit" data-undo-link-action>Undo</button>
     </form>
 {% endif %}
+<a class="button ghost" href="{% url 'assistant_linking:ai_recommendation_queue' %}">AI queue</a>
 <button class="button ghost" type="button" data-shortcut-help>Shortcuts</button>
 <form method="post" action="{% url 'assistant_linking:rebuild_groups' %}">
     {% csrf_token %}

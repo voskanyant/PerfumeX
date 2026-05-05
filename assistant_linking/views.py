@@ -1,6 +1,15 @@
 from __future__ import annotations
 
 from assistant_linking.views_linking import (
+    AILearningProposalApplyView as AILearningProposalApplyView,
+    AILearningProposalBulkApplyAliasView as AILearningProposalBulkApplyAliasView,
+    AILearningProposalRegeneratePreviewView as AILearningProposalRegeneratePreviewView,
+    AILearningProposalRefreshParsesView as AILearningProposalRefreshParsesView,
+    AILearningProposalRevertAliasView as AILearningProposalRevertAliasView,
+    AIRecommendationDetailView as AIRecommendationDetailView,
+    AIRecommendationPatternScanView as AIRecommendationPatternScanView,
+    AIRecommendationQueueView as AIRecommendationQueueView,
+    AIRecommendationReviewView as AIRecommendationReviewView,
     BulkLinkStatusView as BulkLinkStatusView,
     BulkLinkView as BulkLinkView,
     GenerateSuggestionsView as GenerateSuggestionsView,

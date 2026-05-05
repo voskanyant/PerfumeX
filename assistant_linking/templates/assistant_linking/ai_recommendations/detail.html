@@ -1,0 +1,244 @@
+{% extends "prices/base.html" %}
+{% block title %}AI Recommendation{% endblock %}
+{% block topbar_label %}Assistant / AI Recommendation{% endblock %}
+{% block content %}
+    {% include "includes/page_header.html" with kicker="Assistant" title="AI recommendation" meta="Review the evidence, impact, and proposed action before applying knowledge." %}
+    <div class="workspace-block">
+        <div class="layout-inline flex-wrap gap-sm space-bottom-md">
+            <a class="button ghost" href="{% url 'assistant_linking:ai_recommendation_queue' %}">Back to queue</a>
+            <a class="button ghost" href="{{ workbench_url }}">Open target</a>
+            {% if recommendation.status == "pending" %}
+                <form method="post"
+                      action="{% url 'assistant_linking:ai_recommendation_review' recommendation.pk %}">
+                    {% csrf_token %}
+                    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                    <input type="hidden" name="action" value="accept">
+                    <button class="button secondary" type="submit">Accept</button>
+                </form>
+                <form method="post"
+                      action="{% url 'assistant_linking:ai_recommendation_review' recommendation.pk %}">
+                    {% csrf_token %}
+                    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                    <input type="hidden" name="action" value="reject">
+                    <button class="button ghost" type="submit">Reject</button>
+                </form>
+            {% else %}
+                <form method="post"
+                      action="{% url 'assistant_linking:ai_recommendation_review' recommendation.pk %}">
+                    {% csrf_token %}
+                    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                    <input type="hidden" name="action" value="reset">
+                    <button class="button ghost" type="submit">Reset</button>
+                </form>
+            {% endif %}
+            {% if recommendation.learning_proposal.status == "pending" and recommendation.status == "accepted" %}
+                <form method="post"
+                      action="{% url 'assistant_linking:ai_learning_proposal_apply' recommendation.learning_proposal.pk %}">
+                    {% csrf_token %}
+                    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                    <button class="button secondary" type="submit">Apply proposal</button>
+                </form>
+            {% elif proposal_can_refresh %}
+                <form method="post"
+                      action="{% url 'assistant_linking:ai_learning_proposal_refresh_parses' recommendation.learning_proposal.pk %}">
+                    {% csrf_token %}
+                    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                    <button class="button secondary" type="submit">Refresh affected rows</button>
+                </form>
+            {% endif %}
+            {% if proposal_can_regenerate_preview %}
+                <form method="post"
+                      action="{% url 'assistant_linking:ai_learning_proposal_regenerate_preview' recommendation.learning_proposal.pk %}">
+                    {% csrf_token %}
+                    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                    <button class="button ghost" type="submit">Regenerate impact preview</button>
+                </form>
+            {% endif %}
+            {% if proposal_can_revert_alias %}
+                <form method="post"
+                      action="{% url 'assistant_linking:ai_learning_proposal_revert_alias' recommendation.learning_proposal.pk %}">
+                    {% csrf_token %}
+                    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                    <button class="button ghost"
+                            type="submit"
+                            data-confirm="Deactivate the alias created by this AI proposal? Saved parses will not be refreshed automatically.">
+                        Deactivate created alias
+                    </button>
+                </form>
+            {% endif %}
+        </div>
+        <div class="page-grid-3 space-bottom-md">
+            <div class="metric-card">
+                <span class="card-label">Status</span>
+                <strong class="card-title">{{ recommendation.get_status_display }}</strong>
+            </div>
+            <div class="metric-card">
+                <span class="card-label">Risk</span>
+                <strong class="card-title">{{ recommendation.get_risk_level_display }}</strong>
+            </div>
+            <div class="metric-card">
+                <span class="card-label">Confidence</span>
+                <strong class="card-title">{{ recommendation.confidence|default:"-" }}</strong>
+            </div>
+        </div>
+        <div class="page-grid-3">
+            <section class="section-card span-12 md-span-8">
+                <span class="card-label">Recommendation</span>
+                <h2 class="section-title">{{ recommendation.get_task_type_display }}</h2>
+                <p>{{ recommendation.reasoning|default:"No reasoning saved." }}</p>
+                <dl class="detail-list">
+                    <div>
+                        <dt>Target</dt>
+                        <dd>
+                            {% if recommendation.perfume %}
+                                {{ recommendation.perfume }}
+                            {% elif recommendation.supplier_product %}
+                                {{ recommendation.supplier_product }}
+                            {% else %}
+                                Unknown target
+                            {% endif %}
+                        </dd>
+                    </div>
+                    {% if recommendation.fragrantica_product %}
+                        <div>
+                            <dt>Fragrantica row</dt>
+                            <dd>{{ recommendation.fragrantica_product }}</dd>
+                        </div>
+                    {% endif %}
+                    {% if recommendation.supplier_product %}
+                        <div>
+                            <dt>Supplier row</dt>
+                            <dd>{{ recommendation.supplier_product.name }}</dd>
+                        </div>
+                    {% endif %}
+                    {% if recommendation.parsed_product %}
+                        <div>
+                            <dt>Saved parse</dt>
+                            <dd>{{ recommendation.parsed_product.display_identity }}</dd>
+                        </div>
+                    {% endif %}
+                    <div>
+                        <dt>Model</dt>
+                        <dd>{{ recommendation.model_name|default:"Deterministic" }} / {{ recommendation.prompt_version }}</dd>
+                    </div>
+                </dl>
+            </section>
+            <aside class="section-card span-12 md-span-4">
+                <span class="card-label">Proposal</span>
+                {% if recommendation.learning_proposal %}
+                    <h2 class="section-title">{{ recommendation.learning_proposal.get_proposal_type_display }}</h2>
+                    <p>{{ recommendation.learning_proposal.summary|default:"No proposal summary saved." }}</p>
+                    <dl class="detail-list">
+                        <div>
+                            <dt>Status</dt>
+                            <dd>{{ recommendation.learning_proposal.get_status_display }}</dd>
+                        </div>
+                        {% if recommendation.learning_proposal.proposed_action_json.alias_text %}
+                            <div>
+                                <dt>Alias</dt>
+                                <dd>{{ recommendation.learning_proposal.proposed_action_json.alias_text }}</dd>
+                            </div>
+                        {% endif %}
+                        {% if recommendation.learning_proposal.proposed_action_json.canonical_text %}
+                            <div>
+                                <dt>Canonical</dt>
+                                <dd>{{ recommendation.learning_proposal.proposed_action_json.canonical_text }}</dd>
+                            </div>
+                        {% endif %}
+                    </dl>
+                {% else %}
+                    <p class="tone-muted">Accept this recommendation to create a pending learning proposal when supported.</p>
+                {% endif %}
+            </aside>
+        </div>
+        {% if proposal_quality_checks %}
+            <section class="section-card space-top-md">
+                <span class="card-label">Review checklist</span>
+                <div class="page-grid-3">
+                    {% for check in proposal_quality_checks %}
+                        <div class="metric-card">
+                            <span class="card-label">{{ check.label }}</span>
+                            <strong class="card-title">{{ check.status }}</strong>
+                            <span class="tone-muted text-small">{{ check.detail }}</span>
+                        </div>
+                    {% endfor %}
+                </div>
+            </section>
+        {% endif %}
+        {% if recommendation.learning_proposal.impact_json.preview %}
+            {% with preview=recommendation.learning_proposal.impact_json.preview %}
+                <section class="section-card space-top-md">
+                    <span class="card-label">Impact preview</span>
+                    <div class="page-grid-3">
+                        <div class="metric-card">
+                            <span class="card-label">Saved parses</span>
+                            <strong class="card-title">{{ preview.saved_parse_matches|default:0 }}</strong>
+                        </div>
+                        <div class="metric-card">
+                            <span class="card-label">Active rows</span>
+                            <strong class="card-title">{{ preview.active_supplier_matches|default:0 }}</strong>
+                        </div>
+                        <div class="metric-card">
+                            <span class="card-label">Unlocked</span>
+                            <strong class="card-title">{{ preview.unlocked_parse_matches|default:0 }}</strong>
+                        </div>
+                    </div>
+                    {% if preview.sample_supplier_products %}
+                        <p class="tone-muted text-small space-top-sm">
+                            Sample:
+                            {% for product_name in preview.sample_supplier_products %}
+                                {{ product_name }}{% if not forloop.last %}; {% endif %}
+                            {% endfor %}
+                        </p>
+                    {% endif %}
+                    {% if recommendation.learning_proposal.impact_json.last_refresh %}
+                        <p class="tone-muted text-small">
+                            Last refresh:
+                            {{ recommendation.learning_proposal.impact_json.last_refresh.refreshed|default:0 }} refreshed,
+                            {{ recommendation.learning_proposal.impact_json.last_refresh.skipped_locked|default:0 }} locked skipped.
+                        </p>
+                    {% endif %}
+                    {% if recommendation.learning_proposal.impact_json.preview_refreshed_at %}
+                        <p class="tone-muted text-small">
+                            Preview regenerated: {{ recommendation.learning_proposal.impact_json.preview_refreshed_at }}
+                        </p>
+                    {% endif %}
+                    {% if recommendation.learning_proposal.impact_json.revert_result %}
+                        <p class="tone-muted text-small">
+                            Revert: {{ recommendation.learning_proposal.impact_json.revert_result }}
+                        </p>
+                    {% endif %}
+                </section>
+            {% endwith %}
+        {% endif %}
+        {% if recommendation.learning_proposal.evidence_json %}
+            <section class="section-card space-top-md">
+                <span class="card-label">Evidence</span>
+                <dl class="detail-list">
+                    {% if recommendation.learning_proposal.evidence_json.decision_count %}
+                        <div>
+                            <dt>Reviewed decisions</dt>
+                            <dd>{{ recommendation.learning_proposal.evidence_json.decision_count }}</dd>
+                        </div>
+                    {% endif %}
+                    {% if recommendation.learning_proposal.evidence_json.supplier_names %}
+                        <div>
+                            <dt>Suppliers</dt>
+                            <dd>
+                                {% for supplier_name in recommendation.learning_proposal.evidence_json.supplier_names %}
+                                    {{ supplier_name }}{% if not forloop.last %}, {% endif %}
+                                {% endfor %}
+                            </dd>
+                        </div>
+                    {% endif %}
+                    {% if recommendation.learning_proposal.evidence_json.reasoning %}
+                        <div>
+                            <dt>Reasoning</dt>
+                            <dd>{{ recommendation.learning_proposal.evidence_json.reasoning }}</dd>
+                        </div>
+                    {% endif %}
+                </dl>
+            </section>
+        {% endif %}
+    </div>
+{% endblock %}

@@ -4,6 +4,9 @@
 {% block topbar_label %}Catalogue Linking{% endblock %}
 {% block content %}
     {% include "includes/page_header.html" with kicker="Catalogue linking" title="Link Our Products with Fragrantica" %}
+    <div class="page-actions">
+        <a class="button ghost" href="{% url 'assistant_linking:ai_recommendation_queue' %}">AI queue</a>
+    </div>
     <div class="catalogue-linking-tab-grid">
         {% include "includes/tabs.html" with class_name="catalogue-tabs" label="Our Products catalogue tabs" items_template="prices/_our_products_catalog_tab_items.html" %}
         {% include "includes/tabs.html" with class_name="catalogue-tabs" label="Fragrantica catalogue tabs" items_template="prices/_fragrantica_catalogue_tab_items.html" active_fragrantica_tab="linking" %}
@@ -200,6 +203,7 @@
                      aria-live="polite"
                      aria-label="Fragrantica candidates"
                      data-linking-panel
+                     data-ai-advice-url="{% url 'prices:catalogue_linking_ai_advice' %}"
                      data-next-url="{{ request.get_full_path }}">
                 <div class="catalogue-linking-panel-head">
                     <div>
@@ -273,6 +277,23 @@
                             </article>
                         {% endfor %}
                     {% elif selected_row and selected_row.candidates %}
+                        <form method="post"
+                              action="{% url 'prices:catalogue_linking_ai_advice' %}"
+                              class="catalogue-linking-candidate catalogue-linking-ai-action"
+                              data-ai-advice-form>
+                            {% csrf_token %}
+                            <input type="hidden" name="perfume" value="{{ selected_row.perfume.pk }}">
+                            <input type="hidden" name="min_score" value="{{ min_score }}">
+                            <div class="catalogue-linking-candidate-main">
+                                <span class="catalogue-linking-candidate-title">AI advice</span>
+                                <span class="catalogue-linking-candidate-meta">Review-only rerank of the visible Fragrantica candidates.</span>
+                            </div>
+                            <div class="catalogue-linking-candidate-actions">
+                                <button class="button ghost"
+                                        type="submit"
+                                        data-ai-advice-submit>Ask AI</button>
+                            </div>
+                        </form>
                         {% for candidate in selected_row.candidates %}
                             <form method="post"
                                   action="{% url 'prices:fragrantica_product_link' candidate.source.pk %}"

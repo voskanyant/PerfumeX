@@ -73,6 +73,124 @@
         candidatesNode.appendChild(empty);
     }
 
+    function renderAIAdvice(advice) {
+        if (!advice) return;
+        var card = document.createElement("article");
+        card.className = "catalogue-linking-candidate catalogue-linking-ai-advice";
+
+        var main = document.createElement("div");
+        main.className = "catalogue-linking-candidate-main";
+
+        var title = document.createElement("span");
+        title.className = "catalogue-linking-candidate-title";
+        title.textContent = advice.recommended_label
+            ? "AI advice: " + advice.recommended_label
+            : "AI advice";
+
+        var meta = document.createElement("span");
+        meta.className = "catalogue-linking-candidate-meta";
+        var metaParts = [];
+        if (advice.model_name) metaParts.push(advice.model_name);
+        if (advice.risk_level) metaParts.push("Risk " + advice.risk_level);
+        if (advice.status) metaParts.push(advice.status);
+        meta.textContent = metaParts.join(" - ");
+
+        var reason = document.createElement("span");
+        reason.className = "tone-muted text-small";
+        reason.textContent = advice.reasoning || "AI returned no reasoning.";
+
+        main.appendChild(title);
+        main.appendChild(meta);
+        main.appendChild(reason);
+        if (advice.learning_proposal) {
+            var proposal = document.createElement("span");
+            proposal.className = "tone-muted text-small";
+            proposal.textContent = "Learning proposal: " + advice.learning_proposal.label;
+            main.appendChild(proposal);
+        }
+
+        var actions = document.createElement("div");
+        actions.className = "catalogue-linking-candidate-actions";
+
+        var badge = document.createElement("span");
+        badge.className = scoreClass(advice.confidence || 0);
+        badge.textContent = String(advice.confidence || 0);
+        actions.appendChild(badge);
+
+        if (advice.can_review && advice.review_url) {
+            var accept = document.createElement("form");
+            accept.method = "post";
+            accept.action = advice.review_url;
+            accept.setAttribute("data-ai-advice-review-form", "1");
+            appendHidden(accept, "csrfmiddlewaretoken", csrfToken());
+            appendHidden(accept, "action", "accept");
+            var acceptButton = document.createElement("button");
+            acceptButton.className = "button secondary";
+            acceptButton.type = "submit";
+            acceptButton.textContent = "Accept";
+            accept.appendChild(acceptButton);
+            actions.appendChild(accept);
+
+            var reject = document.createElement("form");
+            reject.method = "post";
+            reject.action = advice.review_url;
+            reject.setAttribute("data-ai-advice-review-form", "1");
+            appendHidden(reject, "csrfmiddlewaretoken", csrfToken());
+            appendHidden(reject, "action", "reject");
+            var rejectButton = document.createElement("button");
+            rejectButton.className = "button ghost";
+            rejectButton.type = "submit";
+            rejectButton.textContent = "Reject";
+            reject.appendChild(rejectButton);
+            actions.appendChild(reject);
+        }
+
+        card.appendChild(main);
+        card.appendChild(actions);
+        candidatesNode.appendChild(card);
+    }
+
+    function renderAIAdviceAction(selected) {
+        var form = document.createElement("form");
+        form.method = "post";
+        form.action = panel.getAttribute("data-ai-advice-url") || "";
+        form.className = "catalogue-linking-candidate catalogue-linking-ai-action";
+        form.setAttribute("data-ai-advice-form", "1");
+
+        appendHidden(form, "csrfmiddlewaretoken", csrfToken());
+        appendHidden(form, "perfume", String(selected.id));
+        var minScoreSelect = document.querySelector("[data-linking-min-score]");
+        appendHidden(form, "min_score", minScoreSelect ? minScoreSelect.value : "");
+
+        var main = document.createElement("div");
+        main.className = "catalogue-linking-candidate-main";
+
+        var title = document.createElement("span");
+        title.className = "catalogue-linking-candidate-title";
+        title.textContent = "AI advice";
+
+        var meta = document.createElement("span");
+        meta.className = "catalogue-linking-candidate-meta";
+        meta.textContent = "Review-only rerank of the visible Fragrantica candidates.";
+
+        main.appendChild(title);
+        main.appendChild(meta);
+
+        var actions = document.createElement("div");
+        actions.className = "catalogue-linking-candidate-actions";
+
+        var button = document.createElement("button");
+        button.className = "button ghost";
+        button.type = "submit";
+        button.setAttribute("data-ai-advice-submit", "1");
+        button.textContent = "Ask AI";
+        actions.appendChild(button);
+
+        form.appendChild(main);
+        form.appendChild(actions);
+        candidatesNode.appendChild(form);
+    }
+
     function renderCandidate(selected, candidate) {
         var form = document.createElement("form");
         form.method = "post";
@@ -220,6 +338,10 @@
             renderEmpty("No Fragrantica suggestions meet the current confidence filter.");
             return;
         }
+        renderAIAdvice(data.ai_advice);
+        if (!data.ai_advice || data.ai_advice.status !== "pending") {
+            renderAIAdviceAction(data.selected);
+        }
         candidates.forEach(function (candidate) {
             renderCandidate(data.selected, candidate);
         });
@@ -270,12 +392,12 @@
         suggestion.appendChild(document.createTextNode(data.linked_source.label));
     }
 
-    function setSubmitterBusy(button, busy) {
+    function setSubmitterBusy(button, busy, busyText) {
         if (!button) return;
         if (busy) {
             button.dataset.originalText = button.textContent || "";
             button.disabled = true;
-            button.textContent = "Linking...";
+            button.textContent = busyText || "Linking...";
             return;
         }
         button.disabled = false;
@@ -315,6 +437,75 @@
             });
     }
 
+    function submitAIAdvice(form, submitter) {
+        var action = (submitter && submitter.formAction) || form.action;
+        if (!action) return;
+        setSubmitterBusy(submitter, true, "Thinking...");
+        fetch(action, {
+            method: "POST",
+            body: new FormData(form),
+            headers: { "X-Requested-With": "XMLHttpRequest" }
+        })
+            .then(function (response) {
+                return response.json().then(function (data) {
+                    if (!response.ok || data.error) throw data;
+                    return data;
+                });
+            })
+            .then(function (data) {
+                renderPayload(data);
+                var row = rows.find(function (item) {
+                    return item.getAttribute("data-perfume-id") === String(data.selected.id);
+                });
+                if (row) {
+                    row.setAttribute("data-linking-payload", JSON.stringify(data));
+                }
+            })
+            .catch(function (data) {
+                renderEmpty((data && data.error) || "AI advice failed. Check OpenAI settings and try again.");
+            })
+            .finally(function () {
+                setSubmitterBusy(submitter, false);
+            });
+    }
+
+    function currentSelectedRow() {
+        return rows.find(function (item) {
+            return item.classList.contains("is-selected");
+        });
+    }
+
+    function submitAIAdviceReview(form, submitter) {
+        var action = (submitter && submitter.formAction) || form.action;
+        if (!action) return;
+        setSubmitterBusy(submitter, true, "Saving...");
+        fetch(action, {
+            method: "POST",
+            body: new FormData(form),
+            headers: { "X-Requested-With": "XMLHttpRequest" }
+        })
+            .then(function (response) {
+                return response.json().then(function (data) {
+                    if (!response.ok || data.error) throw data;
+                    return data;
+                });
+            })
+            .then(function (data) {
+                var row = currentSelectedRow();
+                var payload = row ? rowPayload(row) : null;
+                if (!payload) return;
+                payload.ai_advice = data.ai_advice;
+                row.setAttribute("data-linking-payload", JSON.stringify(payload));
+                renderPayload(payload);
+            })
+            .catch(function (data) {
+                renderEmpty((data && data.error) || "AI review failed. Reload and try again.");
+            })
+            .finally(function () {
+                setSubmitterBusy(submitter, false);
+            });
+    }
+
     function selectRow(row) {
         rows.forEach(function (item) {
             item.classList.toggle("is-selected", item === row);
@@ -345,7 +536,20 @@
 
     candidatesNode.addEventListener("submit", function (event) {
         var form = event.target;
-        if (!(form instanceof HTMLFormElement) || !form.matches("[data-fragrantica-link-form]")) return;
+        if (!(form instanceof HTMLFormElement)) return;
+        if (form.matches("[data-ai-advice-form]")) {
+            event.preventDefault();
+            event.stopPropagation();
+            submitAIAdvice(form, event.submitter);
+            return;
+        }
+        if (form.matches("[data-ai-advice-review-form]")) {
+            event.preventDefault();
+            event.stopPropagation();
+            submitAIAdviceReview(form, event.submitter);
+            return;
+        }
+        if (!form.matches("[data-fragrantica-link-form]")) return;
         event.preventDefault();
         event.stopPropagation();
         form.dataset.noSubmitDisable = "1";

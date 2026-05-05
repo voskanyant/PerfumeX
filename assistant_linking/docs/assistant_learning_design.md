@@ -98,6 +98,19 @@ Later AI-backed assistant features should read from the same knowledge surfaces 
 
 The AI should propose knowledge changes for staff review. It should not silently mutate product identity, overwrite links, or bypass the same rule/alias/catalogue layers used by deterministic parsing.
 
+Safe rollout order:
+
+1. Fragrantica link advisor: deterministic matching builds the candidate list, AI may rerank/explain only those candidate IDs, and staff chooses whether to link.
+2. Review pattern finder: AI summarizes repeated manual decisions and proposes aliases/rules for review when the same correction appears many times.
+3. Knowledge proposal drafts: AI creates pending alias/rule/catalogue suggestions with source rows and expected impact, but approval remains a staff action.
+4. Parser review helper: AI can explain low-confidence parses or Cyrillic unresolved identity, but saved parses still come from parser code/rules unless staff accepts a reviewed knowledge change.
+
+AI recommendation records should include the input context, prompt version, model name, confidence, risk level, reasoning, and status. They are audit evidence, not product data. Staff review them through the AI recommendations queue. Accepted recommendations create pending learning proposals; those proposals are still not live aliases, rules, catalogue facts, or links until staff explicitly applies them through the normal audited workflow. The first supported apply path is Fragrantica link review, which reuses the existing reviewed Fragrantica linking action.
+
+The first review pattern finder is deterministic and does not require an API key: it scans repeated approved manual supplier-product links and can propose a `ProductAlias` when the same parsed supplier scent text is repeatedly linked to a different catalogue perfume name. It can also propose a `BrandAlias` when repeated reviewed links show the same non-generic detected supplier brand text should map to a different catalogue brand. Proposals remain pending until staff accepts and applies them; applying creates alias knowledge only and does not automatically reparse saved supplier rows. Alias proposals should show a saved-parse impact preview before apply, including matched saved parses, active supplier rows, unlocked parses, and sample supplier names. After staff applies an alias proposal, any parse refresh must remain explicit and targeted to the preview-matched saved parses; human-locked parses are skipped.
+
+The AI recommendation queue may bulk-apply accepted pending alias proposals from the visible page only. This shortcut is limited to `ProductAlias` and `BrandAlias` proposals because they create reviewable knowledge. Fragrantica link proposals must stay one-at-a-time reviewed actions in the linking workbench. Alias proposal detail pages should compare the saved impact preview against current matching saved parses and warn when the counts have changed. Applying an alias proposal must also refuse stale or missing impact previews so knowledge is not created from outdated evidence. Pending alias proposals must expose an explicit regenerate-preview action that refreshes the saved impact counts and samples before apply. Applied alias proposals must keep the created alias ID in `impact_json` and expose a revert action that deactivates only that created alias; saved parses still require an explicit refresh after either apply or revert.
+
 ## Operational Rule
 
 Every new assistant learning workflow should answer these questions in code or docs:

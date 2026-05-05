@@ -81,6 +81,8 @@ from .views_imports import (
     SupplierRatesRecalculateView,
 )
 from .views_our_products import (
+    CatalogueLinkingAIAdviceView,
+    CatalogueLinkingAIAdviceReviewView,
     CatalogueLinkingCandidateView,
     CatalogueLinkingWorkbenchView,
     FragranticaProductReviewView,
