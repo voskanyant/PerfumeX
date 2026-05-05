@@ -1213,4 +1213,14 @@ tr[data-delta="up"] {
   .products-mobile td.actions .actions-mobile {
     display: none !important;
   }
+
+  .products-mobile td[data-field],
+  .products-mobile td.sparkline-cell,
+  .products-mobile td.actions {
+    display: none !important;
+  }
+
+  .products-mobile td.supplier-mobile-card-cell {
+    display: block !important;
+  }
 }
