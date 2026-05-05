@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
@@ -12,6 +13,7 @@ from assistant_linking.models import (
     FragranticaProduct,
 )
 from catalog.models import Brand, Perfume
+from prices.services.catalog_review import build_catalogue_linking_rows
 
 
 class CatalogueLinkingAIAdviceTests(TestCase):
@@ -90,6 +92,13 @@ class CatalogueLinkingAIAdviceTests(TestCase):
         self.assertEqual(recommendation.status, AIRecommendation.STATUS_PENDING)
         self.assertEqual(recommendation.fragrantica_product, self.source)
         self.assertEqual(recommendation.perfume, self.perfume)
+        row_payload = json.loads(
+            build_catalogue_linking_rows([self.perfume], min_score=80)[0][
+                "payload_json"
+            ]
+        )
+        self.assertEqual(row_payload["ai_advice"]["id"], recommendation.id)
+        self.assertEqual(row_payload["ai_advice"]["confidence"], 93)
 
         self.source.refresh_from_db()
         self.assertEqual(self.source.match_status, FragranticaProduct.STATUS_UNLINKED)

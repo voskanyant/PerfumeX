@@ -2127,16 +2127,29 @@ def serialize_catalogue_linking_selected_perfume(perfume) -> dict:
 
 
 def catalogue_linking_row_payload_json(row: dict) -> str:
+    latest_advice = None
+    perfume = row["perfume"]
+    candidates = row["candidates"]
+    if candidates:
+        latest_advice = latest_fragrantica_rerank_recommendation(
+            perfume=perfume,
+            candidates=candidates,
+        )
     payload = {
-        "selected": serialize_catalogue_linking_selected_perfume(row["perfume"]),
+        "selected": serialize_catalogue_linking_selected_perfume(perfume),
         "linked_sources": [
             serialize_catalogue_linking_source(source)
             for source in row["linked_sources"]
         ],
         "candidates": [
             serialize_catalogue_linking_candidate(candidate)
-            for candidate in row["candidates"]
+            for candidate in candidates
         ],
+        "ai_advice": (
+            serialize_catalogue_linking_ai_advice(latest_advice)
+            if latest_advice
+            else None
+        ),
     }
     return json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
 

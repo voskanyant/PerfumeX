@@ -16,7 +16,35 @@
 
     function csrfToken() {
         var csrfInput = document.querySelector("input[name=csrfmiddlewaretoken]");
-        return csrfInput ? csrfInput.value : "";
+        if (csrfInput && csrfInput.value) return csrfInput.value;
+        var match = document.cookie.match(/(?:^|; )csrftoken=([^;]+)/);
+        return match ? decodeURIComponent(match[1]) : "";
+    }
+
+    function ajaxHeaders() {
+        var headers = { "X-Requested-With": "XMLHttpRequest" };
+        var token = csrfToken();
+        if (token) headers["X-CSRFToken"] = token;
+        return headers;
+    }
+
+    function parseJsonResponse(response, fallbackMessage) {
+        return response.text().then(function (text) {
+            var data = null;
+            if (text) {
+                try {
+                    data = JSON.parse(text);
+                } catch (error) {
+                    throw {
+                        error: fallbackMessage || "Request failed. Reload and try again.",
+                        detail: text.slice(0, 160)
+                    };
+                }
+            }
+            data = data || {};
+            if (!response.ok || data.error || data.ok === false) throw data;
+            return data;
+        });
     }
 
     function scoreClass(score) {
@@ -415,13 +443,10 @@
         fetch(action, {
             method: "POST",
             body: formData,
-            headers: { "X-Requested-With": "XMLHttpRequest" }
+            headers: ajaxHeaders()
         })
             .then(function (response) {
-                return response.json().then(function (data) {
-                    if (!response.ok || !data.ok) throw data;
-                    return data;
-                });
+                return parseJsonResponse(response, "Link failed. Reload and try again.");
             })
             .then(function (data) {
                 var payload = linkingPayloadFromResponse(data);
@@ -429,7 +454,7 @@
                 renderPayload(payload);
             })
             .catch(function (data) {
-                renderEmpty((data && data.message) || "Link failed. Reload and try again.");
+                renderEmpty((data && (data.message || data.error)) || "Link failed. Reload and try again.");
             })
             .finally(function () {
                 delete form.dataset.noSubmitDisable;
@@ -444,22 +469,19 @@
         fetch(action, {
             method: "POST",
             body: new FormData(form),
-            headers: { "X-Requested-With": "XMLHttpRequest" }
+            headers: ajaxHeaders()
         })
             .then(function (response) {
-                return response.json().then(function (data) {
-                    if (!response.ok || data.error) throw data;
-                    return data;
-                });
+                return parseJsonResponse(response, "AI advice failed. Check OpenAI settings and try again.");
             })
             .then(function (data) {
-                renderPayload(data);
                 var row = rows.find(function (item) {
                     return item.getAttribute("data-perfume-id") === String(data.selected.id);
                 });
                 if (row) {
                     row.setAttribute("data-linking-payload", JSON.stringify(data));
                 }
+                renderPayload(data);
             })
             .catch(function (data) {
                 renderEmpty((data && data.error) || "AI advice failed. Check OpenAI settings and try again.");
@@ -482,13 +504,10 @@
         fetch(action, {
             method: "POST",
             body: new FormData(form),
-            headers: { "X-Requested-With": "XMLHttpRequest" }
+            headers: ajaxHeaders()
         })
             .then(function (response) {
-                return response.json().then(function (data) {
-                    if (!response.ok || data.error) throw data;
-                    return data;
-                });
+                return parseJsonResponse(response, "AI review failed. Reload and try again.");
             })
             .then(function (data) {
                 var row = currentSelectedRow();
