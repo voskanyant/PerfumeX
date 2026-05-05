@@ -731,22 +731,21 @@ tr[data-delta="up"] {
 
   .products-mobile tr {
     display: grid !important;
-    grid-template-columns: minmax(0, 1fr) minmax(88px, 100px) !important;
+    grid-template-columns: minmax(0, 1fr) minmax(92px, 106px) !important;
     grid-template-areas:
       "name name"
       "price supplier"
-      "price date"
-      "chart chart"
+      "chart date"
       "actions actions";
-    column-gap: 12px;
-    row-gap: 4px;
-    margin-bottom: 7px !important;
-    padding: 11px 12px 9px !important;
+    column-gap: 16px;
+    row-gap: 7px;
+    margin-bottom: 8px !important;
+    padding: 13px 14px 11px !important;
     border: 1px solid var(--grey-200) !important;
     border-left: 1px solid var(--grey-200) !important;
-    border-radius: 7px !important;
-    background: linear-gradient(180deg, var(--white) 0%, #fdfdfd 100%) !important;
-    box-shadow: 0 1px 1px rgba(10, 10, 10, 0.035) !important;
+    border-radius: 8px !important;
+    background: var(--white) !important;
+    box-shadow: 0 1px 2px rgba(10, 10, 10, 0.045) !important;
     max-width: 100%;
     overflow: hidden;
     position: relative;
@@ -793,19 +792,18 @@ tr[data-delta="up"] {
   .products-mobile td[data-field="current_price"] {
     grid-area: price;
     min-width: 0;
-    align-self: stretch;
-    padding-top: 1px !important;
+    align-self: start;
   }
 
   .products-mobile td[data-field="supplier"] {
     grid-area: supplier;
-    width: 100px;
+    width: 106px;
     min-width: 0;
-    max-width: 100px;
+    max-width: 106px;
     justify-self: end;
     align-self: start;
     text-align: right;
-    padding-top: 1px !important;
+    padding-top: 2px !important;
   }
 
   .products-mobile td[data-field="supplier_sku"] {
@@ -814,11 +812,11 @@ tr[data-delta="up"] {
 
   .products-mobile td[data-field="last_imported_at"] {
     grid-area: date;
-    width: 100px;
+    width: 106px;
     min-width: 0;
-    max-width: 100px;
+    max-width: 106px;
     justify-self: end;
-    align-self: start;
+    align-self: center;
     text-align: right;
   }
 
@@ -826,32 +824,34 @@ tr[data-delta="up"] {
   .products-mobile td[data-field="name"] a.cell-name,
   .products-mobile td[data-field="name"] .cell-name-copy {
     color: var(--black);
-    font-size: 13.75px !important;
+    font-size: 14px !important;
     font-weight: 500 !important;
-    line-height: 1.28 !important;
+    line-height: 1.3 !important;
     text-decoration: none;
   }
 
   .products-mobile td[data-field="name"] .cell-name-wrap {
-    display: block;
-    max-width: calc(100% - 36px);
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 24px;
+    gap: 10px;
+    align-items: start;
+    max-width: 100%;
   }
 
   .products-mobile td[data-field="name"] .cell-name-open {
-    position: absolute;
-    top: 9px;
-    right: 10px;
+    position: static;
     margin-top: 0;
     width: 24px;
     height: 24px;
     flex: none;
     align-items: center;
-    background: rgba(255, 255, 255, 0.68);
+    justify-content: center;
+    background: transparent;
     border: 1px solid transparent;
     border-radius: var(--radius-sm);
     box-shadow: none;
     color: var(--grey-400);
-    opacity: 0.8;
+    opacity: 0.72;
   }
 
   .products-mobile td[data-field="name"] .cell-name-open:hover,
@@ -871,31 +871,31 @@ tr[data-delta="up"] {
   .products-mobile .sparkline-cell {
     grid-area: chart;
     width: 100% !important;
-    margin: 7px 0 0;
-    padding: 4px 6px 0 !important;
-    border-top: 0 !important;
-    border-radius: var(--radius-sm);
-    background: var(--grey-50);
+    margin: 2px 0 0;
+    padding: 5px 0 0 !important;
+    border-top: 1px solid var(--grey-150) !important;
+    border-radius: 0;
+    background: transparent;
     display: block !important;
   }
 
   .products-mobile .product-sparkline {
     display: block;
     width: 100% !important;
-    height: 18px !important;
-    opacity: 0.72;
+    height: 14px !important;
+    opacity: 0.58;
   }
 
   .products-mobile td[data-field="supplier"] .cell-supplier,
   .products-mobile td[data-field="supplier"] .supplier-filter-link {
     display: inline-block;
-    max-width: 100px;
+    max-width: 106px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-size: 10.75px;
+    font-size: 11px;
     font-weight: 700;
-    line-height: 1.15;
+    line-height: 1.2;
     text-decoration: none !important;
     background: none !important;
     border: none !important;
@@ -906,10 +906,10 @@ tr[data-delta="up"] {
 
   .products-mobile td[data-field="last_imported_at"] .cell-imported {
     display: block;
-    font-size: 10.75px;
+    font-size: 11px;
     font-weight: 500;
     letter-spacing: 0.03em;
-    line-height: 1.2;
+    line-height: 1.25;
     white-space: nowrap;
   }
 
@@ -952,14 +952,14 @@ tr[data-delta="up"] {
     grid-template-areas:
       "price"
       "change";
-    row-gap: 1px;
+    row-gap: 2px;
     align-items: start;
   }
 
   .products-mobile .desktop-price-stack .cell-price-main {
     grid-area: price;
     font-family: 'DM Sans', sans-serif !important;
-    font-size: 13.75px !important;
+    font-size: 14px !important;
     font-weight: 700 !important;
     line-height: 1.25 !important;
   }
@@ -971,8 +971,15 @@ tr[data-delta="up"] {
   }
 
   .products-mobile .price-delta-badge {
+    display: inline-flex;
+    align-items: center;
+    width: fit-content;
+    padding: 1px 6px;
+    border: 1px solid var(--grey-150);
+    border-radius: 5px;
+    background: var(--grey-50);
     font-family: 'DM Sans', sans-serif !important;
-    font-size: 10.75px !important;
+    font-size: 10.5px !important;
     font-weight: 400 !important;
     letter-spacing: 0 !important;
     text-transform: none !important;
