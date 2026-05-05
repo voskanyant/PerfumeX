@@ -53,9 +53,9 @@
             submitter.hasAttribute &&
             submitter.hasAttribute("formaction")
         ) {
-            return submitter.formAction;
+            return submitter.getAttribute("formaction") || "";
         }
-        return form.action;
+        return form.getAttribute("action") || "";
     }
 
     function scoreClass(score) {
