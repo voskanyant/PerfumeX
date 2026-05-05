@@ -647,6 +647,8 @@ tr[data-delta="up"] {
 
   .filters-products .search-inline-row,
   .generic-list-surface .search-inline-row {
+    align-items: stretch;
+    gap: 8px;
     top: 64px;
     z-index: 1020;
     padding-bottom: 0;
@@ -687,12 +689,22 @@ tr[data-delta="up"] {
   }
 
   .products-page .search-wrap-inner input {
+    min-height: 40px;
     padding-left: 34px !important;
     font-size: 16px !important;
+    border-radius: var(--radius-sm);
   }
 
   .products-page .search-wrap-inner .search-icon {
     left: 14px !important;
+  }
+
+  .products-page .filter-icon-btn,
+  .generic-list-page .filter-icon-btn {
+    width: 40px;
+    height: 40px;
+    flex-basis: 40px;
+    border-radius: var(--radius-sm);
   }
 
   .product-filters-drawer {
@@ -719,25 +731,29 @@ tr[data-delta="up"] {
 
   .products-mobile tr {
     display: grid !important;
-    grid-template-columns: minmax(0, 1fr) minmax(92px, 106px) !important;
+    grid-template-columns: minmax(0, 1fr) minmax(88px, 100px) !important;
     grid-template-areas:
       "name name"
       "price supplier"
       "price date"
       "chart chart"
       "actions actions";
-    column-gap: 10px;
-    row-gap: 3px;
-    margin-bottom: 8px !important;
-    padding: 13px 14px 10px !important;
+    column-gap: 12px;
+    row-gap: 2px;
+    margin-bottom: 7px !important;
+    padding: 11px 12px 9px !important;
     border: 1px solid var(--grey-200) !important;
     border-left: 1px solid var(--grey-200) !important;
-    border-radius: var(--radius-md) !important;
-    background: var(--white) !important;
-    box-shadow: 0 1px 2px rgba(10, 10, 10, 0.04), 0 0 0 1px rgba(10, 10, 10, 0.015) !important;
+    border-radius: 7px !important;
+    background: linear-gradient(180deg, var(--white) 0%, #fdfdfd 100%) !important;
+    box-shadow: 0 1px 1px rgba(10, 10, 10, 0.035) !important;
     max-width: 100%;
     overflow: hidden;
     position: relative;
+  }
+
+  .products-mobile tr[data-delta] {
+    border-left-width: 3px !important;
   }
 
   .products-mobile tr[data-delta="down"] {
@@ -782,9 +798,9 @@ tr[data-delta="up"] {
 
   .products-mobile td[data-field="supplier"] {
     grid-area: supplier;
-    width: 106px;
+    width: 100px;
     min-width: 0;
-    max-width: 106px;
+    max-width: 100px;
     justify-self: end;
     align-self: start;
     text-align: right;
@@ -796,9 +812,9 @@ tr[data-delta="up"] {
 
   .products-mobile td[data-field="last_imported_at"] {
     grid-area: date;
-    width: 106px;
+    width: 100px;
     min-width: 0;
-    max-width: 106px;
+    max-width: 100px;
     justify-self: end;
     align-self: start;
     text-align: right;
@@ -808,32 +824,32 @@ tr[data-delta="up"] {
   .products-mobile td[data-field="name"] a.cell-name,
   .products-mobile td[data-field="name"] .cell-name-copy {
     color: var(--black);
-    font-size: 14.5px !important;
+    font-size: 13.75px !important;
     font-weight: 500 !important;
-    line-height: 1.32 !important;
+    line-height: 1.28 !important;
     text-decoration: none;
   }
 
   .products-mobile td[data-field="name"] .cell-name-wrap {
     display: block;
-    max-width: calc(100% - 34px);
+    max-width: calc(100% - 36px);
   }
 
   .products-mobile td[data-field="name"] .cell-name-open {
     position: absolute;
-    top: 9px;
-    right: 9px;
+    top: 8px;
+    right: 8px;
     margin-top: 0;
-    width: 28px;
-    height: 28px;
+    width: 30px;
+    height: 30px;
     flex: none;
     align-items: center;
-    background: transparent;
-    border: 0;
+    background: var(--grey-50);
+    border: 1px solid var(--grey-200);
     border-radius: var(--radius-sm);
     box-shadow: none;
     color: var(--grey-500);
-    opacity: 0.78;
+    opacity: 1;
   }
 
   .products-mobile td[data-field="name"] .cell-name-open:hover,
@@ -852,28 +868,31 @@ tr[data-delta="up"] {
   .products-mobile .sparkline-cell {
     grid-area: chart;
     width: 100% !important;
-    margin-top: 7px;
-    padding: 7px 0 0 !important;
-    border-top: 1px solid var(--grey-150) !important;
+    margin: 7px 0 0;
+    padding: 4px 6px 0 !important;
+    border-top: 0 !important;
+    border-radius: var(--radius-sm);
+    background: var(--grey-50);
     display: block !important;
   }
 
   .products-mobile .product-sparkline {
     display: block;
     width: 100% !important;
-    height: 22px !important;
+    height: 18px !important;
+    opacity: 0.72;
   }
 
   .products-mobile td[data-field="supplier"] .cell-supplier,
   .products-mobile td[data-field="supplier"] .supplier-filter-link {
     display: inline-block;
-    max-width: 106px;
+    max-width: 100px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-size: 11.5px;
-    font-weight: 600;
-    line-height: 1.2;
+    font-size: 10.75px;
+    font-weight: 700;
+    line-height: 1.15;
     text-decoration: none !important;
     background: none !important;
     border: none !important;
@@ -884,10 +903,10 @@ tr[data-delta="up"] {
 
   .products-mobile td[data-field="last_imported_at"] .cell-imported {
     display: block;
-    font-size: 11.5px;
+    font-size: 10.75px;
     font-weight: 500;
-    letter-spacing: 0.04em;
-    line-height: 1.25;
+    letter-spacing: 0.03em;
+    line-height: 1.2;
     white-space: nowrap;
   }
 
@@ -930,16 +949,16 @@ tr[data-delta="up"] {
     grid-template-areas:
       "price"
       "change";
-    row-gap: 2px;
+    row-gap: 1px;
     align-items: start;
   }
 
   .products-mobile .desktop-price-stack .cell-price-main {
     grid-area: price;
     font-family: 'DM Sans', sans-serif !important;
-    font-size: 13.5px !important;
+    font-size: 13.75px !important;
     font-weight: 700 !important;
-    line-height: 1.3 !important;
+    line-height: 1.25 !important;
   }
 
   .products-mobile .price-delta-wrap {
@@ -950,7 +969,7 @@ tr[data-delta="up"] {
 
   .products-mobile .price-delta-badge {
     font-family: 'DM Sans', sans-serif !important;
-    font-size: 11px !important;
+    font-size: 10.75px !important;
     font-weight: 400 !important;
     letter-spacing: 0 !important;
     text-transform: none !important;
