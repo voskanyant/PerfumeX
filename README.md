@@ -257,9 +257,10 @@ Current behavior on push to `main`:
 7. restart `perfumex`
 8. restart `nginx`
 
-Production queue-backed actions require a running RQ worker. Install the systemd
-unit from `deploy/systemd/perfumex-worker.service` once per server, then enable
-it:
+Production queue-backed actions require a running RQ worker. The GitHub deploy
+workflow installs or refreshes the systemd unit from
+`deploy/systemd/perfumex-worker.service` on each deploy. On a newly moved server,
+or when doing a manual deploy without GitHub Actions, install and enable it with:
 
 ```bash
 cp deploy/systemd/perfumex-worker.service /etc/systemd/system/perfumex-worker.service

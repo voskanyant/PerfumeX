@@ -237,5 +237,14 @@ jobs:
             else
               echo "No static asset changes; skipping collectstatic"
             fi
+            if [ -f /opt/perfumex/PerfumeX/deploy/systemd/perfumex-worker.service ]; then
+              cp /opt/perfumex/PerfumeX/deploy/systemd/perfumex-worker.service /etc/systemd/system/perfumex-worker.service
+              systemctl daemon-reload
+              systemctl enable --now perfumex-worker
+              systemctl restart perfumex-worker
+            else
+              echo "perfumex-worker service template not found"
+              exit 1
+            fi
             systemctl restart perfumex
             echo "Application restarted; nginx reload not required for app-only deploy"
