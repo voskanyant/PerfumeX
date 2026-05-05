@@ -2100,7 +2100,17 @@ def build_catalogue_linking_perfume_queryset(
     perfume_manager=None,
 ):
     perfume_manager = perfume_manager or CatalogPerfume.objects
-    queryset = perfume_manager.select_related("brand", "collection").annotate(
+    selected_brand = normalize_fragrantica_review_brand_id(
+        request.GET.get("brand") or ""
+    )
+    search_query = request.GET.get("q", "").strip()
+    status_filter = normalize_catalogue_linking_status(request.GET.get("status"))
+
+    queryset = _apply_catalogue_linking_perfume_filters(
+        perfume_manager.select_related("brand", "collection"),
+        selected_brand=selected_brand,
+        search_query=search_query,
+    ).annotate(
         variant_count=Count("variants", distinct=True),
         linked_fragrantica_count=Count(
             "fragrantica_products",
@@ -2114,12 +2124,40 @@ def build_catalogue_linking_perfume_queryset(
             distinct=True,
         ),
     )
-    selected_brand = normalize_fragrantica_review_brand_id(
-        request.GET.get("brand") or ""
-    )
-    search_query = request.GET.get("q", "").strip()
-    status_filter = normalize_catalogue_linking_status(request.GET.get("status"))
+    if status_filter == "linked":
+        queryset = queryset.filter(
+            Q(linked_fragrantica_count__gt=0) | Q(reviewed_fragrantica_link_count__gt=0)
+        )
+    elif status_filter == "unlinked":
+        queryset = queryset.filter(
+            linked_fragrantica_count=0,
+            reviewed_fragrantica_link_count=0,
+        )
+    if _catalogue_linking_request_uses_strict_exact_filter(request):
+        exact_queryset = _apply_catalogue_linking_perfume_filters(
+            perfume_manager.select_related("brand"),
+            selected_brand=selected_brand,
+            search_query=search_query,
+        )
+        if status_filter == "unlinked":
+            exact_queryset = (
+                exact_queryset.exclude(
+                    fragrantica_products__match_status=FragranticaProduct.STATUS_LINKED
+                )
+                .filter(fragrantica_review_links__isnull=True)
+                .distinct()
+            )
+        exact_perfume_ids = _catalogue_linking_strict_exact_perfume_ids(exact_queryset)
+        queryset = queryset.filter(pk__in=exact_perfume_ids)
+    return queryset.order_by("brand__name", "collection_name", "name", "concentration")
 
+
+def _apply_catalogue_linking_perfume_filters(
+    queryset,
+    *,
+    selected_brand: str,
+    search_query: str,
+):
     if selected_brand:
         queryset = queryset.filter(brand_id=selected_brand)
     if search_query:
@@ -2140,19 +2178,7 @@ def build_catalogue_linking_perfume_queryset(
                 | Q(audience__icontains=token)
             )
         queryset = queryset.filter(phrase_filter | token_filter)
-    if status_filter == "linked":
-        queryset = queryset.filter(
-            Q(linked_fragrantica_count__gt=0) | Q(reviewed_fragrantica_link_count__gt=0)
-        )
-    elif status_filter == "unlinked":
-        queryset = queryset.filter(
-            linked_fragrantica_count=0,
-            reviewed_fragrantica_link_count=0,
-        )
-    if _catalogue_linking_request_uses_strict_exact_filter(request):
-        exact_perfume_ids = _catalogue_linking_strict_exact_perfume_ids(queryset)
-        queryset = queryset.filter(pk__in=exact_perfume_ids)
-    return queryset.order_by("brand__name", "collection_name", "name", "concentration")
+    return queryset
 
 
 def build_catalogue_linking_rows(
@@ -2250,7 +2276,11 @@ def _catalogue_linking_sequence_slice(sequence, start: int, stop: int):
 
 
 def _catalogue_linking_lightweight_perfume_rows(sequence) -> list[dict]:
-    if getattr(sequence, "model", None) is CatalogPerfume:
+    query = getattr(sequence, "query", None)
+    if (
+        getattr(sequence, "model", None) is CatalogPerfume
+        and getattr(query, "annotations", {})
+    ):
         sequence = CatalogPerfume.objects.filter(
             pk__in=Subquery(sequence.values("pk"))
         ).select_related("brand")
@@ -2309,17 +2339,22 @@ def _catalogue_linking_strict_exact_perfume_ids(sequence) -> set[int]:
         return set()
 
     perfume_ids_by_brand_name: dict[tuple[int, str], set[int]] = defaultdict(set)
+    perfume_concentration_keys_by_id: dict[int, str] = {}
     for row in perfume_rows:
         brand_id = row.get("brand_id")
         if not brand_id:
             continue
+        perfume_id = row["id"]
+        perfume_concentration_keys_by_id[perfume_id] = (
+            fragrance_concentration_identity_key(row.get("concentration") or "")
+        )
         for normalized_name in _fragrantica_normalized_name_candidates(
             brand_name=row.get("brand__name") or "",
             name=row.get("name") or "",
             collection_name=row.get("collection_name") or "",
             concentration=row.get("concentration") or "",
         ):
-            perfume_ids_by_brand_name[(brand_id, normalized_name)].add(row["id"])
+            perfume_ids_by_brand_name[(brand_id, normalized_name)].add(perfume_id)
 
     matched_perfume_ids: set[int] = set()
     source_rows = (
@@ -2350,10 +2385,27 @@ def _catalogue_linking_strict_exact_perfume_ids(sequence) -> set[int]:
         )
         if not source_name_key:
             continue
+        source_concentration_keys = fragrance_concentration_keys_from_text(
+            source_name,
+            source_normalized_name,
+        )
         for brand_id in source_brand_ids:
-            matched_perfume_ids.update(
-                perfume_ids_by_brand_name.get((brand_id, source_name_key), set())
-            )
+            for perfume_id in perfume_ids_by_brand_name.get(
+                (brand_id, source_name_key),
+                set(),
+            ):
+                perfume_concentration_key = perfume_concentration_keys_by_id.get(
+                    perfume_id,
+                    "",
+                )
+                if perfume_concentration_key and not source_concentration_keys:
+                    continue
+                if (
+                    perfume_concentration_key
+                    and perfume_concentration_key not in source_concentration_keys
+                ):
+                    continue
+                matched_perfume_ids.add(perfume_id)
     return matched_perfume_ids
 
 

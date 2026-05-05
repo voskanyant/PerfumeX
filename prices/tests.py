@@ -9209,6 +9209,20 @@ class OurProductCatalogueListTests(TestCase):
                 name=f"Quiet Scent {index:02d}",
                 concentration="Eau de Parfum",
             )
+        for index in range(20):
+            name = f"Base Only Scent {index:02d}"
+            Perfume.objects.create(
+                brand=brand,
+                name=name,
+                concentration="Eau de Parfum",
+            )
+            FragranticaProduct.objects.create(
+                brand_name="Prefilter Strict Brand",
+                normalized_brand_name="prefilter strict brand",
+                name=name,
+                normalized_name=name.lower(),
+                source_path=f"/perfume/Prefilter-Strict-Brand/Base-Only-{index}.html",
+            )
         for index in range(35):
             name = f"Ready Scent {index:02d}"
             Perfume.objects.create(
@@ -9238,6 +9252,7 @@ class OurProductCatalogueListTests(TestCase):
         self.assertContains(response, "Ready Scent 00")
         self.assertContains(response, "Ready Scent 34")
         self.assertContains(response, "35 shown / 35 visible")
+        self.assertNotContains(response, "Base Only Scent 00")
         self.assertNotContains(response, "Quiet Scent 00")
 
     def test_catalogue_linking_workbench_filters_visible_rows_by_confidence(self):
