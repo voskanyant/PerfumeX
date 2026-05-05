@@ -9518,7 +9518,7 @@ class OurProductCatalogueListTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         payload = response.json()
-        self.assertEqual(len(payload["candidates"]), 2)
+        self.assertEqual(len(payload["candidates"]), 1)
         self.assertEqual(
             payload["candidates"][0]["source_id"],
             concentration_source.pk,
@@ -9526,12 +9526,6 @@ class OurProductCatalogueListTests(TestCase):
         self.assertEqual(
             payload["candidates"][0]["reason"],
             "Exact brand, scent, and concentration match",
-        )
-        self.assertEqual(payload["candidates"][1]["source_id"], generic_source.pk)
-        self.assertEqual(payload["candidates"][1]["score"], 100)
-        self.assertEqual(
-            payload["candidates"][1]["reason"],
-            "Exact brand and scent identity match; source concentration unspecified",
         )
 
         lower_response = self.client.get(
@@ -9545,10 +9539,11 @@ class OurProductCatalogueListTests(TestCase):
             lower_payload["candidates"][1]["source_id"],
             generic_source.pk,
         )
-        self.assertEqual(lower_payload["candidates"][1]["score"], 100)
+        self.assertEqual(lower_payload["candidates"][1]["score"], 98)
         self.assertEqual(
             lower_payload["candidates"][1]["reason"],
-            "Exact brand and scent identity match; source concentration unspecified",
+            "Exact brand and scent identity match; source concentration unspecified; "
+            "concentration-specific source available",
         )
 
     def test_catalogue_linking_demotes_generic_source_when_concentration_matters(self):
@@ -9599,11 +9594,9 @@ class OurProductCatalogueListTests(TestCase):
 
         self.assertEqual(exact_response.status_code, 200)
         exact_payload = exact_response.json()
-        self.assertEqual(len(exact_payload["candidates"]), 2)
+        self.assertEqual(len(exact_payload["candidates"]), 1)
         self.assertEqual(exact_payload["candidates"][0]["source_id"], explicit_edp.pk)
         self.assertEqual(exact_payload["candidates"][0]["score"], 100)
-        self.assertEqual(exact_payload["candidates"][1]["source_id"], generic_source.pk)
-        self.assertEqual(exact_payload["candidates"][1]["score"], 100)
 
         self.assertEqual(lower_response.status_code, 200)
         lower_payload = lower_response.json()
@@ -9611,7 +9604,7 @@ class OurProductCatalogueListTests(TestCase):
             [candidate["source_id"] for candidate in lower_payload["candidates"]],
             [explicit_edp.pk, generic_source.pk],
         )
-        self.assertEqual(lower_payload["candidates"][1]["score"], 100)
+        self.assertEqual(lower_payload["candidates"][1]["score"], 98)
 
         self.assertEqual(edt_exact_response.status_code, 200)
         self.assertEqual(
@@ -9773,6 +9766,71 @@ class OurProductCatalogueListTests(TestCase):
         self.assertEqual(source.match_status, FragranticaProduct.STATUS_LINKED)
         self.assertEqual(self.perfume.name, "Vanilla Extasy")
 
+    def test_catalogue_linking_workbench_bulk_links_all_filtered_pages(self):
+        brand = Brand.objects.create(name="Bulk Filter Brand")
+        sources = []
+        for index in range(45):
+            scent_name = f"Bulk Scent {index:02d}"
+            Perfume.objects.create(
+                brand=brand,
+                name=scent_name,
+                concentration="Eau de Parfum",
+            )
+            sources.append(
+                FragranticaProduct.objects.create(
+                    brand_name=brand.name,
+                    normalized_brand_name="bulk filter brand",
+                    name=scent_name,
+                    normalized_name=scent_name.lower(),
+                    source_path=f"/perfume/Bulk-Filter/{index}.html",
+                )
+            )
+
+        response = self.client.post(
+            reverse("prices:catalogue_linking_workbench"),
+            {
+                "action": "bulk_link_filtered",
+                "next": reverse("prices:catalogue_linking_workbench"),
+                "brand": str(brand.pk),
+                "status": "unlinked",
+                "suggestions": "with",
+                "confidence": "100",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        linked_count = FragranticaProduct.objects.filter(
+            pk__in=[source.pk for source in sources],
+            match_status=FragranticaProduct.STATUS_LINKED,
+            matched_perfume__brand=brand,
+        ).count()
+        self.assertEqual(linked_count, 45)
+
+    def test_catalogue_linking_workbench_rejects_unsafe_all_page_bulk_link(self):
+        source = FragranticaProduct.objects.create(
+            brand_name="Montale",
+            normalized_brand_name="montale",
+            name="Vanilla Extasy",
+            normalized_name="vanilla extasy",
+            source_path="/perfume/Montale/Vanilla-Extasy-unsafe.html",
+        )
+
+        response = self.client.post(
+            reverse("prices:catalogue_linking_workbench"),
+            {
+                "action": "bulk_link_filtered",
+                "next": reverse("prices:catalogue_linking_workbench"),
+                "status": "unlinked",
+                "suggestions": "all",
+                "confidence": "all",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        source.refresh_from_db()
+        self.assertEqual(source.match_status, FragranticaProduct.STATUS_UNLINKED)
+        self.assertIsNone(source.matched_perfume_id)
+
     def test_catalogue_linking_workbench_selects_rows_without_suggestions(self):
         response = self.client.get(reverse("prices:catalogue_linking_workbench"))
 
@@ -9780,6 +9838,7 @@ class OurProductCatalogueListTests(TestCase):
         self.assertContains(response, "data-catalogue-bulk-delete")
         self.assertContains(response, 'data-catalogue-selected-name="perfume_id"')
         self.assertContains(response, 'data-catalogue-selected-source="link-pair"')
+        self.assertContains(response, "Bulk link all filtered")
         self.assertContains(
             response, 'aria-label="Select Montale / Vanilla Extasy / Eau de Parfum"'
         )

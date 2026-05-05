@@ -83,6 +83,11 @@
                     {% csrf_token %}
                     <input type="hidden" name="next" value="{{ request.get_full_path }}">
                     <input type="hidden" name="action" value="bulk_link">
+                    <input type="hidden" name="brand" value="{{ selected_brand }}">
+                    <input type="hidden" name="q" value="{{ search_query }}">
+                    <input type="hidden" name="status" value="{{ status_filter }}">
+                    <input type="hidden" name="suggestions" value="{{ suggestion_filter }}">
+                    <input type="hidden" name="confidence" value="{{ confidence_filter }}">
                     <div class="catalogue-linking-bulk-bar">
                         <label class="catalogue-linking-check-all">
                             <input type="checkbox" data-catalogue-check-all>
@@ -111,6 +116,11 @@
                                     data-catalogue-selected-source="link-pair"
                                     data-catalogue-action-value="bulk_link"
                                     disabled>Bulk link checked</button>
+                            <button class="button secondary"
+                                    type="submit"
+                                    name="action"
+                                    value="bulk_link_filtered"
+                                    data-confirm="Link every safe ready Fragrantica suggestion matching the current filters across all pages? Manual-review rows and duplicate Fragrantica targets will be skipped.">Bulk link all filtered</button>
                         </div>
                     </div>
                     <div class="catalogue-linking-list" data-linking-list>

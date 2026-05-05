@@ -11,13 +11,14 @@ from dataclasses import replace
 from decimal import Decimal, InvalidOperation
 from difflib import SequenceMatcher
 from functools import lru_cache
+from types import SimpleNamespace
 from urllib.parse import urlencode
 
 import regex
 from django.core.paginator import Paginator
 from django.db import IntegrityError
 from django.db.models import Count, Q, Subquery
-from django.http import Http404
+from django.http import Http404, QueryDict
 from django.shortcuts import get_object_or_404
 from django.urls import reverse, reverse_lazy
 from django.utils import timezone
@@ -80,6 +81,7 @@ CATALOGUE_LINKING_STATUSES = {"all", "unlinked", "linked"}
 CATALOGUE_LINKING_SUGGESTION_FILTERS = {"all", "with", "without"}
 CATALOGUE_LINKING_CONFIDENCE_FILTERS = {"all", "review", "0", "80", "90", "95", "100"}
 CATALOGUE_LINKING_FILTER_SCAN_PAGES = 25
+CATALOGUE_LINKING_BULK_FILTERED_BATCH_SIZE = 100
 CATALOG_VARIANT_SEARCH_FIELDS = (
     "perfume__name",
     "perfume__brand__name",
@@ -183,6 +185,7 @@ FRAGRANCE_CONCENTRATION_TERM_KEYS = {
 }
 FRAGRANCE_CONCENTRATION_NAME_TERMS = set(FRAGRANCE_CONCENTRATION_TERM_KEYS)
 FRAGRANTICA_CONCENTRATION_MISMATCH_SCORE_CAP = 88
+FRAGRANTICA_GENERIC_CONCENTRATION_WITH_EXPLICIT_SCORE = 98
 CATALOGUE_LINKING_DEFAULT_MIN_SCORE = 80
 
 
@@ -724,6 +727,40 @@ def _fragrantica_concentration_sort_rank(reason: str) -> int:
     if reason == "Exact brand, scent, and concentration match":
         return 0
     return 1
+
+
+def _demote_generic_fragrantica_concentration_candidates(
+    candidates_by_perfume: dict[int, dict[int, FragranticaMatchCandidate]],
+    *,
+    min_score: int,
+) -> None:
+    for perfume_id, candidates in candidates_by_perfume.items():
+        has_explicit_concentration_match = any(
+            candidate.score >= 100
+            and candidate.reason == "Exact brand, scent, and concentration match"
+            for candidate in candidates.values()
+        )
+        if not has_explicit_concentration_match:
+            continue
+        for source_id, candidate in list(candidates.items()):
+            if (
+                candidate.score < 100
+                or candidate.reason
+                != "Exact brand and scent identity match; source concentration unspecified"
+            ):
+                continue
+            demoted_candidate = replace(
+                candidate,
+                score=FRAGRANTICA_GENERIC_CONCENTRATION_WITH_EXPLICIT_SCORE,
+                reason=(
+                    "Exact brand and scent identity match; source concentration "
+                    "unspecified; concentration-specific source available"
+                ),
+            )
+            if demoted_candidate.score < min_score:
+                del candidates[source_id]
+            else:
+                candidates[source_id] = demoted_candidate
 
 
 def _candidate_sort_key(candidate: FragranticaMatchCandidate):
@@ -1955,6 +1992,10 @@ def build_catalogue_fragrantica_candidates_for_perfumes(
                 ),
             )
 
+    _demote_generic_fragrantica_concentration_candidates(
+        candidates_by_perfume,
+        min_score=min_score,
+    )
     _mark_shared_fragrantica_source_conflicts(perfumes, candidates_by_perfume)
 
     return {
@@ -2885,6 +2926,97 @@ def build_catalogue_linking_ai_advice_review_payload(
     return {"ai_advice": serialize_catalogue_linking_ai_advice(recommendation)}, 200
 
 
+def _catalogue_linking_filter_request_from_post(post_data):
+    query = QueryDict("", mutable=True)
+    for key in ("brand", "q", "status", "suggestions", "confidence"):
+        query[key] = (post_data.get(key) or "").strip()
+    return SimpleNamespace(GET=query)
+
+
+def _catalogue_linking_safe_bulk_filtered_settings(post_data) -> tuple[str, str, int]:
+    confidence_filter = normalize_catalogue_linking_confidence_filter(
+        post_data.get("confidence")
+    )
+    suggestion_filter = normalize_catalogue_linking_suggestion_filter(
+        post_data.get("suggestions")
+    )
+    status_filter = normalize_catalogue_linking_status(post_data.get("status"))
+    if status_filter == "linked":
+        raise ValueError("All-page bulk linking is only available for unlinked rows.")
+    if suggestion_filter == "without":
+        raise ValueError("Use a suggestion filter that includes suggested rows.")
+    if confidence_filter not in {"95", "100"}:
+        raise ValueError(
+            "Choose 95+ or 100 only before linking suggestions across all pages."
+        )
+    return confidence_filter, suggestion_filter, normalize_catalogue_linking_min_score(
+        confidence_filter
+    )
+
+
+def _catalogue_linking_filtered_ready_pairs(
+    post_data,
+    *,
+    perfume_manager=None,
+) -> tuple[list[tuple[int, int, bool]], int]:
+    perfume_manager = perfume_manager or CatalogPerfume.objects
+    confidence_filter, suggestion_filter, min_score = (
+        _catalogue_linking_safe_bulk_filtered_settings(post_data)
+    )
+    filter_request = _catalogue_linking_filter_request_from_post(post_data)
+    queryset = build_catalogue_linking_perfume_queryset(
+        filter_request,
+        perfume_manager=perfume_manager,
+    )
+    perfume_ids = list(queryset.values_list("pk", flat=True))
+    if not perfume_ids:
+        return [], 0
+
+    raw_pairs: list[tuple[int, int, bool]] = []
+    skipped_count = 0
+    for start in range(
+        0,
+        len(perfume_ids),
+        CATALOGUE_LINKING_BULK_FILTERED_BATCH_SIZE,
+    ):
+        batch_ids = perfume_ids[
+            start : start + CATALOGUE_LINKING_BULK_FILTERED_BATCH_SIZE
+        ]
+        perfumes = list(
+            perfume_manager.select_related("brand", "collection").filter(
+                pk__in=batch_ids
+            )
+        )
+        rows = build_catalogue_linking_rows(
+            perfumes,
+            min_score=min_score,
+            include_candidates=True,
+        )
+        rows = filter_catalogue_linking_rows_by_confidence(rows, confidence_filter)
+        rows = filter_catalogue_linking_rows_by_suggestion(rows, suggestion_filter)
+        for row in rows:
+            candidate = row["top_candidate"]
+            if not row["ready_for_bulk"] or not candidate:
+                skipped_count += 1
+                continue
+            raw_pairs.append(
+                (
+                    candidate.source.id,
+                    row["perfume"].id,
+                    bool(candidate.creates_alias),
+                )
+            )
+
+    source_counts: dict[int, int] = defaultdict(int)
+    for source_id, _perfume_id, _create_alias in raw_pairs:
+        source_counts[source_id] += 1
+    safe_pairs = [
+        pair for pair in raw_pairs if source_counts[pair[0]] == 1
+    ]
+    skipped_count += len(raw_pairs) - len(safe_pairs)
+    return safe_pairs, skipped_count
+
+
 def _catalogue_linking_candidate_conflict_scope(perfume, perfume_manager):
     queryset = perfume_manager.select_related("brand", "collection").filter(
         brand=perfume.brand,
@@ -2913,7 +3045,12 @@ def run_catalogue_linking_bulk_action(
         allowed_hosts={host} if host else None,
     ):
         redirect_url = reverse("prices:catalogue_linking_workbench")
-    action = post_data.get("action")
+    action_values = (
+        post_data.getlist("action")
+        if hasattr(post_data, "getlist")
+        else [post_data.get("action")]
+    )
+    action = next((value for value in reversed(action_values) if value), "")
     source_manager = source_manager or FragranticaProduct.objects
     perfume_manager = perfume_manager or CatalogPerfume.objects
 
@@ -2954,28 +3091,45 @@ def run_catalogue_linking_bulk_action(
             redirect_url,
         )
 
-    if action != "bulk_link":
+    if action == "bulk_link_filtered":
+        try:
+            selected_pairs, skipped_count = _catalogue_linking_filtered_ready_pairs(
+                post_data,
+                perfume_manager=perfume_manager,
+            )
+        except ValueError as exc:
+            return CatalogueLinkingBulkResult("error", str(exc), redirect_url)
+        if not selected_pairs:
+            return CatalogueLinkingBulkResult(
+                "error",
+                "No safe ready suggestions matched the current filters.",
+                redirect_url,
+            )
+    elif action == "bulk_link":
+        selected_pairs = post_data.getlist("link_pair")
+        skipped_count = 0
+        if not selected_pairs:
+            return CatalogueLinkingBulkResult(
+                "error",
+                "Select at least one suggested Fragrantica match.",
+                redirect_url,
+            )
+    else:
         return CatalogueLinkingBulkResult(
             "error", "Unknown linking action.", redirect_url
         )
 
-    selected_pairs = post_data.getlist("link_pair")
-    if not selected_pairs:
-        return CatalogueLinkingBulkResult(
-            "error",
-            "Select at least one suggested Fragrantica match.",
-            redirect_url,
-        )
-
     linked_count = 0
-    skipped_count = 0
     for raw_pair in selected_pairs:
-        parts = str(raw_pair).split(":")
-        if len(parts) < 2:
-            skipped_count += 1
-            continue
-        source_id, perfume_id = parts[0], parts[1]
-        create_alias = len(parts) >= 3 and parts[2] == "1"
+        if isinstance(raw_pair, tuple):
+            source_id, perfume_id, create_alias = raw_pair
+        else:
+            parts = str(raw_pair).split(":")
+            if len(parts) < 2:
+                skipped_count += 1
+                continue
+            source_id, perfume_id = parts[0], parts[1]
+            create_alias = len(parts) >= 3 and parts[2] == "1"
         source = first_from_queryset(
             source_manager.select_related("matched_perfume").filter(pk=source_id)
         )
@@ -3013,7 +3167,11 @@ def run_catalogue_linking_bulk_action(
         )
         return CatalogueLinkingBulkResult(
             "success",
-            f"Linked {linked_count} Fragrantica match(es).{skipped_note}",
+            (
+                f"Linked {linked_count} Fragrantica match(es)"
+                f"{' across all filtered pages' if action == 'bulk_link_filtered' else ''}."
+                f"{skipped_note}"
+            ),
             redirect_url,
         )
     return CatalogueLinkingBulkResult(
