@@ -4226,7 +4226,9 @@ class ProductDisplayServiceTests(SimpleTestCase):
     def test_attach_supplier_product_search_display_keeps_sparklines_without_deltas(
         self,
     ):
-        from prices.services.product_display import attach_supplier_product_search_display
+        from prices.services.product_display import (
+            attach_supplier_product_search_display,
+        )
 
         product = SimpleNamespace(
             id=7,
@@ -9253,10 +9255,23 @@ class OurProductCatalogueListTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Ready Scent 00")
-        self.assertContains(response, "Ready Scent 34")
-        self.assertContains(response, "35 shown / 35 visible")
-        self.assertNotContains(response, "Base Only Scent 00")
+        self.assertContains(response, "Base Only Scent 00")
+        self.assertContains(response, "40 shown / 55 visible")
         self.assertNotContains(response, "Quiet Scent 00")
+
+        page_two_response = self.client.get(
+            reverse("prices:catalogue_linking_workbench"),
+            {
+                "brand": str(brand.pk),
+                "status": "unlinked",
+                "suggestions": "with",
+                "confidence": "100",
+                "page": "2",
+            },
+        )
+
+        self.assertEqual(page_two_response.status_code, 200)
+        self.assertContains(page_two_response, "Ready Scent 34")
 
     def test_catalogue_linking_workbench_filters_visible_rows_by_confidence(self):
         FragranticaProduct.objects.create(
@@ -9367,7 +9382,7 @@ class OurProductCatalogueListTests(TestCase):
         )
         self.assertContains(
             review_response,
-            'data-fragrantica-link-submit>Link</button>',
+            "data-fragrantica-link-submit>Link</button>",
         )
         self.assertNotContains(review_response, "Review manually")
 
@@ -9503,7 +9518,7 @@ class OurProductCatalogueListTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         payload = response.json()
-        self.assertEqual(len(payload["candidates"]), 1)
+        self.assertEqual(len(payload["candidates"]), 2)
         self.assertEqual(
             payload["candidates"][0]["source_id"],
             concentration_source.pk,
@@ -9511,6 +9526,12 @@ class OurProductCatalogueListTests(TestCase):
         self.assertEqual(
             payload["candidates"][0]["reason"],
             "Exact brand, scent, and concentration match",
+        )
+        self.assertEqual(payload["candidates"][1]["source_id"], generic_source.pk)
+        self.assertEqual(payload["candidates"][1]["score"], 100)
+        self.assertEqual(
+            payload["candidates"][1]["reason"],
+            "Exact brand and scent identity match; source concentration unspecified",
         )
 
         lower_response = self.client.get(
@@ -9524,7 +9545,7 @@ class OurProductCatalogueListTests(TestCase):
             lower_payload["candidates"][1]["source_id"],
             generic_source.pk,
         )
-        self.assertEqual(lower_payload["candidates"][1]["score"], 98)
+        self.assertEqual(lower_payload["candidates"][1]["score"], 100)
         self.assertEqual(
             lower_payload["candidates"][1]["reason"],
             "Exact brand and scent identity match; source concentration unspecified",
@@ -9578,9 +9599,11 @@ class OurProductCatalogueListTests(TestCase):
 
         self.assertEqual(exact_response.status_code, 200)
         exact_payload = exact_response.json()
-        self.assertEqual(len(exact_payload["candidates"]), 1)
+        self.assertEqual(len(exact_payload["candidates"]), 2)
         self.assertEqual(exact_payload["candidates"][0]["source_id"], explicit_edp.pk)
         self.assertEqual(exact_payload["candidates"][0]["score"], 100)
+        self.assertEqual(exact_payload["candidates"][1]["source_id"], generic_source.pk)
+        self.assertEqual(exact_payload["candidates"][1]["score"], 100)
 
         self.assertEqual(lower_response.status_code, 200)
         lower_payload = lower_response.json()
@@ -9588,10 +9611,16 @@ class OurProductCatalogueListTests(TestCase):
             [candidate["source_id"] for candidate in lower_payload["candidates"]],
             [explicit_edp.pk, generic_source.pk],
         )
-        self.assertEqual(lower_payload["candidates"][1]["score"], 98)
+        self.assertEqual(lower_payload["candidates"][1]["score"], 100)
 
         self.assertEqual(edt_exact_response.status_code, 200)
-        self.assertEqual(edt_exact_response.json()["candidates"], [])
+        self.assertEqual(
+            [
+                candidate["source_id"]
+                for candidate in edt_exact_response.json()["candidates"]
+            ],
+            [generic_source.pk],
+        )
 
     def test_catalogue_linking_candidate_endpoint_returns_linked_state_only(self):
         linked_source = FragranticaProduct.objects.create(
@@ -10179,7 +10208,9 @@ class OurProductCatalogueListTests(TestCase):
         self.assertEqual(source.match_status, FragranticaProduct.STATUS_LINKED)
         self.assertEqual(payload["selected"]["id"], self.perfume.pk)
         self.assertEqual(payload["linked_source"]["source_id"], source.pk)
-        self.assertEqual(payload["linked_source"]["collection"], "Fragrantica Collection")
+        self.assertEqual(
+            payload["linked_source"]["collection"], "Fragrantica Collection"
+        )
         self.assertEqual(payload["linked_source"]["audience"], "Women")
         self.assertEqual(self.perfume.name, "Vanilla Extasy")
 
