@@ -674,6 +674,9 @@
         meta.appendChild(supplier);
         meta.appendChild(el("span", "supplier-mobile-card-dot"));
         var time = el("span", "supplier-mobile-card-time", item.last_imported_at || "");
+        if (item.last_imported_age_class) {
+            time.classList.add(String(item.last_imported_age_class || ""));
+        }
         if (item.last_imported_at_full) {
             time.title = String(item.last_imported_at_full || "");
             time.dataset.fullDatetime = String(item.last_imported_at_full || "");

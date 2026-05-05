@@ -796,9 +796,18 @@ tr[data-delta="up"] {
     row-gap: 10px;
     padding: 14px 16px 12px;
     border: 1px solid var(--grey-200);
+    border-left: 3px solid transparent;
     border-radius: 14px;
     background: var(--white);
     box-shadow: 0 1px 3px rgba(10, 10, 10, 0.06), 0 1px 2px rgba(10, 10, 10, 0.04);
+  }
+
+  .products-mobile tr[data-delta="down"] .supplier-mobile-card {
+    border-left-color: var(--success);
+  }
+
+  .products-mobile tr[data-delta="up"] .supplier-mobile-card {
+    border-left-color: var(--danger);
   }
 
   .supplier-mobile-card-top {
@@ -872,13 +881,21 @@ tr[data-delta="up"] {
 
   .supplier-mobile-card-sparkline {
     width: 76px;
-    opacity: 0.5;
+    min-width: 0;
+    overflow: hidden;
+    opacity: 0.75;
+    justify-self: end;
   }
 
   .supplier-mobile-card-sparkline .product-sparkline {
     display: block;
     width: 100% !important;
+    max-width: 100%;
     height: 28px !important;
+  }
+
+  .products-mobile tr:not([data-delta]) .supplier-mobile-card-sparkline {
+    opacity: 0.55;
   }
 
   .supplier-mobile-card-bottom {
@@ -947,6 +964,21 @@ tr[data-delta="up"] {
     font-weight: 400;
     line-height: 1.2;
     white-space: nowrap;
+  }
+
+  .supplier-mobile-card-time.state-fresh,
+  .supplier-mobile-card-time.age-fresh {
+    color: var(--success);
+  }
+
+  .supplier-mobile-card-time.state-stale,
+  .supplier-mobile-card-time.age-stale {
+    color: var(--danger);
+  }
+
+  .supplier-mobile-card-time.state-warn,
+  .supplier-mobile-card-time.age-warn {
+    color: var(--grey-400);
   }
 
   .products-mobile td[data-field="name"] {
