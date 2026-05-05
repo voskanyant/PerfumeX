@@ -377,6 +377,7 @@ def attach_supplier_product_search_display(products, currency: str) -> None:
     if currency:
         attach_display_prices(products, currency, get_latest_rates())
 
+    sparklines = build_supplier_product_sparklines(products)
     for product in products:
         if getattr(product, "display_currency", None) is None:
             product.display_currency = product.currency
@@ -385,7 +386,7 @@ def attach_supplier_product_search_display(products, currency: str) -> None:
         product.price_delta_direction = ""
         product.price_delta_value = None
         product.price_delta_percent = None
-        product.sparkline_values = []
+        product.sparkline_values = sparklines.get(product.id, [])
         product.original_price_display = (
             format_price(product.current_price, product.currency)
             if product.current_price is not None

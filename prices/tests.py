@@ -4223,7 +4223,9 @@ class ProductDisplayServiceTests(SimpleTestCase):
         self.assertIn("product-sparkline", str(product.sparkline_svg))
         self.assertIn('stroke="#22c55e"', str(product.sparkline_svg))
 
-    def test_attach_supplier_product_search_display_skips_history_hydration(self):
+    def test_attach_supplier_product_search_display_keeps_sparklines_without_deltas(
+        self,
+    ):
         from prices.services.product_display import attach_supplier_product_search_display
 
         product = SimpleNamespace(
@@ -4251,16 +4253,17 @@ class ProductDisplayServiceTests(SimpleTestCase):
                 "prices.services.product_display.attach_previous_price_deltas"
             ) as price_deltas,
             patch(
-                "prices.services.product_display.build_supplier_product_sparklines"
+                "prices.services.product_display.build_supplier_product_sparklines",
+                return_value={7: [10.0, 11.0, 9.5]},
             ) as sparklines,
         ):
             attach_supplier_product_search_display([product], models.Currency.RUB)
 
         display_prices.assert_called_once()
         price_deltas.assert_not_called()
-        sparklines.assert_not_called()
+        sparklines.assert_called_once_with([product])
         self.assertEqual(product.display_price, Decimal("1000.00"))
-        self.assertEqual(product.sparkline_values, [])
+        self.assertEqual(product.sparkline_values, [10.0, 11.0, 9.5])
         self.assertEqual(product.price_delta_value, None)
 
     def test_supplier_product_search_row_serializer_formats_ajax_payload(self):
