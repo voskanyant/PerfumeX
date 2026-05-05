@@ -804,6 +804,7 @@ tr[data-delta="up"] {
     justify-self: end;
     align-self: start;
     text-align: right;
+    padding-top: 13px !important;
   }
 
   .products-mobile td[data-field="supplier_sku"] {
@@ -818,6 +819,7 @@ tr[data-delta="up"] {
     justify-self: end;
     align-self: start;
     text-align: right;
+    padding-top: 1px !important;
   }
 
   .products-mobile td[data-field="name"] .cell-name,
