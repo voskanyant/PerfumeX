@@ -523,10 +523,17 @@
             .then(function (data) {
                 var row = currentSelectedRow();
                 var payload = row ? rowPayload(row) : null;
-                if (!payload) return;
+                if (!payload) {
+                    renderEmpty("AI review saved. Reload this row to refresh the advice.");
+                    return;
+                }
                 payload.ai_advice = data.ai_advice;
                 row.setAttribute("data-linking-payload", JSON.stringify(payload));
-                renderPayload(payload);
+                try {
+                    renderPayload(payload);
+                } catch (error) {
+                    renderEmpty("AI review saved. Reload this row to refresh the advice.");
+                }
             })
             .catch(function (data) {
                 renderEmpty((data && data.error) || "AI review failed. Reload and try again.");
