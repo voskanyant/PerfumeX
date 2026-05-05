@@ -13,7 +13,10 @@ from assistant_linking.models import (
     FragranticaProduct,
 )
 from catalog.models import Brand, Perfume
-from prices.services.catalog_review import build_catalogue_linking_rows
+from prices.services.catalog_review import (
+    FragranticaMatchCandidate,
+    build_catalogue_linking_rows,
+)
 
 
 class CatalogueLinkingAIAdviceTests(TestCase):
@@ -103,6 +106,67 @@ class CatalogueLinkingAIAdviceTests(TestCase):
         self.source.refresh_from_db()
         self.assertEqual(self.source.match_status, FragranticaProduct.STATUS_UNLINKED)
         self.assertIsNone(self.source.matched_perfume_id)
+
+    def test_ai_advice_falls_back_to_visible_row_candidates(self):
+        other_perfume = Perfume.objects.create(
+            brand=self.brand,
+            name="The Icon",
+            concentration="Eau de Toilette",
+        )
+        candidate = FragranticaMatchCandidate(
+            source=self.source,
+            match_type="exact",
+            score=100,
+            reason="Visible row candidate.",
+        )
+        calls = []
+
+        def fake_candidate_builder(perfumes, **kwargs):
+            perfume_ids = [perfume.id for perfume in perfumes]
+            calls.append(perfume_ids)
+            if len(perfume_ids) > 1:
+                return {perfume_id: [] for perfume_id in perfume_ids}
+            if perfume_ids == [other_perfume.id]:
+                return {other_perfume.id: [candidate]}
+            return {perfume_ids[0]: []}
+
+        with (
+            patch("prices.services.catalog_review.use_openai", return_value=True),
+            patch(
+                "prices.services.catalog_review.build_catalogue_fragrantica_candidates_for_perfumes",
+                side_effect=fake_candidate_builder,
+            ),
+            patch(
+                "assistant_linking.services.ai_advisor.use_openai",
+                return_value=True,
+            ),
+            patch(
+                "assistant_linking.services.ai_advisor.create_structured_response",
+                return_value={
+                    "recommended_candidate_id": self.source.pk,
+                    "confidence": 88,
+                    "risk_level": "medium",
+                    "reasoning": "Use the visible row candidate.",
+                    "candidate_notes": [
+                        {
+                            "candidate_id": self.source.pk,
+                            "note": "Visible row candidate.",
+                        }
+                    ],
+                },
+            ),
+        ):
+            response = self.client.post(
+                reverse("prices:catalogue_linking_ai_advice"),
+                {"perfume": other_perfume.pk, "min_score": "100"},
+                HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+            )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["ai_advice"]["recommended_candidate_id"], self.source.pk)
+        self.assertGreater(len(calls[0]), 1)
+        self.assertEqual(calls[1], [other_perfume.id])
 
     def test_ai_advice_review_accepts_recommendation_without_linking(self):
         recommendation = AIRecommendation.objects.create(

@@ -2801,15 +2801,11 @@ def build_catalogue_linking_ai_advice_payload(
     min_score = normalize_catalogue_linking_min_score(
         request.POST.get("min_score") or request.GET.get("min_score")
     )
-    conflict_scope_perfumes = list(
-        _catalogue_linking_candidate_conflict_scope(perfume, perfume_manager)
-    )
-    candidate_map = build_catalogue_fragrantica_candidates_for_perfumes(
-        conflict_scope_perfumes,
+    candidates = _catalogue_linking_candidates_for_ai_advice(
+        perfume,
+        perfume_manager,
         min_score=min_score,
-        limit=12,
     )
-    candidates = candidate_map.get(perfume.id, [])
     if not candidates:
         return {"error": "No Fragrantica candidates are available for AI review."}, 400
 
@@ -2830,6 +2826,31 @@ def build_catalogue_linking_ai_advice_payload(
         },
         200,
     )
+
+
+def _catalogue_linking_candidates_for_ai_advice(
+    perfume,
+    perfume_manager,
+    *,
+    min_score: int,
+) -> list[FragranticaMatchCandidate]:
+    conflict_scope_perfumes = list(
+        _catalogue_linking_candidate_conflict_scope(perfume, perfume_manager)
+    )
+    candidate_map = build_catalogue_fragrantica_candidates_for_perfumes(
+        conflict_scope_perfumes,
+        min_score=min_score,
+        limit=12,
+    )
+    candidates = candidate_map.get(perfume.id, [])
+    if candidates:
+        return candidates
+    fallback_map = build_catalogue_fragrantica_candidates_for_perfumes(
+        [perfume],
+        min_score=min_score,
+        limit=12,
+    )
+    return fallback_map.get(perfume.id, [])
 
 
 def build_catalogue_linking_ai_advice_review_payload(
