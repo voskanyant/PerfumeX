@@ -9342,6 +9342,38 @@ class OurProductCatalogueListTests(TestCase):
         self.assertEqual(page_two_response.status_code, 200)
         self.assertContains(page_two_response, "Ready Scent 34")
 
+    def test_catalogue_linking_strict_filter_recounts_blank_stale_pages(self):
+        brand = Brand.objects.create(name="Stale Strict Brand")
+        for index in range(45):
+            Perfume.objects.create(
+                brand=brand,
+                name="Shared Scent",
+                concentration=f"Edition {index:02d}",
+            )
+        FragranticaProduct.objects.create(
+            brand_name="Stale Strict Brand",
+            normalized_brand_name="stale strict brand",
+            name="Shared Scent",
+            normalized_name="shared scent",
+            source_path="/perfume/Stale-Strict-Brand/Shared-Scent.html",
+        )
+
+        response = self.client.get(
+            reverse("prices:catalogue_linking_workbench"),
+            {
+                "brand": str(brand.pk),
+                "status": "unlinked",
+                "suggestions": "with",
+                "confidence": "100",
+                "page": "2",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "0 shown / 0 visible")
+        self.assertNotContains(response, "Page 2 of")
+        self.assertContains(response, "No Our Products rows match these filters.")
+
     def test_catalogue_linking_workbench_filters_visible_rows_by_confidence(self):
         FragranticaProduct.objects.create(
             brand_name="Montale",

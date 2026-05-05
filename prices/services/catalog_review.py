@@ -2525,6 +2525,39 @@ def _catalogue_linking_strict_exact_perfume_ids(sequence) -> set[int]:
     return matched_perfume_ids
 
 
+def _catalogue_linking_verified_filtered_perfume_ids(
+    sequence,
+    *,
+    min_score: int,
+    confidence_filter: str,
+    suggestion_filter: str,
+    perfume_manager=None,
+) -> set[int]:
+    perfume_manager = perfume_manager or CatalogPerfume.objects
+    perfume_ids = list(sequence.values_list("pk", flat=True)) if hasattr(
+        sequence, "values_list"
+    ) else [getattr(perfume, "pk", perfume) for perfume in sequence]
+    verified_ids: set[int] = set()
+    for start in range(0, len(perfume_ids), CATALOGUE_LINKING_BULK_FILTERED_BATCH_SIZE):
+        batch_ids = perfume_ids[
+            start : start + CATALOGUE_LINKING_BULK_FILTERED_BATCH_SIZE
+        ]
+        perfumes = list(
+            perfume_manager.select_related("brand", "collection").filter(
+                pk__in=batch_ids
+            )
+        )
+        rows = build_catalogue_linking_rows(
+            perfumes,
+            min_score=min_score,
+            include_candidates=True,
+        )
+        rows = filter_catalogue_linking_rows_by_confidence(rows, confidence_filter)
+        rows = filter_catalogue_linking_rows_by_suggestion(rows, suggestion_filter)
+        verified_ids.update(row["perfume"].id for row in rows)
+    return verified_ids
+
+
 def _catalogue_linking_request_uses_high_confidence_prefilter(request) -> bool:
     confidence_filter = normalize_catalogue_linking_confidence_filter(
         request.GET.get("confidence")
@@ -2696,6 +2729,30 @@ def build_catalogue_linking_context(
                 else None
             ),
         )
+        if (
+            not rows
+            and visible_count
+            and _catalogue_linking_request_uses_strict_exact_filter(request)
+        ):
+            verified_ids = _catalogue_linking_verified_filtered_perfume_ids(
+                paginator.object_list,
+                min_score=min_score,
+                confidence_filter=confidence_filter,
+                suggestion_filter=suggestion_filter,
+            )
+            verified_sequence = paginator.object_list.filter(pk__in=verified_ids)
+            paginator = Paginator(verified_sequence, page_obj.paginator.per_page)
+            page_obj = paginator.get_page(request.GET.get("page"))
+            visible_count = paginator.count
+            rows = _build_catalogue_linking_filtered_page_rows(
+                paginator.object_list,
+                page_number=page_obj.number,
+                page_size=page_obj.paginator.per_page,
+                min_score=min_score,
+                confidence_filter=confidence_filter,
+                suggestion_filter=suggestion_filter,
+                max_scan_rows=page_obj.paginator.per_page,
+            )
     else:
         visible_rows = build_catalogue_linking_rows(
             perfumes,
@@ -2741,6 +2798,9 @@ def build_catalogue_linking_context(
         "selected_row": selected_row,
         "ready_bulk_count": sum(1 for row in rows if row["ready_for_bulk"]),
         "query_string": query_without_page.urlencode(),
+        "page_obj": page_obj,
+        "paginator": paginator,
+        "is_paginated": paginator.num_pages > 1 if paginator else False,
     }
 
 
