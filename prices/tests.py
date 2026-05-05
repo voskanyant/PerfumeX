@@ -1203,6 +1203,75 @@ class JobQueueTests(SimpleTestCase):
         self.assertEqual(captured["enqueue_kwargs"]["job_timeout"], 123)
         self.assertEqual(captured["enqueue_kwargs"]["description"], "Import emails")
 
+    @override_settings(
+        PERFUMEX_RQ_SYNC=False,
+        REDIS_URL="redis://redis.example/0",
+        RQ_DEFAULT_QUEUE="async-queue",
+    )
+    @patch("prices.services.job_queue._import_rq")
+    def test_enqueue_management_command_fails_without_worker(self, mock_import_rq):
+        from prices.services.job_queue import enqueue_management_command
+
+        class FakeRedis:
+            @staticmethod
+            def from_url(_url):
+                return "redis-connection"
+
+        class FakeWorker:
+            @staticmethod
+            def all(connection):
+                self.assertEqual(connection, "redis-connection")
+                return []
+
+        mock_import_rq.return_value = (
+            SimpleNamespace(Redis=FakeRedis),
+            SimpleNamespace(Queue=Mock(), Worker=FakeWorker),
+        )
+
+        with self.assertRaisesMessage(RuntimeError, "No active RQ worker"):
+            enqueue_management_command("import_emails", description="Import emails")
+
+    @override_settings(
+        PERFUMEX_RQ_SYNC=False,
+        REDIS_URL="redis://redis.example/0",
+        RQ_DEFAULT_QUEUE="async-queue",
+    )
+    @patch("prices.services.job_queue._import_rq")
+    def test_enqueue_management_command_accepts_worker_for_queue(self, mock_import_rq):
+        from prices.services.job_queue import enqueue_management_command
+
+        captured = {}
+
+        class FakeRedis:
+            @staticmethod
+            def from_url(_url):
+                return "redis-connection"
+
+        class FakeWorker:
+            @staticmethod
+            def all(connection):
+                self.assertEqual(connection, "redis-connection")
+                return [SimpleNamespace(queue_names=lambda: ["async-queue"])]
+
+        class FakeQueue:
+            def __init__(self, name, connection):
+                captured["queue_name"] = name
+                captured["connection"] = connection
+
+            def enqueue(self, *args, **kwargs):
+                return SimpleNamespace(id="job-123")
+
+        mock_import_rq.return_value = (
+            SimpleNamespace(Redis=FakeRedis),
+            SimpleNamespace(Queue=FakeQueue, Worker=FakeWorker),
+        )
+
+        result = enqueue_management_command("import_emails", description="Import emails")
+
+        self.assertTrue(result.queued)
+        self.assertEqual(result.job_id, "job-123")
+        self.assertEqual(captured["queue_name"], "async-queue")
+
 
 class SupplierBoardServiceTests(SimpleTestCase):
     def test_business_interval_skips_weekends_for_daily_cadence(self):
@@ -9870,6 +9939,31 @@ class OurProductCatalogueListTests(TestCase):
         self.assertEqual(enqueue.call_args.kwargs["status"], "unlinked")
         source.refresh_from_db()
         self.assertEqual(source.match_status, FragranticaProduct.STATUS_UNLINKED)
+
+    @override_settings(PERFUMEX_RQ_SYNC=False)
+    def test_catalogue_linking_workbench_reports_missing_worker_for_all_page_bulk_link(
+        self,
+    ):
+        with patch(
+            "prices.services.catalog_review.enqueue_management_command",
+            side_effect=RuntimeError("No active RQ worker is registered"),
+        ):
+            response = self.client.post(
+                reverse("prices:catalogue_linking_workbench"),
+                {
+                    "action": "bulk_link_filtered",
+                    "next": reverse("prices:catalogue_linking_workbench"),
+                    "status": "unlinked",
+                    "suggestions": "with",
+                    "confidence": "100",
+                },
+            )
+
+        self.assertEqual(response.status_code, 302)
+        messages = [str(message) for message in get_messages(response.wsgi_request)]
+        self.assertTrue(
+            any("No active RQ worker is registered" in message for message in messages)
+        )
 
     def test_catalogue_linking_workbench_selects_rows_without_suggestions(self):
         response = self.client.get(reverse("prices:catalogue_linking_workbench"))

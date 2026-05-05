@@ -1,0 +1,15 @@
+[Unit]
+Description=PerfumeX RQ Worker
+After=network.target redis-server.service perfumex.service
+Wants=redis-server.service
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/perfumex/PerfumeX
+EnvironmentFile=/opt/perfumex/PerfumeX/.env
+ExecStart=/opt/perfumex/PerfumeX/.venv/bin/python3 manage.py run_rq_worker
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

@@ -3231,7 +3231,10 @@ def run_catalogue_linking_bulk_action(
                     **catalogue_linking_filtered_bulk_command_options(post_data),
                 )
             except Exception as exc:
-                logger.exception("Failed to queue catalogue filtered bulk link")
+                logger.warning(
+                    "Failed to queue catalogue filtered bulk link: %s",
+                    exc,
+                )
                 return CatalogueLinkingBulkResult(
                     "error",
                     f"Could not queue all-filtered bulk linking: {exc}",

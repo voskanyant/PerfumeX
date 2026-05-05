@@ -21,6 +21,12 @@ class Command(BaseCommand):
         for key in ("brand", "q", "status", "suggestions", "confidence"):
             post_data[key] = str(options.get(key) or "")
 
+        self.stdout.write(
+            "Starting all-filtered catalogue linking "
+            f"(status={post_data['status']}, suggestions={post_data['suggestions']}, "
+            f"confidence={post_data['confidence']}, brand={post_data['brand'] or 'all'}, "
+            f"q={post_data['q'] or '-'})..."
+        )
         result = run_catalogue_linking_filtered_bulk_action(post_data)
         if result.level == "error":
             raise CommandError(result.message)

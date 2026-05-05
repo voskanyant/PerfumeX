@@ -117,6 +117,7 @@ Should not own:
 - Email import run timeout/stale-running checks, status payload construction, stuck-run listing/context/recovery action results, user-cancel action results, manual, supplier email-import, supplier backfill, bulk backfill, and forced mailbox-scan action results, import/backfill date-range parsing, active supplier selection for email backfills, run creation/message helpers, bulk backfill run creation, forced mailbox scan dispatch, process-email command argument/queue dispatch helpers, and dispatch-failure status updates: `prices/services/email_import_runs.py`.
 - Background job dispatch: `prices/services/job_queue.py`; worker process command: `prices/management/commands/run_rq_worker.py`.
 - Queue-backed commands should remain directly callable and be dispatchable through the job queue where practical.
+- Production service templates for queue workers and similar deployment helpers: `deploy/systemd/`.
 - Supplier import board/status helper logic, summary rows, and full email status endpoint payload assembly: `prices/services/supplier_board.py`.
 - Automatic mailbox scan/import-board status summaries: `prices/services/autoimport_status.py`.
 - Cron runner script, crontab install/remove action results, next-run calculation, scheduler status logic, import settings page context, and import settings POST action orchestration: `prices/services/import_scheduler.py`.

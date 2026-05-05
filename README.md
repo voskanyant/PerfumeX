@@ -228,6 +228,7 @@ The most important audit chain is:
 - `python manage.py repair_supplier_price_imports`
 - `python manage.py sync_cbr_rates --date YYYY-MM-DD`
 - `python manage.py run_rq_worker`
+- `python manage.py bulk_link_catalogue_filtered --status unlinked --suggestions with --confidence 100`
 
 See [PROJECT_HANDOFF.md](PROJECT_HANDOFF.md) for what each command does and when to use it.
 
@@ -256,6 +257,17 @@ Current behavior on push to `main`:
 7. restart `perfumex`
 8. restart `nginx`
 
+Production queue-backed actions require a running RQ worker. Install the systemd
+unit from `deploy/systemd/perfumex-worker.service` once per server, then enable
+it:
+
+```bash
+cp deploy/systemd/perfumex-worker.service /etc/systemd/system/perfumex-worker.service
+systemctl daemon-reload
+systemctl enable --now perfumex-worker
+systemctl status perfumex-worker --no-pager
+```
+
 Server paths assumed by the workflow:
 
 - app root: `/opt/perfumex/PerfumeX`
@@ -272,6 +284,7 @@ assistant_core/      Assistant dashboard, knowledge, rules, catalogue admin, res
 assistant_linking/   Parsing, aliases, normalization queues, matching/linking
 docs/       Short agent-maintained repository docs
 scripts/    Utility scripts
+deploy/     Deployment helper files such as systemd unit templates
 media/      Uploaded import files
 .github/    CI and deployment workflow
 ```

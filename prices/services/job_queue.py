@@ -57,6 +57,11 @@ def enqueue_management_command(
 
     redis_module, rq_module = _import_rq()
     connection = redis_module.Redis.from_url(settings.REDIS_URL)
+    if not _has_active_worker_for_queue(rq_module, connection, queue):
+        raise RuntimeError(
+            f"No active RQ worker is registered for queue '{queue}'. "
+            "Start `python manage.py run_rq_worker` before queueing background jobs."
+        )
     rq_queue = rq_module.Queue(queue, connection=connection)
     job = rq_queue.enqueue(
         _run_management_command,
@@ -73,6 +78,32 @@ def enqueue_management_command(
         queued=True,
         description=label,
     )
+
+
+def _has_active_worker_for_queue(rq_module, connection, queue_name: str) -> bool:
+    worker_model = getattr(rq_module, "Worker", None)
+    if worker_model is None or not hasattr(worker_model, "all"):
+        return True
+    workers = worker_model.all(connection=connection)
+    for worker in workers:
+        queue_names = _worker_queue_names(worker)
+        if queue_name in queue_names:
+            return True
+    return False
+
+
+def _worker_queue_names(worker) -> set[str]:
+    queue_names = getattr(worker, "queue_names", None)
+    if callable(queue_names):
+        return {str(name) for name in queue_names()}
+    if queue_names:
+        return {str(name) for name in queue_names}
+    queues = getattr(worker, "queues", None) or []
+    return {
+        str(getattr(queue, "name", queue))
+        for queue in queues
+        if getattr(queue, "name", queue)
+    }
 
 
 def _import_rq():
