@@ -47,6 +47,17 @@
         });
     }
 
+    function submitAction(form, submitter) {
+        if (
+            submitter &&
+            submitter.hasAttribute &&
+            submitter.hasAttribute("formaction")
+        ) {
+            return submitter.formAction;
+        }
+        return form.action;
+    }
+
     function scoreClass(score) {
         if (score >= 95) return "score-badge score-badge--success";
         if (score >= 90) return "score-badge score-badge--strong";
@@ -433,7 +444,7 @@
     }
 
     function submitFragranticaLink(form, submitter) {
-        var action = (submitter && submitter.formAction) || form.action;
+        var action = submitAction(form, submitter);
         if (!action) return;
         var formData = new FormData(form);
         if (submitter && submitter.name) {
@@ -463,7 +474,7 @@
     }
 
     function submitAIAdvice(form, submitter) {
-        var action = (submitter && submitter.formAction) || form.action;
+        var action = submitAction(form, submitter);
         if (!action) return;
         setSubmitterBusy(submitter, true, "Thinking...");
         fetch(action, {
@@ -498,7 +509,7 @@
     }
 
     function submitAIAdviceReview(form, submitter) {
-        var action = (submitter && submitter.formAction) || form.action;
+        var action = submitAction(form, submitter);
         if (!action) return;
         setSubmitterBusy(submitter, true, "Saving...");
         fetch(action, {
