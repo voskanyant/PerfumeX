@@ -590,6 +590,102 @@
         return wrap;
     }
 
+    function buildOpenLink(detailUrl, className) {
+        var link = el("a", className);
+        link.dataset.productDetailLink = "";
+        link.href = detailUrl;
+        link.setAttribute("aria-label", "Open product page");
+        link.title = "Open product page";
+        var icon = svgEl("svg", {
+            viewBox: "0 0 16 16",
+            fill: "none",
+            stroke: "currentColor",
+            "stroke-width": "1.6",
+            "stroke-linecap": "round",
+            "stroke-linejoin": "round",
+            "aria-hidden": "true"
+        });
+        [
+            "M6 3H3.75A1.75 1.75 0 0 0 2 4.75v7.5C2 13.216 2.784 14 3.75 14h7.5A1.75 1.75 0 0 0 13 12.25V10",
+            "M9 2h5v5",
+            "M14 2 7.5 8.5"
+        ].forEach(function (pathData) {
+            icon.appendChild(svgEl("path", { d: pathData }));
+        });
+        link.appendChild(icon);
+        return link;
+    }
+
+    function buildSupplierMobileCard(item, detailUrl, priceText, deltaDirection, deltaValue, deltaPercent) {
+        var cell = el("td", "supplier-mobile-card-cell");
+        cell.colSpan = 8;
+        var card = el("div", "supplier-mobile-card");
+
+        var top = el("div", "supplier-mobile-card-top");
+        var nameButton = el("button", "supplier-mobile-card-name", item.name || "");
+        nameButton.type = "button";
+        nameButton.dataset.copyProductName = String(item.name || "");
+        nameButton.setAttribute("aria-label", "Copy product name");
+        top.appendChild(nameButton);
+        if (detailUrl) {
+            top.appendChild(buildOpenLink(detailUrl, "supplier-mobile-card-open"));
+        }
+        card.appendChild(top);
+
+        var mid = el("div", "supplier-mobile-card-mid");
+        var price = el("div", "supplier-mobile-card-price");
+        var priceParts = String(priceText || "-").match(/^(.+?)\s+([^\s]+)$/);
+        if (priceParts && priceParts[1] !== "-") {
+            price.appendChild(document.createTextNode(priceParts[1] + " "));
+            price.appendChild(el("span", "", priceParts[2]));
+        } else {
+            price.textContent = priceText || "-";
+        }
+        if (item.original_price) {
+            price.title = "Original: " + item.original_price;
+            price.dataset.originalPrice = "Original: " + item.original_price;
+        }
+        mid.appendChild(price);
+        var sparkline = el("div", "supplier-mobile-card-sparkline");
+        sparkline.appendChild(buildSparkline(item.sparkline, deltaDirection, deltaPercent));
+        mid.appendChild(sparkline);
+        card.appendChild(mid);
+
+        var bottom = el("div", "supplier-mobile-card-bottom");
+        var delta = el("span", "supplier-mobile-card-delta");
+        if (deltaDirection && deltaValue) {
+            delta.classList.add(deltaDirection);
+            delta.appendChild(el("span", "visually-hidden", deltaDirection === "down" ? "Decreased" : "Increased"));
+            delta.appendChild(document.createTextNode((deltaDirection === "down" ? "↓ " : "↑ ") + deltaValue + (deltaPercent ? " (" + deltaPercent + ")" : "")));
+        } else {
+            delta.classList.add("neutral");
+            delta.appendChild(el("span", "visually-hidden", "Unchanged"));
+            delta.appendChild(document.createTextNode("- No change"));
+        }
+        bottom.appendChild(delta);
+
+        var meta = el("span", "supplier-mobile-card-meta");
+        var supplierId = String(item.supplier_id || "");
+        var supplier = supplierId ? el("a", "supplier-mobile-card-supplier", item.supplier || "") : el("span", "supplier-mobile-card-supplier", item.supplier || "");
+        if (supplierId) {
+            supplier.href = "?supplier=" + encodeURIComponent(supplierId);
+            supplier.dataset.supplierId = supplierId;
+        }
+        meta.appendChild(supplier);
+        meta.appendChild(el("span", "supplier-mobile-card-dot"));
+        var time = el("span", "supplier-mobile-card-time", item.last_imported_at || "");
+        if (item.last_imported_at_full) {
+            time.title = String(item.last_imported_at_full || "");
+            time.dataset.fullDatetime = String(item.last_imported_at_full || "");
+        }
+        meta.appendChild(time);
+        bottom.appendChild(meta);
+        card.appendChild(bottom);
+
+        cell.appendChild(card);
+        return cell;
+    }
+
     function ensureCopyToast() {
         var existing = document.getElementById("copy-feedback-toast");
         if (existing) return existing;
@@ -741,6 +837,7 @@
                 checkboxCell.appendChild(checkbox);
                 row.appendChild(checkboxCell);
             }
+            row.appendChild(buildSupplierMobileCard(item, detailUrl, price, deltaDirection, deltaValue, deltaPercent));
             row.appendChild(fieldCell("supplier_sku", "SKU", el("span", "cell-sku", sku)));
             row.appendChild(fieldCell("name", "Name", buildProductNameCell(rawName, detailUrl)));
             row.appendChild(fieldCell("current_price", "Price", priceStack));

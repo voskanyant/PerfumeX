@@ -149,6 +149,55 @@
                                                aria-label="Select product row">
                                     </td>
                                 {% endif %}
+                                {% if list_title == 'Suppliers Products' or list_title == 'Supplier Products' %}
+                                    <td class="supplier-mobile-card-cell" colspan="{% if show_bulk_delete %}{% if show_actions %}{{ list_display|length|add:'3' }}{% else %}{{ list_display|length|add:'2' }}{% endif %}{% else %}{% if show_actions %}{{ list_display|length|add:'2' }}{% else %}{{ list_display|length|add:'1' }}{% endif %}{% endif %}">
+                                        <div class="supplier-mobile-card">
+                                            <div class="supplier-mobile-card-top">
+                                                <button class="supplier-mobile-card-name" type="button" data-copy-product-name="{{ obj.name }}" aria-label="Copy product name">{{ obj.name }}</button>
+                                                {% if link_detail and detail_url_name %}
+                                                    <a class="supplier-mobile-card-open" data-product-detail-link href="{% url detail_url_name obj.pk %}?next={{ request.get_full_path|urlencode }}&from={{ obj.pk }}" aria-label="Open product page" title="Open product page">
+                                                        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                                            <path d="M6 3H3.75A1.75 1.75 0 0 0 2 4.75v7.5C2 13.216 2.784 14 3.75 14h7.5A1.75 1.75 0 0 0 13 12.25V10"></path>
+                                                            <path d="M9 2h5v5"></path>
+                                                            <path d="M14 2 7.5 8.5"></path>
+                                                        </svg>
+                                                    </a>
+                                                {% endif %}
+                                            </div>
+                                            <div class="supplier-mobile-card-mid">
+                                                <div class="supplier-mobile-card-price"{% if obj.original_price_display %} title="Original: {{ obj.original_price_display }}" data-original-price="Original: {{ obj.original_price_display }}"{% endif %}>
+                                                    {% if obj.display_price %}
+                                                        {{ obj.display_price|floatformat:2 }} <span>{{ obj.display_currency|currency_symbol }}</span>
+                                                    {% else %}
+                                                        {{ obj.current_price|default_if_none:"-" }}{% if obj.current_price|default_if_none:'' != '' %} <span>{{ obj.currency|currency_symbol }}</span>{% endif %}
+                                                    {% endif %}
+                                                </div>
+                                                <div class="supplier-mobile-card-sparkline">{{ obj.sparkline_svg }}</div>
+                                            </div>
+                                            <div class="supplier-mobile-card-bottom">
+                                                {% if obj.price_delta_direction %}
+                                                    <span class="supplier-mobile-card-delta {{ obj.price_delta_direction }}">
+                                                        <span class="visually-hidden">{% if obj.price_delta_direction == "down" %}Decreased{% else %}Increased{% endif %}</span>
+                                                        {% if obj.price_delta_direction == "down" %}&darr;{% else %}&uarr;{% endif %}
+                                                        {{ obj.price_delta_value|floatformat:2 }} {{ obj.display_currency|currency_symbol }}
+                                                        {% if obj.price_delta_percent %}({{ obj.price_delta_percent|floatformat:2 }}%){% endif %}
+                                                    </span>
+                                                {% else %}
+                                                    <span class="supplier-mobile-card-delta neutral"><span class="visually-hidden">Unchanged</span>- No change</span>
+                                                {% endif %}
+                                                <span class="supplier-mobile-card-meta">
+                                                    {% if obj.supplier_id %}
+                                                        <a href="?supplier={{ obj.supplier_id }}" class="supplier-mobile-card-supplier" data-supplier-id="{{ obj.supplier_id }}">{{ obj.supplier }}</a>
+                                                    {% else %}
+                                                        <span class="supplier-mobile-card-supplier">{{ obj.supplier }}</span>
+                                                    {% endif %}
+                                                    <span class="supplier-mobile-card-dot" aria-hidden="true"></span>
+                                                    <span class="supplier-mobile-card-time {{ obj.last_imported_at|imported_age_class }}" title="{{ obj.last_imported_at|date:'d.m.Y H:i' }}" data-full-datetime="{{ obj.last_imported_at|date:'d.m.Y H:i' }}">{{ obj.last_imported_at|relative_time_short }}</span>
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </td>
+                                {% endif %}
                                 {% for field in list_display %}
                                     {% if field == "last_imported_at" %}
                                         <td data-field="{{ field }}" data-label="Last imported"><span class="cell-imported {{ obj.last_imported_at|imported_age_class }}" title="{{ obj.last_imported_at|date:'d.m.Y H:i' }}" data-full-datetime="{{ obj.last_imported_at|date:'d.m.Y H:i' }}">{{ obj.last_imported_at|relative_time_short }}</span></td>

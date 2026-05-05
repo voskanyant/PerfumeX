@@ -200,6 +200,7 @@ Standard responsive structure:
 - Catalogue linking single-row Fragrantica link actions should update the selected row in place with the AJAX response; do not redirect back into a full candidate rebuild unless JavaScript is unavailable.
 - Assistant unparsed normalization rows should mirror parsed queue columns and may show bounded, non-persistent parser previews for the visible page; use explicit parse actions to create saved `ParsedSupplierProduct` rows.
 - Supplier import spreadsheet previews are specialized scrollable tables. Keep `.import-preview-table` headers visible because they are mapping controls; do not add `.table-mobile` there. Generated preview cells should still use scoped headers and `data-label` metadata.
+- Supplier Products mobile rows are specialized price-tracking cards, not table-cell reshuffles. Preserve the dedicated mobile card structure: product name with a small open action, price beside sparkline, and bottom-row change badge plus supplier/time metadata.
 - Keep actions in `td.actions` or `td[data-label="Actions"]`.
 
 ## Filters and search

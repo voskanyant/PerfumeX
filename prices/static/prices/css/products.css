@@ -56,6 +56,10 @@
   display: table-cell;
 }
 
+.supplier-mobile-card-cell {
+  display: none;
+}
+
 .products-command-surface,
 .generic-list-surface,
 .products-search-row,
@@ -730,22 +734,14 @@ tr[data-delta="up"] {
   }
 
   .products-mobile tr {
-    display: grid !important;
-    grid-template-columns: minmax(0, 1fr) 76px !important;
-    grid-template-areas:
-      "name name"
-      "price chart"
-      "supplier date"
-      "actions actions";
-    column-gap: 12px;
-    row-gap: 10px;
+    display: block !important;
     margin-bottom: 8px !important;
-    padding: 14px 16px 12px !important;
-    border: 1px solid var(--grey-200) !important;
-    border-left: 1px solid var(--grey-200) !important;
-    border-radius: 14px !important;
-    background: var(--white) !important;
-    box-shadow: 0 1px 3px rgba(10, 10, 10, 0.06), 0 1px 2px rgba(10, 10, 10, 0.04) !important;
+    padding: 0 !important;
+    border: 0 !important;
+    border-left: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
     max-width: 100%;
     overflow: hidden;
     position: relative;
@@ -779,9 +775,178 @@ tr[data-delta="up"] {
 
   .products-mobile .bulk-col,
   .products-mobile td.select-col,
+  .products-mobile td[data-field],
+  .products-mobile td.sparkline-cell,
+  .products-mobile td.actions,
   .products-mobile input[name="product_ids"],
   .products-mobile #product-select-all {
     display: none !important;
+  }
+
+  .products-mobile td.supplier-mobile-card-cell {
+    display: block !important;
+    width: auto !important;
+    padding: 0 !important;
+    line-height: 1.35 !important;
+    border: 0 !important;
+  }
+
+  .supplier-mobile-card {
+    display: grid;
+    row-gap: 10px;
+    padding: 14px 16px 12px;
+    border: 1px solid var(--grey-200);
+    border-radius: 14px;
+    background: var(--white);
+    box-shadow: 0 1px 3px rgba(10, 10, 10, 0.06), 0 1px 2px rgba(10, 10, 10, 0.04);
+  }
+
+  .supplier-mobile-card-top {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 22px;
+    gap: 8px;
+    align-items: start;
+  }
+
+  .supplier-mobile-card-name {
+    width: 100%;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--black);
+    font: inherit;
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 1.35;
+    text-align: left;
+    text-decoration: none;
+  }
+
+  .supplier-mobile-card-open {
+    display: inline-flex;
+    width: 22px;
+    height: 22px;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--grey-200);
+    border-radius: 6px;
+    color: var(--grey-400);
+    opacity: 0.48;
+    text-decoration: none;
+  }
+
+  .supplier-mobile-card-open:hover,
+  .supplier-mobile-card-open:focus-visible {
+    border-color: var(--grey-300);
+    color: var(--black);
+    opacity: 1;
+  }
+
+  .supplier-mobile-card-open svg {
+    width: 13px;
+    height: 13px;
+  }
+
+  .supplier-mobile-card-mid {
+    display: grid;
+    grid-template-columns: minmax(0, max-content) 76px;
+    gap: 12px;
+    align-items: end;
+    justify-content: space-between;
+  }
+
+  .supplier-mobile-card-price {
+    color: var(--black);
+    font-size: 20px;
+    font-weight: 700;
+    line-height: 1;
+    white-space: nowrap;
+  }
+
+  .supplier-mobile-card-price span {
+    margin-left: 1px;
+    color: var(--grey-700);
+    font-size: 13px;
+    font-weight: 500;
+  }
+
+  .supplier-mobile-card-sparkline {
+    width: 76px;
+    opacity: 0.5;
+  }
+
+  .supplier-mobile-card-sparkline .product-sparkline {
+    display: block;
+    width: 100% !important;
+    height: 28px !important;
+  }
+
+  .supplier-mobile-card-bottom {
+    display: grid;
+    grid-template-columns: minmax(0, max-content) minmax(0, 1fr);
+    gap: 8px;
+    align-items: center;
+  }
+
+  .supplier-mobile-card-delta {
+    display: inline-flex;
+    width: fit-content;
+    align-items: center;
+    gap: 3px;
+    padding: 3px 8px;
+    border-radius: 5px;
+    background: var(--grey-50);
+    color: var(--grey-500);
+    font-size: 11px;
+    font-weight: 500;
+    line-height: 1.2;
+    white-space: nowrap;
+  }
+
+  .supplier-mobile-card-delta.up {
+    background: color-mix(in srgb, var(--danger) 8%, var(--white));
+    color: var(--danger);
+  }
+
+  .supplier-mobile-card-delta.down {
+    background: color-mix(in srgb, var(--success) 8%, var(--white));
+    color: var(--success);
+  }
+
+  .supplier-mobile-card-meta {
+    display: inline-flex;
+    min-width: 0;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 6px;
+  }
+
+  .supplier-mobile-card-supplier {
+    min-width: 0;
+    overflow: hidden;
+    color: var(--grey-600) !important;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.2;
+    text-decoration: none !important;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .supplier-mobile-card-dot {
+    width: 3px;
+    height: 3px;
+    border-radius: 50%;
+    background: var(--grey-300);
+    flex: none;
+  }
+
+  .supplier-mobile-card-time {
+    color: var(--grey-400);
+    font-size: 11.5px;
+    font-weight: 400;
+    line-height: 1.2;
+    white-space: nowrap;
   }
 
   .products-mobile td[data-field="name"] {
