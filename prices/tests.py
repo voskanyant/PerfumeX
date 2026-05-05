@@ -9831,6 +9831,46 @@ class OurProductCatalogueListTests(TestCase):
         self.assertEqual(source.match_status, FragranticaProduct.STATUS_UNLINKED)
         self.assertIsNone(source.matched_perfume_id)
 
+    @override_settings(PERFUMEX_RQ_SYNC=False)
+    def test_catalogue_linking_workbench_queues_all_page_bulk_link_in_production(self):
+        source = FragranticaProduct.objects.create(
+            brand_name="Montale",
+            normalized_brand_name="montale",
+            name="Vanilla Extasy",
+            normalized_name="vanilla extasy",
+            source_path="/perfume/Montale/Vanilla-Extasy-queued.html",
+        )
+
+        with patch(
+            "prices.services.catalog_review.enqueue_management_command",
+            return_value=SimpleNamespace(
+                job_id="job-123",
+                status="queued",
+                queue_name="perfumex",
+            ),
+        ) as enqueue:
+            response = self.client.post(
+                reverse("prices:catalogue_linking_workbench"),
+                {
+                    "action": "bulk_link_filtered",
+                    "next": reverse("prices:catalogue_linking_workbench"),
+                    "status": "unlinked",
+                    "suggestions": "with",
+                    "confidence": "100",
+                },
+            )
+
+        self.assertEqual(response.status_code, 302)
+        enqueue.assert_called_once()
+        self.assertEqual(
+            enqueue.call_args.args[0],
+            "bulk_link_catalogue_filtered",
+        )
+        self.assertEqual(enqueue.call_args.kwargs["confidence"], "100")
+        self.assertEqual(enqueue.call_args.kwargs["status"], "unlinked")
+        source.refresh_from_db()
+        self.assertEqual(source.match_status, FragranticaProduct.STATUS_UNLINKED)
+
     def test_catalogue_linking_workbench_selects_rows_without_suggestions(self):
         response = self.client.get(reverse("prices:catalogue_linking_workbench"))
 

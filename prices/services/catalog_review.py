@@ -15,6 +15,7 @@ from types import SimpleNamespace
 from urllib.parse import urlencode
 
 import regex
+from django.conf import settings
 from django.core.paginator import Paginator
 from django.db import IntegrityError
 from django.db.models import Count, Q, Subquery
@@ -59,6 +60,7 @@ from prices.services.product_filters import (
     resolve_supplier_exclude_terms,
 )
 from prices.services.product_visibility import apply_hidden_product_keywords
+from prices.services.job_queue import enqueue_management_command
 
 
 logger = logging.getLogger(__name__)
@@ -2933,6 +2935,20 @@ def _catalogue_linking_filter_request_from_post(post_data):
     return SimpleNamespace(GET=query)
 
 
+def catalogue_linking_filtered_bulk_command_options(post_data) -> dict[str, str]:
+    return {
+        "brand": (post_data.get("brand") or "").strip(),
+        "q": (post_data.get("q") or "").strip(),
+        "status": normalize_catalogue_linking_status(post_data.get("status")),
+        "suggestions": normalize_catalogue_linking_suggestion_filter(
+            post_data.get("suggestions")
+        ),
+        "confidence": normalize_catalogue_linking_confidence_filter(
+            post_data.get("confidence")
+        ),
+    }
+
+
 def _catalogue_linking_safe_bulk_filtered_settings(post_data) -> tuple[str, str, int]:
     confidence_filter = normalize_catalogue_linking_confidence_filter(
         post_data.get("confidence")
@@ -3017,6 +3033,112 @@ def _catalogue_linking_filtered_ready_pairs(
     return safe_pairs, skipped_count
 
 
+def _run_catalogue_linking_selected_pairs(
+    selected_pairs,
+    *,
+    skipped_count: int,
+    redirect_url: str,
+    action: str,
+    host: str = "",
+    source_manager,
+    perfume_manager,
+) -> CatalogueLinkingBulkResult:
+    linked_count = 0
+    for raw_pair in selected_pairs:
+        if isinstance(raw_pair, tuple):
+            source_id, perfume_id, create_alias = raw_pair
+        else:
+            parts = str(raw_pair).split(":")
+            if len(parts) < 2:
+                skipped_count += 1
+                continue
+            source_id, perfume_id = parts[0], parts[1]
+            create_alias = len(parts) >= 3 and parts[2] == "1"
+        source = first_from_queryset(
+            source_manager.select_related("matched_perfume").filter(pk=source_id)
+        )
+        perfume = first_from_queryset(
+            perfume_manager.select_related("brand").filter(pk=perfume_id)
+        )
+        if (
+            not source
+            or not perfume
+            or not fragrantica_source_is_available_for_perfume(
+                source,
+                perfume,
+            )
+        ):
+            skipped_count += 1
+            continue
+        result = run_fragrantica_catalogue_link_action(
+            source.id,
+            {
+                "perfume_id": str(perfume.id),
+                "next": redirect_url,
+                "create_alias": "1" if create_alias else "0",
+                "apply_identity_group": "1",
+            },
+            host=host,
+        )
+        if result.level == "success":
+            linked_count += 1
+        else:
+            skipped_count += 1
+
+    if linked_count:
+        skipped_note = (
+            f" Skipped {skipped_count} stale suggestion(s)." if skipped_count else ""
+        )
+        return CatalogueLinkingBulkResult(
+            "success",
+            (
+                f"Linked {linked_count} Fragrantica match(es)"
+                f"{' across all filtered pages' if action == 'bulk_link_filtered' else ''}."
+                f"{skipped_note}"
+            ),
+            redirect_url,
+        )
+    return CatalogueLinkingBulkResult(
+        "error",
+        "No selected suggestions could be linked.",
+        redirect_url,
+    )
+
+
+def run_catalogue_linking_filtered_bulk_action(
+    post_data,
+    *,
+    redirect_url: str = "",
+    source_manager=None,
+    perfume_manager=None,
+) -> CatalogueLinkingBulkResult:
+    redirect_url = redirect_url or reverse("prices:catalogue_linking_workbench")
+    source_manager = source_manager or FragranticaProduct.objects
+    perfume_manager = perfume_manager or CatalogPerfume.objects
+    try:
+        selected_pairs, skipped_count = _catalogue_linking_filtered_ready_pairs(
+            post_data,
+            perfume_manager=perfume_manager,
+        )
+    except ValueError as exc:
+        return CatalogueLinkingBulkResult("error", str(exc), redirect_url)
+    if not selected_pairs:
+        return CatalogueLinkingBulkResult(
+            "error",
+            "No safe ready suggestions matched the current filters.",
+            redirect_url,
+        )
+    return _run_catalogue_linking_selected_pairs(
+        selected_pairs,
+        skipped_count=skipped_count,
+        redirect_url=redirect_url,
+        action="bulk_link_filtered",
+        host="",
+        source_manager=source_manager,
+        perfume_manager=perfume_manager,
+    )
+
+
 def _catalogue_linking_candidate_conflict_scope(perfume, perfume_manager):
     queryset = perfume_manager.select_related("brand", "collection").filter(
         brand=perfume.brand,
@@ -3093,18 +3215,42 @@ def run_catalogue_linking_bulk_action(
 
     if action == "bulk_link_filtered":
         try:
-            selected_pairs, skipped_count = _catalogue_linking_filtered_ready_pairs(
-                post_data,
-                perfume_manager=perfume_manager,
-            )
+            _catalogue_linking_safe_bulk_filtered_settings(post_data)
         except ValueError as exc:
             return CatalogueLinkingBulkResult("error", str(exc), redirect_url)
-        if not selected_pairs:
+        if (
+            not settings.PERFUMEX_RQ_SYNC
+            and source_manager.model is FragranticaProduct
+            and perfume_manager.model is CatalogPerfume
+        ):
+            try:
+                job = enqueue_management_command(
+                    "bulk_link_catalogue_filtered",
+                    queue_name=settings.RQ_DEFAULT_QUEUE,
+                    description="Bulk link catalogue Fragrantica matches",
+                    **catalogue_linking_filtered_bulk_command_options(post_data),
+                )
+            except Exception as exc:
+                logger.exception("Failed to queue catalogue filtered bulk link")
+                return CatalogueLinkingBulkResult(
+                    "error",
+                    f"Could not queue all-filtered bulk linking: {exc}",
+                    redirect_url,
+                )
             return CatalogueLinkingBulkResult(
-                "error",
-                "No safe ready suggestions matched the current filters.",
+                "success",
+                (
+                    "Queued all-filtered Fragrantica bulk linking "
+                    f"(job {job.job_id or job.status}). Refresh this page in a minute."
+                ),
                 redirect_url,
             )
+        return run_catalogue_linking_filtered_bulk_action(
+            post_data,
+            redirect_url=redirect_url,
+            source_manager=source_manager,
+            perfume_manager=perfume_manager,
+        )
     elif action == "bulk_link":
         selected_pairs = post_data.getlist("link_pair")
         skipped_count = 0
