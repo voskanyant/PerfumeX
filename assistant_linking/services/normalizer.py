@@ -52,7 +52,7 @@ from prices.models import SupplierProduct
 
 
 logger = logging.getLogger(__name__)
-PARSER_VERSION = "deterministic-v41"
+PARSER_VERSION = "deterministic-v42"
 REGEX_ALIAS_TIMEOUT_SECONDS = 1.0
 CATALOG_CONCENTRATION_CONFLICT_WARNING = (
     "Catalogue match suggests {suggested}. Supplier text parsed as {parsed}."
@@ -885,9 +885,7 @@ def _alias_starts_text(text: str, alias_text: str) -> bool:
     normalized_alias = normalize_text(alias_text)
     if not normalized_alias:
         return False
-    return bool(
-        re.match(rf"^\s*{re.escape(normalized_alias)}(?:\s+|$)", text or "")
-    )
+    return bool(re.match(rf"^\s*{re.escape(normalized_alias)}(?:\s+|$)", text or ""))
 
 
 def _product_name_from_alias_match_context(

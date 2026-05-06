@@ -19,7 +19,7 @@
             <a class="button ghost" href="{% url 'assistant_linking:normalization_low_confidence' %}">Reset</a>
         {% endif %}
         {% if allow_refresh_visible %}
-            <a class="button ghost" href="?{% if search_query %}q={{ search_query|urlencode }}&amp;{% endif %}{% if page_obj %}page={{ page_obj.number }}&amp;{% endif %}refresh=1">Refresh visible rows</a>
+            <a class="button ghost" href="?{% if search_query %}q={{ search_query|urlencode }}&amp;{% endif %}{% if page_obj %}page={{ page_obj.number }}&amp;{% endif %}refresh=1">Reparse this page now</a>
         {% endif %}
     </form>
     {% if refreshed_visible %}
@@ -34,8 +34,8 @@
             {% for parsed in parses %}
                 <input type="hidden" name="supplier_product_ids" value="{{ parsed.supplier_product_id }}">
             {% endfor %}
-            <button class="button secondary" type="submit">Refresh visible in background</button>
-            <span class="form-help">Reparse this page's rows, then reload to remove fixed items.</span>
+            <button class="button secondary" type="submit">Queue this page for reparse</button>
+            <span class="form-help">Use this for stale saved parses; reload after the background job finishes.</span>
         </form>
     {% endif %}
 </div>

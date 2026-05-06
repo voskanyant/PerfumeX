@@ -25,7 +25,7 @@ from assistant_linking.services.normalization_detail import (
     teach_parse_for_product,
 )
 from assistant_linking.services.normalizer import PARSER_VERSION, save_parse
-from catalog.models import Brand
+from catalog.models import Brand, Perfume
 from prices.models import Supplier, SupplierProduct
 
 
@@ -294,7 +294,11 @@ class NormalizationDetailServiceTests(SimpleTestCase):
         )
 
     def test_get_saved_or_preview_parse_prefers_existing_saved_parse(self):
-        existing = SimpleNamespace(id=7)
+        existing = SimpleNamespace(
+            id=7,
+            locked_by_human=False,
+            parser_version=PARSER_VERSION,
+        )
         product = SimpleNamespace(assistant_parse=existing)
         preview_builder = MagicMock()
 
@@ -742,7 +746,9 @@ class NormalizationDetailDatabaseTests(TestCase):
             name="100 Bon Bois De Mangrove парфюмированная вода тестер 50 мл. уни",
         )
         parsed = save_parse(product)
-        parsed.product_name_text = "100 bon bois de mangrove парфюмированная вода тестер уни"
+        parsed.product_name_text = (
+            "100 bon bois de mangrove парфюмированная вода тестер уни"
+        )
         parsed.concentration = ""
         parsed.supplier_gender_hint = ""
         parsed.warnings = ["brand missing", "concentration missing", "gender missing"]
@@ -759,6 +765,45 @@ class NormalizationDetailDatabaseTests(TestCase):
         self.assertEqual(refreshed.supplier_gender_hint, "Unisex")
         self.assertTrue(refreshed.is_tester)
         self.assertEqual(refreshed.warnings, [])
+
+    def test_detail_context_refreshes_stale_royal_vintage_parse(self):
+        supplier = Supplier.objects.create(name="Supplier", code="supplier")
+        brand = Brand.objects.create(name="M. Micallef")
+        Perfume.objects.create(
+            brand=brand,
+            name="Royal Vintage",
+            concentration="Eau de Parfum",
+            audience="men",
+        )
+        product = SupplierProduct.objects.create(
+            supplier=supplier,
+            identity_key="micallef-royal-vintage-stale",
+            name="M. Micallef Royal Vintage m edp100ml",
+        )
+        ParsedSupplierProduct.objects.create(
+            supplier_product=product,
+            raw_name=product.name,
+            normalized_text="m micallef royal vintage m edp100ml",
+            normalized_brand=brand,
+            product_name_text="M. Micallef Royal Vintage M Edp100ml",
+            concentration="Eau de Parfum",
+            size_ml=Decimal("100.00"),
+            raw_size_text="100ml",
+            parser_version="deterministic-v41",
+            locked_by_human=False,
+        )
+
+        refreshed = get_saved_or_preview_parse(product)
+
+        self.assertIsInstance(refreshed, ParsedSupplierProduct)
+        self.assertEqual(refreshed.parser_version, PARSER_VERSION)
+        self.assertEqual(refreshed.normalized_brand, brand)
+        self.assertEqual(refreshed.product_name_text, "Royal Vintage")
+        self.assertEqual(refreshed.supplier_gender_hint, "Men")
+        self.assertEqual(
+            refreshed.display_identity,
+            "M. Micallef / Royal Vintage / Eau de Parfum / 100ml",
+        )
 
     def test_detail_context_preserves_locked_stale_parse(self):
         supplier = Supplier.objects.create(name="Supplier", code="supplier")

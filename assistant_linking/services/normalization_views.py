@@ -26,9 +26,9 @@ PARSED_PRODUCT_HIDDEN_FIELDS = (
     "supplier_product__supplier_sku",
 )
 COMPLETE_PARSED_ORDER = (
-    "-updated_at",
     "supplier_product__supplier__name",
     "supplier_product__name",
+    "pk",
 )
 
 

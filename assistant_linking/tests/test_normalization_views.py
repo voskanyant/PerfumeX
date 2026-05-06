@@ -492,9 +492,9 @@ class NormalizationViewServiceTests(SimpleTestCase):
         self.assertEqual(hider_calls, [(base, ["tester"])])
         hidden.filter.assert_called_once()
         hidden.order_by.assert_called_once_with(
-            "-updated_at",
             "supplier_product__supplier__name",
             "supplier_product__name",
+            "pk",
         )
 
     def test_build_complete_parsed_id_queryset_filters_by_ids(self):
@@ -518,9 +518,9 @@ class NormalizationViewServiceTests(SimpleTestCase):
         base.filter.assert_called_once_with(pk__in=[5, 7])
         id_queryset.filter.assert_called_once()
         id_queryset.order_by.assert_called_once_with(
-            "-updated_at",
             "supplier_product__supplier__name",
             "supplier_product__name",
+            "pk",
         )
 
     def test_refresh_visible_parsed_context_keeps_rows_when_not_forced(self):
