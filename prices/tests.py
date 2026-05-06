@@ -9281,6 +9281,55 @@ class OurProductCatalogueListTests(TestCase):
         )
         self.assertContains(response, reverse("prices:catalogue_linking_candidates"))
 
+    def test_catalogue_linking_queryset_filters_link_status_without_global_counts(self):
+        from prices.services.catalog_review import (
+            build_catalogue_linking_perfume_queryset,
+        )
+
+        linked_source = FragranticaProduct.objects.create(
+            brand_name="Montale",
+            normalized_brand_name="montale",
+            name="Vanilla Extasy",
+            normalized_name="vanilla extasy",
+            source_path="/perfume/Montale/Vanilla-Extasy-1.html",
+            match_status=FragranticaProduct.STATUS_LINKED,
+            matched_perfume=self.perfume,
+        )
+        extra_perfume = Perfume.objects.create(
+            brand=self.perfume.brand,
+            name="Vanilla Extasy Rare",
+            concentration="Eau de Parfum",
+        )
+        FragranticaProductLink.objects.create(
+            source=linked_source,
+            perfume=extra_perfume,
+        )
+        unlinked_perfume = Perfume.objects.create(
+            brand=self.perfume.brand,
+            name="Quiet Scent",
+            concentration="Eau de Parfum",
+        )
+
+        linked_request = RequestFactory().get(
+            reverse("prices:catalogue_linking_workbench"),
+            {"status": "linked"},
+        )
+        linked_queryset = build_catalogue_linking_perfume_queryset(linked_request)
+        linked_ids = set(linked_queryset.values_list("pk", flat=True))
+
+        unlinked_request = RequestFactory().get(
+            reverse("prices:catalogue_linking_workbench"),
+            {"status": "unlinked"},
+        )
+        unlinked_queryset = build_catalogue_linking_perfume_queryset(unlinked_request)
+        unlinked_ids = set(unlinked_queryset.values_list("pk", flat=True))
+
+        self.assertIn(self.perfume.pk, linked_ids)
+        self.assertIn(extra_perfume.pk, linked_ids)
+        self.assertNotIn(unlinked_perfume.pk, linked_ids)
+        self.assertIn(unlinked_perfume.pk, unlinked_ids)
+        self.assertNotIn("COUNT(", str(linked_queryset.query).upper())
+
     def test_catalogue_linking_workbench_filters_visible_rows_by_suggestion(self):
         FragranticaProduct.objects.create(
             brand_name="Montale",

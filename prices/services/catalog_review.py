@@ -19,7 +19,7 @@ from django.apps import apps
 from django.conf import settings
 from django.core.paginator import Paginator
 from django.db import IntegrityError, transaction
-from django.db.models import Count, Q, Subquery
+from django.db.models import Count, Exists, OuterRef, Q, Subquery
 from django.http import Http404, QueryDict
 from django.shortcuts import get_object_or_404
 from django.urls import reverse, reverse_lazy
@@ -2425,43 +2425,21 @@ def build_catalogue_linking_perfume_queryset(
         perfume_manager.select_related("brand", "collection"),
         selected_brand=selected_brand,
         search_query=search_query,
-    ).annotate(
-        variant_count=Count("variants", distinct=True),
-        linked_fragrantica_count=Count(
-            "fragrantica_products",
-            filter=Q(
-                fragrantica_products__match_status=FragranticaProduct.STATUS_LINKED
-            ),
-            distinct=True,
-        ),
-        reviewed_fragrantica_link_count=Count(
-            "fragrantica_review_links",
-            distinct=True,
-        ),
     )
-    if status_filter == "linked":
-        queryset = queryset.filter(
-            Q(linked_fragrantica_count__gt=0) | Q(reviewed_fragrantica_link_count__gt=0)
-        )
-    elif status_filter == "unlinked":
-        queryset = queryset.filter(
-            linked_fragrantica_count=0,
-            reviewed_fragrantica_link_count=0,
-        )
+    queryset = _filter_catalogue_linking_queryset_by_link_status(
+        queryset,
+        status_filter,
+    )
     if _catalogue_linking_request_uses_high_confidence_prefilter(request):
         exact_queryset = _apply_catalogue_linking_perfume_filters(
             perfume_manager.select_related("brand"),
             selected_brand=selected_brand,
             search_query=search_query,
         )
-        if status_filter == "unlinked":
-            exact_queryset = (
-                exact_queryset.exclude(
-                    fragrantica_products__match_status=FragranticaProduct.STATUS_LINKED
-                )
-                .filter(fragrantica_review_links__isnull=True)
-                .distinct()
-            )
+        exact_queryset = _filter_catalogue_linking_queryset_by_link_status(
+            exact_queryset,
+            status_filter,
+        )
         exact_perfume_ids = _catalogue_linking_strict_exact_perfume_ids(
             exact_queryset,
             include_linked_sources=_catalogue_linking_request_uses_review_filter(
@@ -2501,6 +2479,73 @@ def _apply_catalogue_linking_perfume_filters(
     return queryset
 
 
+def _filter_catalogue_linking_queryset_by_link_status(queryset, status_filter: str):
+    if status_filter not in {"linked", "unlinked"}:
+        return queryset
+    queryset = queryset.alias(
+        _has_linked_fragrantica_source=Exists(
+            FragranticaProduct.objects.filter(
+                matched_perfume_id=OuterRef("pk"),
+                match_status=FragranticaProduct.STATUS_LINKED,
+            )
+        ),
+        _has_reviewed_fragrantica_link=Exists(
+            FragranticaProductLink.objects.filter(perfume_id=OuterRef("pk"))
+        ),
+    )
+    linked_filter = (
+        Q(_has_linked_fragrantica_source=True)
+        | Q(_has_reviewed_fragrantica_link=True)
+    )
+    if status_filter == "linked":
+        return queryset.filter(linked_filter)
+    return queryset.filter(
+        _has_linked_fragrantica_source=False,
+        _has_reviewed_fragrantica_link=False,
+    )
+
+
+def _attach_catalogue_linking_row_counts(perfumes) -> None:
+    perfume_ids = [perfume.id for perfume in perfumes if getattr(perfume, "id", None)]
+    if not perfume_ids:
+        return
+
+    variant_counts = {
+        row["perfume_id"]: row["count"]
+        for row in CatalogPerfumeVariant.objects.filter(perfume_id__in=perfume_ids)
+        .values("perfume_id")
+        .annotate(count=Count("id"))
+    }
+    linked_source_counts = {
+        row["matched_perfume_id"]: row["count"]
+        for row in FragranticaProduct.objects.filter(
+            matched_perfume_id__in=perfume_ids,
+            match_status=FragranticaProduct.STATUS_LINKED,
+        )
+        .values("matched_perfume_id")
+        .annotate(count=Count("id"))
+    }
+    reviewed_link_counts = {
+        row["perfume_id"]: row["count"]
+        for row in FragranticaProductLink.objects.filter(perfume_id__in=perfume_ids)
+        .values("perfume_id")
+        .annotate(count=Count("id"))
+    }
+    for perfume in perfumes:
+        perfume_id = getattr(perfume, "id", None)
+        if not perfume_id:
+            continue
+        perfume.variant_count = variant_counts.get(perfume_id, 0)
+        perfume.linked_fragrantica_count = linked_source_counts.get(
+            perfume_id,
+            0,
+        ) + reviewed_link_counts.get(perfume_id, 0)
+        perfume.reviewed_fragrantica_link_count = reviewed_link_counts.get(
+            perfume_id,
+            0,
+        )
+
+
 def build_catalogue_linking_rows(
     perfumes,
     *,
@@ -2508,6 +2553,7 @@ def build_catalogue_linking_rows(
     include_candidates: bool = True,
 ) -> list[dict]:
     perfumes = list(perfumes)
+    _attach_catalogue_linking_row_counts(perfumes)
     linked_source_map = build_linked_fragrantica_sources_by_perfume_ids(
         [perfume.id for perfume in perfumes]
     )
@@ -2917,6 +2963,8 @@ def build_catalogue_linking_context(
     )
     if confidence_filter != "all":
         min_score = normalize_catalogue_linking_min_score(confidence_filter)
+    if confidence_filter == "review":
+        min_score = max(min_score, 95)
     suggestion_filter = normalize_catalogue_linking_suggestion_filter(
         request.GET.get("suggestions")
     )
