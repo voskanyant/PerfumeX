@@ -6502,6 +6502,7 @@ class CatalogReviewServiceTests(SimpleTestCase):
 
     def test_fragrantica_identity_matching_folds_latin_diacritics(self):
         from prices.services.catalog_review import (
+            fragrantica_identity_key,
             normalize_catalogue_perfume_name,
             normalized_fragrance_key,
         )
@@ -6521,6 +6522,14 @@ class CatalogReviewServiceTests(SimpleTestCase):
         self.assertEqual(
             normalize_catalogue_perfume_name("L’air Barbès"),
             "L'air Barbes",
+        )
+        self.assertEqual(
+            normalize_catalogue_perfume_name("L´air Barbès"),
+            "L'air Barbes",
+        )
+        self.assertEqual(
+            fragrantica_identity_key("19-69", "L´air Barbès"),
+            fragrantica_identity_key("19-69", "L'air Barbes"),
         )
 
     def test_build_our_product_catalog_variant_queryset_applies_search_policy(self):
@@ -8643,6 +8652,46 @@ class OurProductCatalogueListTests(TestCase):
         )
         self.assertNotEqual(perfume.pk, self.perfume.pk)
 
+    def test_fragrantica_products_suggests_extrait_title_for_extrait_variant(self):
+        brand = Brand.objects.create(name="Matiere Premiere")
+        Perfume.objects.create(
+            brand=brand,
+            name="Crystal Saffron",
+            concentration="Eau de Parfum",
+        )
+        extrait = Perfume.objects.create(
+            brand=brand,
+            name="Crystal Saffron",
+            concentration="Extrait de Parfum",
+        )
+        source = FragranticaProduct.objects.create(
+            brand_name="Matiere Premiere",
+            normalized_brand_name="matiere premiere",
+            name="Crystal Saffron Extrait",
+            normalized_name="crystal saffron extrait",
+            collection_name="Extrait de Parfum",
+            audience="Unisex",
+            release_year=2024,
+            source_path="/perfume/Matiere-Premiere/Crystal-Saffron-Extrait.html",
+        )
+
+        response = self.client.get(
+            reverse("prices:fragrantica_product_review"),
+            {"brand": "Matiere Premiere", "q": "crystal saffron extrait"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            "Matiere Premiere / Crystal Saffron / Extrait de Parfum",
+        )
+        self.assertContains(response, "Exact brand, scent, and concentration match")
+        self.assertContains(
+            response,
+            reverse("prices:fragrantica_product_link", args=[source.pk]),
+        )
+        self.assertNotEqual(extrait.pk, self.perfume.pk)
+
     def test_fragrantica_products_suggests_audience_suffix_and_concentration_title(
         self,
     ):
@@ -9604,6 +9653,57 @@ class OurProductCatalogueListTests(TestCase):
         self.assertEqual(
             exact_payload["candidates"][0]["source_id"],
             matching_source.pk,
+        )
+
+    def test_catalogue_linking_treats_extrait_as_extrait_de_parfum(self):
+        brand = Brand.objects.create(name="Matiere Premiere")
+        edp = Perfume.objects.create(
+            brand=brand,
+            name="Crystal Saffron",
+            concentration="Eau de Parfum",
+        )
+        extrait = Perfume.objects.create(
+            brand=brand,
+            name="Crystal Saffron",
+            concentration="Extrait de Parfum",
+        )
+        source = FragranticaProduct.objects.create(
+            brand_name="Matiere Premiere",
+            normalized_brand_name="matiere premiere",
+            name="Crystal Saffron Extrait",
+            normalized_name="crystal saffron extrait",
+            collection_name="Extrait de Parfum",
+            audience="Unisex",
+            release_year=2024,
+            source_path="/perfume/Matiere-Premiere/Crystal-Saffron-Extrait.html",
+        )
+
+        extrait_response = self.client.get(
+            reverse("prices:catalogue_linking_candidates"),
+            {"perfume": extrait.pk, "min_score": "100"},
+        )
+        edp_response = self.client.get(
+            reverse("prices:catalogue_linking_candidates"),
+            {"perfume": edp.pk, "min_score": "0"},
+        )
+
+        self.assertEqual(extrait_response.status_code, 200)
+        extrait_payload = extrait_response.json()
+        self.assertEqual(len(extrait_payload["candidates"]), 1)
+        self.assertEqual(extrait_payload["candidates"][0]["source_id"], source.pk)
+        self.assertEqual(extrait_payload["candidates"][0]["score"], 100)
+        self.assertEqual(
+            extrait_payload["candidates"][0]["reason"],
+            "Exact brand, scent, and concentration match",
+        )
+
+        self.assertEqual(edp_response.status_code, 200)
+        edp_payload = edp_response.json()
+        self.assertEqual(edp_payload["candidates"][0]["source_id"], source.pk)
+        self.assertEqual(edp_payload["candidates"][0]["score"], 88)
+        self.assertEqual(
+            edp_payload["candidates"][0]["reason"],
+            "Same brand and scent; concentration differs",
         )
 
     def test_catalogue_linking_prefers_explicit_concentration_match_over_generic(self):

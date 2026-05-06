@@ -88,6 +88,10 @@ When the user says "remember", "always", "never", "from now on", "same as before
 
 Store durable project rules only. Do not store secrets, passwords, private credentials, or temporary emotional comments. Keep entries short and actionable.
 
+When the user explains why a normalization/linking result is wrong, treat the example as operator teaching data. Extract the reusable rule behind it, check whether existing catalogue facts/aliases/rules already express it, then update code, DB-backed knowledge, tests, and docs only as far as needed. Prefer global or brand/supplier-scoped logic over a one-row exception when the reasoning applies to similar products.
+
+Every new normalization, linking, parser, importer, catalogue, alias, or KB rule must be documented in the repo in the same task, no matter which computer or chat applies it. Documentation is part of the change, not an optional follow-up. If the change creates executable knowledge through migrations, database rows, or code, also add the durable reasoning to the relevant docs so future sessions can understand why the rule exists.
+
 Use these destinations:
 - `docs/UI_DESIGN_SYSTEM.md` for design rules.
 - `docs/DOMAIN_MODEL.md` for business rules.
@@ -95,6 +99,8 @@ Use these destinations:
 - `docs/CODEX_TASKS.md` for current priorities and lessons learned.
 - `docs/REPO_MAP.md` for file placement or ownership rules.
 - `AGENTS.md` for high-level agent behavior rules.
+- `assistant_linking/docs/assistant_learning_design.md` for assistant normalization/linking learning philosophy, live-KB scan protocol, and reusable operator-teaching patterns.
+- `assistant_linking/docs/live_kb_learning_map.md` for the latest documented production KB/rule inventory and cross-computer assistant-learning protocol.
 
 Future entry templates:
 

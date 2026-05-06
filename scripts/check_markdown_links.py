@@ -75,7 +75,7 @@ def check_file(path: Path) -> list[tuple[int, str]]:
                 continue
             target_path = (path.parent / target_path_text).resolve()
             try:
-                target_path.relative_to(BASE_DIR)
+                target_path.relative_to(BASE_DIR.resolve())
             except ValueError:
                 failures.append((line_number, target))
                 continue

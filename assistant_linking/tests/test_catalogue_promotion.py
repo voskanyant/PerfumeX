@@ -258,6 +258,34 @@ class FragranticaCataloguePromotionTests(TestCase):
             "Light Blue Pour Homme",
         )
 
+    def test_link_action_keeps_fragrantica_acute_apostrophe_as_ascii_apostrophe(self):
+        brand = Brand.objects.create(name="19-69")
+        perfume = Perfume.objects.create(
+            brand=brand,
+            name="L air Barbes",
+            concentration="Eau de Parfum",
+        )
+        source = FragranticaProduct.objects.create(
+            brand_name="19-69",
+            normalized_brand_name="19 69",
+            name="L´air Barbès",
+            normalized_name="l air barbes",
+            release_year=2017,
+            source_path="/perfume/19-69/L-air-Barbes.html",
+        )
+
+        result = run_fragrantica_catalogue_link_action(
+            source.id,
+            {
+                "perfume_id": str(perfume.id),
+                "next": "/admin/our-products/linking/",
+            },
+        )
+
+        perfume.refresh_from_db()
+        self.assertEqual(result.level, "success")
+        self.assertEqual(perfume.name, "L'air Barbes")
+
     def test_equal_top_fragrantica_source_requires_manual_review(self):
         brand = Brand.objects.create(name="100 Bon")
         edp = Perfume.objects.create(

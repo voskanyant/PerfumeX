@@ -182,6 +182,7 @@ FRAGRANCE_CONCENTRATION_TERM_KEYS = {
     "eau de toilette": "eau de toilette",
     "eau de cologne": "eau de cologne",
     "extrait de parfum": "extrait de parfum",
+    "extrait": "extrait de parfum",
     "edp": "eau de parfum",
     "edt": "eau de toilette",
     "edc": "eau de cologne",
@@ -250,7 +251,7 @@ class FragranticaMatchCandidate:
 
     @property
     def source_display_name(self) -> str:
-        return fragrantica_source_catalogue_name(self.source)
+        return fragrantica_source_catalogue_display_name(self.source)
 
     @property
     def source_label(self) -> str:
@@ -1030,7 +1031,7 @@ def build_linked_fragrantica_sources_by_perfume_ids(
     source_map: dict[int, list] = defaultdict(list)
     seen_source_ids_by_perfume_id: dict[int, set[int]] = defaultdict(set)
     for source in linked_sources:
-        source.catalogue_display_name = fragrantica_source_catalogue_name(source)
+        source.catalogue_display_name = fragrantica_source_catalogue_display_name(source)
         source.fragrantica_display_audience = source.audience or (
             source.matched_perfume.audience
             if getattr(source, "matched_perfume", None)
@@ -1058,7 +1059,7 @@ def build_linked_fragrantica_sources_by_perfume_ids(
         source = link.source
         if source.id in seen_source_ids_by_perfume_id[link.perfume_id]:
             continue
-        source.catalogue_display_name = fragrantica_source_catalogue_name(source)
+        source.catalogue_display_name = fragrantica_source_catalogue_display_name(source)
         source.fragrantica_display_audience = source.audience or link.perfume.audience
         source.review_link_type = link.link_type
         source_map[link.perfume_id].append(source)
@@ -1189,7 +1190,7 @@ def build_fragrantica_product_review_context(
         rows.append(
             {
                 "source": row,
-                "display_name": fragrantica_source_catalogue_name(row),
+                "display_name": fragrantica_source_catalogue_display_name(row),
                 "candidate": candidate,
                 "candidate_choices": choices,
             }
@@ -1215,8 +1216,14 @@ def build_fragrantica_product_review_context(
 
 def fragrantica_identity_key(brand_name: str, perfume_name: str) -> tuple[str, str]:
     return (
-        normalize_alias_value(brand_name or "").replace("&", "and"),
-        normalize_alias_value(perfume_name or "").replace("&", "and"),
+        normalize_alias_value(fold_latin_diacritics(brand_name or "")).replace(
+            "&",
+            "and",
+        ),
+        normalize_alias_value(fold_latin_diacritics(perfume_name or "")).replace(
+            "&",
+            "and",
+        ),
     )
 
 
@@ -1225,6 +1232,10 @@ def fragrantica_source_catalogue_name(source) -> str:
         getattr(source, "brand_name", ""),
         getattr(source, "name", ""),
     )
+
+
+def fragrantica_source_catalogue_display_name(source) -> str:
+    return normalize_catalogue_perfume_name(fragrantica_source_catalogue_name(source))
 
 
 def _fragrantica_source_match_names(source) -> tuple[str, ...]:
@@ -2069,7 +2080,7 @@ def catalogue_linking_perfume_label(perfume) -> str:
 def catalogue_linking_source_label(source) -> str:
     parts = [
         source.brand_name,
-        fragrantica_source_catalogue_name(source),
+        fragrantica_source_catalogue_display_name(source),
         source.audience,
         str(source.release_year) if source.release_year else "",
     ]
@@ -2089,7 +2100,7 @@ def serialize_catalogue_linking_source(source) -> dict:
         "source_id": source.id,
         "label": catalogue_linking_source_label(source),
         "brand": source.brand_name,
-        "name": fragrantica_source_catalogue_name(source),
+        "name": fragrantica_source_catalogue_display_name(source),
         "collection": source.collection_name,
         "audience": display_audience,
         "release_year": source.release_year,
@@ -3468,7 +3479,7 @@ def build_fragrantica_staging_context(
         staged_rows.append(
             {
                 "source": row,
-                "display_name": fragrantica_source_catalogue_name(row),
+                "display_name": fragrantica_source_catalogue_display_name(row),
                 "candidate": row.matched_perfume
                 or candidate_map.get(getattr(row, "id", None))
                 or candidate_map.get(

@@ -6,6 +6,8 @@ This note describes how the assistant should be extended over time.
 
 The assistant should learn through data, rules, aliases, catalogue facts, and review decisions. Do not hardcode one-off brand/product fixes into parser logic when the same result can be represented as knowledge.
 
+User corrections are training examples for reusable perfume-domain rules. When an operator explains why a parse, link, or display is wrong, extract the smallest durable rule behind the example and implement that rule through the safest available knowledge surface. Only make product-specific knowledge when the reason is truly product-specific; otherwise make the rule global or brand/supplier scoped as appropriate.
+
 Code should provide reusable machinery:
 
 - parse supplier text into stable fields
@@ -38,6 +40,20 @@ When a supplier product parses incorrectly, use this order:
 5. Add a `GlobalRule` only for reusable parser terms, regex preprocessing, audience terms, or garbage keywords.
 6. Change parser code only when the parser lacks a reusable capability or a general rule cannot express the behavior.
 
+For each correction, write down the learned rule in one of these places when it should survive across computers:
+
+- `docs/DOMAIN_MODEL.md` for business meaning and parser/linking behavior.
+- `assistant_linking/docs/assistant_learning_design.md` for assistant-learning workflow and operator teaching philosophy.
+- `docs/DECISIONS.md` for durable architecture or product decisions.
+- `docs/CODEX_TASKS.md` for active lessons, risks, or repeated mistakes.
+- Seed migrations or editable DB knowledge for aliases/rules that must execute in production.
+
+This is mandatory for every new assistant normalization, linking, parser,
+importer, catalogue, alias, and KB rule. The executable change and the durable
+reasoning must travel together, across all computers and chats. A future agent
+should be able to read the docs and understand why the rule exists before
+looking at the exact migration or code.
+
 ## What Belongs In Code
 
 Code changes are appropriate for:
@@ -58,6 +74,32 @@ Code changes are not appropriate for:
 - one exclusion keyword that can be a rule
 
 Those should live in database-backed knowledge or seed migrations.
+
+## Live Knowledge Scan Protocol
+
+Before changing normalization, linking, or assistant learning on a restored/live-like database, inspect existing knowledge first:
+
+- catalogue brands, perfumes, collections, variants, and reviewed Fragrantica links
+- `BrandAlias`, `ProductAlias`, and `ConcentrationAlias`
+- approved `GlobalRule` and `SupplierRule` rows
+- `KnowledgeNote`, manual link decisions, AI recommendations, and learning proposals when relevant
+- existing migrations that seed the same kind of rule
+
+Use the live KB to avoid duplicating rules, to find whether a correction should be global, brand-scoped, supplier-scoped, or catalogue-confirmed, and to choose test fixtures that represent the real failure. Do not store passwords, mailbox secrets, or temporary credentials in docs.
+
+The latest documented production KB/rule inventory and cross-computer learning
+protocol lives in `assistant_linking/docs/live_kb_learning_map.md`.
+
+## Current Learned Patterns
+
+These rules came from operator corrections and should guide future logic:
+
+- Fix the general rule, not only the shown row. If the example is `Extrait`, teach `Extrait` as a concentration alias for `Extrait de Parfum`, not as a hardcoded `Crystal Saffron` exception.
+- Catalogue-confirmed identity is stronger than supplier wording. Supplier descriptors like new, exclusive, red, Cyrillic color notes, old/new design, with cap, no box, damaged, tester, sample, decant, atomizer, and similar terms should be stripped, moved to structured type/packaging/comment fields, or routed to manual review according to the existing rule surface.
+- Brand, brand-scoped collection, scent, concentration, size, audience, tester, packaging, type, year, and comments are separate fields. Do not leave metadata in the scent name just because the supplier wrote it near the scent.
+- Audience words belong in the scent name only when the catalogue has same-base men/women scents or the reviewed local name itself includes the audience suffix. Otherwise keep audience in the audience field only.
+- Fragrantica and Our Products should improve each other through reviewed links and catalogue-confirmed matching, but Fragrantica rows are evidence until linked; they should not silently overwrite local catalogue facts.
+- Ambiguous corrections should produce warnings or manual-review candidates instead of confident automatic matches.
 
 ## Catalogue Import Pattern
 

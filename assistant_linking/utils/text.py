@@ -92,7 +92,8 @@ def normalize_mixed_script_latin_lookalikes(value: str) -> str:
 def fold_latin_diacritics(value: str) -> str:
     """Fold Latin accented source text to catalogue-safe ASCII text."""
 
-    text = unicodedata.normalize("NFKD", value or "")
+    text = (value or "").translate(LATIN_DIACRITIC_TRANSLATION)
+    text = unicodedata.normalize("NFKD", text)
     text = "".join(char for char in text if not unicodedata.combining(char))
     return text.translate(LATIN_DIACRITIC_TRANSLATION)
 
