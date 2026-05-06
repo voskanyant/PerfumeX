@@ -10396,6 +10396,73 @@ class OurProductCatalogueListTests(TestCase):
         self.assertEqual(linked_map[self.perfume.id][0], source)
         self.assertEqual(linked_map[other_perfume.id][0], source)
 
+    def test_individual_link_click_approves_second_fragrantica_link(self):
+        other_perfume = Perfume.objects.create(
+            brand=self.perfume.brand,
+            name="Vanilla Extasy",
+            concentration="Eau de Toilette",
+        )
+        source = FragranticaProduct.objects.create(
+            brand_name="Montale",
+            normalized_brand_name="montale",
+            name="Vanilla Extasy",
+            normalized_name="vanilla extasy",
+            matched_perfume=self.perfume,
+            match_status=FragranticaProduct.STATUS_LINKED,
+            source_path="/perfume/Montale/Vanilla-Extasy-1.html",
+        )
+
+        response = self.client.post(
+            reverse("prices:fragrantica_product_link", args=[source.pk]),
+            {
+                "perfume_id": other_perfume.pk,
+                "next": reverse("prices:catalogue_linking_workbench"),
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(
+            FragranticaProductLink.objects.filter(
+                source=source,
+                perfume=other_perfume,
+                link_type=FragranticaProductLink.LINK_TYPE_MANUAL_EXTRA,
+            ).exists()
+        )
+
+    def test_bulk_link_checked_does_not_approve_second_fragrantica_link(self):
+        other_perfume = Perfume.objects.create(
+            brand=self.perfume.brand,
+            name="Vanilla Extasy",
+            concentration="Eau de Toilette",
+        )
+        source = FragranticaProduct.objects.create(
+            brand_name="Montale",
+            normalized_brand_name="montale",
+            name="Vanilla Extasy",
+            normalized_name="vanilla extasy",
+            matched_perfume=self.perfume,
+            match_status=FragranticaProduct.STATUS_LINKED,
+            source_path="/perfume/Montale/Vanilla-Extasy-1.html",
+        )
+
+        response = self.client.post(
+            reverse("prices:catalogue_linking_workbench"),
+            {
+                "action": "bulk_link",
+                "link_pair": f"{source.pk}:{other_perfume.pk}:0",
+                "next": reverse("prices:catalogue_linking_workbench"),
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(
+            FragranticaProductLink.objects.filter(
+                source=source,
+                perfume=other_perfume,
+                link_type=FragranticaProductLink.LINK_TYPE_MANUAL_EXTRA,
+            ).exists()
+        )
+
     def test_catalogue_linking_workbench_can_unlink_primary_fragrantica_link(self):
         source = FragranticaProduct.objects.create(
             brand_name="Montale",

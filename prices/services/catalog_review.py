@@ -4275,17 +4275,6 @@ def run_fragrantica_catalogue_link_action(
     is_manual_extra_link = (
         source.matched_perfume_id and source.matched_perfume_id != perfume.id
     )
-    if is_manual_extra_link and post_data.get("manual_review_link") != "1":
-        linked_name = (
-            catalogue_linking_perfume_label(source.matched_perfume)
-            if getattr(source, "matched_perfume", None)
-            else "another Our Products row"
-        )
-        return FragranticaCatalogueLinkResult(
-            "error",
-            f"This Fragrantica row is already linked to {linked_name}. Review manually before adding a second link.",
-            redirect_url,
-        )
     old_name = perfume.name
     create_alias = post_data.get("create_alias") == "1"
     apply_identity_group = post_data.get("apply_identity_group") == "1"

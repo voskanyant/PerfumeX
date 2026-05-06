@@ -103,6 +103,7 @@ External catalogue import:
 - Deleting selected rows from the Our Products products tab deletes catalogue variant rows only. It should not automatically delete the underlying `catalog.Perfume` identity.
 - Deleting selected rows from the Our Products linking workbench deletes the selected `catalog.Perfume` identities and their variants, and clears Fragrantica matches back to unlinked.
 - Editing an Our Products variant to the same brand, scent, and concentration as an existing catalogue perfume should move the variant onto that existing perfume identity when no duplicate variant would be created. This keeps corrected size/tester rows under the reviewed Fragrantica link instead of leaving duplicate unlinked perfume identities.
+- In the Fragrantica linking workbench, an individual staff click on a candidate's `Link` button is the manual review approval for that one row. Bulk linking must remain stricter and skip manual-review rows, already-linked duplicate targets, and unsafe duplicate Fragrantica targets.
 - `FragranticaProduct` is not a supplier row or variant. It is staged external source evidence; it becomes trusted for local normalization only after staff links/applies it to `catalog.Perfume`.
 - Alias/rule data is preferred over parser code for one-off brand, product, concentration, collection, or garbage corrections.
 - Import batch/import file are operational audit records, not product identity.
