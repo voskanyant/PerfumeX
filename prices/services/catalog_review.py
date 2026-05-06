@@ -2758,11 +2758,16 @@ def _catalogue_linking_request_uses_high_confidence_prefilter(request) -> bool:
         request.GET.get("suggestions")
     )
     status_filter = normalize_catalogue_linking_status(request.GET.get("status"))
-    return (
-        confidence_filter in {"95", "100", "review"}
-        and suggestion_filter in {"all", "with"}
-        and status_filter != "linked"
-    )
+    if suggestion_filter not in {"all", "with"} or status_filter == "linked":
+        return False
+    if confidence_filter == "100":
+        return True
+    if confidence_filter in {"95", "review"}:
+        return bool(
+            normalize_fragrantica_review_brand_id(request.GET.get("brand") or "")
+            or request.GET.get("q", "").strip()
+        )
+    return False
 
 
 def _catalogue_linking_request_uses_review_filter(request) -> bool:

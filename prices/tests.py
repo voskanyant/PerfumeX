@@ -9576,14 +9576,19 @@ class OurProductCatalogueListTests(TestCase):
                 ),
             )
 
-        with patch(
-            "prices.services.catalog_review._catalogue_linking_verified_filtered_perfume_ids",
-            side_effect=AssertionError("95+ should not verify every filtered row"),
+        with (
+            patch(
+                "prices.services.catalog_review._catalogue_linking_strict_exact_perfume_ids",
+                side_effect=AssertionError("95+ should not prefilter every row"),
+            ),
+            patch(
+                "prices.services.catalog_review._catalogue_linking_verified_filtered_perfume_ids",
+                side_effect=AssertionError("95+ should not verify every filtered row"),
+            ),
         ):
             response = self.client.get(
                 reverse("prices:catalogue_linking_workbench"),
                 {
-                    "brand": str(brand.pk),
                     "status": "unlinked",
                     "suggestions": "with",
                     "confidence": "95",
@@ -9613,14 +9618,19 @@ class OurProductCatalogueListTests(TestCase):
             source_path="/perfume/Bounded-Review-Brand/Shared-Bounded-Mirage.html",
         )
 
-        with patch(
-            "prices.services.catalog_review._catalogue_linking_verified_filtered_perfume_ids",
-            side_effect=AssertionError("Needs review should not verify every row"),
+        with (
+            patch(
+                "prices.services.catalog_review._catalogue_linking_strict_exact_perfume_ids",
+                side_effect=AssertionError("Needs review should not prefilter every row"),
+            ),
+            patch(
+                "prices.services.catalog_review._catalogue_linking_verified_filtered_perfume_ids",
+                side_effect=AssertionError("Needs review should not verify every row"),
+            ),
         ):
             response = self.client.get(
                 reverse("prices:catalogue_linking_workbench"),
                 {
-                    "brand": str(brand.pk),
                     "status": "unlinked",
                     "suggestions": "with",
                     "confidence": "review",
