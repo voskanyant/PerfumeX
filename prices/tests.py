@@ -9557,6 +9557,79 @@ class OurProductCatalogueListTests(TestCase):
         self.assertNotContains(lower_response, quiet.name)
         self.assertContains(lower_response, "2 shown / 3 visible")
 
+    def test_catalogue_linking_high_confidence_page_does_not_verify_all_rows(self):
+        brand = Brand.objects.create(name="Bounded High Confidence Brand")
+        for index in range(50):
+            name = f"Bounded Match {index:02d}"
+            Perfume.objects.create(
+                brand=brand,
+                name=name,
+                concentration="Eau de Parfum",
+            )
+            FragranticaProduct.objects.create(
+                brand_name="Bounded High Confidence Brand",
+                normalized_brand_name="bounded high confidence brand",
+                name=f"{name} Eau de Parfum",
+                normalized_name=f"{name.lower()} eau de parfum",
+                source_path=(
+                    f"/perfume/Bounded-High-Confidence-Brand/Bounded-{index}.html"
+                ),
+            )
+
+        with patch(
+            "prices.services.catalog_review._catalogue_linking_verified_filtered_perfume_ids",
+            side_effect=AssertionError("95+ should not verify every filtered row"),
+        ):
+            response = self.client.get(
+                reverse("prices:catalogue_linking_workbench"),
+                {
+                    "brand": str(brand.pk),
+                    "status": "unlinked",
+                    "suggestions": "with",
+                    "confidence": "95",
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Bounded Match 00")
+
+    def test_catalogue_linking_review_page_does_not_verify_all_rows(self):
+        brand = Brand.objects.create(name="Bounded Review Brand")
+        Perfume.objects.create(
+            brand=brand,
+            name="Shared Bounded Mirage",
+            concentration="Eau de Parfum",
+        )
+        Perfume.objects.create(
+            brand=brand,
+            name="Shared Bounded Mirage",
+            concentration="Eau de Toilette",
+        )
+        FragranticaProduct.objects.create(
+            brand_name="Bounded Review Brand",
+            normalized_brand_name="bounded review brand",
+            name="Shared Bounded Mirage",
+            normalized_name="shared bounded mirage",
+            source_path="/perfume/Bounded-Review-Brand/Shared-Bounded-Mirage.html",
+        )
+
+        with patch(
+            "prices.services.catalog_review._catalogue_linking_verified_filtered_perfume_ids",
+            side_effect=AssertionError("Needs review should not verify every row"),
+        ):
+            response = self.client.get(
+                reverse("prices:catalogue_linking_workbench"),
+                {
+                    "brand": str(brand.pk),
+                    "status": "unlinked",
+                    "suggestions": "with",
+                    "confidence": "review",
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Shared Bounded Mirage")
+
     def test_catalogue_linking_workbench_filters_manual_review_separately(self):
         brand = Brand.objects.create(name="Manual Review Brand")
         Perfume.objects.create(

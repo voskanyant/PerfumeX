@@ -2783,7 +2783,7 @@ def _catalogue_linking_request_uses_verified_candidate_filter(request) -> bool:
     )
     status_filter = normalize_catalogue_linking_status(request.GET.get("status"))
     return (
-        confidence_filter in {"95", "100", "review"}
+        confidence_filter == "100"
         and suggestion_filter in {"all", "with"}
         and status_filter != "linked"
     )
