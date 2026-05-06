@@ -12,6 +12,7 @@ from catalog.models import PerfumeVariant as CatalogPerfumeVariant
 from . import forms, models
 from .services.catalog_review import (
     build_fragrantica_catalogue_link_response_payload,
+    build_fragrantica_catalogue_unlink_response_payload,
     build_catalogue_linking_ai_advice_payload,
     build_catalogue_linking_ai_advice_review_payload,
     build_catalogue_linking_candidate_payload,
@@ -23,6 +24,7 @@ from .services.catalog_review import (
     build_our_product_catalog_variant_queryset,
     run_catalogue_linking_bulk_action,
     run_fragrantica_catalogue_link_action,
+    run_fragrantica_catalogue_unlink_action,
     run_catalog_tab_post_action,
     run_catalog_variant_inline_update_action,
 )
@@ -77,6 +79,26 @@ class FragranticaProductLinkView(LoginRequiredMixin, View):
             payload = build_fragrantica_catalogue_link_response_payload(
                 result,
                 source_id=pk,
+                perfume_id=request.POST.get("perfume_id"),
+            )
+            return JsonResponse(
+                payload,
+                status=200 if payload["ok"] else 400,
+            )
+        getattr(messages, result.level)(request, result.message)
+        return redirect(result.redirect_url)
+
+
+class FragranticaProductUnlinkView(LoginRequiredMixin, View):
+    def post(self, request, pk):
+        result = run_fragrantica_catalogue_unlink_action(
+            pk,
+            request.POST,
+            host=request.get_host(),
+        )
+        if request.headers.get("x-requested-with") == "XMLHttpRequest":
+            payload = build_fragrantica_catalogue_unlink_response_payload(
+                result,
                 perfume_id=request.POST.get("perfume_id"),
             )
             return JsonResponse(

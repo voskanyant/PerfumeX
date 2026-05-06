@@ -2230,6 +2230,10 @@ select:focus {
 .catalogue-linking-candidate-actions .button {
   white-space: nowrap;
 }
+.catalogue-linking-inline-form {
+  display: inline-flex;
+  margin: 0;
+}
 .catalogue-linking-option {
   display: inline-flex;
   align-items: center;

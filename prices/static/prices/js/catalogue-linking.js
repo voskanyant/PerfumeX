@@ -95,6 +95,7 @@
 
     function renderSelected(selected) {
         clearNode(selectedNode);
+        selectedNode.dataset.selectedPerfumeId = String(selected.id || "");
         var title = document.createElement("span");
         title.className = "catalogue-linking-selected-title";
         title.textContent = selected.label;
@@ -353,6 +354,24 @@
         review.href = source.review_url || "#";
         review.textContent = "Review";
         actions.appendChild(review);
+
+        if (source.unlink_url) {
+            var unlinkForm = document.createElement("form");
+            unlinkForm.className = "catalogue-linking-inline-form";
+            unlinkForm.method = "post";
+            unlinkForm.action = source.unlink_url;
+            appendHidden(unlinkForm, "csrfmiddlewaretoken", csrfToken());
+            appendHidden(unlinkForm, "next", panel.getAttribute("data-next-url") || window.location.pathname);
+            appendHidden(unlinkForm, "perfume_id", String(selectedNode.dataset.selectedPerfumeId || ""));
+
+            var unlink = document.createElement("button");
+            unlink.className = "button danger";
+            unlink.type = "submit";
+            unlink.setAttribute("data-confirm", "Unlink this Fragrantica row from the selected Our Products row?");
+            unlink.textContent = "Unlink";
+            unlinkForm.appendChild(unlink);
+            actions.appendChild(unlinkForm);
+        }
 
         card.appendChild(main);
         card.appendChild(actions);

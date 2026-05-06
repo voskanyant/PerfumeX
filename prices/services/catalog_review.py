@@ -183,6 +183,9 @@ FRAGRANCE_CONCENTRATION_TERM_KEYS = {
     "eau de cologne": "eau de cologne",
     "extrait de parfum": "extrait de parfum",
     "extrait": "extrait de parfum",
+    "parfum": "extrait de parfum",
+    "perfume": "extrait de parfum",
+    "pure perfume": "extrait de parfum",
     "edp": "eau de parfum",
     "edt": "eau de toilette",
     "edc": "eau de cologne",
@@ -1037,6 +1040,7 @@ def build_linked_fragrantica_sources_by_perfume_ids(
             if getattr(source, "matched_perfume", None)
             else ""
         )
+        source.review_link_type = FragranticaProductLink.LINK_TYPE_PRIMARY
         source_map[source.matched_perfume_id].append(source)
         seen_source_ids_by_perfume_id[source.matched_perfume_id].add(source.id)
     review_links = (
@@ -2106,6 +2110,8 @@ def serialize_catalogue_linking_source(source) -> dict:
         "release_year": source.release_year,
         "match_status": source.match_status,
         "source_href": source.source_href,
+        "unlink_url": reverse("prices:fragrantica_product_unlink", args=[source.id]),
+        "link_type": getattr(source, "review_link_type", ""),
         "review_url": (
             f"{reverse('prices:fragrantica_product_review')}?"
             f"{urlencode({'q': fragrantica_source_catalogue_name(source)})}"
@@ -2241,6 +2247,43 @@ def build_fragrantica_catalogue_link_response_payload(
         {
             "selected": serialize_catalogue_linking_selected_perfume(perfume),
             "linked_source": serialize_catalogue_linking_source(source),
+        }
+    )
+    return payload
+
+
+def build_fragrantica_catalogue_unlink_response_payload(
+    result: FragranticaCatalogueLinkResult,
+    *,
+    perfume_id,
+    perfume_manager=None,
+) -> dict:
+    payload = {
+        "ok": result.level != "error",
+        "level": result.level,
+        "message": result.message,
+        "redirect_url": result.redirect_url,
+    }
+    if not perfume_id:
+        return payload
+
+    perfume_manager = perfume_manager or CatalogPerfume.objects
+    try:
+        perfume = perfume_manager.select_related("brand").get(pk=perfume_id)
+    except (CatalogPerfume.DoesNotExist, ValueError):
+        return payload
+
+    linked_sources = build_linked_fragrantica_sources_by_perfume_ids([perfume.id]).get(
+        perfume.id,
+        [],
+    )
+    payload.update(
+        {
+            "selected": serialize_catalogue_linking_selected_perfume(perfume),
+            "linked_sources": [
+                serialize_catalogue_linking_source(source)
+                for source in linked_sources
+            ],
         }
     )
     return payload
@@ -3962,6 +4005,73 @@ def run_fragrantica_catalogue_link_action(
         "success",
         f"{link_message} to {perfume.brand.name} / {perfume.name}."
         f"{changed_note}{group_note}{source_note}{alias_note}{name_note}{preserved_note}",
+        redirect_url,
+    )
+
+
+def run_fragrantica_catalogue_unlink_action(
+    source_id,
+    post_data,
+    *,
+    host: str = "",
+    source_getter=None,
+    perfume_getter=None,
+    link_manager=None,
+) -> FragranticaCatalogueLinkResult:
+    if source_getter is None:
+
+        def source_getter(pk):
+            return get_object_or_404(FragranticaProduct, pk=pk)
+
+    if perfume_getter is None:
+
+        def perfume_getter(pk):
+            return get_object_or_404(
+                CatalogPerfume.objects.select_related("brand"),
+                pk=pk,
+            )
+
+    link_manager = link_manager or FragranticaProductLink.objects
+    redirect_url = post_data.get("next", reverse("prices:catalogue_linking_workbench"))
+    if not url_has_allowed_host_and_scheme(
+        redirect_url,
+        allowed_hosts={host} if host else None,
+    ):
+        redirect_url = reverse("prices:catalogue_linking_workbench")
+
+    perfume_id = post_data.get("perfume_id")
+    if not perfume_id:
+        return FragranticaCatalogueLinkResult(
+            "error",
+            "Choose an Our Products catalogue row before unlinking.",
+            redirect_url,
+        )
+
+    source = source_getter(source_id)
+    perfume = perfume_getter(perfume_id)
+    link_queryset = link_manager.filter(source=source, perfume=perfume)
+    is_primary_link = source.matched_perfume_id == perfume.id
+    if not is_primary_link and not link_queryset.exists():
+        return FragranticaCatalogueLinkResult(
+            "error",
+            "This Fragrantica row is not linked to that Our Products row.",
+            redirect_url,
+        )
+
+    deleted_count = link_queryset.count()
+    link_queryset.delete()
+    if is_primary_link:
+        source.matched_perfume = None
+        source.match_status = FragranticaProduct.STATUS_UNLINKED
+        source.save(update_fields=["matched_perfume", "match_status", "updated_at"])
+        relationship_label = "primary Fragrantica link"
+    else:
+        relationship_label = "reviewed extra Fragrantica link"
+
+    removed_note = " Removed reviewed link record." if deleted_count else ""
+    return FragranticaCatalogueLinkResult(
+        "success",
+        f"Unlinked {relationship_label} from {perfume.brand.name} / {perfume.name}.{removed_note}",
         redirect_url,
     )
 

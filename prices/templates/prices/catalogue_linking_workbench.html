@@ -283,6 +283,16 @@
                                     {% endif %}
                                     <a class="button secondary"
                                        href="{% url 'prices:fragrantica_product_review' %}?q={{ source.catalogue_display_name|urlencode }}">Review</a>
+                                    <form method="post"
+                                          action="{% url 'prices:fragrantica_product_unlink' source.pk %}"
+                                          class="catalogue-linking-inline-form">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                        <input type="hidden" name="perfume_id" value="{{ selected_row.perfume.pk }}">
+                                        <button class="button danger"
+                                                type="submit"
+                                                data-confirm="Unlink this Fragrantica row from the selected Our Products row?">Unlink</button>
+                                    </form>
                                 </div>
                             </article>
                         {% endfor %}

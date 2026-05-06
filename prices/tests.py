@@ -9706,6 +9706,74 @@ class OurProductCatalogueListTests(TestCase):
             "Same brand and scent; concentration differs",
         )
 
+    def test_catalogue_linking_treats_parfum_title_as_extrait_de_parfum(self):
+        brand = Brand.objects.create(name="Chanel")
+        edp = Perfume.objects.create(
+            brand=brand,
+            name="Coco Noir",
+            concentration="Eau de Parfum",
+            collection_name="Coco Noir",
+        )
+        extrait = Perfume.objects.create(
+            brand=brand,
+            name="Coco Noir",
+            concentration="Extrait de Parfum",
+            collection_name="Coco Noir",
+        )
+        generic_source = FragranticaProduct.objects.create(
+            brand_name="Chanel",
+            normalized_brand_name="chanel",
+            name="Coco Noir",
+            normalized_name="coco noir",
+            collection_name="Coco Noir",
+            audience="Women",
+            release_year=2012,
+            source_path="/perfume/Chanel/Coco-Noir.html",
+        )
+        parfum_source = FragranticaProduct.objects.create(
+            brand_name="Chanel",
+            normalized_brand_name="chanel",
+            name="Coco Noir Parfum",
+            normalized_name="coco noir parfum",
+            collection_name="Coco Noir",
+            audience="Women",
+            release_year=2014,
+            source_path="/perfume/Chanel/Coco-Noir-Parfum.html",
+        )
+
+        extrait_response = self.client.get(
+            reverse("prices:catalogue_linking_candidates"),
+            {"perfume": extrait.pk, "min_score": "95"},
+        )
+        edp_response = self.client.get(
+            reverse("prices:catalogue_linking_candidates"),
+            {"perfume": edp.pk, "min_score": "0"},
+        )
+
+        self.assertEqual(extrait_response.status_code, 200)
+        extrait_payload = extrait_response.json()
+        self.assertEqual(
+            [candidate["source_id"] for candidate in extrait_payload["candidates"]],
+            [parfum_source.pk, generic_source.pk],
+        )
+        self.assertEqual(extrait_payload["candidates"][0]["score"], 100)
+        self.assertEqual(
+            extrait_payload["candidates"][0]["reason"],
+            "Exact brand, scent, and concentration match",
+        )
+        self.assertEqual(extrait_payload["candidates"][1]["score"], 98)
+
+        self.assertEqual(edp_response.status_code, 200)
+        edp_payload = edp_response.json()
+        self.assertEqual(edp_payload["candidates"][0]["source_id"], generic_source.pk)
+        self.assertEqual(edp_payload["candidates"][0]["score"], 100)
+        self.assertEqual(edp_payload["candidates"][1]["source_id"], parfum_source.pk)
+        self.assertEqual(edp_payload["candidates"][1]["score"], 88)
+        self.assertEqual(
+            edp_payload["candidates"][1]["reason"],
+            "Same brand and scent; concentration differs",
+        )
+
     def test_catalogue_linking_prefers_explicit_concentration_match_over_generic(self):
         brand = Brand.objects.create(name="Alfred Dunhill")
         perfume = Perfume.objects.create(
@@ -9878,6 +9946,10 @@ class OurProductCatalogueListTests(TestCase):
             payload["linked_sources"][0]["collection"],
             "Fragrantica Collection",
         )
+        self.assertEqual(
+            payload["linked_sources"][0]["unlink_url"],
+            reverse("prices:fragrantica_product_unlink", args=[linked_source.pk]),
+        )
 
     def test_catalogue_linking_candidate_endpoint_allows_reviewed_second_link(self):
         other_perfume = Perfume.objects.create(
@@ -9961,6 +10033,93 @@ class OurProductCatalogueListTests(TestCase):
         )
         self.assertEqual(linked_map[self.perfume.id][0], source)
         self.assertEqual(linked_map[other_perfume.id][0], source)
+
+    def test_catalogue_linking_workbench_can_unlink_primary_fragrantica_link(self):
+        source = FragranticaProduct.objects.create(
+            brand_name="Montale",
+            normalized_brand_name="montale",
+            name="Vanilla Extasy",
+            normalized_name="vanilla extasy",
+            audience="Women",
+            matched_perfume=self.perfume,
+            match_status=FragranticaProduct.STATUS_LINKED,
+        )
+        FragranticaProductLink.objects.create(
+            source=source,
+            perfume=self.perfume,
+            link_type=FragranticaProductLink.LINK_TYPE_PRIMARY,
+        )
+
+        response = self.client.post(
+            reverse("prices:fragrantica_product_unlink", args=[source.pk]),
+            {
+                "perfume_id": self.perfume.pk,
+                "next": reverse("prices:catalogue_linking_workbench"),
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        source.refresh_from_db()
+        self.assertIsNone(source.matched_perfume_id)
+        self.assertEqual(source.match_status, FragranticaProduct.STATUS_UNLINKED)
+        self.assertFalse(
+            FragranticaProductLink.objects.filter(
+                source=source,
+                perfume=self.perfume,
+            ).exists()
+        )
+
+    def test_catalogue_linking_workbench_can_unlink_manual_extra_fragrantica_link(self):
+        other_perfume = Perfume.objects.create(
+            brand=self.perfume.brand,
+            name="Vanilla Extasy",
+            concentration="Eau de Toilette",
+        )
+        source = FragranticaProduct.objects.create(
+            brand_name="Montale",
+            normalized_brand_name="montale",
+            name="Vanilla Extasy",
+            normalized_name="vanilla extasy",
+            audience="Women",
+            matched_perfume=self.perfume,
+            match_status=FragranticaProduct.STATUS_LINKED,
+        )
+        FragranticaProductLink.objects.create(
+            source=source,
+            perfume=self.perfume,
+            link_type=FragranticaProductLink.LINK_TYPE_PRIMARY,
+        )
+        FragranticaProductLink.objects.create(
+            source=source,
+            perfume=other_perfume,
+            link_type=FragranticaProductLink.LINK_TYPE_MANUAL_EXTRA,
+        )
+
+        response = self.client.post(
+            reverse("prices:fragrantica_product_unlink", args=[source.pk]),
+            {
+                "perfume_id": other_perfume.pk,
+                "next": reverse("prices:catalogue_linking_workbench"),
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        source.refresh_from_db()
+        self.assertEqual(source.matched_perfume, self.perfume)
+        self.assertEqual(source.match_status, FragranticaProduct.STATUS_LINKED)
+        self.assertTrue(
+            FragranticaProductLink.objects.filter(
+                source=source,
+                perfume=self.perfume,
+                link_type=FragranticaProductLink.LINK_TYPE_PRIMARY,
+            ).exists()
+        )
+        self.assertFalse(
+            FragranticaProductLink.objects.filter(
+                source=source,
+                perfume=other_perfume,
+            ).exists()
+        )
 
     def test_catalogue_linking_workbench_bulk_links_checked_suggestions(self):
         source = FragranticaProduct.objects.create(
