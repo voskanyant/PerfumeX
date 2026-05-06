@@ -5,6 +5,9 @@
     var selectedNode = document.querySelector("[data-linking-selected]");
     var countNode = document.querySelector("[data-linking-candidate-count]");
     var selectionRoot = document.querySelector("[data-catalogue-selection-root]");
+    var searchForm = document.querySelector("[data-fragrantica-search-form]");
+    var searchInput = document.querySelector("[data-fragrantica-search-input]");
+    var searchResultsNode = document.querySelector("[data-fragrantica-search-results]");
 
     if (!panel || !candidatesNode || !selectedNode) return;
 
@@ -103,14 +106,21 @@
         appendProductIdentitySubnames(selectedNode, selected);
     }
 
-    function renderEmpty(message) {
-        clearNode(candidatesNode);
+    function renderEmpty(message, targetNode) {
+        var target = targetNode || candidatesNode;
+        clearNode(target);
         var empty = document.createElement("div");
         empty.className = "empty-state";
         var text = document.createElement("p");
         text.textContent = message;
         empty.appendChild(text);
-        candidatesNode.appendChild(empty);
+        target.appendChild(empty);
+    }
+
+    function clearSearchResults() {
+        if (!searchResultsNode) return;
+        clearNode(searchResultsNode);
+        searchResultsNode.hidden = true;
     }
 
     function renderAIAdvice(advice) {
@@ -231,7 +241,8 @@
         candidatesNode.appendChild(form);
     }
 
-    function renderCandidate(selected, candidate) {
+    function renderCandidate(selected, candidate, targetNode) {
+        var target = targetNode || candidatesNode;
         var form = document.createElement("form");
         form.method = "post";
         form.action = candidate.link_url;
@@ -262,7 +273,10 @@
 
         var meta = document.createElement("span");
         meta.className = "catalogue-linking-candidate-meta";
-        var metaParts = [candidate.reason, "Score " + candidate.score];
+        var metaParts = [candidate.reason];
+        if (typeof candidate.score === "number") {
+            metaParts.push("Score " + candidate.score);
+        }
         if (candidate.audience) metaParts.push(candidate.audience);
         if (candidate.release_year) metaParts.push(String(candidate.release_year));
         meta.textContent = metaParts.filter(Boolean).join(" · ");
@@ -275,9 +289,11 @@
         actions.className = "catalogue-linking-candidate-actions";
 
         var badge = document.createElement("span");
-        badge.className = scoreClass(candidate.score || 0);
-        badge.textContent = candidate.manual_review_reason ? "Review" : String(candidate.score || 0);
-        actions.appendChild(badge);
+        if (typeof candidate.score === "number" || candidate.manual_review_reason) {
+            badge.className = scoreClass(candidate.score || 0);
+            badge.textContent = candidate.manual_review_reason ? "Review" : String(candidate.score || 0);
+            actions.appendChild(badge);
+        }
 
         if (candidate.source_href) {
             var open = document.createElement("a");
@@ -306,7 +322,7 @@
 
         form.appendChild(main);
         form.appendChild(actions);
-        candidatesNode.appendChild(form);
+        target.appendChild(form);
     }
 
     function renderLinkedSource(source) {
@@ -405,6 +421,23 @@
         });
     }
 
+    function renderManualSearchResults(data) {
+        if (!searchResultsNode) return;
+        clearNode(searchResultsNode);
+        searchResultsNode.hidden = false;
+        var results = data.results || [];
+        if (!results.length) {
+            renderEmpty(
+                data.message || "No Fragrantica rows matched that search.",
+                searchResultsNode
+            );
+            return;
+        }
+        results.forEach(function (candidate) {
+            renderCandidate(data.selected, candidate, searchResultsNode);
+        });
+    }
+
     function rowPayload(row) {
         var rawPayload = row.getAttribute("data-linking-payload");
         if (!rawPayload) return null;
@@ -482,6 +515,7 @@
                 var payload = linkingPayloadFromResponse(data);
                 updateRowAfterLink(data);
                 renderPayload(payload);
+                clearSearchResults();
             })
             .catch(function (data) {
                 renderEmpty((data && (data.message || data.error)) || "Link failed. Reload and try again.");
@@ -527,6 +561,47 @@
         });
     }
 
+    function submitManualSearch(form, submitter) {
+        var searchUrl = panel.getAttribute("data-fragrantica-search-url");
+        var selectedId = selectedNode.dataset.selectedPerfumeId;
+        var query = searchInput ? searchInput.value.trim() : "";
+        if (!searchUrl || !selectedId) {
+            if (searchResultsNode) {
+                searchResultsNode.hidden = false;
+                renderEmpty("Choose an Our Products row first.", searchResultsNode);
+            }
+            return;
+        }
+        if (query.length < 2) {
+            if (searchResultsNode) {
+                searchResultsNode.hidden = false;
+                renderEmpty("Type at least 2 characters to search Fragrantica.", searchResultsNode);
+            }
+            return;
+        }
+        var url = new URL(searchUrl, window.location.origin);
+        url.searchParams.set("perfume", selectedId);
+        url.searchParams.set("q", query);
+        setSubmitterBusy(submitter, true, "Searching...");
+        fetch(url.toString(), { headers: { "X-Requested-With": "XMLHttpRequest" } })
+            .then(function (response) {
+                return parseJsonResponse(response, "Fragrantica search failed. Reload and try again.");
+            })
+            .then(renderManualSearchResults)
+            .catch(function (data) {
+                if (searchResultsNode) {
+                    searchResultsNode.hidden = false;
+                    renderEmpty(
+                        (data && (data.message || data.error)) || "Fragrantica search failed. Reload and try again.",
+                        searchResultsNode
+                    );
+                }
+            })
+            .finally(function () {
+                setSubmitterBusy(submitter, false);
+            });
+    }
+
     function submitAIAdviceReview(form, submitter) {
         var action = submitAction(form, submitter);
         if (!action) return;
@@ -566,6 +641,7 @@
         rows.forEach(function (item) {
             item.classList.toggle("is-selected", item === row);
         });
+        clearSearchResults();
         var preloaded = rowPayload(row);
         if (preloaded) {
             renderPayload(preloaded);
@@ -590,7 +666,7 @@
             });
     }
 
-    candidatesNode.addEventListener("submit", function (event) {
+    function handleLinkingSubmit(event) {
         var form = event.target;
         if (!(form instanceof HTMLFormElement)) return;
         if (form.matches("[data-ai-advice-form]")) {
@@ -610,7 +686,19 @@
         event.stopPropagation();
         form.dataset.noSubmitDisable = "1";
         submitFragranticaLink(form, event.submitter);
-    });
+    }
+
+    candidatesNode.addEventListener("submit", handleLinkingSubmit);
+    if (searchResultsNode) {
+        searchResultsNode.addEventListener("submit", handleLinkingSubmit);
+    }
+    if (searchForm) {
+        searchForm.addEventListener("submit", function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+            submitManualSearch(searchForm, event.submitter);
+        });
+    }
 
     if (selectionRoot) {
         selectionRoot.addEventListener("catalogue-selection:row-selected", function (event) {

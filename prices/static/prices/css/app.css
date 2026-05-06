@@ -2182,6 +2182,30 @@ select:focus {
 .catalogue-linking-selected-title {
   color: var(--grey-800);
 }
+.catalogue-linking-fragrantica-search {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: end;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--grey-200);
+}
+.catalogue-linking-search-results {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border-bottom: 1px solid var(--grey-200);
+  background: var(--grey-50);
+}
+.catalogue-linking-search-results[hidden] {
+  display: none;
+}
+.catalogue-linking-search-results .empty-state {
+  padding: 10px;
+  border: 1px dashed var(--grey-200);
+  border-radius: var(--radius-sm);
+  background: var(--white);
+}
 .catalogue-linking-candidates {
   display: grid;
   align-content: start;
@@ -2922,6 +2946,9 @@ pre, code {
   .catalogue-linking-layout {
     height: auto;
     min-height: 0;
+  }
+  .catalogue-linking-fragrantica-search {
+    grid-template-columns: 1fr;
   }
   .catalogue-linking-panel-left,
   .catalogue-linking-panel-right {

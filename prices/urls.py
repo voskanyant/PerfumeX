@@ -90,6 +90,7 @@ urlpatterns = [
     path("our-products/", views.OurProductListView.as_view(), name="our_product_list"),
     path("our-products/linking/", views.CatalogueLinkingWorkbenchView.as_view(), name="catalogue_linking_workbench"),
     path("our-products/linking/candidates/", views.CatalogueLinkingCandidateView.as_view(), name="catalogue_linking_candidates"),
+    path("our-products/linking/fragrantica-search/", views.CatalogueLinkingFragranticaSearchView.as_view(), name="catalogue_linking_fragrantica_search"),
     path("our-products/linking/ai-advice/", views.CatalogueLinkingAIAdviceView.as_view(), name="catalogue_linking_ai_advice"),
     path("our-products/linking/ai-advice/<int:pk>/review/", views.CatalogueLinkingAIAdviceReviewView.as_view(), name="catalogue_linking_ai_advice_review"),
     path("our-products/fragrantica/", views.FragranticaProductReviewView.as_view(), name="fragrantica_product_review"),

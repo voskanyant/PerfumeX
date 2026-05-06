@@ -2140,6 +2140,44 @@ def serialize_catalogue_linking_candidate(candidate: FragranticaMatchCandidate) 
     return serialized
 
 
+def serialize_catalogue_linking_manual_source(source, perfume) -> dict:
+    linked_to_selected = (
+        source.match_status == FragranticaProduct.STATUS_LINKED
+        and source.matched_perfume_id == perfume.id
+    )
+    linked_elsewhere = (
+        source.match_status == FragranticaProduct.STATUS_LINKED
+        and source.matched_perfume_id
+        and source.matched_perfume_id != perfume.id
+    )
+    manual_review_reason = ""
+    if linked_elsewhere:
+        linked_name = (
+            catalogue_linking_perfume_label(source.matched_perfume)
+            if getattr(source, "matched_perfume", None)
+            else "another Our Products row"
+        )
+        manual_review_reason = f"Manual review: already linked to {linked_name}"
+    source_name = display_name_without_concentration(
+        fragrantica_source_catalogue_name(source)
+    )
+    serialized = serialize_catalogue_linking_source(source)
+    serialized.update(
+        {
+            "score": None,
+            "reason": "Manual Fragrantica search result",
+            "match_type": "manual_search",
+            "creates_alias": normalized_fragrance_key(source_name)
+            != normalized_fragrance_key(perfume.name),
+            "manual_review_reason": manual_review_reason,
+            "manual_review_link": bool(manual_review_reason),
+            "can_link": not linked_to_selected,
+            "link_url": reverse("prices:fragrantica_product_link", args=[source.pk]),
+        }
+    )
+    return serialized
+
+
 def serialize_catalogue_linking_ai_advice(recommendation) -> dict:
     payload = recommendation.recommendation_json or {}
     source = recommendation.fragrantica_product
@@ -2921,6 +2959,66 @@ def build_catalogue_linking_candidate_payload(
                 if latest_advice
                 else None
             ),
+        },
+        200,
+    )
+
+
+def build_catalogue_linking_fragrantica_search_payload(
+    request,
+    *,
+    perfume_manager=None,
+    source_manager=None,
+) -> tuple[dict, int]:
+    perfume_manager = perfume_manager or CatalogPerfume.objects
+    source_manager = source_manager or FragranticaProduct.objects
+    perfume_id = request.GET.get("perfume")
+    if not perfume_id:
+        return {"error": "Choose an Our Products row first."}, 400
+    perfume = first_from_queryset(
+        perfume_manager.select_related("brand", "collection").filter(pk=perfume_id)
+    )
+    if not perfume:
+        return {"error": "Our Products row was not found."}, 404
+    query = (request.GET.get("q") or "").strip()
+    if len(query) < 2:
+        return (
+            {
+                "selected": serialize_catalogue_linking_selected_perfume(perfume),
+                "results": [],
+                "message": "Type at least 2 characters to search Fragrantica.",
+            },
+            200,
+        )
+    queryset = (
+        source_manager.select_related("matched_perfume", "matched_perfume__brand")
+        .exclude(match_status=FragranticaProduct.STATUS_IGNORED)
+        .filter(fragrantica_product_search_filter(query))
+        .order_by("brand_name", "collection_name", "name", "release_year", "id")
+    )
+    perfume_brand_key = normalized_fragrance_key(perfume.brand.name)
+    sources = list(queryset[:80])
+    sources.sort(
+        key=lambda source: (
+            normalized_fragrance_key(source.brand_name) != perfume_brand_key,
+            source.match_status == FragranticaProduct.STATUS_LINKED
+            and source.matched_perfume_id != perfume.id,
+            source.match_status == FragranticaProduct.STATUS_LINKED,
+            source.brand_name,
+            fragrantica_source_catalogue_name(source),
+            source.release_year or 0,
+            source.id,
+        )
+    )
+    results = [
+        serialize_catalogue_linking_manual_source(source, perfume)
+        for source in sources[:20]
+    ]
+    return (
+        {
+            "selected": serialize_catalogue_linking_selected_perfume(perfume),
+            "results": results,
+            "message": "" if results else "No Fragrantica rows matched that search.",
         },
         200,
     )

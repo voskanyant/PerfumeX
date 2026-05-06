@@ -9189,6 +9189,11 @@ class OurProductCatalogueListTests(TestCase):
         self.assertContains(response, "Link Our Products with Fragrantica")
         self.assertContains(response, "Left column")
         self.assertContains(response, "Right column")
+        self.assertContains(response, "Search Fragrantica")
+        self.assertContains(
+            response,
+            reverse("prices:catalogue_linking_fragrantica_search"),
+        )
         self.assertContains(response, "Bulk link checked")
         self.assertContains(response, "data-catalogue-selection-root")
         self.assertContains(response, "data-catalogue-select-toggle")
@@ -9642,6 +9647,62 @@ class OurProductCatalogueListTests(TestCase):
             payload["candidates"][0]["link_url"],
             reverse("prices:fragrantica_product_link", args=[source.pk]),
         )
+
+    def test_catalogue_linking_fragrantica_search_endpoint_returns_manual_results(self):
+        source = FragranticaProduct.objects.create(
+            brand_name="Montale",
+            normalized_brand_name="montale",
+            name="Manual Search Vanilla",
+            normalized_name="manual search vanilla",
+            collection_name="Search Collection",
+            audience="Women",
+            release_year=2010,
+            source_path="/perfume/Montale/Manual-Search-Vanilla.html",
+        )
+
+        response = self.client.get(
+            reverse("prices:catalogue_linking_fragrantica_search"),
+            {"perfume": self.perfume.pk, "q": "manual vanilla"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["selected"]["id"], self.perfume.pk)
+        self.assertEqual(payload["results"][0]["source_id"], source.pk)
+        self.assertEqual(payload["results"][0]["score"], None)
+        self.assertEqual(
+            payload["results"][0]["reason"],
+            "Manual Fragrantica search result",
+        )
+        self.assertEqual(payload["results"][0]["collection"], "Search Collection")
+        self.assertEqual(payload["results"][0]["audience"], "Women")
+        self.assertEqual(payload["results"][0]["release_year"], 2010)
+        self.assertEqual(
+            payload["results"][0]["link_url"],
+            reverse("prices:fragrantica_product_link", args=[source.pk]),
+        )
+
+    def test_catalogue_linking_fragrantica_search_marks_already_linked_results(self):
+        source = FragranticaProduct.objects.create(
+            brand_name="Montale",
+            normalized_brand_name="montale",
+            name="Vanilla Extasy",
+            normalized_name="vanilla extasy",
+            matched_perfume=self.perfume,
+            match_status=FragranticaProduct.STATUS_LINKED,
+            source_path="/perfume/Montale/Vanilla-Extasy.html",
+        )
+
+        response = self.client.get(
+            reverse("prices:catalogue_linking_fragrantica_search"),
+            {"perfume": self.perfume.pk, "q": "vanilla extasy"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        result = response.json()["results"][0]
+        self.assertEqual(result["source_id"], source.pk)
+        self.assertEqual(result["match_status"], FragranticaProduct.STATUS_LINKED)
+        self.assertFalse(result["can_link"])
 
     def test_catalogue_linking_scores_explicit_concentration_match_above_conflict(self):
         brand = Brand.objects.create(name="Acca Kappa")

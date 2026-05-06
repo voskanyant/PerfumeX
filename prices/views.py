@@ -84,6 +84,7 @@ from .views_our_products import (
     CatalogueLinkingAIAdviceView,
     CatalogueLinkingAIAdviceReviewView,
     CatalogueLinkingCandidateView,
+    CatalogueLinkingFragranticaSearchView,
     CatalogueLinkingWorkbenchView,
     FragranticaProductReviewView,
     FragranticaProductLinkView,

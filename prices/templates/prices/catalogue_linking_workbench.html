@@ -214,6 +214,7 @@
                      aria-label="Fragrantica candidates"
                      data-linking-panel
                      data-ai-advice-url="{% url 'prices:catalogue_linking_ai_advice' %}"
+                     data-fragrantica-search-url="{% url 'prices:catalogue_linking_fragrantica_search' %}"
                      data-next-url="{{ request.get_full_path }}">
                 <div class="catalogue-linking-panel-head">
                     <div>
@@ -230,7 +231,9 @@
                         {% endif %}
                     </span>
                 </div>
-                <div class="catalogue-linking-selected" data-linking-selected>
+                <div class="catalogue-linking-selected"
+                     data-linking-selected
+                     {% if selected_row %}data-selected-perfume-id="{{ selected_row.perfume.pk }}"{% endif %}>
                     {% if selected_row %}
                         <span class="catalogue-linking-selected-title">{{ selected_row.label }}</span>
                         {% if selected_row.perfume.collection_name %}
@@ -255,6 +258,22 @@
                         Select an Our Products row.
                     {% endif %}
                 </div>
+                <form method="get"
+                      class="catalogue-linking-fragrantica-search"
+                      data-fragrantica-search-form>
+                    <label class="catalogue-linking-filter catalogue-linking-filter-wide">
+                        <span>Search Fragrantica</span>
+                        <input type="search"
+                               name="q"
+                               placeholder="Brand, scent, collection"
+                               autocomplete="off"
+                               data-fragrantica-search-input>
+                    </label>
+                    <button class="button ghost" type="submit">Search</button>
+                </form>
+                <div class="catalogue-linking-search-results"
+                     data-fragrantica-search-results
+                     hidden></div>
                 <div class="catalogue-linking-candidates" data-linking-candidates>
                     {% if selected_row and selected_row.linked_sources %}
                         {% for source in selected_row.linked_sources %}

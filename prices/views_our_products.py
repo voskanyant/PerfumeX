@@ -17,6 +17,7 @@ from .services.catalog_review import (
     build_catalogue_linking_ai_advice_review_payload,
     build_catalogue_linking_candidate_payload,
     build_catalogue_linking_context,
+    build_catalogue_linking_fragrantica_search_payload,
     build_catalogue_linking_perfume_queryset,
     build_fragrantica_product_review_context,
     build_our_product_detail_context,
@@ -135,6 +136,14 @@ class CatalogueLinkingWorkbenchView(LoginRequiredMixin, ListView):
 class CatalogueLinkingCandidateView(LoginRequiredMixin, View):
     def get(self, request):
         payload, status_code = build_catalogue_linking_candidate_payload(request)
+        return JsonResponse(payload, status=status_code)
+
+
+class CatalogueLinkingFragranticaSearchView(LoginRequiredMixin, View):
+    def get(self, request):
+        payload, status_code = build_catalogue_linking_fragrantica_search_payload(
+            request
+        )
         return JsonResponse(payload, status=status_code)
 
 
