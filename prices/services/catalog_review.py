@@ -4727,11 +4727,78 @@ def build_catalog_variant_inline_update(post_data) -> CatalogVariantInlineUpdate
     )
 
 
+def _catalogue_variant_identity_exists(variant, perfume, update_data) -> bool:
+    return (
+        CatalogPerfumeVariant.objects.filter(
+            perfume=perfume,
+            size_ml=update_data.size_ml,
+            packaging=update_data.packaging,
+            variant_type=update_data.variant_type,
+            is_tester=update_data.is_tester,
+        )
+        .exclude(pk=variant.pk)
+        .exists()
+    )
+
+
+def _matching_perfume_for_variant_update(
+    variant,
+    update_data,
+    brand,
+    *,
+    perfume_manager=None,
+):
+    if not getattr(variant, "perfume_id", None):
+        return None
+    perfume_manager = perfume_manager or CatalogPerfume.objects
+    target_name_key = normalized_fragrance_key(update_data.perfume_name)
+    target_concentration_key = normalized_fragrance_key(update_data.concentration)
+    requested_collection_key = normalized_fragrance_key(update_data.collection_name)
+    candidates = (
+        perfume_manager.filter(brand=brand)
+        .exclude(pk=variant.perfume_id)
+        .select_related("brand", "collection")
+        .order_by("id")
+    )
+    for candidate in candidates:
+        if normalized_fragrance_key(candidate.name) != target_name_key:
+            continue
+        if (
+            normalized_fragrance_key(candidate.concentration)
+            != target_concentration_key
+        ):
+            continue
+        candidate_collection_key = normalized_fragrance_key(candidate.collection_name)
+        if (
+            requested_collection_key
+            and candidate_collection_key
+            and requested_collection_key != candidate_collection_key
+        ):
+            continue
+        return candidate
+    return None
+
+
+def _delete_empty_unlinked_catalogue_perfume(perfume) -> None:
+    if not perfume or not getattr(perfume, "pk", None):
+        return
+    if CatalogPerfumeVariant.objects.filter(perfume=perfume).exists():
+        return
+    if FragranticaProduct.objects.filter(matched_perfume=perfume).exists():
+        return
+    if FragranticaProductLink.objects.filter(perfume=perfume).exists():
+        return
+    if models.SupplierProduct.objects.filter(catalog_perfume=perfume).exists():
+        return
+    _fast_delete_catalogue_perfumes([perfume.id])
+
+
 def apply_catalog_variant_inline_update(
     variant,
     post_data,
     *,
     brand_manager=None,
+    perfume_manager=None,
 ) -> CatalogVariantInlineUpdateResult:
     update_data = build_catalog_variant_inline_update(post_data)
 
@@ -4750,36 +4817,66 @@ def apply_catalog_variant_inline_update(
         )
 
     perfume = variant.perfume
-    perfume.brand = brand
-    perfume.name = update_data.perfume_name
-    perfume.collection_name = update_data.collection_name
-    perfume.concentration = update_data.concentration
-    perfume.save(
-        update_fields=[
-            "brand",
-            "name",
-            "collection",
-            "collection_name",
-            "concentration",
-            "updated_at",
-        ]
+    target_perfume = _matching_perfume_for_variant_update(
+        variant,
+        update_data,
+        brand,
+        perfume_manager=perfume_manager,
     )
+    if target_perfume and _catalogue_variant_identity_exists(
+        variant,
+        target_perfume,
+        update_data,
+    ):
+        return CatalogVariantInlineUpdateResult(
+            "error",
+            "A catalogue variant with this product identity already exists.",
+        )
+    if target_perfume:
+        variant.perfume = target_perfume
+    else:
+        perfume.brand = brand
+        perfume.name = update_data.perfume_name
+        perfume.collection_name = update_data.collection_name
+        perfume.concentration = update_data.concentration
+        perfume.save(
+            update_fields=[
+                "brand",
+                "name",
+                "collection",
+                "collection_name",
+                "concentration",
+                "updated_at",
+            ]
+        )
 
     variant.size_ml = update_data.size_ml
     variant.size_label = update_data.size_label
     variant.is_tester = update_data.is_tester
     variant.packaging = update_data.packaging
     variant.variant_type = update_data.variant_type
+    update_fields = [
+        "size_ml",
+        "size_label",
+        "is_tester",
+        "packaging",
+        "variant_type",
+        "updated_at",
+    ]
+    if target_perfume:
+        update_fields.insert(0, "perfume")
     variant.save(
-        update_fields=[
-            "size_ml",
-            "size_label",
-            "is_tester",
-            "packaging",
-            "variant_type",
-            "updated_at",
-        ]
+        update_fields=update_fields,
     )
+    if target_perfume:
+        models.SupplierProduct.objects.filter(catalog_variant=variant).update(
+            catalog_perfume=target_perfume,
+        )
+        _delete_empty_unlinked_catalogue_perfume(perfume)
+        return CatalogVariantInlineUpdateResult(
+            "success",
+            "Product row updated and joined existing catalogue identity.",
+        )
     return CatalogVariantInlineUpdateResult("success", "Product row updated.")
 
 

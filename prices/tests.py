@@ -8361,6 +8361,70 @@ class OurProductCatalogueListTests(TestCase):
             "Montale / Vanilla Extasy / Fragrantica Collection / 2008 / Unisex",
         )
 
+    def test_inline_edit_joins_existing_linked_perfume_identity(self):
+        from prices.services.catalog_review import apply_catalog_variant_inline_update
+
+        self.perfume.audience = "Men"
+        self.perfume.release_year = 2000
+        self.perfume.save(update_fields=["audience", "release_year", "updated_at"])
+        FragranticaProduct.objects.create(
+            brand_name="Montale",
+            normalized_brand_name="montale",
+            name="Vanilla Extasy for Men",
+            normalized_name="vanilla extasy for men",
+            collection_name="Classic",
+            audience="Men",
+            release_year=2000,
+            matched_perfume=self.perfume,
+            match_status=FragranticaProduct.STATUS_LINKED,
+            source_path="/perfume/Montale/Vanilla-Extasy-Men.html",
+        )
+        duplicate_perfume = Perfume.objects.create(
+            brand=self.perfume.brand,
+            name="Vanilla Extasy Men",
+            concentration="Eau de Parfum",
+        )
+        duplicate_variant = PerfumeVariant.objects.create(
+            perfume=duplicate_perfume,
+            size_ml="150.00",
+            variant_type="standard",
+        )
+        supplier = models.Supplier.objects.create(name="Linked Supplier")
+        supplier_product = models.SupplierProduct.objects.create(
+            supplier=supplier,
+            identity_key="linked-duplicate-variant",
+            name="Montale Vanilla Extasy Men 150ml",
+            catalog_perfume=duplicate_perfume,
+            catalog_variant=duplicate_variant,
+        )
+
+        result = apply_catalog_variant_inline_update(
+            duplicate_variant,
+            {
+                "brand_name": "Montale",
+                "perfume_name": "Vanilla Extasy",
+                "collection_name": "",
+                "concentration": "Eau de Parfum",
+                "size_ml": "150ml",
+                "variant_type": "standard",
+            },
+        )
+
+        self.assertEqual(result.level, "success")
+        self.assertIn("joined existing catalogue identity", result.message)
+        duplicate_variant.refresh_from_db()
+        self.assertEqual(duplicate_variant.perfume, self.perfume)
+        supplier_product.refresh_from_db()
+        self.assertEqual(supplier_product.catalog_perfume, self.perfume)
+        self.assertEqual(supplier_product.catalog_variant, duplicate_variant)
+        self.assertFalse(Perfume.objects.filter(pk=duplicate_perfume.pk).exists())
+
+        response = self.client.get(reverse("prices:our_product_list"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Linked Fragrantica:")
+        self.assertNotContains(response, "Vanilla Extasy Men")
+
     def test_fragrantica_products_lists_fragrantica_rows_only(self):
         supplier = models.Supplier.objects.create(name="Antonina")
         supplier_product = models.SupplierProduct.objects.create(
