@@ -2770,7 +2770,36 @@ def build_catalogue_linking_context(
     row_filter_active = suggestion_filter != "all" or confidence_filter != "all"
     paginator = list_context.get("paginator")
     page_obj = list_context.get("page_obj")
-    if row_filter_active and paginator and page_obj:
+    if (
+        row_filter_active
+        and paginator
+        and page_obj
+        and _catalogue_linking_request_uses_strict_exact_filter(request)
+    ):
+        verified_ids = _catalogue_linking_verified_filtered_perfume_ids(
+            paginator.object_list,
+            min_score=min_score,
+            confidence_filter=confidence_filter,
+            suggestion_filter=suggestion_filter,
+        )
+        verified_sequence = paginator.object_list.filter(pk__in=verified_ids)
+        paginator = Paginator(verified_sequence, page_obj.paginator.per_page)
+        page_obj = paginator.get_page(request.GET.get("page"))
+        visible_count = paginator.count
+        visible_rows = build_catalogue_linking_rows(
+            page_obj.object_list,
+            min_score=min_score,
+            include_candidates=True,
+        )
+        rows = filter_catalogue_linking_rows_by_confidence(
+            visible_rows,
+            confidence_filter,
+        )
+        rows = filter_catalogue_linking_rows_by_suggestion(
+            rows,
+            suggestion_filter,
+        )
+    elif row_filter_active and paginator and page_obj:
         visible_rows = []
         visible_count = paginator.count
         rows = _build_catalogue_linking_filtered_page_rows(
@@ -2780,36 +2809,7 @@ def build_catalogue_linking_context(
             min_score=min_score,
             confidence_filter=confidence_filter,
             suggestion_filter=suggestion_filter,
-            max_scan_rows=(
-                page_obj.paginator.per_page
-                if _catalogue_linking_request_uses_strict_exact_filter(request)
-                else None
-            ),
         )
-        if (
-            not rows
-            and visible_count
-            and _catalogue_linking_request_uses_strict_exact_filter(request)
-        ):
-            verified_ids = _catalogue_linking_verified_filtered_perfume_ids(
-                paginator.object_list,
-                min_score=min_score,
-                confidence_filter=confidence_filter,
-                suggestion_filter=suggestion_filter,
-            )
-            verified_sequence = paginator.object_list.filter(pk__in=verified_ids)
-            paginator = Paginator(verified_sequence, page_obj.paginator.per_page)
-            page_obj = paginator.get_page(request.GET.get("page"))
-            visible_count = paginator.count
-            rows = _build_catalogue_linking_filtered_page_rows(
-                paginator.object_list,
-                page_number=page_obj.number,
-                page_size=page_obj.paginator.per_page,
-                min_score=min_score,
-                confidence_filter=confidence_filter,
-                suggestion_filter=suggestion_filter,
-                max_scan_rows=page_obj.paginator.per_page,
-            )
     else:
         visible_rows = build_catalogue_linking_rows(
             perfumes,

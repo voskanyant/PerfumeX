@@ -9446,6 +9446,54 @@ class OurProductCatalogueListTests(TestCase):
         self.assertNotContains(response, "Page 2 of")
         self.assertContains(response, "No Our Products rows match these filters.")
 
+    def test_catalogue_linking_strict_filter_pages_verified_rows_not_prefilter_rows(
+        self,
+    ):
+        brand = Brand.objects.create(name="Sparse Strict Brand")
+        for index in range(40):
+            Perfume.objects.create(
+                brand=brand,
+                name="A Shared Conflict",
+                concentration=f"Edition {index:02d}",
+            )
+        FragranticaProduct.objects.create(
+            brand_name="Sparse Strict Brand",
+            normalized_brand_name="sparse strict brand",
+            name="A Shared Conflict",
+            normalized_name="a shared conflict",
+            source_path="/perfume/Sparse-Strict-Brand/Shared-Conflict.html",
+        )
+        for index in range(2):
+            name = f"Z Ready Match {index:02d}"
+            Perfume.objects.create(
+                brand=brand,
+                name=name,
+                concentration="Eau de Parfum",
+            )
+            FragranticaProduct.objects.create(
+                brand_name="Sparse Strict Brand",
+                normalized_brand_name="sparse strict brand",
+                name=f"{name} Eau de Parfum",
+                normalized_name=f"{name.lower()} eau de parfum",
+                source_path=f"/perfume/Sparse-Strict-Brand/Ready-{index}.html",
+            )
+
+        response = self.client.get(
+            reverse("prices:catalogue_linking_workbench"),
+            {
+                "brand": str(brand.pk),
+                "status": "unlinked",
+                "suggestions": "with",
+                "confidence": "100",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Z Ready Match 00")
+        self.assertContains(response, "Z Ready Match 01")
+        self.assertNotContains(response, "A Shared Conflict")
+        self.assertContains(response, "2 shown / 2 visible")
+
     def test_catalogue_linking_workbench_filters_visible_rows_by_confidence(self):
         FragranticaProduct.objects.create(
             brand_name="Montale",
