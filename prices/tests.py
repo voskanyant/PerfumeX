@@ -1266,7 +1266,9 @@ class JobQueueTests(SimpleTestCase):
             SimpleNamespace(Queue=FakeQueue, Worker=FakeWorker),
         )
 
-        result = enqueue_management_command("import_emails", description="Import emails")
+        result = enqueue_management_command(
+            "import_emails", description="Import emails"
+        )
 
         self.assertTrue(result.queued)
         self.assertEqual(result.job_id, "job-123")
@@ -9574,6 +9576,12 @@ class OurProductCatalogueListTests(TestCase):
             normalized_name="shared mirage",
             source_path="/perfume/Manual-Review-Brand/Shared-Mirage.html",
         )
+        for index in range(45):
+            Perfume.objects.create(
+                brand=brand,
+                name=f"Quiet Review Scent {index:02d}",
+                concentration="Eau de Parfum",
+            )
 
         exact_response = self.client.get(
             reverse("prices:catalogue_linking_workbench"),
@@ -9598,6 +9606,8 @@ class OurProductCatalogueListTests(TestCase):
         self.assertEqual(review_response.status_code, 200)
         self.assertContains(review_response, "Needs review")
         self.assertContains(review_response, "Shared Mirage")
+        self.assertNotContains(review_response, "Quiet Review Scent")
+        self.assertContains(review_response, "2 shown / 2 visible")
         self.assertContains(
             review_response,
             "Manual review: same Fragrantica row is an equal top match",
@@ -9611,6 +9621,102 @@ class OurProductCatalogueListTests(TestCase):
             "data-fragrantica-link-submit>Link</button>",
         )
         self.assertNotContains(review_response, "Review manually")
+
+    def test_catalogue_linking_review_filter_includes_linked_source_conflicts(self):
+        brand = Brand.objects.create(name="Linked Review Brand")
+        primary = Perfume.objects.create(
+            brand=brand,
+            name="Already Linked Mirage",
+            concentration="Eau de Parfum",
+        )
+        Perfume.objects.create(
+            brand=brand,
+            name="Already Linked Mirage",
+            concentration="Eau de Toilette",
+        )
+        FragranticaProduct.objects.create(
+            brand_name="Linked Review Brand",
+            normalized_brand_name="linked review brand",
+            name="Already Linked Mirage",
+            normalized_name="already linked mirage",
+            match_status=FragranticaProduct.STATUS_LINKED,
+            matched_perfume=primary,
+            source_path="/perfume/Linked-Review-Brand/Already-Linked-Mirage.html",
+        )
+
+        response = self.client.get(
+            reverse("prices:catalogue_linking_workbench"),
+            {
+                "brand": str(brand.pk),
+                "status": "unlinked",
+                "suggestions": "with",
+                "confidence": "review",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            "Linked Review Brand / Already Linked Mirage / Eau de Toilette",
+        )
+        self.assertContains(
+            response, "Manual review: Fragrantica row is already linked"
+        )
+        self.assertContains(response, "1 shown / 1 visible")
+
+    def test_catalogue_linking_skips_generic_base_when_audience_siblings_exist(self):
+        from prices.services.catalog_review import (
+            build_catalogue_fragrantica_candidates_for_perfumes,
+        )
+
+        brand = Brand.objects.create(name="Abercrombie & Fitch")
+        generic = Perfume.objects.create(
+            brand=brand,
+            name="Authentic",
+            concentration="Eau de Parfum",
+        )
+        men = Perfume.objects.create(
+            brand=brand,
+            name="Authentic for Men",
+            concentration="Eau de Toilette",
+            audience="Men",
+        )
+        women = Perfume.objects.create(
+            brand=brand,
+            name="Authentic for Women",
+            concentration="Eau de Parfum",
+            audience="Women",
+        )
+        FragranticaProduct.objects.create(
+            brand_name="Abercrombie & Fitch",
+            normalized_brand_name="abercrombie and fitch",
+            name="Authentic Man",
+            normalized_name="authentic man",
+            collection_name="Authentic",
+            audience="Men",
+            match_status=FragranticaProduct.STATUS_LINKED,
+            matched_perfume=men,
+            source_path="/perfume/Abercrombie-Fitch/Authentic-Man.html",
+        )
+        FragranticaProduct.objects.create(
+            brand_name="Abercrombie & Fitch",
+            normalized_brand_name="abercrombie and fitch",
+            name="Authentic Woman",
+            normalized_name="authentic woman",
+            collection_name="Authentic",
+            audience="Women",
+            match_status=FragranticaProduct.STATUS_LINKED,
+            matched_perfume=women,
+            source_path="/perfume/Abercrombie-Fitch/Authentic-Woman.html",
+        )
+
+        candidate_map = build_catalogue_fragrantica_candidates_for_perfumes(
+            [generic],
+            min_score=0,
+            limit=5,
+        )
+
+        self.assertEqual(candidate_map[generic.id], [])
 
     def test_catalogue_linking_candidate_endpoint_returns_fragrantica_matches(self):
         self.perfume.audience = "Women"
