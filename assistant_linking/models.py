@@ -1,5 +1,4 @@
 import re
-import unicodedata
 
 from django.conf import settings
 from django.contrib.postgres.indexes import GinIndex
@@ -8,6 +7,7 @@ from django.core.exceptions import ValidationError
 from django.db import models
 
 from assistant_linking.utils.text import normalize_alias_value
+from assistant_linking.utils.text import fold_latin_diacritics
 from catalog.models import Brand, compact_decimal_text, get_or_create_collection
 
 
@@ -79,12 +79,15 @@ def strip_leading_fragrantica_brand_name(brand_name: str, scent_name: str) -> st
 
 
 def normalized_fragrantica_product_name(brand_name: str, scent_name: str) -> str:
-    text = unicodedata.normalize(
-        "NFKD",
+    text = fold_latin_diacritics(
         strip_leading_fragrantica_brand_name(brand_name, scent_name),
     )
-    text = "".join(char for char in text if not unicodedata.combining(char))
     return normalize_alias_value(text).replace("&", "and")
+
+
+def normalized_fragrantica_brand_name(value: str) -> str:
+    text = fold_latin_diacritics(value).replace("&", " and ")
+    return normalize_alias_value(text)
 
 
 def display_label(value: str, *, default: str = "") -> str:
@@ -299,10 +302,9 @@ class FragranticaProduct(TimeStampedModel):
         ]
 
     def save(self, *args, **kwargs):
-        if not self.normalized_brand_name:
-            self.normalized_brand_name = normalize_alias_value(self.brand_name).replace(
-                "&", "and"
-            )
+        self.normalized_brand_name = normalized_fragrantica_brand_name(
+            self.brand_name
+        )
         self.normalized_name = normalized_fragrantica_product_name(
             self.brand_name,
             self.name,

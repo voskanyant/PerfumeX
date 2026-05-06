@@ -47,6 +47,7 @@ from assistant_linking.services.ai_recommendations import (
     sync_learning_proposal_for_recommendation,
 )
 from assistant_linking.services.parser_rules import get_regex_preprocess_rules
+from assistant_linking.utils.text import fold_latin_diacritics
 from assistant_linking.utils.text import normalize_alias_value
 from assistant_linking.utils.text import normalize_mixed_script_latin_lookalikes
 from catalog.models import Brand as CatalogBrand
@@ -400,7 +401,9 @@ def build_our_product_catalog_list_context(
 
 
 def normalized_fragrance_key(value: str) -> str:
-    text = normalize_alias_value((value or "").replace("&", " and "))
+    text = normalize_alias_value(
+        fold_latin_diacritics(value or "").replace("&", " and ")
+    )
     return re.sub(r"\bet\b", "and", text)
 
 
@@ -3505,7 +3508,7 @@ def _catalogue_collection_title_word(word: str, index: int) -> str:
 def normalize_catalogue_collection_name(value: str) -> str:
     """Normalize reviewed external collection names before storing locally."""
 
-    text = re.sub(r"\s+", " ", (value or "").strip())
+    text = re.sub(r"\s+", " ", fold_latin_diacritics(value or "").strip())
     if not text:
         return ""
 
@@ -3540,7 +3543,7 @@ def _catalogue_text_needs_title_case(value: str) -> bool:
 def normalize_catalogue_perfume_name(value: str) -> str:
     """Normalize reviewed external perfume names before storing/displaying locally."""
 
-    text = re.sub(r"\s+", " ", (value or "").strip())
+    text = re.sub(r"\s+", " ", fold_latin_diacritics(value or "").strip())
     if not text or not _catalogue_text_needs_title_case(text):
         return text
 
@@ -3777,7 +3780,12 @@ def upsert_fragrantica_catalog_source(source, perfume) -> bool:
 
 def create_fragrantica_product_alias_if_needed(source, perfume, old_name: str) -> bool:
     alias_text = (old_name or "").strip()
-    canonical_text = fragrantica_source_catalogue_name(source).strip()
+    canonical_source_name = display_name_without_concentration(
+        reviewed_fragrantica_perfume_name(source, perfume)
+    )
+    canonical_text = normalize_catalogue_perfume_name(
+        canonical_source_name or fragrantica_source_catalogue_name(source)
+    ).strip()
     if not alias_text or not canonical_text:
         return False
     if normalized_fragrance_key(alias_text) == normalized_fragrance_key(canonical_text):

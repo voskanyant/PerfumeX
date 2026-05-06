@@ -37,6 +37,28 @@ CYRILLIC_LATIN_LOOKALIKE_TRANSLATION = str.maketrans(
     }
 )
 
+LATIN_DIACRITIC_TRANSLATION = str.maketrans(
+    {
+        "Æ": "AE",
+        "æ": "ae",
+        "Œ": "OE",
+        "œ": "oe",
+        "Ø": "O",
+        "ø": "o",
+        "Ð": "D",
+        "ð": "d",
+        "Đ": "D",
+        "đ": "d",
+        "Ł": "L",
+        "ł": "l",
+        "Þ": "Th",
+        "þ": "th",
+        "ß": "ss",
+        "ẞ": "SS",
+        "ı": "i",
+    }
+)
+
 
 def normalize_mixed_script_latin_lookalikes(value: str) -> str:
     """Convert Cyrillic lookalikes only inside tokens that also contain Latin.
@@ -56,6 +78,14 @@ def normalize_mixed_script_latin_lookalikes(value: str) -> str:
         return segment
 
     return re.sub(r"[\w\u0400-\u04ff]+", normalize_token, value or "")
+
+
+def fold_latin_diacritics(value: str) -> str:
+    """Fold Latin accented source text to catalogue-safe plain letters."""
+
+    text = unicodedata.normalize("NFKD", value or "")
+    text = "".join(char for char in text if not unicodedata.combining(char))
+    return text.translate(LATIN_DIACRITIC_TRANSLATION)
 
 
 def normalize_alias_value(value: str) -> str:

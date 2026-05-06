@@ -6500,6 +6500,21 @@ class CatalogReviewServiceTests(SimpleTestCase):
         self.assertEqual(catalog_search_tokens("Vanilla Extasy"), ["Vanilla", "Extasy"])
         self.assertEqual(catalog_search_tokens("Vanilla"), [])
 
+    def test_fragrantica_identity_matching_folds_latin_diacritics(self):
+        from prices.services.catalog_review import (
+            normalize_catalogue_perfume_name,
+            normalized_fragrance_key,
+        )
+
+        self.assertEqual(
+            normalized_fragrance_key("Donna Nòbile Ìle Été"),
+            normalized_fragrance_key("Donna Nobile Ile Ete"),
+        )
+        self.assertEqual(
+            normalize_catalogue_perfume_name("Donna Nòbile Ìle Été"),
+            "Donna Nobile Ile Ete",
+        )
+
     def test_build_our_product_catalog_variant_queryset_applies_search_policy(self):
         from prices.services.catalog_review import (
             build_our_product_catalog_variant_queryset,
@@ -10061,6 +10076,47 @@ class OurProductCatalogueListTests(TestCase):
         self.perfume.refresh_from_db()
         self.assertEqual(self.perfume.collection_name, "Parfum Oriental for Women")
         self.assertEqual(self.perfume.collection.name, "Parfum Oriental for Women")
+
+    def test_fragrantica_link_folds_accents_before_applying_local_name(self):
+        brand = Brand.objects.create(name="Accent Brand")
+        perfume = Perfume.objects.create(
+            brand=brand,
+            name="Donna Nobile Ile Ete",
+            concentration="Eau de Parfum",
+        )
+        source = FragranticaProduct.objects.create(
+            brand_name="Accent Brand",
+            normalized_brand_name="accent brand",
+            name="Donna Nòbile Ìle Été Eau de Parfum",
+            normalized_name="donna nobile ile ete eau de parfum",
+            source_path="/perfume/Accent-Brand/Donna-Nobile-Ile-Ete.html",
+        )
+
+        response = self.client.get(
+            reverse("prices:catalogue_linking_workbench"),
+            {"q": "donna nobile ile ete", "suggestions": "with"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Accent Brand / Donna Nobile Ile Ete")
+        self.assertContains(response, "Exact brand, scent, and concentration match")
+
+        response = self.client.post(
+            reverse("prices:fragrantica_product_link", args=[source.pk]),
+            {
+                "perfume_id": str(perfume.pk),
+                "next": reverse("prices:fragrantica_product_review"),
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        perfume.refresh_from_db()
+        source.refresh_from_db()
+        self.assertEqual(perfume.name, "Donna Nobile Ile Ete")
+        self.assertEqual(source.normalized_name, "donna nobile ile ete eau de parfum")
+        self.assertNotIn("ò", perfume.name)
+        self.assertNotIn("Ì", perfume.name)
+        self.assertNotIn("É", perfume.name)
 
     def test_fragrantica_link_adds_for_audience_when_same_base_has_men_and_women(self):
         brand = Brand.objects.create(name="Dolce Gabbana")
