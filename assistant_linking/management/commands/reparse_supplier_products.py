@@ -6,13 +6,16 @@ from prices.models import SupplierProduct
 
 
 class Command(BaseCommand):
-    help = "Deterministically reparse supplier products into ParsedSupplierProduct rows."
+    help = (
+        "Deterministically reparse supplier products into ParsedSupplierProduct rows."
+    )
 
     def add_arguments(self, parser):
         parser.add_argument("--supplier-id", type=int)
         parser.add_argument("--only-unparsed", action="store_true")
         parser.add_argument("--only-stale", action="store_true")
         parser.add_argument("--name-contains")
+        parser.add_argument("--force", action="store_true")
         parser.add_argument(
             "--product-id",
             dest="product_ids",
@@ -23,7 +26,9 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         if options["only_unparsed"] and options["only_stale"]:
-            raise CommandError("--only-unparsed and --only-stale cannot be used together.")
+            raise CommandError(
+                "--only-unparsed and --only-stale cannot be used together."
+            )
 
         queryset = SupplierProduct.objects.select_related("supplier").all()
         if options["supplier_id"]:
@@ -41,7 +46,9 @@ class Command(BaseCommand):
                 | Q(assistant_parse__last_parsed_at__isnull=True)
                 | Q(updated_at__gt=F("assistant_parse__last_parsed_at"))
             )
-            queryset = queryset.filter(assistant_parse__isnull=False, assistant_parse__locked_by_human=False).filter(stale_filter)
+            queryset = queryset.filter(
+                assistant_parse__isnull=False, assistant_parse__locked_by_human=False
+            ).filter(stale_filter)
 
         queryset = queryset.order_by("id")
         if options["limit"]:
@@ -49,6 +56,6 @@ class Command(BaseCommand):
 
         count = 0
         for product in queryset.iterator():
-            save_parse(product)
+            save_parse(product, force=options["force"])
             count += 1
         self.stdout.write(self.style.SUCCESS(f"Parsed {count} supplier products."))

@@ -441,6 +441,7 @@ def dispatch_reparse_visible_products(
         result = dispatcher(
             "reparse_supplier_products",
             product_ids=product_ids,
+            force=True,
             description=f"Refresh {len(product_ids)} visible normalization rows",
         )
     except Exception as exc:
@@ -716,7 +717,7 @@ def refresh_visible_parsed_context(
     refreshed_parses = []
     for parsed in visible_parses:
         if force_refresh:
-            refreshed_parses.append(parse_saver(parsed.supplier_product))
+            refreshed_parses.append(parse_saver(parsed.supplier_product, force=True))
             refreshed_count += 1
         else:
             refreshed_parses.append(parsed)

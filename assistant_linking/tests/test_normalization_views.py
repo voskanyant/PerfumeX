@@ -312,6 +312,7 @@ class NormalizationViewServiceTests(SimpleTestCase):
         dispatcher.assert_called_once_with(
             "reparse_supplier_products",
             product_ids=[4, 6],
+            force=True,
             description="Refresh 2 visible normalization rows",
         )
 
@@ -562,8 +563,8 @@ class NormalizationViewServiceTests(SimpleTestCase):
         )
 
         self.assertIs(returned, context)
-        parse_saver.assert_any_call(product_1)
-        parse_saver.assert_any_call(product_2)
+        parse_saver.assert_any_call(product_1, force=True)
+        parse_saver.assert_any_call(product_2, force=True)
         parsed_id_queryset_builder.assert_called_once_with([11, 12])
         self.assertEqual(context["parses"], ["refreshed"])
         self.assertEqual(context["object_list"], ["refreshed"])
