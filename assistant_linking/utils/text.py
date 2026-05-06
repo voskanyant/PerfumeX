@@ -56,6 +56,15 @@ LATIN_DIACRITIC_TRANSLATION = str.maketrans(
         "ß": "ss",
         "ẞ": "SS",
         "ı": "i",
+        "’": "'",
+        "‘": "'",
+        "‛": "'",
+        "ʼ": "'",
+        "ʻ": "'",
+        "ʹ": "'",
+        "′": "'",
+        "´": "'",
+        "`": "'",
     }
 )
 
@@ -81,7 +90,7 @@ def normalize_mixed_script_latin_lookalikes(value: str) -> str:
 
 
 def fold_latin_diacritics(value: str) -> str:
-    """Fold Latin accented source text to catalogue-safe plain letters."""
+    """Fold Latin accented source text to catalogue-safe ASCII text."""
 
     text = unicodedata.normalize("NFKD", value or "")
     text = "".join(char for char in text if not unicodedata.combining(char))
@@ -107,6 +116,6 @@ def normalize_alias_value(value: str) -> str:
     )
     text = re.sub(r"(?<=\d),(?=\d)", ".", text)
     text = re.sub(r"(?<!\d)\.(?!\d)", " ", text)
-    text = re.sub(r"[\u00a0_&/,;:|()\[\]{}]+", " ", text)
+    text = re.sub(r"[\u00a0_&'\",.;:|/\\()\[\]{}]+", " ", text)
     text = re.sub(r"\s+", " ", text).strip()
     return text

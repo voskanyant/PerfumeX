@@ -6514,6 +6514,14 @@ class CatalogReviewServiceTests(SimpleTestCase):
             normalize_catalogue_perfume_name("Donna Nòbile Ìle Été"),
             "Donna Nobile Ile Ete",
         )
+        self.assertEqual(
+            normalized_fragrance_key("L’air Barbès"),
+            normalized_fragrance_key("L air Barbes"),
+        )
+        self.assertEqual(
+            normalize_catalogue_perfume_name("L’air Barbès"),
+            "L'air Barbes",
+        )
 
     def test_build_our_product_catalog_variant_queryset_applies_search_policy(self):
         from prices.services.catalog_review import (
@@ -10081,24 +10089,24 @@ class OurProductCatalogueListTests(TestCase):
         brand = Brand.objects.create(name="Accent Brand")
         perfume = Perfume.objects.create(
             brand=brand,
-            name="Donna Nobile Ile Ete",
+            name="L air Barbes",
             concentration="Eau de Parfum",
         )
         source = FragranticaProduct.objects.create(
             brand_name="Accent Brand",
             normalized_brand_name="accent brand",
-            name="Donna Nòbile Ìle Été Eau de Parfum",
-            normalized_name="donna nobile ile ete eau de parfum",
-            source_path="/perfume/Accent-Brand/Donna-Nobile-Ile-Ete.html",
+            name="L’air Barbès Eau de Parfum",
+            normalized_name="l air barbes eau de parfum",
+            source_path="/perfume/Accent-Brand/L-air-Barbes.html",
         )
 
         response = self.client.get(
             reverse("prices:catalogue_linking_workbench"),
-            {"q": "donna nobile ile ete", "suggestions": "with"},
+            {"q": "l air barbes", "suggestions": "with"},
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Accent Brand / Donna Nobile Ile Ete")
+        self.assertContains(response, "Accent Brand / L air Barbes")
         self.assertContains(response, "Exact brand, scent, and concentration match")
 
         response = self.client.post(
@@ -10112,11 +10120,10 @@ class OurProductCatalogueListTests(TestCase):
         self.assertEqual(response.status_code, 302)
         perfume.refresh_from_db()
         source.refresh_from_db()
-        self.assertEqual(perfume.name, "Donna Nobile Ile Ete")
-        self.assertEqual(source.normalized_name, "donna nobile ile ete eau de parfum")
-        self.assertNotIn("ò", perfume.name)
-        self.assertNotIn("Ì", perfume.name)
-        self.assertNotIn("É", perfume.name)
+        self.assertEqual(perfume.name, "L'air Barbes")
+        self.assertEqual(source.normalized_name, "l air barbes eau de parfum")
+        self.assertNotIn("’", perfume.name)
+        self.assertNotIn("è", perfume.name)
 
     def test_fragrantica_link_adds_for_audience_when_same_base_has_men_and_women(self):
         brand = Brand.objects.create(name="Dolce Gabbana")
