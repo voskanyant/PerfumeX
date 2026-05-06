@@ -2910,15 +2910,15 @@ def _build_catalogue_linking_filtered_page_rows(
             max_scan_rows=max_scan_rows,
         )
 
-    target_start = max(page_number - 1, 0) * page_size
-    target_stop = target_start + page_size
+    target_start = 0
+    target_stop = page_size
     page_rows: list[dict] = []
     total_count = _catalogue_linking_sequence_count(sequence)
     scan_size = max(page_size * 2, page_size)
     scan_limit = max_scan_rows or page_size * CATALOGUE_LINKING_FILTER_SCAN_PAGES
-    scan_start = min(target_start, total_count)
+    scan_start = min(max(page_number - 1, 0) * scan_limit, total_count)
     scan_stop_limit = min(total_count, scan_start + scan_limit)
-    matched_seen = target_start
+    matched_seen = 0
 
     for start in range(scan_start, scan_stop_limit, scan_size):
         perfumes = list(
@@ -3003,14 +3003,19 @@ def build_catalogue_linking_context(
         )
     elif row_filter_active and paginator and page_obj:
         visible_rows = []
+        display_page_size = page_obj.paginator.per_page
+        scan_limit = display_page_size * CATALOGUE_LINKING_FILTER_SCAN_PAGES
+        paginator = Paginator(paginator.object_list, scan_limit)
+        page_obj = paginator.get_page(request.GET.get("page"))
         visible_count = paginator.count
         rows = _build_catalogue_linking_filtered_page_rows(
             paginator.object_list,
             page_number=page_obj.number,
-            page_size=page_obj.paginator.per_page,
+            page_size=display_page_size,
             min_score=min_score,
             confidence_filter=confidence_filter,
             suggestion_filter=suggestion_filter,
+            max_scan_rows=scan_limit,
         )
     else:
         visible_rows = build_catalogue_linking_rows(

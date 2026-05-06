@@ -9711,6 +9711,56 @@ class OurProductCatalogueListTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Bounded Match 00")
 
+    def test_catalogue_linking_high_confidence_pages_do_not_overlap_scan_windows(self):
+        brand = Brand.objects.create(name="A Windowed Linking Brand")
+        for index in range(120):
+            name = f"Windowed Row {index:03d}"
+            Perfume.objects.create(
+                brand=brand,
+                name=name,
+                concentration="Eau de Parfum",
+            )
+            if index in {0, 80}:
+                FragranticaProduct.objects.create(
+                    brand_name="A Windowed Linking Brand",
+                    normalized_brand_name="a windowed linking brand",
+                    name=f"{name} Eau de Parfum",
+                    normalized_name=f"{name.lower()} eau de parfum",
+                    source_path=(
+                        f"/perfume/A-Windowed-Linking-Brand/Windowed-{index}.html"
+                    ),
+                )
+
+        with patch(
+            "prices.services.catalog_review.CATALOGUE_LINKING_FILTER_SCAN_PAGES",
+            1,
+        ):
+            page_one = self.client.get(
+                reverse("prices:catalogue_linking_workbench"),
+                {
+                    "status": "unlinked",
+                    "suggestions": "with",
+                    "confidence": "95",
+                    "page": "1",
+                },
+            )
+            page_three = self.client.get(
+                reverse("prices:catalogue_linking_workbench"),
+                {
+                    "status": "unlinked",
+                    "suggestions": "with",
+                    "confidence": "95",
+                    "page": "3",
+                },
+            )
+
+        self.assertEqual(page_one.status_code, 200)
+        self.assertEqual(page_three.status_code, 200)
+        self.assertContains(page_one, "Windowed Row 000")
+        self.assertNotContains(page_one, "Windowed Row 080")
+        self.assertContains(page_three, "Windowed Row 080")
+        self.assertNotContains(page_three, "Windowed Row 000")
+
     def test_catalogue_linking_review_page_does_not_verify_all_rows(self):
         brand = Brand.objects.create(name="Bounded Review Brand")
         Perfume.objects.create(
