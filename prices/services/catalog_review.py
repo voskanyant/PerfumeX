@@ -15,9 +15,10 @@ from types import SimpleNamespace
 from urllib.parse import urlencode
 
 import regex
+from django.apps import apps
 from django.conf import settings
 from django.core.paginator import Paginator
-from django.db import IntegrityError
+from django.db import IntegrityError, transaction
 from django.db.models import Count, Q, Subquery
 from django.http import Http404, QueryDict
 from django.shortcuts import get_object_or_404
@@ -51,7 +52,11 @@ from assistant_linking.utils.text import fold_latin_diacritics
 from assistant_linking.utils.text import normalize_alias_value
 from assistant_linking.utils.text import normalize_mixed_script_latin_lookalikes
 from catalog.models import Brand as CatalogBrand
+from catalog.models import AIDraft as CatalogAIDraft
+from catalog.models import FactClaim as CatalogFactClaim
+from catalog.models import PerfumeAccord as CatalogPerfumeAccord
 from catalog.models import Perfume as CatalogPerfume
+from catalog.models import PerfumeNote as CatalogPerfumeNote
 from catalog.models import Source as CatalogSource
 from catalog.models import PerfumeVariant as CatalogPerfumeVariant
 from catalog.models import get_or_create_collection
@@ -3477,6 +3482,134 @@ def _catalogue_linking_candidate_conflict_scope(perfume, perfume_manager):
     return queryset
 
 
+def _raw_delete_queryset(queryset) -> int:
+    return queryset._raw_delete(queryset.db)
+
+
+def _model_update(app_label: str, model_name: str, filters: dict, updates: dict) -> None:
+    try:
+        model = apps.get_model(app_label, model_name)
+    except LookupError:
+        return
+    model.objects.filter(**filters).update(**updates)
+
+
+def _fast_unlink_catalogue_variants(variant_ids: list[int]) -> None:
+    if not variant_ids:
+        return
+    models.SupplierProduct.objects.filter(catalog_variant_id__in=variant_ids).update(
+        catalog_variant=None,
+    )
+    _model_update(
+        "assistant_linking",
+        "MatchGroup",
+        {"candidate_variant_id__in": variant_ids},
+        {"candidate_variant": None},
+    )
+    _model_update(
+        "assistant_linking",
+        "ManualLinkDecision",
+        {"variant_id__in": variant_ids},
+        {"variant": None},
+    )
+    _model_update(
+        "assistant_linking",
+        "LinkSuggestion",
+        {"suggested_variant_id__in": variant_ids},
+        {"suggested_variant": None},
+    )
+
+
+def _fast_delete_catalogue_variants(variant_ids: list[int]) -> int:
+    if not variant_ids:
+        return 0
+    variant_ids = [int(variant_id) for variant_id in variant_ids]
+    variant_queryset = CatalogPerfumeVariant.objects.filter(pk__in=variant_ids)
+    deleted_count = variant_queryset.count()
+    if not deleted_count:
+        return 0
+    _fast_unlink_catalogue_variants(variant_ids)
+    _raw_delete_queryset(variant_queryset)
+    return deleted_count
+
+
+def _fast_unlink_catalogue_perfumes(perfume_ids: list[int]) -> list[int]:
+    variant_ids = list(
+        CatalogPerfumeVariant.objects.filter(perfume_id__in=perfume_ids).values_list(
+            "pk",
+            flat=True,
+        )
+    )
+    _fast_unlink_catalogue_variants(variant_ids)
+    models.SupplierProduct.objects.filter(catalog_perfume_id__in=perfume_ids).update(
+        catalog_perfume=None,
+    )
+    FragranticaProduct.objects.filter(matched_perfume_id__in=perfume_ids).update(
+        matched_perfume=None,
+        match_status=FragranticaProduct.STATUS_UNLINKED,
+    )
+    ProductAlias.objects.filter(perfume_id__in=perfume_ids).update(perfume=None)
+    _model_update(
+        "assistant_core",
+        "KnowledgeNote",
+        {"perfume_id__in": perfume_ids},
+        {"perfume": None},
+    )
+    _model_update(
+        "assistant_core",
+        "ResearchJob",
+        {"perfume_id__in": perfume_ids},
+        {"perfume": None},
+    )
+    _model_update(
+        "assistant_core",
+        "DetectedChange",
+        {"perfume_id__in": perfume_ids},
+        {"perfume": None},
+    )
+    _model_update(
+        "assistant_linking",
+        "MatchGroup",
+        {"candidate_perfume_id__in": perfume_ids},
+        {"candidate_perfume": None},
+    )
+    _model_update(
+        "assistant_linking",
+        "ManualLinkDecision",
+        {"perfume_id__in": perfume_ids},
+        {"perfume": None},
+    )
+    _model_update(
+        "assistant_linking",
+        "LinkSuggestion",
+        {"suggested_perfume_id__in": perfume_ids},
+        {"suggested_perfume": None},
+    )
+    AIRecommendation.objects.filter(perfume_id__in=perfume_ids).update(perfume=None)
+    return variant_ids
+
+
+def _fast_delete_catalogue_perfumes(perfume_ids: list[int]) -> int:
+    if not perfume_ids:
+        return 0
+    perfume_ids = [int(perfume_id) for perfume_id in perfume_ids]
+    perfume_queryset = CatalogPerfume.objects.filter(pk__in=perfume_ids)
+    deleted_count = perfume_queryset.count()
+    if not deleted_count:
+        return 0
+    variant_ids = _fast_unlink_catalogue_perfumes(perfume_ids)
+    FragranticaProductLink.objects.filter(perfume_id__in=perfume_ids).delete()
+    CatalogAIDraft.objects.filter(perfume_id__in=perfume_ids).delete()
+    CatalogPerfumeAccord.objects.filter(perfume_id__in=perfume_ids).delete()
+    CatalogPerfumeNote.objects.filter(perfume_id__in=perfume_ids).delete()
+    CatalogFactClaim.objects.filter(perfume_id__in=perfume_ids).delete()
+    CatalogSource.objects.filter(perfume_id__in=perfume_ids).delete()
+    if variant_ids:
+        _raw_delete_queryset(CatalogPerfumeVariant.objects.filter(pk__in=variant_ids))
+    _raw_delete_queryset(perfume_queryset)
+    return deleted_count
+
+
 def run_catalogue_linking_bulk_action(
     post_data,
     *,
@@ -3527,12 +3660,21 @@ def run_catalogue_linking_bulk_action(
                 "Selected Our Products rows were not found.",
                 redirect_url,
             )
-        source_manager.filter(matched_perfume_id__in=clean_ids).update(
-            matched_perfume=None,
-            match_status=FragranticaProduct.STATUS_UNLINKED,
-        )
-        FragranticaProductLink.objects.filter(perfume_id__in=clean_ids).delete()
-        queryset.delete()
+        with transaction.atomic():
+            if (
+                source_manager.model is FragranticaProduct
+                and perfume_manager.model is CatalogPerfume
+            ):
+                _fast_delete_catalogue_perfumes(
+                    [int(perfume_id) for perfume_id in clean_ids],
+                )
+            else:
+                source_manager.filter(matched_perfume_id__in=clean_ids).update(
+                    matched_perfume=None,
+                    match_status=FragranticaProduct.STATUS_UNLINKED,
+                )
+                FragranticaProductLink.objects.filter(perfume_id__in=clean_ids).delete()
+                queryset.delete()
         return CatalogueLinkingBulkResult(
             "success",
             f"Deleted {deleted_count} Our Products perfume row(s).",
@@ -4320,7 +4462,13 @@ def build_catalog_tab_action_result(
             return CatalogTabActionResult(
                 "error", "Selected product rows were not found.", tab
             )
-        queryset.delete()
+        with transaction.atomic():
+            if variant_manager.model is CatalogPerfumeVariant:
+                _fast_delete_catalogue_variants(
+                    [int(variant_id) for variant_id in clean_ids],
+                )
+            else:
+                queryset.delete()
         return CatalogTabActionResult(
             "success", f"Deleted {deleted_count} catalogue variant row(s).", tab
         )

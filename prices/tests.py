@@ -10591,6 +10591,14 @@ class OurProductCatalogueListTests(TestCase):
         self.assertNotContains(response, "No bulk suggestion for")
 
     def test_catalogue_linking_workbench_bulk_deletes_selected_perfumes(self):
+        supplier = models.Supplier.objects.create(name="Delete Supplier")
+        supplier_product = models.SupplierProduct.objects.create(
+            supplier=supplier,
+            identity_key="delete-supplier-product",
+            name="Montale Vanilla Extasy 100ml",
+            catalog_perfume=self.perfume,
+            catalog_variant=self.variant,
+        )
         source = FragranticaProduct.objects.create(
             brand_name="Montale",
             normalized_brand_name="montale",
@@ -10616,6 +10624,9 @@ class OurProductCatalogueListTests(TestCase):
         source.refresh_from_db()
         self.assertIsNone(source.matched_perfume)
         self.assertEqual(source.match_status, FragranticaProduct.STATUS_UNLINKED)
+        supplier_product.refresh_from_db()
+        self.assertIsNone(supplier_product.catalog_perfume)
+        self.assertIsNone(supplier_product.catalog_variant)
 
     def test_fragrantica_link_normalizes_uppercase_collection_before_applying(self):
         source = FragranticaProduct.objects.create(
@@ -11107,6 +11118,14 @@ class OurProductCatalogueListTests(TestCase):
         self.assertEqual(self.variant.variant_type, "travel")
 
     def test_our_products_products_tab_bulk_deletes_selected_variants(self):
+        supplier = models.Supplier.objects.create(name="Variant Delete Supplier")
+        supplier_product = models.SupplierProduct.objects.create(
+            supplier=supplier,
+            identity_key="variant-delete-supplier-product",
+            name="Montale Vanilla Extasy 100ml",
+            catalog_perfume=self.perfume,
+            catalog_variant=self.variant,
+        )
         response = self.client.post(
             reverse("prices:our_product_list"),
             {
@@ -11120,6 +11139,9 @@ class OurProductCatalogueListTests(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertFalse(PerfumeVariant.objects.filter(pk=self.variant.pk).exists())
         self.assertTrue(Perfume.objects.filter(pk=self.perfume.pk).exists())
+        supplier_product.refresh_from_db()
+        self.assertEqual(supplier_product.catalog_perfume, self.perfume)
+        self.assertIsNone(supplier_product.catalog_variant)
 
     def test_our_products_brands_tab_can_add_brand(self):
         response = self.client.post(
