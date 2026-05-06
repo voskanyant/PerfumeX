@@ -52,7 +52,7 @@ from prices.models import SupplierProduct
 
 
 logger = logging.getLogger(__name__)
-PARSER_VERSION = "deterministic-v39"
+PARSER_VERSION = "deterministic-v41"
 REGEX_ALIAS_TIMEOUT_SECONDS = 1.0
 CATALOG_CONCENTRATION_CONFLICT_WARNING = (
     "Catalogue match suggests {suggested}. Supplier text parsed as {parsed}."
@@ -1258,6 +1258,9 @@ def _catalog_name_from_audience_only_context(
             for alias in _generated_brand_alias_candidates(result.normalized_brand)
         ),
     }
+    brand_tokens = normalize_text(result.normalized_brand.name).split()
+    if len(brand_tokens) > 1:
+        brand_prefix_keys.add(_catalog_scent_key(" ".join(brand_tokens[1:])))
     brand_prefix_keys = {key for key in brand_prefix_keys if key}
     names = {
         perfume.name
@@ -1304,6 +1307,31 @@ def _catalog_name_with_audience_before_name_extension(
         if len(candidates) == 1:
             return candidates.pop()
     return result.product_name_text
+
+
+def _catalog_name_from_identity_text(
+    result: ParseResult,
+    identity_text: str,
+) -> str:
+    if not result.normalized_brand or not result.normalized_brand.id:
+        return ""
+    candidate_key = _catalog_scent_key(identity_text)
+    if len(candidate_key) < 3:
+        return ""
+    names = {
+        perfume.name
+        for perfume in Perfume.objects.filter(brand_id=result.normalized_brand.id).only(
+            "name",
+            "concentration",
+            "audience",
+            "collection_name",
+        )
+        if _catalog_perfume_matches_parse_context(perfume, result)
+        and _catalog_scent_key(perfume.name) == candidate_key
+    }
+    if len(names) == 1:
+        return names.pop()
+    return ""
 
 
 def _canonicalize_product_name_from_catalog(result: ParseResult) -> str:
@@ -2059,6 +2087,26 @@ def _mark_manual_review(result: ParseResult, warning: str) -> None:
         result.warnings.append(warning)
 
 
+def _parenthetical_secondary_brand_terms(
+    raw_text: str,
+    selected_brand: Brand | None,
+    supplier_id: int | None,
+) -> list[str]:
+    if not raw_text or not selected_brand or not selected_brand.pk:
+        return []
+    terms: list[str] = []
+    seen: set[str] = set()
+    for match in re.finditer(r"[\(\[\{](?P<comment>[^\)\]\}]+)[\)\]\}]", raw_text):
+        comment = normalize_text(match.group("comment"))
+        if not comment or comment in seen:
+            continue
+        _alias, brand = _match_aliases(comment, supplier_id)
+        if brand and brand.pk != selected_brand.pk:
+            seen.add(comment)
+            terms.append(comment)
+    return terms
+
+
 def parse_supplier_product(product: SupplierProduct) -> ParseResult:
     raw = product.name or ""
     text = normalize_text(" ".join([product.brand or "", raw, product.size or ""]))
@@ -2231,6 +2279,7 @@ def parse_supplier_product(product: SupplierProduct) -> ParseResult:
     if _contains_any_phrase(text, refill_terms):
         result.modifiers.append(REFILL_MODIFIER)
 
+    vintage_terms_for_stripping = vintage_terms
     if needs_cyrillic_identity_review:
         alias, brand = None, None
         _mark_manual_review(
@@ -2254,12 +2303,69 @@ def parse_supplier_product(product: SupplierProduct) -> ParseResult:
         if alias and not isinstance(alias, str) and alias.supplier_id:
             result.warnings.append("supplier-specific alias overrode global alias")
 
+    secondary_brand_comment_terms = _parenthetical_secondary_brand_terms(
+        raw,
+        result.normalized_brand,
+        product.supplier_id,
+    )
+    if secondary_brand_comment_terms:
+        text = _strip_known_terms(text, secondary_brand_comment_terms)
+        _mark_manual_review(
+            result,
+            "secondary brand mention needs manual review",
+        )
+
     if not is_non_perfume and not result.size_ml:
         size, raw_size, compact_text = _extract_loose_trailing_size(text)
         if size is not None:
             result.size_ml = size
             result.raw_size_text = raw_size
             text = compact_text
+
+    if is_vintage and result.normalized_brand:
+        vintage_identity_text = _strip_known_terms(
+            text,
+            [
+                result.raw_size_text,
+                result.concentration,
+                *_audience_terms_to_strip(audience_aliases),
+                *tester_terms,
+                *sample_terms,
+                *travel_terms,
+                *mini_terms,
+                *set_terms,
+                *cosmetic_poudre_terms,
+                *deodorant_terms,
+                *decant_terms,
+                *atomizer_terms,
+                *refill_terms,
+                *decoded_terms,
+                *supplier_comment_terms,
+                *packaging_descriptor_terms,
+                *variant_type_terms,
+                *no_box_packaging_terms,
+                *WOODBOX_TERMS,
+            ],
+            preserve_phrases=NAME_AUDIENCE_TERMS,
+        )
+        catalog_vintage_name = _catalog_name_from_identity_text(
+            result,
+            vintage_identity_text,
+        )
+        if catalog_vintage_name:
+            result.product_name_text = catalog_vintage_name
+            is_vintage = False
+            vintage_terms_for_stripping = ()
+            result.modifiers = [
+                modifier
+                for modifier in result.modifiers
+                if modifier != VINTAGE_MODIFIER
+            ]
+            if result.variant_type == VINTAGE_MODIFIER:
+                result.variant_type = "tester" if result.is_tester else "standard"
+            is_non_perfume = (
+                is_bag or is_cosmetic_poudre or is_deodorant or is_decant or is_atomizer
+            )
 
     product_alias_non_name_terms = [
         *tester_terms,
@@ -2270,7 +2376,7 @@ def parse_supplier_product(product: SupplierProduct) -> ParseResult:
         *cosmetic_poudre_terms,
         *deodorant_terms,
         *decant_terms,
-        *vintage_terms,
+        *vintage_terms_for_stripping,
         *atomizer_terms,
         *refill_terms,
         *decoded_terms,
@@ -2407,7 +2513,7 @@ def parse_supplier_product(product: SupplierProduct) -> ParseResult:
                 *cosmetic_poudre_terms,
                 *deodorant_terms,
                 *decant_terms,
-                *vintage_terms,
+                *vintage_terms_for_stripping,
                 *atomizer_terms,
                 *refill_terms,
                 *decoded_terms,

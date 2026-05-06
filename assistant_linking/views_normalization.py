@@ -40,6 +40,7 @@ from assistant_linking.services.normalization_views import (
     build_unparsed_queryset,
     build_vintage_queryset,
     dispatch_parse_unparsed_products,
+    dispatch_reparse_stale_products,
     dispatch_reparse_visible_products,
     refresh_visible_parsed_context,
     refresh_visible_unparsed_context,
@@ -111,11 +112,23 @@ class LowConfidenceListView(NormalizationSearchMixin, StaffAssistantMixin, ListV
     template_name = "assistant_linking/normalization/low_confidence.html"
     context_object_name = "parses"
     paginate_by = 50
+    refresh_param = "refresh"
 
     def get_queryset(self):
         return build_low_confidence_queryset(
             self.get_search_query(),
             _hidden_product_keywords(self.request),
+        )
+
+    def get_refreshed_id_queryset(self, parsed_ids):
+        return self.get_queryset().filter(pk__in=parsed_ids)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        return refresh_visible_parsed_context(
+            context,
+            force_refresh=self.request.GET.get(self.refresh_param) == "1",
+            parsed_id_queryset_builder=self.get_refreshed_id_queryset,
         )
 
 
@@ -269,19 +282,11 @@ class ModifierConflictListView(NormalizationIssueListView):
 
 class ParsedListView(NormalizationIssueListView):
     issue_title = "Complete parsed products"
-    refresh_param = "refresh"
 
     def get_queryset(self):
         return build_complete_parsed_queryset(
             self.get_search_query(),
             _hidden_product_keywords(self.request),
-        )
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        return refresh_visible_parsed_context(
-            context,
-            force_refresh=self.request.GET.get(self.refresh_param) == "1",
         )
 
 
@@ -290,6 +295,13 @@ class ParseUnparsedProductsView(StaffAssistantMixin, View):
         result = dispatch_parse_unparsed_products()
         getattr(messages, result.message_level)(request, result.message)
         return redirect("assistant_linking:normalization_unparsed")
+
+
+class RefreshStaleParsesView(StaffAssistantMixin, View):
+    def post(self, request):
+        result = dispatch_reparse_stale_products()
+        getattr(messages, result.message_level)(request, result.message)
+        return redirect("assistant_linking:normalization_dashboard")
 
 
 class RefreshVisibleParsesView(StaffAssistantMixin, View):

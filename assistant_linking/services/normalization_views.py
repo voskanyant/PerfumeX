@@ -375,6 +375,39 @@ def dispatch_parse_unparsed_products(
     )
 
 
+def dispatch_reparse_stale_products(
+    *,
+    dispatcher=enqueue_management_command,
+) -> ReparseVisibleProductsResult:
+    try:
+        result = dispatcher(
+            "reparse_supplier_products",
+            only_stale=True,
+            description="Refresh stale normalization parses",
+        )
+    except Exception as exc:
+        return ReparseVisibleProductsResult(
+            success=False,
+            message_level="error",
+            message=f"Could not start stale parse refresh: {exc}",
+        )
+
+    if result.queued:
+        return ReparseVisibleProductsResult(
+            success=True,
+            message_level="success",
+            message=(
+                "Stale parse refresh was queued. Refresh stats after the job finishes "
+                "to update queue counts."
+            ),
+        )
+    return ReparseVisibleProductsResult(
+        success=True,
+        message_level="success",
+        message="Stale parses refreshed. Refresh stats to update queue counts.",
+    )
+
+
 def parse_visible_product_ids(raw_values, *, limit=100) -> list[int]:
     product_ids: list[int] = []
     seen: set[int] = set()

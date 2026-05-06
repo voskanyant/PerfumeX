@@ -95,6 +95,66 @@ class NormalizerTests(TestCase):
         self.assertEqual(parsed.normalized_brand, self.brand)
         self.assertEqual(parsed.product_name_text, "light blue pour homme")
 
+    def test_parses_initial_brand_standalone_audience_and_compact_concentration_size(
+        self,
+    ):
+        brand = Brand.objects.create(name="M. Micallef")
+        Perfume.objects.create(
+            brand=brand,
+            name="Royal Vintage",
+            concentration="Eau de Parfum",
+            audience="men",
+        )
+        product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="m-micallef-royal-vintage",
+            name="M. Micallef Royal Vintage m edp100ml",
+        )
+
+        parsed = parse_supplier_product(product)
+
+        self.assertEqual(parsed.normalized_brand, brand)
+        self.assertEqual(parsed.product_name_text, "Royal Vintage")
+        self.assertEqual(parsed.supplier_gender_hint, "Men")
+        self.assertEqual(parsed.concentration, "Eau de Parfum")
+        self.assertEqual(parsed.size_ml, Decimal("100.00"))
+        self.assertEqual(parsed.raw_size_text, "100ml")
+
+    def test_leading_brand_wins_over_parenthetical_comparison_brand(self):
+        alhambra, _created = Brand.objects.get_or_create(name="Maison Alhambra")
+        micallef = Brand.objects.create(name="M. Micallef")
+        BrandAlias.objects.update_or_create(
+            brand=alhambra,
+            alias_text="AlHambra",
+            supplier=None,
+            defaults={"normalized_alias": "alhambra", "priority": 20, "active": True},
+        )
+        BrandAlias.objects.create(
+            brand=micallef,
+            alias_text="M. Micallef",
+            normalized_alias="m micallef",
+            priority=20,
+        )
+        Perfume.objects.create(
+            brand=micallef,
+            name="Gntonic",
+            concentration="Eau de Parfum",
+        )
+        product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="alhambra-tonic-ice",
+            name="AlHambra Tonic Ice (GNTONIC M. Micallef) edp 100 ml NEW",
+        )
+
+        parsed = parse_supplier_product(product)
+
+        self.assertEqual(parsed.normalized_brand, alhambra)
+        self.assertEqual(parsed.product_name_text, "tonic ice")
+        self.assertEqual(parsed.concentration, "Eau de Parfum")
+        self.assertEqual(parsed.size_ml, Decimal("100.00"))
+        self.assertIn(MANUAL_REVIEW_MODIFIER, parsed.modifiers)
+        self.assertIn("secondary brand mention needs manual review", parsed.warnings)
+
     def test_brand_alias_matching_ignores_ampersands_and_non_decimal_dots(self):
         abercrombie = Brand.objects.create(name="Abercrombie & Fitch")
         banderas = Brand.objects.create(name="Antonio Banderas")

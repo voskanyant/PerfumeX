@@ -18,7 +18,13 @@
         {% if search_query %}
             <a class="button ghost" href="{% url 'assistant_linking:normalization_low_confidence' %}">Reset</a>
         {% endif %}
+        {% if allow_refresh_visible %}
+            <a class="button ghost" href="?{% if search_query %}q={{ search_query|urlencode }}&amp;{% endif %}{% if page_obj %}page={{ page_obj.number }}&amp;{% endif %}refresh=1">Refresh visible rows</a>
+        {% endif %}
     </form>
+    {% if refreshed_visible %}
+        <p class="form-help">{{ refreshed_visible_count }} visible row{{ refreshed_visible_count|pluralize }} reparsed.</p>
+    {% endif %}
     {% if parses %}
         <form method="post"
               action="{% url 'assistant_linking:normalization_refresh_visible' %}"
@@ -64,5 +70,5 @@
     </div>
 </div>
 
-{% include "includes/pagination.html" with page_obj=page_obj page_param="page" class_name="space-top-md" label="Low-confidence rows pagination" jump_id="low-confidence-page-jump" %}
+{% include "includes/pagination.html" with page_obj=page_obj page_param="page" class_name="space-top-md" label="Low-confidence rows pagination" jump_id="low-confidence-page-jump" exclude_query_params="refresh" %}
 {% endblock %}

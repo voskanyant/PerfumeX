@@ -4,6 +4,10 @@
     {% csrf_token %}
     <button class="button secondary" type="submit">Parse unparsed queue</button>
 </form>
+<form method="post" action="{% url 'assistant_linking:normalization_refresh_stale' %}">
+    {% csrf_token %}
+    <button class="button secondary" type="submit">Refresh stale parses</button>
+</form>
 <form method="post" action="{% url 'assistant_linking:rebuild_groups' %}">
     {% csrf_token %}
     <button class="button ghost" type="submit">Rebuild groups</button>

@@ -18,6 +18,7 @@ from assistant_linking.services.normalization_views import (
     build_normalization_dashboard_context,
     build_unparsed_queryset,
     dispatch_parse_unparsed_products,
+    dispatch_reparse_stale_products,
     dispatch_reparse_visible_products,
     parse_visible_product_ids,
     refresh_visible_parsed_context,
@@ -247,6 +248,36 @@ class NormalizationViewServiceTests(SimpleTestCase):
         dispatcher = MagicMock(side_effect=RuntimeError("Redis unavailable"))
 
         result = dispatch_parse_unparsed_products(dispatcher=dispatcher)
+
+        self.assertFalse(result.success)
+        self.assertEqual(result.message_level, "error")
+        self.assertIn("Redis unavailable", result.message)
+
+    def test_dispatch_reparse_stale_products_runs_stale_refresh(self):
+        dispatcher = MagicMock(
+            return_value=JobDispatchResult(
+                job_id="",
+                queue_name="perfumex",
+                status="finished",
+                queued=False,
+                description="Refresh stale normalization parses",
+            )
+        )
+
+        result = dispatch_reparse_stale_products(dispatcher=dispatcher)
+
+        self.assertTrue(result.success)
+        self.assertEqual(result.message_level, "success")
+        dispatcher.assert_called_once_with(
+            "reparse_supplier_products",
+            only_stale=True,
+            description="Refresh stale normalization parses",
+        )
+
+    def test_dispatch_reparse_stale_products_reports_queue_failure(self):
+        dispatcher = MagicMock(side_effect=RuntimeError("Redis unavailable"))
+
+        result = dispatch_reparse_stale_products(dispatcher=dispatcher)
 
         self.assertFalse(result.success)
         self.assertEqual(result.message_level, "error")

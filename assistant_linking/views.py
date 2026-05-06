@@ -43,6 +43,7 @@ from assistant_linking.views_normalization import (
     ParseUnparsedProductsView as ParseUnparsedProductsView,
     ParsedListView as ParsedListView,
     ParsedProductDetailView as ParsedProductDetailView,
+    RefreshStaleParsesView as RefreshStaleParsesView,
     RefreshVisibleParsesView as RefreshVisibleParsesView,
     ReparseProductView as ReparseProductView,
     SaveBrandAliasView as SaveBrandAliasView,
