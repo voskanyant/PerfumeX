@@ -778,6 +778,7 @@ class NormalizationDetailDatabaseTests(TestCase):
         product = SupplierProduct.objects.create(
             supplier=supplier,
             identity_key="micallef-royal-vintage-stale",
+            brand="M. Micallef",
             name="M. Micallef Royal Vintage m edp100ml",
         )
         ParsedSupplierProduct.objects.create(

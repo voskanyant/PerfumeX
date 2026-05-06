@@ -108,6 +108,7 @@ class NormalizerTests(TestCase):
         product = SupplierProduct.objects.create(
             supplier=self.supplier,
             identity_key="m-micallef-royal-vintage",
+            brand="M. Micallef",
             name="M. Micallef Royal Vintage m edp100ml",
         )
 
@@ -379,7 +380,10 @@ class NormalizerTests(TestCase):
         examples = (
             ("once-explosea-explicit-ml-set", "Once Explosea 100ml EDP + 30ml EDP"),
             ("once-explosea-compact-set", r"Once Explosea \100edp+30edp\\"),
-            ("once-explosea-concentration-before-size", "Once Explosea EDP 100ml + EDP 30ml"),
+            (
+                "once-explosea-concentration-before-size",
+                "Once Explosea EDP 100ml + EDP 30ml",
+            ),
         )
 
         for identity_key, name in examples:
@@ -889,7 +893,9 @@ class NormalizerTests(TestCase):
 
         self.assertIsNone(parsed.normalized_brand)
         self.assertNotEqual(parsed.display_brand, "Dr. Vranjes Firenze")
-        self.assertEqual(parsed.product_name_text, "armorial collection privee leather oud")
+        self.assertEqual(
+            parsed.product_name_text, "armorial collection privee leather oud"
+        )
         self.assertIn("brand missing", parsed.warnings)
 
     def test_brand_scoped_collection_alias_can_infer_missing_brand(self):

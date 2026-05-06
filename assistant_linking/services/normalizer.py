@@ -52,7 +52,7 @@ from prices.models import SupplierProduct
 
 
 logger = logging.getLogger(__name__)
-PARSER_VERSION = "deterministic-v42"
+PARSER_VERSION = "deterministic-v43"
 REGEX_ALIAS_TIMEOUT_SECONDS = 1.0
 CATALOG_CONCENTRATION_CONFLICT_WARNING = (
     "Catalogue match suggests {suggested}. Supplier text parsed as {parsed}."
@@ -848,6 +848,50 @@ def _strip_first_phrase(text: str, phrase: str) -> str:
     if not normalized_phrase:
         return text
     return re.sub(_phrase_pattern(normalized_phrase), " ", text, count=1).strip()
+
+
+def _strip_leading_phrase(text: str, phrase: str) -> tuple[str, bool]:
+    normalized_phrase = normalize_text(phrase)
+    if not normalized_phrase:
+        return text, False
+    match = re.match(rf"^\s*{_phrase_pattern(normalized_phrase)}(?:\s+|$)", text)
+    if not match:
+        return text, False
+    return text[match.end() :].strip(), True
+
+
+def _brand_identity_terms(brand: Brand, detected_brand_text: str) -> tuple[str, ...]:
+    terms = {detected_brand_text, brand.name, normalize_text(brand.name)}
+    terms.update(_generated_brand_alias_candidates(brand))
+    for alias_text, normalized_alias in BrandAlias.objects.filter(
+        brand_id=brand.id,
+        active=True,
+        is_regex=False,
+    ).values_list("alias_text", "normalized_alias"):
+        terms.update({alias_text, normalized_alias})
+    return tuple(
+        sorted(
+            {normalize_text(term) for term in terms if normalize_text(term)},
+            key=lambda term: (-len(term), term),
+        )
+    )
+
+
+def _strip_repeated_leading_brand_identity(
+    text: str,
+    brand: Brand,
+    detected_brand_text: str,
+) -> str:
+    terms = _brand_identity_terms(brand, detected_brand_text)
+    for _attempt in range(5):
+        for term in terms:
+            stripped, changed = _strip_leading_phrase(text, term)
+            if changed:
+                text = stripped
+                break
+        else:
+            return text
+    return text
 
 
 def _strip_concentration_aliases(text: str, rows: list[tuple]) -> str:
@@ -2298,6 +2342,11 @@ def parse_supplier_product(product: SupplierProduct) -> ParseResult:
             else (alias.alias_text if alias else brand.name)
         )
         text = _strip_first_phrase(text, result.detected_brand_text)
+        text = _strip_repeated_leading_brand_identity(
+            text,
+            brand,
+            result.detected_brand_text,
+        )
         if alias and not isinstance(alias, str) and alias.supplier_id:
             result.warnings.append("supplier-specific alias overrode global alias")
 
