@@ -672,6 +672,18 @@
     gap: 16px;
   }
 
+  .import-settings-actions,
+  .scheduler-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .import-settings-actions .button,
+  .scheduler-actions form,
+  .scheduler-actions .button {
+    width: 100%;
+  }
+
   .import-col-actions .d-inline-flex,
   .import-col-actions .d-flex,
   .import-col-actions .layout-inline,
@@ -894,15 +906,15 @@
 
   .import-actions-row {
     display: grid;
-    grid-template-columns: repeat(2, 30px);
-    gap: 5px;
+    grid-template-columns: repeat(2, 42px);
+    gap: 6px;
     justify-content: flex-end;
   }
 
   .import-action-button {
-    width: 30px;
-    height: 30px;
-    min-width: 30px;
+    width: 42px;
+    height: 42px;
+    min-width: 42px;
     border-radius: 8px;
     color: var(--grey-500);
     opacity: 0.9;

@@ -31,7 +31,9 @@ Add or update tests when:
 
 For documentation-only changes, a full test run is usually unnecessary. Run a lightweight check such as `git diff --check` when practical.
 
-Before pushing to `main` or triggering deploy, run the deploy gate that matches the risk level. `make deploy-gate` is the default fast deploy gate: Django check, migration generation check, and migration plan. Add UI and targeted test checks with `make deploy-gate DEPLOY_GATE_ARGS="--ui --test prices.tests.SomeTest"` when templates/CSS/JS or focused behavior changed.
+Before pushing to `main` or triggering deploy, run the deploy gate that matches the risk level. `make deploy-gate` is the default fast deploy gate: Django check, migration generation check, migration plan, and Makefile target-surface guard. Add UI and targeted test checks with `make deploy-gate DEPLOY_GATE_ARGS="--ui --test prices.tests.SomeTest"` when templates/CSS/JS or focused behavior changed. Use `make ui-smoke` during UI/mobile iteration to run the focused template, CSS, JavaScript, table, accessibility, and shared-partial checks without the database-backed deploy gate.
+
+Makefile Python targets use the local `.venv/bin/python` when it exists, then `python3`, then `python`. Override explicitly when needed, for example `make PYTHON=/path/to/python deploy-gate`. Use `make lint-touched` for focused Black/Ruff checks on changed Python files when a tiny slice should avoid unrelated repo-wide formatting drift; use `make format-touched` to Black-format only those changed Python files.
 
 Use `make deploy-gate-full` before big merges, schema changes, parser/linking logic changes, import/deletion behavior, shared service refactors, or batched releases. Full mode runs the heavier CI-style checks, full Django tests, and repo check scripts.
 

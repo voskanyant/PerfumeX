@@ -166,7 +166,7 @@
                         <option value="{{ concentration }}"></option>
                     {% endfor %}
                 </datalist>
-                {% include "prices/components/pagination.html" with label="Concentration audit pagination" jump_id="audit-page-jump" %}
+                {% include "includes/pagination.html" with label="Concentration audit pagination" jump_id="audit-page-jump" %}
             {% else %}
                 {% include "includes/empty_state.html" with message="No concentration audit rows match these filters." %}
             {% endif %}

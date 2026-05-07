@@ -28,6 +28,12 @@ make local-smoke
 
 `make local-smoke` runs JavaScript syntax checks in all checkouts and runs `npm run lint:js` too when `node_modules` is installed.
 
+For focused template/CSS/JavaScript/mobile UI iteration, run:
+
+```bash
+make ui-smoke
+```
+
 When editing the local smoke runner, run `make local-smoke-rules`.
 
 When editing Python files that may not be imported by Django checks, run `make python-smoke`.

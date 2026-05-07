@@ -174,7 +174,7 @@ Before pushing to `main` or triggering deploy, run the GitHub-equivalent gate:
 make deploy-gate
 ```
 
-`make local-smoke` is a fast iteration guard, not a deploy gate.
+`make local-smoke` is a fast iteration guard, not a deploy gate. `make ui-smoke` is the focused guard for template, CSS, JavaScript, responsive table, accessibility, and shared UI partial changes.
 
 Targeted checks:
 
@@ -183,6 +183,7 @@ ruff check .
 black --check .
 djlint --check prices/templates assistant_core/templates assistant_linking/templates
 npm run lint:js
+make ui-smoke
 python manage.py makemigrations --check --dry-run
 python manage.py migrate --plan
 python scripts/check_agent_docs.py

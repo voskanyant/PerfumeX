@@ -129,7 +129,7 @@ Tab item structure:
 - Tabs use `.tabs` plus `.tab`; active state is `.active` or `.is-active`.
 - Existing examples: `prices/_import_tabs.html`, `prices/_import_tab_items.html`, `assistant_core/catalog/_nav.html`, `prices/our_products_catalog.html`, `prices/supplier_import.html`.
 - Do not introduce `nav-tabs` or a new tab visual language.
-- Tabs scroll horizontally on mobile; preserve that behavior.
+- Tabs scroll horizontally on mobile; preserve that behavior and keep each tab at least a 42px touch target while retaining the existing underline style.
 
 ## Pagination
 
@@ -155,6 +155,7 @@ Standard classes:
 - If JavaScript updates pagination in place, render the standard children (`.pagination-list`, `.page-link`, `.page-link.is-active`, `.pagination-summary`) inside the shared `.pagination-shell` container; do not append a second nested `<nav>`.
 - Existing manual/specialized paginators should be migrated only when the page is already being touched and the replacement is obvious.
 - Avoid plain `.pagination` with only Previous/Next for new work.
+- On mobile, shared pagination links and jump controls must stay at least 42px tall and use the existing `.pagination-shell` pattern; do not add page-specific tiny pagination controls.
 
 ## Tables
 
@@ -186,7 +187,7 @@ Standard responsive structure:
 - Run `python scripts/check_js_table_labels.py` after changing JavaScript that generates table rows or cells.
 - Use `includes/table_empty.html` for table empty rows when possible.
 - Product list tables are specialized with `.products-grid` and `.products-mobile`; extend those only in `prices/list.html`/`products.css`.
-- Our Products catalogue rows in `prices/our_products_catalog.html` are specialized as parsed read-only rows with a pencil-triggered inline editor; do not render every row as visible inputs by default.
+- Our Products catalogue rows in `prices/our_products_catalog.html` are specialized as parsed read-only rows with a pencil-triggered inline editor; do not render every row as visible inputs by default. On mobile they should behave like compact app cards: identity first, secondary metadata below, actions inside the card, and the inline editor hidden until the operator taps edit.
 - Our Products collections tab must display collection rows with their brand and submit brand-scoped actions; collection names are not global buckets.
 - Fragrantica staged source rows in `prices/fragrantica_products.html` should mirror the Our Products parsed-row structure and keep audience/gender, year, and source link visible.
 - Fragrantica staged source rows should show ranked Our Products candidates inline with same-page link actions; avoid forcing operators to navigate to another catalogue page for normal linking.
@@ -199,10 +200,14 @@ Standard responsive structure:
 - Catalogue linking workbench suggestion/confidence filters must fill the current page from matching rows, not only filter the already-paginated 40 rows; after bulk linking, page 1 should continue showing later eligible matches instead of an empty panel while matches remain on later pages.
 - Catalogue linking single-row Fragrantica link actions should update the selected row in place with the AJAX response; do not redirect back into a full candidate rebuild unless JavaScript is unavailable.
 - Catalogue linking workbench right column must keep a manual Fragrantica search for the selected Our Products row, so operators can link when generated suggestions are missing or wrong without leaving the two-column workflow.
+- Catalogue linking mobile rows should become app-card rows inside the workbench: selected checkbox at the left, product identity and suggestion text wrapped inside the card, and all candidate/link/unlink actions full-width inside the card instead of narrow desktop columns.
+- Fragrantica match/review candidate actions should wrap into full-width touch targets on mobile; do not keep right-aligned desktop action clusters inside candidate cards.
+- Product Linking mobile should let supplier/match tables become normal table-mobile cards; desktop capped scroll wrappers must be disabled on mobile so selection, keyword toggles, and link confirmation read as an app flow instead of a clipped table.
 - Assistant unparsed normalization rows should mirror parsed queue columns and may show bounded, non-persistent parser previews for the visible page; use explicit parse actions to create saved `ParsedSupplierProduct` rows.
 - Supplier import spreadsheet previews are specialized scrollable tables. Keep `.import-preview-table` headers visible because they are mapping controls; do not add `.table-mobile` there. Generated preview cells should still use scoped headers and `data-label` metadata.
-- Supplier Products mobile rows are specialized price-tracking cards, not table-cell reshuffles. Preserve the dedicated mobile card structure: product name with a small open action, price beside sparkline, and bottom-row change badge plus supplier/time metadata.
+- Supplier Products mobile rows are specialized price-tracking cards, not table-cell reshuffles. Preserve the dedicated mobile card structure: product name with a small open action, price beside sparkline, and bottom-row change badge plus supplier/time metadata. Treat this page as the mobile quality reference and do not touch its dedicated markup/CSS unless explicitly requested.
 - Keep actions in `td.actions` or `td[data-label="Actions"]`.
+- On generic `.table-mobile` cards, action cells should wrap buttons/forms into full-width or fixed icon touch targets inside the card, not right-aligned desktop button clusters. This does not apply to `.products-mobile`.
 
 ## Filters and search
 
@@ -240,6 +245,7 @@ Product list search/filter pattern:
 - Use drawer filters for the product list pattern; use grid filters for admin/report screens.
 - Preserve filter query parameters through pagination.
 - Always provide reset/clear behavior when filters can hide data.
+- On mobile, normal admin/report filters collapse to one column with full-width controls and 42px touch targets. Keep the specialized product-browser search drawer pattern separate.
 
 ## Buttons
 
@@ -253,6 +259,7 @@ Visual hierarchy:
 Rules:
 - Do not add new button colors or shapes.
 - Use existing `.button`, `.btn`, `.action-btn` styling; prefer `.button` in templates.
+- On mobile, shared `.button`, `.btn`, and `.action-btn` controls must be at least 42px tall; icon buttons should reserve a 42px square touch target.
 - Every `<button>` must declare an explicit `type`: use `type="submit"` for form submission, `type="button"` for JS/UI controls, and `type="reset"` only for real reset controls.
 - JS automatically adds `.btn-icon` to `.button.icon`; keep icon buttons accessible.
 - Icon-only `.button.icon` links/buttons must include both `title` and `aria-label`.
@@ -274,6 +281,12 @@ History-back/cancel controls should be buttons with `data-history-back` and an o
 - Literal `id` values must be unique within a template. When similar branches share behavior, use unique ids plus shared `data-*` hooks for JavaScript.
 - `prices/js/app.js` decorates normal inputs with `.form-field`, selects with `.select-field`, and checkboxes with `.check-input`; do not fight those classes.
 - Keep form state and validation errors visible after errors.
+- On mobile, framed admin forms in `.section-card`, `.section-panel`, and `.workspace-block` should stack labels, controls, and actions into full-width touch-friendly rows instead of keeping desktop inline form geometry.
+- On mobile, search/action strips inside `.workspace-block`, `.section-card`, or `.section-panel` should allow inputs to take the full row and buttons to wrap as full-width touch targets.
+- On mobile, shared `.page-header` action areas should collapse into a full-width touch grid below the title; long detail-page titles must wrap instead of pushing actions off canvas.
+- On mobile, page/hero metadata should wrap instead of ellipsizing; desktop may truncate secondary metadata, but phone views should preserve operator context.
+- On mobile, source-management rows should stack the source text and actions; do not hide long URLs or notes behind desktop ellipsis in narrow cards.
+- On mobile, checkbox/radio rows and switch rows should keep at least a 42px tap row; switches should use a larger mobile thumb/track while preserving the same form classes.
 - Every template `method="post"` form must include `{% csrf_token %}`; run `python scripts/check_template_csrf.py` after changing POST forms.
 - Do not rely on browser default submit behavior for buttons inside forms; submit buttons must say `type="submit"`.
 - Run `python scripts/check_template_labels.py` after changing labels or form control ids.
@@ -285,7 +298,10 @@ History-back/cancel controls should be buttons with `data-history-back` and an o
 - Use `.section-panel` for secondary work panels.
 - Use `.workspace-block` in assistant/workbench contexts.
 - Use `.metric-card`/`.kpi-link-card` for dashboard count/action cards.
+- On mobile, `.metric-card` links should read as compact touch cards: no underlined link styling, visible keyboard focus, wrapped labels/counts, and no hover-only movement.
 - Use `.card-label`, `.card-title`, and `.card-desc` inside cards/panels.
+- Use `.detail-list` for labelled metadata in cards/panels. On mobile it stacks label/value pairs with divider rhythm; do not keep two-column definition lists in narrow cards.
+- Use `.surface-meta` inside `.surface-grid` for compact profile facts such as supplier settings. Values must wrap long mailbox patterns on mobile instead of clipping or forcing horizontal scroll.
 - Import dashboard summaries use `.import-summary-card` variants in `imports.css`; product/catalog cards use existing `our-products-*` classes.
 - For bidirectional catalogue matching, extend the existing `.catalogue-linking-*` two-column workbench pattern instead of adding another one-off link list.
 - Catalogue linking workbench height changes must update the desktop `.catalogue-linking-layout` and its internal scroll panels (`.catalogue-linking-list`, `.catalogue-linking-candidates`), then verify against a real desktop viewport. Do not assume changing the outer card alone improves visible working height.
@@ -297,8 +313,11 @@ History-back/cancel controls should be buttons with `data-history-back` and an o
 - Shared message markup lives in `includes/messages.html`; do not duplicate flash markup in individual pages.
 - Inline warnings use `.flash flash--warning`; success/error use `.flash--success`, `.flash--error`, or `.flash--danger`.
 - Status badges/chips use existing classes: `.badge`, `.score-badge`, `.import-status-chip`, `.import-health-chip`, `.run-log-status`, `.price-delta-badge`.
+- On mobile, shared flash messages should wrap long text and keep close controls as comfortable touch targets; do not add page-specific notification markup.
+- On mobile, badges and score/status chips must wrap inside their container instead of forcing horizontal overflow.
 - Empty states use `.empty-state`, `.products-empty-state`, or `includes/table_empty.html`.
 - Empty states should say what is missing and include a next action only when useful.
+- On mobile, shared empty states and `includes/table_empty.html` rows should render as readable app cards without generated table labels; keep any empty-state CTA as a full-width touch target.
 
 ## Drawers, dialogs, and UI JavaScript
 
@@ -308,6 +327,7 @@ History-back/cancel controls should be buttons with `data-history-back` and an o
   - panel: `.app-drawer` with matching `data-drawer="name"`, `id`, initial `aria-hidden="true"`, and `aria-labelledby` or `aria-label`
   - close button: `[data-drawer-close]` with visible text, `aria-label`, or `title`
   - shared backdrop: `[data-drawer-backdrop]`
+- On mobile, non-navigation `.app-drawer` panels should behave like bottom sheets with sticky headers and 42px close controls; keep `mobile-nav-drawer` as the shell navigation drawer.
 - Native `<dialog>` shortcut/help panels must have `aria-labelledby` or `aria-label`.
 - `prices/js/app.js` manages drawer open/close, focus return, Escape, Tab trapping, flash dismissal, submit confirms, submit busy states, and table/input class decoration.
 - `prices/js/app.js` manages `data-history-back` cancel buttons; do not use `javascript:` href values.
@@ -337,7 +357,7 @@ History-back/cancel controls should be buttons with `data-history-back` and an o
 
 Add CSS to the narrowest appropriate file. If a pattern is reusable across apps, prefer shared CSS and document it here.
 
-Run `python scripts/check_css_static.py` after changing static CSS. The checker enforces balanced braces, blocks merge markers, disallows negative `letter-spacing`, and disallows viewport-scaled font sizes.
+Run `python scripts/check_css_static.py` after changing static CSS. The checker enforces balanced braces, blocks merge markers, disallows negative `letter-spacing`, disallows viewport-scaled font sizes, and guards shared mobile icon/action controls against touch targets below 42px.
 Run `python scripts/check_template_inline_styles.py` after changing template visual styling. Templates should not use `style` attributes or `<style>` blocks; put reusable styling in the appropriate static CSS file.
 Run `python scripts/check_template_accessibility.py` after changing icon-only actions, image tags, checkbox/radio controls, or text/search inputs.
 

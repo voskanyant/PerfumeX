@@ -38,6 +38,10 @@ FAST_STEPS = (
         (PYTHON, "manage.py", "makemigrations", "--check", "--dry-run"),
     ),
     Step("migrations: plan", (PYTHON, "manage.py", "migrate", "--plan")),
+    Step(
+        "repo: Makefile target surface",
+        (PYTHON, "scripts/check_make_targets.py", "--quiet"),
+    ),
 )
 
 UI_STEPS = (
@@ -101,14 +105,20 @@ def targeted_test_step(test_labels: Sequence[str]) -> Step | None:
 
 
 def _missing_executables(step: Step) -> list[str]:
-    return [executable for executable in step.required_executables if shutil.which(executable) is None]
+    return [
+        executable
+        for executable in step.required_executables
+        if shutil.which(executable) is None
+    ]
 
 
 def run_step(step: Step) -> None:
     missing = _missing_executables(step)
     if missing:
         names = ", ".join(missing)
-        raise SystemExit(f"{step.name}: missing executable(s): {names}. Run npm install first.")
+        raise SystemExit(
+            f"{step.name}: missing executable(s): {names}. Run npm install first."
+        )
 
     print(f"\n==> {step.name}", flush=True)
     print("$ " + " ".join(step.command), flush=True)
@@ -160,8 +170,14 @@ def main() -> int:
             flush=True,
         )
     else:
-        print("Running fast deploy gate: Django check and migration checks.", flush=True)
-        print("Add --ui for UI syntax checks and --test LABEL for targeted tests.", flush=True)
+        print(
+            "Running fast deploy gate: Django, migrations, and workflow checks.",
+            flush=True,
+        )
+        print(
+            "Add --ui for UI syntax checks and --test LABEL for targeted tests.",
+            flush=True,
+        )
         print(
             "Use --full before big merges or shared service/schema/import changes.",
             flush=True,

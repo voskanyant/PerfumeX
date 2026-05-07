@@ -11,6 +11,7 @@ Related docs: [AGENTS.md](../AGENTS.md), [README.md](../README.md), [docs/REPO_M
 - Keep repository docs concise and synchronized with real app ownership.
 - Prefer database-backed assistant knowledge over hardcoded parser exceptions.
 - Improve safety around imports, email processing, normalization, and linking without changing behavior casually.
+- 2026-05-07 - Architecture: service cleanup should move behavior-preserving pure helpers out of large hotspot services first, keeping compatibility imports until call sites can migrate safely.
 - Reuse existing UI components/classes before adding new markup or CSS.
 - Keep checks realistic: PostgreSQL is required for Django checks/tests.
 
@@ -33,6 +34,7 @@ Related docs: [AGENTS.md](../AGENTS.md), [README.md](../README.md), [docs/REPO_M
 - 2026-05-01 - Checks: `python scripts/check_agent_docs.py` protects required repo-memory docs, purpose sections, AGENTS protocol anchors, focused-doc links, the AGENTS targeted command list, drift-checklist Makefile targets, and CONTRIBUTING Makefile targets; `python scripts/check_agent_docs_rules.py` protects the checker rules.
 - 2026-05-01 - Checks: `python scripts/check_markdown_links.py` validates local Markdown links in root, `docs/`, and `assistant_linking/docs/` docs; `python scripts/check_markdown_links_rules.py` protects link parser behavior.
 - 2026-05-01 - Checks: `python scripts/check_make_targets.py` keeps every `scripts/check_*.py` file exposed through a matching Makefile target and matching checker/rule script pair; `python scripts/check_make_targets_rules.py` protects the checker rules.
+- 2026-05-07 - Checks: `make lint` is venv-aware, but repo-wide `black --check .` currently reports legacy formatting drift. Do not mass-format during unrelated tiny slices; run `make lint-touched` for focused Black/Ruff checks on touched Python files, use `make format-touched` to Black-format only those files, and keep deploy gates green until a dedicated formatting cleanup is planned.
 - 2026-05-01 - Checks: `python scripts/check_local_smoke_rules.py` verifies local smoke includes focused checker scripts exposed through Makefile targets.
 - 2026-05-01 - Checks: `python scripts/check_secret_patterns.py` scans changed text files for obvious committed credentials, including structured `key: value` config syntax; `python scripts/check_secret_patterns_rules.py` protects the checker rules.
 - 2026-05-01 - Checks: `python scripts/check_python_syntax.py` compiles project/app/script Python files and catches syntax errors outside Django import paths; `python scripts/check_python_syntax_rules.py` protects the checker rules.

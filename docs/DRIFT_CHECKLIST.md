@@ -92,6 +92,12 @@ make local-smoke
 
 `check_local_smoke.py` always runs the dependency-light JavaScript syntax check. If `node_modules` is installed, it also runs `npm run lint:js`.
 
+For a focused UI guard while iterating on templates, CSS, JavaScript, responsive tables, accessibility, and shared partials, run:
+
+```bash
+make ui-smoke
+```
+
 When changing the local smoke runner itself, run:
 
 ```bash

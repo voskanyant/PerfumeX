@@ -26,9 +26,7 @@ def makefile_text(
     wrong_script_target: str | None = None,
 ) -> str:
     phony_targets = [
-        target
-        for target in check_make_targets.EXPECTED_TARGETS
-        if target != omit_phony
+        target for target in check_make_targets.EXPECTED_TARGETS if target != omit_phony
     ]
     lines = [".PHONY: " + " ".join(sorted(phony_targets)), ""]
     lines.extend(["export POSTGRES_PASSWORD ?=", ""])
@@ -41,7 +39,7 @@ def makefile_text(
             if target == wrong_script_target
             else script_path
         )
-        lines.extend([f"{target}:", f"\tpython {command_script}", ""])
+        lines.extend([f"{target}:", f"\t$(PYTHON) {command_script}", ""])
 
     return "\n".join(lines)
 
@@ -66,6 +64,23 @@ class MakeTargetRuleTests(unittest.TestCase):
 
         self.assertIn("Makefile target is not listed in .PHONY: js-smoke", failures)
 
+    def test_non_checker_target_missing_phony_entry_is_reported(self):
+        content = makefile_text() + "\ncustom:\n\t$(PYTHON) manage.py check\n"
+
+        failures = check_make_targets.check_targets(content)
+
+        self.assertIn("Makefile target is not listed in .PHONY: custom", failures)
+
+    def test_stale_phony_entry_is_reported(self):
+        content = makefile_text().replace(".PHONY: ", ".PHONY: custom ", 1)
+
+        failures = check_make_targets.check_targets(content)
+
+        self.assertIn(
+            ".PHONY target has no matching Makefile target: custom",
+            failures,
+        )
+
     def test_wrong_script_is_reported(self):
         failures = check_make_targets.check_targets(
             makefile_text(wrong_script_target="template-smoke")
@@ -74,6 +89,29 @@ class MakeTargetRuleTests(unittest.TestCase):
         self.assertIn(
             "Makefile target 'template-smoke' does not run expected script: "
             "scripts/check_templates.py",
+            failures,
+        )
+
+    def test_bare_python_recipe_is_reported(self):
+        content = makefile_text().replace(
+            "\t$(PYTHON) scripts/check_css_static.py",
+            "\tpython scripts/check_css_static.py",
+        )
+
+        failures = check_make_targets.check_targets(content)
+
+        self.assertIn(
+            "Makefile target 'css-smoke' should use $(PYTHON), not bare python",
+            failures,
+        )
+
+    def test_bare_python_recipe_is_reported_for_non_checker_target(self):
+        content = makefile_text() + "\ncustom:\n\tpython manage.py check\n"
+
+        failures = check_make_targets.check_targets(content)
+
+        self.assertIn(
+            "Makefile target 'custom' should use $(PYTHON), not bare python",
             failures,
         )
 

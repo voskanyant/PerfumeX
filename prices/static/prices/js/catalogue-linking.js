@@ -37,7 +37,7 @@
             if (text) {
                 try {
                     data = JSON.parse(text);
-                } catch (error) {
+                } catch {
                     throw {
                         error: fallbackMessage || "Request failed. Reload and try again.",
                         detail: text.slice(0, 160)
@@ -443,7 +443,7 @@
         if (!rawPayload) return null;
         try {
             return JSON.parse(rawPayload);
-        } catch (error) {
+        } catch {
             return null;
         }
     }
@@ -625,7 +625,7 @@
                 row.setAttribute("data-linking-payload", JSON.stringify(payload));
                 try {
                     renderPayload(payload);
-                } catch (error) {
+                } catch {
                     renderEmpty("AI review saved. Reload this row to refresh the advice.");
                 }
             })

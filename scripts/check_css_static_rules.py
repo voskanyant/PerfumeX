@@ -46,6 +46,46 @@ class CssRuleCheckerTests(unittest.TestCase):
         self.assertEqual(len(findings), 1)
         self.assertIn("viewport-scaled", findings[0].message)
 
+    def test_desktop_action_controls_may_stay_compact(self):
+        findings = check_css_static.css_rule_findings(
+            check_css_static.BASE_DIR / "example.css",
+            ".button.icon, .drawer-close { width: 32px; height: 32px; }\n",
+        )
+
+        self.assertEqual(findings, [])
+
+    def test_mobile_action_control_touch_targets_are_reported(self):
+        findings = check_css_static.css_rule_findings(
+            check_css_static.BASE_DIR / "example.css",
+            "@media (max-width: 767.98px) {\n"
+            "  .button.icon, .search-clear-text { width: 40px; height: 42px; }\n"
+            "}\n",
+        )
+
+        self.assertEqual(len(findings), 1)
+        self.assertIn("mobile width", findings[0].message)
+
+    def test_mobile_action_control_touch_targets_allow_42px(self):
+        findings = check_css_static.css_rule_findings(
+            check_css_static.BASE_DIR / "example.css",
+            "@media (max-width: 767.98px) {\n"
+            "  .button.icon, .search-clear-text { width: 42px; min-width: 42px; height: 42px; }\n"
+            "}\n",
+        )
+
+        self.assertEqual(findings, [])
+
+    def test_mobile_action_control_min_height_is_reported(self):
+        findings = check_css_static.css_rule_findings(
+            check_css_static.BASE_DIR / "example.css",
+            "@media (max-width: 767.98px) {\n"
+            "  .catalogue-linking-option { min-height: 40px; }\n"
+            "}\n",
+        )
+
+        self.assertEqual(len(findings), 1)
+        self.assertIn("mobile min-height", findings[0].message)
+
     def test_unbalanced_brace_is_reported(self):
         findings = check_css_static.css_rule_findings(
             check_css_static.BASE_DIR / "example.css",

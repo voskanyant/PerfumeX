@@ -665,7 +665,8 @@ class SharedUiPartialRenderTests(SimpleTestCase):
         self.assertIn("tab=brands", content)
         self.assertIn("tab=collections", content)
         self.assertIn("tab=concentrations", content)
-        self.assertEqual(content.count('class="tab'), 5)
+        self.assertIn("prices:our_product_concentration_audit", content)
+        self.assertEqual(content.count('class="tab'), 6)
 
     def test_prices_supplier_import_tab_items_preserve_existing_links(self):
         content = (
@@ -1024,9 +1025,10 @@ class SharedUiPartialRenderTests(SimpleTestCase):
 
         self.assertIn("prices:fragrantica_product_review", actions)
         self.assertIn("prices:catalogue_linking_workbench", actions)
+        self.assertIn("prices:our_product_concentration_audit", actions)
         self.assertIn("assistant_core:catalog_import", actions)
         self.assertIn("assistant_core:catalog_perfume_create", actions)
-        self.assertEqual(actions.count('class="button secondary"'), 3)
+        self.assertEqual(actions.count('class="button secondary"'), 4)
         self.assertIn('class="button primary"', actions)
         self.assertIn("total_count", meta)
 

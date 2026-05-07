@@ -177,7 +177,7 @@ Status: Accepted
 
 Context: Focused corrections were paying the cost of full test and repository check runs before every deploy.
 
-Decision: `make deploy-gate` runs the fast deploy gate by default: Django check, migration generation check, and migration plan. Add `DEPLOY_GATE_ARGS="--ui --test ..."` for UI syntax checks and targeted tests. Use `make deploy-gate-full` before big merges, schema changes, parser/linking logic changes, import/deletion behavior, shared service refactors, or batched releases.
+Decision: `make deploy-gate` runs the fast deploy gate by default: Django check, migration generation check, migration plan, and the Makefile target-surface guard. Add `DEPLOY_GATE_ARGS="--ui --test ..."` for UI syntax checks and targeted tests. Use `make deploy-gate-full` before big merges, schema changes, parser/linking logic changes, import/deletion behavior, shared service refactors, or batched releases.
 
 Consequences: Do not require full Django tests for every small deploy. Pick the gate based on blast radius, and document any skipped high-risk checks in the task summary.
 

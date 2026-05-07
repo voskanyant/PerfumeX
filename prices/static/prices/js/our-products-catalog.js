@@ -103,8 +103,8 @@
         });
         var button = row.querySelector("[data-row-edit-toggle]");
         if (button) {
-            button.title = isEditing ? "Close editor" : "Edit row";
-            button.setAttribute("aria-label", isEditing ? "Close editor" : "Edit row");
+            button.title = isEditing ? "Save row" : "Edit row";
+            button.setAttribute("aria-label", isEditing ? "Save row" : "Edit row");
             button.setAttribute("aria-expanded", isEditing ? "true" : "false");
         }
         if (isEditing) {
@@ -143,6 +143,11 @@
         if (!button) return;
         button.addEventListener("click", function (event) {
             event.preventDefault();
+            if (row.classList.contains("is-editing")) {
+                enableRowFields(row);
+                if (form) form.requestSubmit();
+                return;
+            }
             setRowEditing(row, !row.classList.contains("is-editing"));
         });
         row.querySelectorAll("[data-row-edit-cancel]").forEach(function (cancelButton) {

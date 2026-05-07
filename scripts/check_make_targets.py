@@ -13,6 +13,7 @@ MAKEFILE = BASE_DIR / "Makefile"
 SCRIPTS_DIR = BASE_DIR / "scripts"
 TARGET_RE = re.compile(r"^([A-Za-z0-9_.-]+):(?![=])")
 PHONY_RE = re.compile(r"^\.PHONY:\s*(?P<targets>.+)$")
+BARE_PYTHON_RE = re.compile(r"^\tpython\s+")
 
 EXPECTED_TARGETS = {
     "agent-docs-rules": "scripts/check_agent_docs_rules.py",
@@ -141,7 +142,9 @@ def check_script_target_coverage(
     discovered_scripts: set[str] | None = None,
 ) -> list[str]:
     target_scripts = set((expected_targets or EXPECTED_TARGETS).values())
-    scripts = discovered_scripts if discovered_scripts is not None else check_script_paths()
+    scripts = (
+        discovered_scripts if discovered_scripts is not None else check_script_paths()
+    )
 
     failures = [
         f"missing Makefile target mapping for check script: {script_path}"
@@ -155,7 +158,9 @@ def check_script_target_coverage(
 
 
 def check_rule_pair_coverage(discovered_scripts: set[str] | None = None) -> list[str]:
-    scripts = discovered_scripts if discovered_scripts is not None else check_script_paths()
+    scripts = (
+        discovered_scripts if discovered_scripts is not None else check_script_paths()
+    )
     failures: list[str] = []
 
     for script_path in sorted(scripts):
@@ -171,26 +176,63 @@ def check_rule_pair_coverage(discovered_scripts: set[str] | None = None) -> list
 
         rule_script = path.with_name(f"{stem}_rules.py").as_posix()
         if rule_script not in scripts:
-            failures.append(f"checker script has no matching rule script: {script_path}")
+            failures.append(
+                f"checker script has no matching rule script: {script_path}"
+            )
 
     return failures
+
+
+def check_bare_python_recipes(makefile_text: str) -> list[str]:
+    failures: list[str] = []
+    blocks = target_blocks(makefile_text)
+
+    for target, block in sorted(blocks.items()):
+        for line in block.splitlines():
+            if BARE_PYTHON_RE.match(line):
+                failures.append(
+                    f"Makefile target {target!r} should use $(PYTHON), not bare python"
+                )
+                break
+
+    return failures
+
+
+def check_all_targets_are_phony(makefile_text: str) -> list[str]:
+    blocks = target_blocks(makefile_text)
+    phony = phony_targets(makefile_text)
+
+    return [
+        f"Makefile target is not listed in .PHONY: {target}"
+        for target in sorted(set(blocks) - phony)
+    ]
+
+
+def check_phony_targets_exist(makefile_text: str) -> list[str]:
+    blocks = target_blocks(makefile_text)
+    phony = phony_targets(makefile_text)
+
+    return [
+        f".PHONY target has no matching Makefile target: {target}"
+        for target in sorted(phony - set(blocks))
+    ]
 
 
 def check_targets(makefile_text: str) -> list[str]:
     failures: list[str] = []
     blocks = target_blocks(makefile_text)
-    phony = phony_targets(makefile_text)
 
     failures.extend(check_script_target_coverage())
     failures.extend(check_rule_pair_coverage())
+    failures.extend(check_bare_python_recipes(makefile_text))
+    failures.extend(check_all_targets_are_phony(makefile_text))
+    failures.extend(check_phony_targets_exist(makefile_text))
 
     for target, script_path in sorted(EXPECTED_TARGETS.items()):
         block = blocks.get(target)
         if block is None:
             failures.append(f"missing Makefile target: {target}")
             continue
-        if target not in phony:
-            failures.append(f"Makefile target is not listed in .PHONY: {target}")
         if script_path not in block:
             failures.append(
                 f"Makefile target {target!r} does not run expected script: {script_path}"
@@ -218,8 +260,10 @@ def main(*, quiet: bool = False) -> int:
         print("- all scripts/check_*.py files are mapped to expected Makefile targets")
         print("- all scripts/check_*.py checker scripts have matching rule scripts")
         print("- expected focused smoke targets exist")
-        print("- expected focused smoke targets are listed in .PHONY")
+        print("- all Makefile targets are listed in .PHONY")
+        print("- all .PHONY entries have matching Makefile targets")
         print("- expected focused smoke targets run their matching scripts")
+        print("- Makefile recipes use $(PYTHON) instead of bare python")
     print(f"\nMakefile target check passed for {len(EXPECTED_TARGETS)} target(s).")
     return 0
 

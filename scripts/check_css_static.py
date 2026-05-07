@@ -27,6 +27,23 @@ VIEWPORT_FONT_SIZE_RE = re.compile(
     r"font-size\s*:\s*[^;]*(?:vw|vh|vmin|vmax)[^;]*;",
     re.IGNORECASE,
 )
+MEDIA_RE = re.compile(r"@media\s*\((?P<condition>[^)]*)\)\s*{", re.IGNORECASE)
+MAX_WIDTH_RE = re.compile(r"max-width\s*:\s*(?P<width>\d+(?:\.\d+)?)px", re.IGNORECASE)
+RULE_RE = re.compile(r"(?P<selectors>[^{}@]+){(?P<declarations>[^{}]+)}", re.DOTALL)
+TOUCH_TARGET_DECL_RE = re.compile(
+    r"(?:^|;)\s*(?P<property>width|height|min-width|min-height)\s*:\s*(?P<value>\d+(?:\.\d+)?)px\b",
+    re.IGNORECASE,
+)
+MOBILE_TOUCH_TARGET_SELECTORS = (
+    ".button.icon",
+    ".btn-icon",
+    ".drawer-close",
+    ".flash-close",
+    ".search-clear-text",
+    ".catalogue-linking-option",
+    ".fragrantica-row-link",
+    ".our-products-edit-button",
+)
 
 CHECK_DESCRIPTION = """\
 CSS rule smoke check:
@@ -34,6 +51,7 @@ CSS rule smoke check:
 - blocks unresolved merge markers.
 - checks balanced braces after stripping comments.
 - enforces stable typography rules from docs/UI_DESIGN_SYSTEM.md.
+- enforces 42px mobile touch targets for shared icon/action controls.
 """
 
 
@@ -99,6 +117,68 @@ def brace_findings(path: Path, text: str) -> list[Finding]:
     return findings
 
 
+def media_block_end(text: str, open_brace_index: int) -> int | None:
+    depth = 0
+    for index in range(open_brace_index, len(text)):
+        char = text[index]
+        if char == "{":
+            depth += 1
+        elif char == "}":
+            depth -= 1
+            if depth == 0:
+                return index
+    return None
+
+
+def mobile_media_blocks(text: str) -> list[tuple[int, str]]:
+    blocks: list[tuple[int, str]] = []
+    for match in MEDIA_RE.finditer(text):
+        width_match = MAX_WIDTH_RE.search(match.group("condition"))
+        if not width_match:
+            continue
+        if float(width_match.group("width")) > 767.98:
+            continue
+        block_start = match.end()
+        block_end = media_block_end(text, block_start - 1)
+        if block_end is None:
+            continue
+        blocks.append((block_start, text[block_start:block_end]))
+    return blocks
+
+
+def mobile_touch_target_findings(path: Path, text: str) -> list[Finding]:
+    findings: list[Finding] = []
+    relative_path = path.relative_to(BASE_DIR)
+    for block_start, block in mobile_media_blocks(stripped_css(text)):
+        for rule_match in RULE_RE.finditer(block):
+            selectors = rule_match.group("selectors")
+            if not any(
+                selector in selectors for selector in MOBILE_TOUCH_TARGET_SELECTORS
+            ):
+                continue
+            declarations = rule_match.group("declarations")
+            for declaration_match in TOUCH_TARGET_DECL_RE.finditer(declarations):
+                value = float(declaration_match.group("value"))
+                if value >= 42:
+                    continue
+                findings.append(
+                    Finding(
+                        path=relative_path,
+                        line_number=line_number(
+                            text,
+                            block_start
+                            + rule_match.start()
+                            + declaration_match.start(),
+                        ),
+                        message=(
+                            f"mobile {declaration_match.group('property')} for shared action controls "
+                            "must be at least 42px"
+                        ),
+                    )
+                )
+    return findings
+
+
 def css_rule_findings(path: Path, text: str) -> list[Finding]:
     findings: list[Finding] = []
     relative_path = path.relative_to(BASE_DIR)
@@ -128,8 +208,12 @@ def css_rule_findings(path: Path, text: str) -> list[Finding]:
             )
         )
 
+    findings.extend(mobile_touch_target_findings(path, text))
     findings.extend(brace_findings(path, text))
-    return sorted(findings, key=lambda finding: (str(finding.path), finding.line_number, finding.message))
+    return sorted(
+        findings,
+        key=lambda finding: (str(finding.path), finding.line_number, finding.message),
+    )
 
 
 def all_findings(paths: list[Path]) -> list[Finding]:

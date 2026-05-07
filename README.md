@@ -242,9 +242,11 @@ Before pushing or deploying, run the deploy gate that matches the change:
 make deploy-gate
 make deploy-gate DEPLOY_GATE_ARGS="--ui --test prices.tests.SomeFocusedTest"
 make deploy-gate-full
+make ui-smoke
 ```
 
-Use the fast default for focused corrections, add `--ui` for template/CSS/JS work and `--test` for touched behavior, and reserve full mode for high-risk or batched changes.
+Use the fast default for focused corrections; it checks Django settings, migrations, and the Makefile target surface. Add `--ui` for template/CSS/JS work and `--test` for touched behavior, and reserve full mode for high-risk or batched changes.
+Use `make ui-smoke` while iterating on templates, CSS, JavaScript, responsive tables, and shared UI partials before the final deploy gate.
 
 Current behavior on push to `main`:
 

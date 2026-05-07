@@ -33,8 +33,6 @@ from assistant_linking.models import FragranticaProductLink
 from assistant_linking.models import normalized_fragrantica_product_name
 from assistant_linking.models import ParsedSupplierProduct
 from assistant_linking.models import ProductAlias
-from assistant_linking.models import TITLECASE_APOSTROPHE_SUFFIXES
-from assistant_linking.models import TITLECASE_LOWER_WORDS
 from assistant_linking.models import strip_leading_fragrantica_brand_name
 from assistant_core.services.openai_responses import use_openai
 from assistant_linking.services.ai_advisor import (
@@ -67,6 +65,8 @@ from prices.services.product_filters import (
 )
 from prices.services.product_visibility import apply_hidden_product_keywords
 from prices.services.job_queue import enqueue_management_command
+from prices.services.catalog_formatting import normalize_catalogue_collection_name
+from prices.services.catalog_formatting import normalize_catalogue_perfume_name
 
 
 logger = logging.getLogger(__name__)
@@ -84,13 +84,6 @@ OUR_PRODUCT_CATALOG_TABS = {
     "concentrations",
     "audit",
 }
-COLLECTION_TITLECASE_ACRONYMS = {
-    "DNA",
-    "VIP",
-    "WB",
-}
-ROMAN_NUMERAL_RE = re.compile(r"^[IVXLCDM]+$")
-TITLE_WORD_RE = re.compile(r"[A-Za-zÀ-ÖØ-öø-ÿ]+(?:'[A-Za-zÀ-ÖØ-öø-ÿ]+)?")
 CATALOGUE_LINKING_STATUSES = {"all", "unlinked", "linked"}
 CATALOGUE_LINKING_SUGGESTION_FILTERS = {"all", "with", "without"}
 CATALOGUE_LINKING_CONFIDENCE_FILTERS = {"all", "review", "0", "80", "90", "95", "100"}
@@ -1107,8 +1100,11 @@ def attach_linked_fragrantica_sources_to_variants(
             getattr(variant, "perfume_id", None),
             [],
         )
-        variant.fragrantica_linked_sources = linked_sources
-        variant.fragrantica_candidates = []
+        try:
+            variant.fragrantica_linked_sources = linked_sources
+            variant.fragrantica_candidates = []
+        except AttributeError:
+            continue
     return variants
 
 
@@ -4265,73 +4261,6 @@ def first_from_queryset(queryset):
     if hasattr(queryset, "first"):
         return queryset.first()
     return next(iter(queryset), None)
-
-
-def _catalogue_collection_title_word(word: str, index: int) -> str:
-    if not word:
-        return word
-    lower_word = word.lower()
-    if index > 0 and lower_word in TITLECASE_LOWER_WORDS:
-        return lower_word
-    if word.upper() in COLLECTION_TITLECASE_ACRONYMS:
-        return word.upper()
-    if word.isupper() and ROMAN_NUMERAL_RE.match(word):
-        return word
-    return lower_word[:1].upper() + lower_word[1:]
-
-
-def normalize_catalogue_collection_name(value: str) -> str:
-    """Normalize reviewed external collection names before storing locally."""
-
-    text = re.sub(r"\s+", " ", fold_latin_diacritics(value or "").strip())
-    if not text:
-        return ""
-
-    word_index = 0
-
-    def replace_word(match: re.Match[str]) -> str:
-        nonlocal word_index
-        raw_word = match.group(0)
-        apostrophe_parts = raw_word.split("'")
-        normalized_parts = []
-        for part_index, part in enumerate(apostrophe_parts):
-            if part_index > 0 and part.lower() in TITLECASE_APOSTROPHE_SUFFIXES:
-                normalized_parts.append(part.lower())
-                continue
-            normalized_parts.append(
-                _catalogue_collection_title_word(
-                    part,
-                    word_index if part_index == 0 else 0,
-                )
-            )
-        word_index += 1
-        return "'".join(normalized_parts)
-
-    return TITLE_WORD_RE.sub(replace_word, text)
-
-
-def _catalogue_text_needs_title_case(value: str) -> bool:
-    letters = [char for char in value if char.isalpha()]
-    return bool(letters) and all(char.isupper() for char in letters)
-
-
-def normalize_catalogue_perfume_name(value: str) -> str:
-    """Normalize reviewed external perfume names before storing/displaying locally."""
-
-    text = re.sub(r"\s+", " ", fold_latin_diacritics(value or "").strip())
-    if not text or not _catalogue_text_needs_title_case(text):
-        return text
-
-    word_index = 0
-
-    def replace_word(match: re.Match[str]) -> str:
-        nonlocal word_index
-        raw_word = match.group(0)
-        normalized = _catalogue_collection_title_word(raw_word, word_index)
-        word_index += 1
-        return normalized
-
-    return TITLE_WORD_RE.sub(replace_word, text)
 
 
 def scent_name_audience_suffix_style(value: str) -> str:
