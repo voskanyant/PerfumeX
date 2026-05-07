@@ -1,0 +1,175 @@
+{% extends "prices/base.html" %}
+{% block title %}Concentration Audit{% endblock %}
+{% block topbar_label %}Concentration Audit{% endblock %}
+{% block content %}
+    {% include "includes/page_header.html" with kicker="Catalogue audit" title="Concentration Audit" %}
+
+    <div class="workspace-block">
+        {% include "includes/tabs.html" with class_name="catalogue-tabs" label="Catalogue management tabs" items_template="prices/_our_products_catalog_tab_items.html" %}
+
+        <form method="get" class="catalogue-linking-filters" aria-label="Concentration audit filters">
+            <label class="catalogue-linking-filter catalogue-linking-filter-wide">
+                <span>Search</span>
+                <input type="text"
+                       name="q"
+                       value="{{ search_query }}"
+                       placeholder="Brand, scent, collection, concentration">
+            </label>
+            <label class="catalogue-linking-filter">
+                <span>Issue</span>
+                <select name="issue">
+                    <option value="all" {% if issue_filter == "all" %}selected{% endif %}>All issues</option>
+                    <option value="source_conflict" {% if issue_filter == "source_conflict" %}selected{% endif %}>Source conflict</option>
+                    <option value="name_conflict" {% if issue_filter == "name_conflict" %}selected{% endif %}>Name conflict</option>
+                    <option value="name_contains_concentration" {% if issue_filter == "name_contains_concentration" %}selected{% endif %}>Name contains concentration</option>
+                    <option value="source_unspecified_split" {% if issue_filter == "source_unspecified_split" %}selected{% endif %}>Source unspecified split</option>
+                    <option value="multiple_local_concentrations" {% if issue_filter == "multiple_local_concentrations" %}selected{% endif %}>Multiple local concentrations</option>
+                </select>
+            </label>
+            <label class="catalogue-linking-filter">
+                <span>Status</span>
+                <select name="status">
+                    <option value="open" {% if status_filter == "open" %}selected{% endif %}>Open</option>
+                    <option value="all" {% if status_filter == "all" %}selected{% endif %}>All statuses</option>
+                    <option value="draft" {% if status_filter == "draft" %}selected{% endif %}>Draft</option>
+                    <option value="review" {% if status_filter == "review" %}selected{% endif %}>Needs review</option>
+                    <option value="conflict" {% if status_filter == "conflict" %}selected{% endif %}>Conflict</option>
+                    <option value="verified" {% if status_filter == "verified" %}selected{% endif %}>Verified</option>
+                </select>
+            </label>
+            <button class="button ghost" type="submit">Apply filters</button>
+        </form>
+
+        <div class="section-card">
+            <div class="section-heading">
+                <div>
+                    <span class="card-label">Review queue</span>
+                    <h2 class="card-title">Likely concentration issues</h2>
+                </div>
+                <span class="tone-muted text-small">{{ audit_total_count }} row{{ audit_total_count|pluralize }}</span>
+            </div>
+
+            {% if audit_rows %}
+                <div class="table-wrap table-scroll-x">
+                    <table class="data-table table-mobile">
+                        <thead>
+                            <tr>
+                                <th scope="col">Our Product</th>
+                                <th scope="col">Issue</th>
+                                <th scope="col">Evidence</th>
+                                <th scope="col">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in audit_rows %}
+                                <tr>
+                                    <td data-label="Our Product">
+                                        <div class="catalogue-cell-stack">
+                                            <strong>{{ row.perfume.brand.name }} / {{ row.perfume.name }}</strong>
+                                            <span>{{ row.perfume.concentration|default:"No concentration" }}</span>
+                                            {% if row.perfume.collection_name or row.perfume.release_year or row.perfume.audience %}
+                                                <span class="catalogue-identity-meta">
+                                                    {% if row.perfume.collection_name %}
+                                                        <span><span>Collection</span>{{ row.perfume.collection_name }}</span>
+                                                    {% endif %}
+                                                    {% if row.perfume.release_year %}
+                                                        <span><span>Year</span>{{ row.perfume.release_year }}</span>
+                                                    {% endif %}
+                                                    {% if row.perfume.audience %}
+                                                        <span><span>Audience</span>{{ row.perfume.audience }}</span>
+                                                    {% endif %}
+                                                </span>
+                                            {% endif %}
+                                            <span class="tone-muted text-small">
+                                                {{ row.perfume.variant_count|default:0 }} variant{{ row.perfume.variant_count|default:0|pluralize }} &middot;
+                                                {{ row.perfume.linked_supplier_count|default:0 }} supplier link{{ row.perfume.linked_supplier_count|default:0|pluralize }} &middot;
+                                                {{ row.perfume.get_verification_status_display }}
+                                            </span>
+                                        </div>
+                                    </td>
+                                    <td data-label="Issue">
+                                        <div class="catalogue-cell-stack">
+                                            <span class="score-badge {% if row.severity == 'low' %}score-badge--muted{% else %}score-badge--warning{% endif %}">
+                                                {{ row.issue_label }}
+                                            </span>
+                                            <span>{{ row.reason }}</span>
+                                        </div>
+                                    </td>
+                                    <td data-label="Evidence">
+                                        <div class="catalogue-cell-stack">
+                                            {% if row.name_concentration_labels %}
+                                                <span><strong>Name terms:</strong> {{ row.name_concentration_labels|join:", " }}</span>
+                                            {% endif %}
+                                            {% if row.source_concentration_labels %}
+                                                <span><strong>Fragrantica terms:</strong> {{ row.source_concentration_labels|join:", " }}</span>
+                                            {% endif %}
+                                            {% if row.group_concentrations %}
+                                                <span><strong>Same scent concentrations:</strong> {{ row.group_concentrations|join:", " }}</span>
+                                            {% endif %}
+                                            {% for source in row.linked_sources %}
+                                                <span class="fragrantica-linked-inline">
+                                                    Linked Fragrantica: {{ source.brand_name }} / {{ source.catalogue_display_name }}{% if source.collection_name %} / {{ source.collection_name }}{% endif %}{% if source.release_year %} / {{ source.release_year }}{% endif %}{% if source.fragrantica_display_audience %} / {{ source.fragrantica_display_audience }}{% endif %}
+                                                </span>
+                                            {% empty %}
+                                                <span class="tone-muted text-small">No linked Fragrantica evidence yet.</span>
+                                            {% endfor %}
+                                        </div>
+                                    </td>
+                                    <td data-label="Actions">
+                                        <div class="catalogue-cell-stack">
+                                            <form method="post" class="layout-inline gap-sm">
+                                                {% csrf_token %}
+                                                <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                                <input type="hidden" name="perfume_id" value="{{ row.perfume.pk }}">
+                                                <label class="sr-only" for="concentration-{{ row.perfume.pk }}">Concentration</label>
+                                                <input id="concentration-{{ row.perfume.pk }}"
+                                                       type="text"
+                                                       name="concentration"
+                                                       value="{{ row.perfume.concentration }}"
+                                                       list="audit-concentrations"
+                                                       placeholder="Concentration">
+                                                <button class="button secondary"
+                                                        type="submit"
+                                                        name="action"
+                                                        value="set_concentration">Update</button>
+                                            </form>
+                                            <div class="layout-inline gap-sm">
+                                                <a class="button ghost" href="{{ row.search_url }}">Open row</a>
+                                                <form method="post">
+                                                    {% csrf_token %}
+                                                    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                                    <input type="hidden" name="perfume_id" value="{{ row.perfume.pk }}">
+                                                    <button class="button secondary"
+                                                            type="submit"
+                                                            name="action"
+                                                            value="mark_reviewed">Mark reviewed</button>
+                                                </form>
+                                                <form method="post">
+                                                    {% csrf_token %}
+                                                    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                                    <input type="hidden" name="perfume_id" value="{{ row.perfume.pk }}">
+                                                    <button class="button danger"
+                                                            type="submit"
+                                                            name="action"
+                                                            value="mark_conflict">Conflict</button>
+                                                </form>
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                <datalist id="audit-concentrations">
+                    {% for concentration in common_concentrations %}
+                        <option value="{{ concentration }}"></option>
+                    {% endfor %}
+                </datalist>
+                {% include "prices/components/pagination.html" with label="Concentration audit pagination" jump_id="audit-page-jump" %}
+            {% else %}
+                {% include "includes/empty_state.html" with message="No concentration audit rows match these filters." %}
+            {% endif %}
+        </div>
+    </div>
+{% endblock %}

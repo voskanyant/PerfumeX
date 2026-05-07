@@ -89,6 +89,7 @@ from .views_our_products import (
     FragranticaProductReviewView,
     FragranticaProductLinkView,
     FragranticaProductUnlinkView,
+    OurProductConcentrationAuditView,
     OurProductCreateView,
     OurProductDeleteView,
     OurProductDetailView,

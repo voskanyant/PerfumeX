@@ -77,7 +77,13 @@ FRAGRANTICA_REVIEW_STATUSES = {
     "linked",
     "ignored",
 }
-OUR_PRODUCT_CATALOG_TABS = {"products", "brands", "collections", "concentrations"}
+OUR_PRODUCT_CATALOG_TABS = {
+    "products",
+    "brands",
+    "collections",
+    "concentrations",
+    "audit",
+}
 COLLECTION_TITLECASE_ACRONYMS = {
     "DNA",
     "VIP",
@@ -196,9 +202,31 @@ FRAGRANCE_CONCENTRATION_TERM_KEYS = {
     "edc": "eau de cologne",
 }
 FRAGRANCE_CONCENTRATION_NAME_TERMS = set(FRAGRANCE_CONCENTRATION_TERM_KEYS)
+FRAGRANCE_CONCENTRATION_DISPLAY_LABELS = {
+    "eau de parfum": "Eau de Parfum",
+    "eau de toilette": "Eau de Toilette",
+    "eau de cologne": "Eau de Cologne",
+    "extrait de parfum": "Extrait de Parfum",
+}
 FRAGRANTICA_CONCENTRATION_MISMATCH_SCORE_CAP = 88
 FRAGRANTICA_GENERIC_CONCENTRATION_WITH_EXPLICIT_SCORE = 98
 CATALOGUE_LINKING_DEFAULT_MIN_SCORE = 80
+CATALOGUE_CONCENTRATION_AUDIT_ISSUES = {
+    "all",
+    "source_conflict",
+    "name_conflict",
+    "name_contains_concentration",
+    "source_unspecified_split",
+    "multiple_local_concentrations",
+}
+CATALOGUE_CONCENTRATION_AUDIT_STATUSES = {
+    "open",
+    "all",
+    CatalogPerfume.VERIFICATION_DRAFT,
+    CatalogPerfume.VERIFICATION_REVIEW,
+    CatalogPerfume.VERIFICATION_VERIFIED,
+    CatalogPerfume.VERIFICATION_CONFLICT,
+}
 
 
 @dataclass(frozen=True)
@@ -275,6 +303,13 @@ class FragranticaPerfumeCandidate:
 
 @dataclass(frozen=True)
 class CatalogueLinkingBulkResult:
+    level: str
+    message: str
+    redirect_url: str
+
+
+@dataclass(frozen=True)
+class CatalogueConcentrationAuditActionResult:
     level: str
     message: str
     redirect_url: str
@@ -1138,6 +1173,290 @@ def build_linked_fragrantica_sources_by_perfume_ids(
         source_map[link.perfume_id].append(source)
         seen_source_ids_by_perfume_id[link.perfume_id].add(source.id)
     return source_map
+
+
+def fragrance_concentration_display_label(value: str) -> str:
+    key = fragrance_concentration_identity_key(value)
+    return FRAGRANCE_CONCENTRATION_DISPLAY_LABELS.get(key, value or "")
+
+
+def fragrance_concentration_display_labels(values) -> tuple[str, ...]:
+    labels = []
+    for value in values:
+        label = fragrance_concentration_display_label(value)
+        if label and label not in labels:
+            labels.append(label)
+    return tuple(labels)
+
+
+def normalize_catalogue_concentration_audit_issue(value: str | None) -> str:
+    issue = (value or "all").strip() or "all"
+    if issue not in CATALOGUE_CONCENTRATION_AUDIT_ISSUES:
+        return "all"
+    return issue
+
+
+def normalize_catalogue_concentration_audit_status(value: str | None) -> str:
+    status = (value or "open").strip() or "open"
+    if status not in CATALOGUE_CONCENTRATION_AUDIT_STATUSES:
+        return "open"
+    return status
+
+
+def _catalogue_concentration_audit_search_filter(query: str) -> Q:
+    query = (query or "").strip()
+    if not query:
+        return Q()
+    filters = Q()
+    fields = (
+        "brand__name",
+        "name",
+        "collection_name",
+        "concentration",
+        "audience",
+    )
+    tokens = [query, *catalog_search_tokens(query)]
+    for token in dict.fromkeys(token for token in tokens if token):
+        token_filter = Q()
+        for field in fields:
+            token_filter |= Q(**{f"{field}__icontains": token})
+        filters &= token_filter
+    return filters
+
+
+def _catalogue_concentration_audit_base_key(perfume) -> tuple[int, str, str]:
+    return (
+        perfume.brand_id,
+        loose_fragrance_name_without_audience_or_concentration(perfume.name),
+        audience_group_from_text(perfume.audience, perfume.name),
+    )
+
+
+def _catalogue_concentration_group_summary(group_perfumes) -> tuple[str, ...]:
+    keys = {
+        fragrance_concentration_identity_key(perfume.concentration)
+        for perfume in group_perfumes
+        if fragrance_concentration_identity_key(perfume.concentration)
+    }
+    return fragrance_concentration_display_labels(sorted(keys))
+
+
+def _catalogue_audit_source_concentration_keys(source_map, perfume_id: int) -> set[str]:
+    keys: set[str] = set()
+    for source in source_map.get(perfume_id, []):
+        keys.update(
+            fragrance_concentration_keys_from_text(
+                fragrantica_source_catalogue_name(source),
+                source.collection_name,
+            )
+        )
+    return keys
+
+
+def _catalogue_concentration_audit_row(
+    perfume,
+    *,
+    group_perfumes,
+    source_map,
+) -> dict | None:
+    local_key = fragrance_concentration_identity_key(perfume.concentration)
+    name_keys = fragrance_concentration_keys_from_text(perfume.name)
+    source_keys = _catalogue_audit_source_concentration_keys(source_map, perfume.id)
+    group_concentrations = _catalogue_concentration_group_summary(group_perfumes)
+    linked_sources = tuple(source_map.get(perfume.id, []))
+
+    issue_type = ""
+    severity = "medium"
+    reason = ""
+    if source_keys and local_key and local_key not in source_keys:
+        issue_type = "source_conflict"
+        severity = "high"
+        reason = "Linked Fragrantica title contains a different concentration than this Our Products row."
+    elif name_keys and local_key and local_key not in name_keys:
+        issue_type = "name_conflict"
+        severity = "high"
+        reason = "Our Products scent name contains a concentration that differs from the concentration field."
+    elif linked_sources and not source_keys and len(group_concentrations) > 1:
+        issue_type = "source_unspecified_split"
+        severity = "high"
+        reason = "Linked Fragrantica source does not specify concentration, but this scent base has multiple local concentrations."
+    elif name_keys:
+        issue_type = "name_contains_concentration"
+        severity = "medium"
+        reason = "Our Products scent name contains concentration text; scent names should usually stay concentration-free."
+    elif len(group_concentrations) > 1:
+        issue_type = "multiple_local_concentrations"
+        severity = "low"
+        reason = "Same brand and scent base exists in multiple local concentrations; verify each concentration has external evidence."
+    if not issue_type:
+        return None
+
+    return {
+        "perfume": perfume,
+        "issue_type": issue_type,
+        "issue_label": issue_type.replace("_", " ").title(),
+        "severity": severity,
+        "reason": reason,
+        "name_concentration_labels": fragrance_concentration_display_labels(
+            sorted(name_keys)
+        ),
+        "source_concentration_labels": fragrance_concentration_display_labels(
+            sorted(source_keys)
+        ),
+        "group_concentrations": group_concentrations,
+        "linked_sources": linked_sources,
+        "search_url": f"{reverse('prices:our_product_list')}?{urlencode({'q': perfume.name})}",
+    }
+
+
+def build_our_product_concentration_audit_context(
+    request,
+    *,
+    page_size: int = 50,
+    perfume_manager=None,
+) -> dict:
+    perfume_manager = perfume_manager or CatalogPerfume.objects
+    search_query = request.GET.get("q", "").strip()
+    issue_filter = normalize_catalogue_concentration_audit_issue(
+        request.GET.get("issue")
+    )
+    status_filter = normalize_catalogue_concentration_audit_status(
+        request.GET.get("status")
+    )
+    queryset = perfume_manager.select_related("brand", "collection").annotate(
+        variant_count=Count("variants", distinct=True),
+        linked_supplier_count=Count("supplier_products", distinct=True),
+    )
+    if search_query:
+        queryset = queryset.filter(
+            _catalogue_concentration_audit_search_filter(search_query)
+        )
+    if status_filter == "open":
+        queryset = queryset.exclude(
+            verification_status=CatalogPerfume.VERIFICATION_VERIFIED
+        )
+    elif status_filter != "all":
+        queryset = queryset.filter(verification_status=status_filter)
+    queryset = queryset.order_by("brand__name", "name", "concentration", "id")
+    perfumes = list(queryset)
+    source_map = build_linked_fragrantica_sources_by_perfume_ids(
+        [perfume.id for perfume in perfumes]
+    )
+    grouped_perfumes: dict[tuple[int, str, str], list] = defaultdict(list)
+    for perfume in perfumes:
+        grouped_perfumes[_catalogue_concentration_audit_base_key(perfume)].append(
+            perfume
+        )
+
+    rows = []
+    for perfume in perfumes:
+        row = _catalogue_concentration_audit_row(
+            perfume,
+            group_perfumes=grouped_perfumes[
+                _catalogue_concentration_audit_base_key(perfume)
+            ],
+            source_map=source_map,
+        )
+        if not row:
+            continue
+        if issue_filter != "all" and row["issue_type"] != issue_filter:
+            continue
+        rows.append(row)
+
+    paginator = Paginator(rows, page_size)
+    page_obj = paginator.get_page(request.GET.get("page") or 1)
+    query_without_page = request.GET.copy()
+    query_without_page.pop("page", None)
+    return {
+        "active_tab": "audit",
+        "search_query": search_query,
+        "issue_filter": issue_filter,
+        "status_filter": status_filter,
+        "audit_rows": page_obj.object_list,
+        "audit_total_count": len(rows),
+        "page_obj": page_obj,
+        "paginator": paginator,
+        "is_paginated": paginator.num_pages > 1,
+        "query_string": query_without_page.urlencode(),
+        "common_concentrations": tuple(FRAGRANCE_CONCENTRATION_DISPLAY_LABELS.values()),
+    }
+
+
+def run_our_product_concentration_audit_action(
+    post_data,
+    *,
+    host: str = "",
+    perfume_manager=None,
+) -> CatalogueConcentrationAuditActionResult:
+    perfume_manager = perfume_manager or CatalogPerfume.objects
+    redirect_url = post_data.get(
+        "next",
+        reverse("prices:our_product_concentration_audit"),
+    )
+    if not url_has_allowed_host_and_scheme(
+        redirect_url,
+        allowed_hosts={host} if host else None,
+    ):
+        redirect_url = reverse("prices:our_product_concentration_audit")
+
+    perfume_id = post_data.get("perfume_id")
+    if not str(perfume_id or "").isdigit():
+        perfume = None
+    else:
+        perfume = first_from_queryset(
+            perfume_manager.select_related("brand").filter(pk=perfume_id)
+        )
+    if not perfume:
+        return CatalogueConcentrationAuditActionResult(
+            "error",
+            "Choose an Our Products row to review.",
+            redirect_url,
+        )
+
+    action = post_data.get("action", "").strip()
+    if action == "mark_reviewed":
+        perfume.verification_status = CatalogPerfume.VERIFICATION_VERIFIED
+        perfume.save(update_fields=["verification_status", "updated_at"])
+        return CatalogueConcentrationAuditActionResult(
+            "success",
+            f"Marked reviewed: {perfume.brand.name} / {perfume.name}.",
+            redirect_url,
+        )
+    if action == "mark_conflict":
+        perfume.verification_status = CatalogPerfume.VERIFICATION_CONFLICT
+        perfume.save(update_fields=["verification_status", "updated_at"])
+        return CatalogueConcentrationAuditActionResult(
+            "success",
+            f"Marked concentration conflict: {perfume.brand.name} / {perfume.name}.",
+            redirect_url,
+        )
+    if action == "set_concentration":
+        raw_concentration = post_data.get("concentration", "").strip()
+        concentration = fragrance_concentration_display_label(
+            raw_concentration
+        ) or normalize_catalogue_perfume_name(raw_concentration)
+        if not concentration:
+            return CatalogueConcentrationAuditActionResult(
+                "error",
+                "Concentration is required.",
+                redirect_url,
+            )
+        perfume.concentration = concentration
+        perfume.verification_status = CatalogPerfume.VERIFICATION_REVIEW
+        perfume.save(
+            update_fields=["concentration", "verification_status", "updated_at"]
+        )
+        return CatalogueConcentrationAuditActionResult(
+            "success",
+            f"Updated concentration for {perfume.brand.name} / {perfume.name}.",
+            redirect_url,
+        )
+
+    return CatalogueConcentrationAuditActionResult(
+        "error",
+        "Unknown concentration audit action.",
+        redirect_url,
+    )
 
 
 def normalize_fragrantica_review_brand_id(value: str | None) -> str:
@@ -2493,9 +2812,8 @@ def _filter_catalogue_linking_queryset_by_link_status(queryset, status_filter: s
             FragranticaProductLink.objects.filter(perfume_id=OuterRef("pk"))
         ),
     )
-    linked_filter = (
-        Q(_has_linked_fragrantica_source=True)
-        | Q(_has_reviewed_fragrantica_link=True)
+    linked_filter = Q(_has_linked_fragrantica_source=True) | Q(
+        _has_reviewed_fragrantica_link=True
     )
     if status_filter == "linked":
         return queryset.filter(linked_filter)
@@ -3536,7 +3854,9 @@ def _raw_delete_queryset(queryset) -> int:
     return queryset._raw_delete(queryset.db)
 
 
-def _model_update(app_label: str, model_name: str, filters: dict, updates: dict) -> None:
+def _model_update(
+    app_label: str, model_name: str, filters: dict, updates: dict
+) -> None:
     try:
         model = apps.get_model(app_label, model_name)
     except LookupError:

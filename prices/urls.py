@@ -88,6 +88,7 @@ urlpatterns = [
     path("products/<int:pk>/edit/", views.SupplierProductUpdateView.as_view(), name="product_update"),
     path("products/<int:pk>/delete/", views.SupplierProductDeleteView.as_view(), name="product_delete"),
     path("our-products/", views.OurProductListView.as_view(), name="our_product_list"),
+    path("our-products/concentration-audit/", views.OurProductConcentrationAuditView.as_view(), name="our_product_concentration_audit"),
     path("our-products/linking/", views.CatalogueLinkingWorkbenchView.as_view(), name="catalogue_linking_workbench"),
     path("our-products/linking/candidates/", views.CatalogueLinkingCandidateView.as_view(), name="catalogue_linking_candidates"),
     path("our-products/linking/fragrantica-search/", views.CatalogueLinkingFragranticaSearchView.as_view(), name="catalogue_linking_fragrantica_search"),

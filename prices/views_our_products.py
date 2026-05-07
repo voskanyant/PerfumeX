@@ -23,11 +23,13 @@ from .services.catalog_review import (
     build_our_product_detail_context,
     build_our_product_catalog_list_context,
     build_our_product_catalog_variant_queryset,
+    build_our_product_concentration_audit_context,
     run_catalogue_linking_bulk_action,
     run_fragrantica_catalogue_link_action,
     run_fragrantica_catalogue_unlink_action,
     run_catalog_tab_post_action,
     run_catalog_variant_inline_update_action,
+    run_our_product_concentration_audit_action,
 )
 from .view_base import BaseCreateView, BaseDeleteView, BaseUpdateView
 
@@ -50,6 +52,29 @@ class OurProductListView(LoginRequiredMixin, ListView):
 
     def post(self, request, *args, **kwargs):
         result = run_catalog_tab_post_action(request.POST, host=request.get_host())
+        getattr(messages, result.level)(request, result.message)
+        return redirect(result.redirect_url)
+
+
+class OurProductConcentrationAuditView(LoginRequiredMixin, TemplateView):
+    template_name = "prices/our_products_concentration_audit.html"
+    paginate_by = 50
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update(
+            build_our_product_concentration_audit_context(
+                self.request,
+                page_size=self.paginate_by,
+            )
+        )
+        return context
+
+    def post(self, request, *args, **kwargs):
+        result = run_our_product_concentration_audit_action(
+            request.POST,
+            host=request.get_host(),
+        )
         getattr(messages, result.level)(request, result.message)
         return redirect(result.redirect_url)
 

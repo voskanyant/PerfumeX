@@ -8361,6 +8361,66 @@ class OurProductCatalogueListTests(TestCase):
             "Montale / Vanilla Extasy / Fragrantica Collection / 2008 / Unisex",
         )
 
+    def test_concentration_audit_flags_name_concentration_conflict(self):
+        self.perfume.name = "Vanilla Extasy Eau de Toilette"
+        self.perfume.concentration = "Eau de Parfum"
+        self.perfume.save(update_fields=["name", "concentration", "updated_at"])
+
+        response = self.client.get(reverse("prices:our_product_concentration_audit"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Name Conflict")
+        self.assertContains(response, "Name terms:")
+        self.assertContains(response, "Eau de Toilette")
+        self.assertContains(response, "Eau de Parfum")
+
+    def test_concentration_audit_flags_linked_fragrantica_conflict(self):
+        self.perfume.name = "The Icon"
+        self.perfume.concentration = "Eau de Toilette"
+        self.perfume.save(update_fields=["name", "concentration", "updated_at"])
+        FragranticaProduct.objects.create(
+            brand_name="Montale",
+            normalized_brand_name="montale",
+            name="The Icon Eau de Parfum",
+            normalized_name="the icon eau de parfum",
+            matched_perfume=self.perfume,
+            match_status=FragranticaProduct.STATUS_LINKED,
+            source_path="/perfume/Montale/The-Icon-1.html",
+        )
+
+        response = self.client.get(
+            reverse("prices:our_product_concentration_audit"),
+            {"issue": "source_conflict"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Source Conflict")
+        self.assertContains(response, "Linked Fragrantica")
+        self.assertContains(response, "The Icon Eau de Parfum")
+
+    def test_concentration_audit_can_mark_conflict(self):
+        self.perfume.name = "Vanilla Extasy Eau de Toilette"
+        self.perfume.concentration = "Eau de Parfum"
+        self.perfume.save(update_fields=["name", "concentration", "updated_at"])
+
+        response = self.client.post(
+            reverse("prices:our_product_concentration_audit"),
+            {
+                "action": "mark_conflict",
+                "perfume_id": str(self.perfume.pk),
+                "next": reverse("prices:our_product_concentration_audit"),
+            },
+        )
+
+        self.assertRedirects(
+            response, reverse("prices:our_product_concentration_audit")
+        )
+        self.perfume.refresh_from_db()
+        self.assertEqual(
+            self.perfume.verification_status,
+            Perfume.VERIFICATION_CONFLICT,
+        )
+
     def test_inline_edit_joins_existing_linked_perfume_identity(self):
         from prices.services.catalog_review import apply_catalog_variant_inline_update
 
@@ -9792,7 +9852,9 @@ class OurProductCatalogueListTests(TestCase):
         with (
             patch(
                 "prices.services.catalog_review._catalogue_linking_strict_exact_perfume_ids",
-                side_effect=AssertionError("Needs review should not prefilter every row"),
+                side_effect=AssertionError(
+                    "Needs review should not prefilter every row"
+                ),
             ),
             patch(
                 "prices.services.catalog_review._catalogue_linking_verified_filtered_perfume_ids",
