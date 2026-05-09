@@ -67,6 +67,7 @@ from prices.services.product_visibility import apply_hidden_product_keywords
 from prices.services.job_queue import enqueue_management_command
 from prices.services.catalog_formatting import normalize_catalogue_collection_name
 from prices.services.catalog_formatting import normalize_catalogue_perfume_name
+from prices.services.pagination import paginate_queryset_without_count
 
 
 logger = logging.getLogger(__name__)
@@ -88,6 +89,7 @@ CATALOGUE_LINKING_STATUSES = {"all", "unlinked", "linked"}
 CATALOGUE_LINKING_SUGGESTION_FILTERS = {"all", "with", "without"}
 CATALOGUE_LINKING_CONFIDENCE_FILTERS = {"all", "review", "0", "80", "90", "95", "100"}
 CATALOGUE_LINKING_FILTER_SCAN_PAGES = 25
+CATALOGUE_LINKING_FILTER_SCAN_MIN_BATCH = 200
 CATALOGUE_LINKING_BULK_FILTERED_BATCH_SIZE = 100
 CATALOG_VARIANT_SEARCH_FIELDS = (
     "perfume__name",
@@ -398,8 +400,14 @@ def build_our_product_catalog_list_context(
     variant_manager = variant_manager or CatalogPerfumeVariant.objects
 
     paginator = list_context.get("paginator")
+    page_obj = list_context.get("page_obj")
     variants = list_context.get("variants", [])
-    total_count = paginator.count if paginator else len(variants)
+    total_count = getattr(paginator, "count", None) if paginator else len(variants)
+    total_count_display = (
+        _countless_page_result_display(page_obj, noun="catalogue variants")
+        if page_obj
+        else f"{len(variants)} catalogue variants"
+    )
 
     collection_rows = (
         perfume_manager.exclude(collection_name="")
@@ -426,6 +434,7 @@ def build_our_product_catalog_list_context(
     return {
         "variants": visible_variants,
         "total_count": total_count,
+        "total_count_display": total_count_display,
         "search_query": request.GET.get("q", "").strip(),
         "active_tab": normalize_our_product_catalog_tab(request.GET.get("tab")),
         "brand_rows": brand_manager.annotate(perfume_count=Count("perfumes")).order_by(
@@ -1532,11 +1541,7 @@ def build_fragrantica_product_review_context(
         "matched_perfume",
         "matched_perfume__brand",
     )
-    brands = (
-        base_queryset.values("brand_name")
-        .annotate(perfume_count=Count("id"))
-        .order_by("brand_name")
-    )
+    brands = base_queryset.order_by("brand_name").values("brand_name").distinct()
 
     filtered_queryset = base_queryset
     if selected_brand:
@@ -1546,16 +1551,10 @@ def build_fragrantica_product_review_context(
             fragrantica_product_search_filter(search_query)
         )
 
-    status_counts = dict(
-        filtered_queryset.values("match_status")
-        .annotate(count=Count("id"))
-        .values_list("match_status", "count")
-    )
+    status_counts = {}
     if status_filter != "all":
         filtered_queryset = filtered_queryset.filter(match_status=status_filter)
 
-    total_count = base_queryset.count()
-    filtered_count = filtered_queryset.count()
     queryset = filtered_queryset.order_by(
         "brand_name",
         "collection_name",
@@ -1564,9 +1563,25 @@ def build_fragrantica_product_review_context(
         "release_year",
         "id",
     )
-    paginator = paginator_class(queryset, page_size)
-    page_obj = paginator.get_page(request.GET.get("page"))
-    source_rows = list(page_obj.object_list)
+    if paginator_class is Paginator:
+        paginator, page_obj, source_rows, is_paginated = (
+            paginate_queryset_without_count(
+                queryset,
+                page_number=request.GET.get("page"),
+                page_size=page_size,
+            )
+        )
+    else:
+        paginator = paginator_class(queryset, page_size)
+        page_obj = paginator.get_page(request.GET.get("page"))
+        source_rows = list(page_obj.object_list)
+        is_paginated = getattr(paginator, "num_pages", 1) > 1
+
+    has_next = page_obj.has_next() if hasattr(page_obj, "has_next") else is_paginated
+    end_index = (
+        page_obj.end_index() if hasattr(page_obj, "end_index") else len(source_rows)
+    )
+    filtered_count_display = f"{end_index}+" if has_next else str(end_index)
     candidate_choices = build_fragrantica_candidate_choices(
         source_rows,
         perfume_manager=perfume_manager,
@@ -1592,12 +1607,13 @@ def build_fragrantica_product_review_context(
         "search_query": search_query,
         "status_filter": status_filter,
         "status_counts": status_counts,
-        "total_count": total_count,
-        "filtered_count": filtered_count,
+        "total_count": None,
+        "filtered_count": end_index,
+        "filtered_count_display": filtered_count_display,
         "rows": rows,
         "page_obj": page_obj,
         "paginator": paginator,
-        "is_paginated": paginator.num_pages > 1,
+        "is_paginated": is_paginated,
         "query_string": query_without_page.urlencode(),
     }
 
@@ -2865,6 +2881,7 @@ def build_catalogue_linking_rows(
     *,
     min_score: int,
     include_candidates: bool = True,
+    include_payload: bool = True,
 ) -> list[dict]:
     perfumes = list(perfumes)
     _attach_catalogue_linking_row_counts(perfumes)
@@ -2904,7 +2921,7 @@ def build_catalogue_linking_rows(
         }
         row["payload_json"] = (
             catalogue_linking_row_payload_json(row)
-            if include_candidates or linked_sources
+            if include_payload and (include_candidates or linked_sources)
             else ""
         )
         rows.append(row)
@@ -2953,6 +2970,25 @@ def _catalogue_linking_sequence_count(sequence) -> int:
 
 def _catalogue_linking_sequence_slice(sequence, start: int, stop: int):
     return sequence[start:stop]
+
+
+def _countless_page_result_display(page_obj, *, noun: str) -> str:
+    if not page_obj:
+        return f"0 {noun}"
+    paginator = getattr(page_obj, "paginator", None)
+    count = getattr(paginator, "count", None)
+    if count is not None:
+        return f"{count} {noun}"
+    end_index = page_obj.end_index() if hasattr(page_obj, "end_index") else 0
+    has_next = page_obj.has_next() if hasattr(page_obj, "has_next") else False
+    suffix = "+" if has_next else ""
+    return f"{end_index}{suffix} {noun}"
+
+
+def _countless_visible_count_display(page_obj, visible_count) -> str:
+    if visible_count is not None:
+        return str(visible_count)
+    return ""
 
 
 def _catalogue_linking_lightweight_perfume_rows(sequence) -> list[dict]:
@@ -3108,6 +3144,7 @@ def _catalogue_linking_verified_filtered_perfume_ids(
             perfumes,
             min_score=min_score,
             include_candidates=True,
+            include_payload=False,
         )
         rows = filter_catalogue_linking_rows_by_confidence(rows, confidence_filter)
         rows = filter_catalogue_linking_rows_by_suggestion(rows, suggestion_filter)
@@ -3191,6 +3228,7 @@ def _build_catalogue_linking_strict_exact_page_rows(
             perfumes,
             min_score=min_score,
             include_candidates=True,
+            include_payload=False,
         )
         filtered_rows = filter_catalogue_linking_rows_by_confidence(
             visible_rows,
@@ -3227,25 +3265,26 @@ def _build_catalogue_linking_filtered_page_rows(
     target_start = max(page_number - 1, 0) * page_size
     target_stop = target_start + page_size
     page_rows: list[dict] = []
-    total_count = _catalogue_linking_sequence_count(sequence)
-    scan_size = max(page_size * 2, page_size)
+    scan_size = max(page_size * 5, CATALOGUE_LINKING_FILTER_SCAN_MIN_BATCH)
     scan_limit = max_scan_rows or page_size * CATALOGUE_LINKING_FILTER_SCAN_PAGES
-    scan_start = 0
-    scan_stop_limit = min(total_count, scan_limit)
     matched_seen = 0
 
-    for start in range(scan_start, scan_stop_limit, scan_size):
+    for start in range(0, scan_limit, scan_size):
+        stop = min(start + scan_size, scan_limit)
         perfumes = list(
             _catalogue_linking_sequence_slice(
                 sequence,
                 start,
-                min(start + scan_size, scan_stop_limit),
+                stop,
             )
         )
+        if not perfumes:
+            break
         visible_rows = build_catalogue_linking_rows(
             perfumes,
             min_score=min_score,
             include_candidates=True,
+            include_payload=False,
         )
         filtered_rows = filter_catalogue_linking_rows_by_confidence(
             visible_rows,
@@ -3286,6 +3325,7 @@ def build_catalogue_linking_context(
     row_filter_active = suggestion_filter != "all" or confidence_filter != "all"
     paginator = list_context.get("paginator")
     page_obj = list_context.get("page_obj")
+    visible_count = getattr(paginator, "count", None) if paginator else len(perfumes)
     if (
         row_filter_active
         and paginator
@@ -3306,6 +3346,7 @@ def build_catalogue_linking_context(
             page_obj.object_list,
             min_score=min_score,
             include_candidates=True,
+            include_payload=False,
         )
         rows = filter_catalogue_linking_rows_by_confidence(
             visible_rows,
@@ -3318,7 +3359,6 @@ def build_catalogue_linking_context(
     elif row_filter_active and paginator and page_obj:
         visible_rows = []
         display_page_size = page_obj.paginator.per_page
-        visible_count = paginator.count
         rows = _build_catalogue_linking_filtered_page_rows(
             paginator.object_list,
             page_number=page_obj.number,
@@ -3326,7 +3366,6 @@ def build_catalogue_linking_context(
             min_score=min_score,
             confidence_filter=confidence_filter,
             suggestion_filter=suggestion_filter,
-            max_scan_rows=visible_count,
         )
     else:
         visible_rows = build_catalogue_linking_rows(
@@ -3334,7 +3373,6 @@ def build_catalogue_linking_context(
             min_score=min_score,
             include_candidates=False,
         )
-        visible_count = len(visible_rows)
         rows = filter_catalogue_linking_rows_by_confidence(
             visible_rows,
             confidence_filter,
@@ -3351,13 +3389,21 @@ def build_catalogue_linking_context(
             break
     if selected_row is None and rows:
         selected_row = rows[0]
+    if selected_row and not selected_row.get("payload_json"):
+        selected_row["payload_json"] = catalogue_linking_row_payload_json(selected_row)
+    suggestion_visible_count_display = _countless_visible_count_display(
+        page_obj,
+        visible_count,
+    )
+    catalogue_linking_row_count_display = _countless_page_result_display(
+        page_obj,
+        noun="rows",
+    )
     query_without_page = request.GET.copy()
     query_without_page.pop("page", None)
     return {
         "active_tab": "linking",
-        "brands": brand_manager.annotate(perfume_count=Count("perfumes")).order_by(
-            "name"
-        ),
+        "brands": brand_manager.only("id", "name").order_by("name"),
         "selected_brand": normalize_fragrantica_review_brand_id(
             request.GET.get("brand") or ""
         ),
@@ -3368,8 +3414,10 @@ def build_catalogue_linking_context(
         "min_score": min_score,
         "rows": rows,
         "suggestion_visible_count": visible_count,
+        "suggestion_visible_count_display": suggestion_visible_count_display,
         "suggestion_filtered_count": len(rows),
         "row_filter_active": row_filter_active,
+        "catalogue_linking_row_count_display": catalogue_linking_row_count_display,
         "selected_row": selected_row,
         "ready_bulk_count": sum(1 for row in rows if row["ready_for_bulk"]),
         "query_string": query_without_page.urlencode(),
@@ -3704,6 +3752,7 @@ def _catalogue_linking_filtered_ready_pairs(
             perfumes,
             min_score=min_score,
             include_candidates=True,
+            include_payload=False,
         )
         rows = filter_catalogue_linking_rows_by_confidence(rows, confidence_filter)
         rows = filter_catalogue_linking_rows_by_suggestion(rows, suggestion_filter)

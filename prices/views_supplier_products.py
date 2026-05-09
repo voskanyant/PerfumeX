@@ -96,6 +96,8 @@ class SupplierProductListView(BaseListView):
     show_bulk_delete = True
     link_detail = True
     show_status = True
+    total_count_singular = "offer"
+    total_count_plural = "offers"
     detail_url_name = "prices:product_detail"
     create_url_name = "prices:product_create"
     update_url_name = "prices:product_update"

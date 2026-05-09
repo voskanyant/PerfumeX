@@ -1011,8 +1011,9 @@ class SharedUiPartialRenderTests(SimpleTestCase):
         self.assertIn("assistant_core:catalog_import", actions)
         self.assertIn('class="button secondary"', actions)
         self.assertIn('class="button primary"', actions)
-        self.assertIn("filtered_count", meta)
-        self.assertIn("total_count", meta)
+        self.assertIn("filtered_count_display", meta)
+        self.assertIn("current Fragrantica filters", meta)
+        self.assertNotIn("total_count", meta)
 
     def test_prices_our_products_header_partials_preserve_existing_markup(self):
         actions = (

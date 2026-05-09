@@ -28,9 +28,22 @@
         <form class="pagination-jump" method="get">
             {% pagination_hidden_inputs page_param|default:"page" exclude_query_params|default:"" %}
             <label for="{{ jump_id|default:'page-jump' }}">Page</label>
-            <input id="{{ jump_id|default:'page-jump' }}" type="number" name="{{ page_param|default:'page' }}" min="1" max="{{ page_obj.paginator.num_pages }}" value="{{ page_obj.number }}">
+            <input
+                id="{{ jump_id|default:'page-jump' }}"
+                type="number"
+                name="{{ page_param|default:'page' }}"
+                min="1"
+                {% if page_obj.paginator.has_exact_count != False %}max="{{ page_obj.paginator.num_pages }}"{% endif %}
+                value="{{ page_obj.number }}"
+            >
             <button class="button secondary" type="submit">Go</button>
         </form>
-        <div class="pagination-summary">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</div>
+        <div class="pagination-summary">
+            {% if page_obj.paginator.has_exact_count is False %}
+                Page {{ page_obj.number }}{% if page_obj.has_next %}+{% endif %}
+            {% else %}
+                Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+            {% endif %}
+        </div>
     </nav>
 {% endif %}

@@ -1306,3 +1306,29 @@ class TeachParseTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.context["page_obj"].paginator.per_page, 50)
+
+    def test_parsed_products_page_uses_countless_pagination(self):
+        brand = Brand.objects.create(name="Countless Brand")
+        for index in range(60):
+            product = SupplierProduct.objects.create(
+                supplier=self.supplier,
+                identity_key=f"parsed-countless-{index}",
+                name=f"Countless Brand Product {index} edp 100ml",
+            )
+            ParsedSupplierProduct.objects.create(
+                supplier_product=product,
+                raw_name=product.name,
+                normalized_text=product.name.lower(),
+                normalized_brand=brand,
+                product_name_text=f"Product {index}",
+                concentration="Eau de Parfum",
+                size_ml=Decimal("100.00"),
+                confidence=100,
+            )
+
+        response = self.client.get(reverse("assistant_linking:normalization_parsed"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.context["parses"]), 50)
+        self.assertIsNone(response.context["page_obj"].paginator.count)
+        self.assertTrue(response.context["page_obj"].has_next())

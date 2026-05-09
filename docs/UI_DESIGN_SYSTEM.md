@@ -63,6 +63,7 @@ Prefer these shared include paths for new templates:
 - Use `includes/messages.html` only from base/layout templates; normal pages should rely on `prices/base.html`.
 - Keep specialized legacy paginators and tabs in place unless the page is already being touched and the replacement is obvious.
 - After changing shared include/component markup, run `python scripts/check_ui_partials.py`.
+- High-volume review/search queues may use count-free pagination with fresh `page_size + 1` queries instead of exact database totals. In that mode, keep the shared pagination component and show the current page with a `+` when another page exists; do not introduce cached list totals just to fill the page summary.
 
 ## App shell and layout
 

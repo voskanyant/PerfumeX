@@ -11,6 +11,8 @@ from django.urls import reverse_lazy
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.generic import CreateView, DeleteView, ListView, UpdateView
 
+from prices.services.pagination import paginate_queryset_without_count
+
 
 class StaffRequiredMixin(UserPassesTestMixin):
     def test_func(self):
@@ -47,6 +49,9 @@ class BaseListView(LoginRequiredMixin, ListView):
     show_actions = True
     show_action_menu = True
     inactive_divider_label = "Inactive records"
+    use_countless_pagination = True
+    total_count_singular = "record"
+    total_count_plural = "records"
 
     def get_ordering(self):
         sort_field = self.request.GET.get("sort")
@@ -56,13 +61,50 @@ class BaseListView(LoginRequiredMixin, ListView):
             return (f"{prefix}{sort_field}",)
         return super().get_ordering()
 
+    def paginate_queryset(self, queryset, page_size):
+        if not self.use_countless_pagination:
+            return super().paginate_queryset(queryset, page_size)
+        page_number = self.kwargs.get(self.page_kwarg) or self.request.GET.get(
+            self.page_kwarg
+        )
+        return paginate_queryset_without_count(
+            queryset,
+            page_number=page_number,
+            page_size=page_size,
+        )
+
+    def get_total_count_display(self, context):
+        page_obj = context.get("page_obj")
+        paginator = context.get("paginator")
+        total_count = getattr(paginator, "count", None) if paginator else None
+        if total_count is not None:
+            noun = (
+                self.total_count_singular
+                if total_count == 1
+                else self.total_count_plural
+            )
+            return f"Total {total_count} {noun}"
+        if not page_obj:
+            return f"Showing 0 {self.total_count_plural}"
+        end_index = page_obj.end_index() if hasattr(page_obj, "end_index") else 0
+        has_next = page_obj.has_next() if hasattr(page_obj, "has_next") else False
+        noun = (
+            self.total_count_singular
+            if end_index == 1 and not has_next
+            else self.total_count_plural
+        )
+        suffix = "+" if has_next else ""
+        return f"Showing {end_index}{suffix} {noun}"
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["list_display"] = self.list_display
         context["list_title"] = getattr(
             self, "list_title", self.model._meta.verbose_name_plural.title()
         )
-        context["total_count"] = self.get_queryset().count()
+        paginator = context.get("paginator")
+        context["total_count"] = getattr(paginator, "count", None)
+        context["total_count_display"] = self.get_total_count_display(context)
         context["current_sort"] = self.request.GET.get("sort", "")
         context["current_dir"] = self.request.GET.get("dir", "asc")
         context["current_q"] = self.request.GET.get("q", "")

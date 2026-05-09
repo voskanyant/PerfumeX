@@ -20,7 +20,7 @@
                     {% for brand in brands %}
                         <option value="{{ brand.id }}"
                                 {% if selected_brand == brand.id|stringformat:"s" %}selected{% endif %}>
-                            {{ brand.name }} ({{ brand.perfume_count }})
+                            {{ brand.name }}
                         </option>
                     {% endfor %}
                 </select>
@@ -73,9 +73,9 @@
                     </div>
                     <span class="catalogue-linking-count">
                         {% if row_filter_active %}
-                            {{ suggestion_filtered_count }} shown / {{ suggestion_visible_count }} visible
+                            {{ suggestion_filtered_count }} shown{% if suggestion_visible_count_display %} / {{ suggestion_visible_count_display }} visible{% endif %}
                         {% else %}
-                            {{ page_obj.paginator.count }} rows
+                            {{ catalogue_linking_row_count_display }}
                         {% endif %}
                     </span>
                 </div>

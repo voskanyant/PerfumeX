@@ -294,6 +294,12 @@ class FragranticaProduct(TimeStampedModel):
 
     class Meta:
         ordering = ("brand_name", "collection_name", "name")
+        indexes = [
+            models.Index(
+                fields=["normalized_brand_name", "match_status", "normalized_name"],
+                name="alink_frag_bstat_name_idx",
+            ),
+        ]
         constraints = [
             models.UniqueConstraint(
                 fields=["normalized_brand_name", "normalized_name", "source_path"],
@@ -302,9 +308,7 @@ class FragranticaProduct(TimeStampedModel):
         ]
 
     def save(self, *args, **kwargs):
-        self.normalized_brand_name = normalized_fragrantica_brand_name(
-            self.brand_name
-        )
+        self.normalized_brand_name = normalized_fragrantica_brand_name(self.brand_name)
         self.normalized_name = normalized_fragrantica_product_name(
             self.brand_name,
             self.name,

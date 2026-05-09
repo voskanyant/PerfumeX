@@ -31,6 +31,7 @@ from .services.catalog_review import (
     run_catalog_variant_inline_update_action,
     run_our_product_concentration_audit_action,
 )
+from .services.pagination import paginate_queryset_without_count
 from .view_base import BaseCreateView, BaseDeleteView, BaseUpdateView
 
 
@@ -43,6 +44,13 @@ class OurProductListView(LoginRequiredMixin, ListView):
     def get_queryset(self):
         return build_our_product_catalog_variant_queryset(
             self.request.GET.get("q", "").strip()
+        )
+
+    def paginate_queryset(self, queryset, page_size):
+        return paginate_queryset_without_count(
+            queryset,
+            page_number=self.request.GET.get(self.page_kwarg),
+            page_size=page_size,
         )
 
     def get_context_data(self, **kwargs):
@@ -143,6 +151,13 @@ class CatalogueLinkingWorkbenchView(LoginRequiredMixin, ListView):
 
     def get_queryset(self):
         return build_catalogue_linking_perfume_queryset(self.request)
+
+    def paginate_queryset(self, queryset, page_size):
+        return paginate_queryset_without_count(
+            queryset,
+            page_number=self.request.GET.get(self.page_kwarg),
+            page_size=page_size,
+        )
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)

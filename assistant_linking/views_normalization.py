@@ -47,6 +47,7 @@ from assistant_linking.services.normalization_views import (
 )
 from assistant_linking.view_mixins import StaffAssistantMixin
 from prices.models import SupplierProduct
+from prices.services.pagination import paginate_queryset_without_count
 from prices.services.product_visibility import (
     get_hidden_product_keywords_for_user,
 )
@@ -73,9 +74,22 @@ class NormalizationDashboardView(StaffAssistantMixin, TemplateView):
 class NormalizationSearchMixin:
     search_param = "q"
     search_placeholder = "Search supplier, product, brand, or SKU"
+    use_countless_pagination = True
 
     def get_search_query(self):
         return self.request.GET.get(self.search_param, "").strip()
+
+    def paginate_queryset(self, queryset, page_size):
+        if not self.use_countless_pagination:
+            return super().paginate_queryset(queryset, page_size)
+        page_number = self.kwargs.get(self.page_kwarg) or self.request.GET.get(
+            self.page_kwarg
+        )
+        return paginate_queryset_without_count(
+            queryset,
+            page_number=page_number,
+            page_size=page_size,
+        )
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)

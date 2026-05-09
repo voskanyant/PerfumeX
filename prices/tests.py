@@ -178,6 +178,10 @@ class FrontendHardeningTests(TestCase):
         self.assertContains(response, "Show inactive product rows")
         self.assertContains(response, "Products from inactive suppliers")
         self.assertContains(response, "Show inactive supplier products")
+        self.assertIsNone(response.context["paginator"].count)
+        self.assertEqual(response.context["total_count"], None)
+        self.assertEqual(response.context["total_count_display"], "Showing 1 offer")
+        self.assertContains(response, "Showing 1 offer")
 
         response = self.client.get(
             reverse("prices:product_list"),
@@ -6637,6 +6641,7 @@ class CatalogReviewServiceTests(SimpleTestCase):
         )
 
         self.assertEqual(result["total_count"], 2)
+        self.assertEqual(result["total_count_display"], "2 catalogue variants")
         self.assertEqual(result["search_query"], "vanilla")
         self.assertEqual(result["active_tab"], "products")
         self.assertIs(result["brand_rows"], brand_rows)
@@ -6731,6 +6736,9 @@ class CatalogReviewServiceTests(SimpleTestCase):
                     tuple(row[field] for field in fields) for row in self._dict_rows()
                 ]
 
+            def distinct(self):
+                return self
+
             def _dict_rows(self):
                 grouped = defaultdict(int)
                 for row in self.rows:
@@ -6753,15 +6761,6 @@ class CatalogReviewServiceTests(SimpleTestCase):
 
             def __iter__(self):
                 return iter(())
-
-        class FakePaginator:
-            def __init__(self, rows, page_size):
-                self.rows = list(rows)
-                self.page_size = page_size
-                self.num_pages = 2
-
-            def get_page(self, page_number):
-                return SimpleNamespace(object_list=self.rows, number=page_number)
 
         unlinked = SimpleNamespace(
             brand_name="Montale",
@@ -6796,7 +6795,7 @@ class CatalogReviewServiceTests(SimpleTestCase):
             {
                 "brand": "Montale",
                 "status": "unlinked",
-                "page": "3",
+                "page": "1",
             },
         )
 
@@ -6804,19 +6803,21 @@ class CatalogReviewServiceTests(SimpleTestCase):
             request,
             fragrantica_manager=fragrantica_rows,
             perfume_manager=FakePerfumeQuerySet(),
-            paginator_class=FakePaginator,
             page_size=25,
         )
 
         self.assertEqual(result["selected_brand"], "Montale")
         self.assertEqual(result["search_query"], "")
         self.assertEqual(result["status_filter"], "unlinked")
-        self.assertEqual(result["status_counts"], {"unlinked": 1, "linked": 1})
-        self.assertEqual(result["total_count"], 3)
+        self.assertEqual(result["status_counts"], {})
+        self.assertIsNone(result["total_count"])
         self.assertEqual(result["filtered_count"], 1)
+        self.assertEqual(result["filtered_count_display"], "1")
         self.assertEqual(result["rows"][0]["source"], unlinked)
         self.assertNotIn("page=", result["query_string"])
-        self.assertEqual(result["paginator"].page_size, 25)
+        self.assertEqual(result["paginator"].per_page, 25)
+        self.assertIsNone(result["paginator"].count)
+        self.assertNotIn(("values", ("match_status",)), fragrantica_rows.calls)
         self.assertIn(
             ("filter", (), {"brand_name__iexact": "Montale"}), fragrantica_rows.calls
         )
@@ -8233,6 +8234,13 @@ class OurProductCatalogueListTests(TestCase):
         response = self.client.get(reverse("prices:our_product_list"))
 
         self.assertEqual(response.status_code, 200)
+        self.assertIsNone(response.context["paginator"].count)
+        self.assertEqual(
+            response.context["total_count_display"],
+            "1 catalogue variants",
+        )
+        self.assertContains(response, "Showing 1 catalogue variants")
+        self.assertNotContains(response, "Total 1 catalogue variants")
         self.assertContains(response, "data-catalogue-selection-root")
         self.assertContains(response, "Delete selected")
         self.assertContains(response, "data-catalogue-select-toggle")
@@ -9390,6 +9398,54 @@ class OurProductCatalogueListTests(TestCase):
         self.assertIn(unlinked_perfume.pk, unlinked_ids)
         self.assertNotIn("COUNT(", str(linked_queryset.query).upper())
 
+    def test_catalogue_linking_brand_filter_does_not_count_brand_perfumes(self):
+        from prices.services.catalog_review import build_catalogue_linking_context
+
+        brand = Brand.objects.create(name="Countless Filter Brand")
+        Perfume.objects.create(
+            brand=brand,
+            name="Quiet Countless Scent",
+            concentration="Eau de Parfum",
+        )
+        request = RequestFactory().get(reverse("prices:catalogue_linking_workbench"))
+        request.user = get_user_model().objects.get(username="staff")
+
+        context = build_catalogue_linking_context(
+            request,
+            {
+                "perfumes": [],
+                "paginator": None,
+                "page_obj": None,
+            },
+        )
+
+        self.assertIn(
+            "Countless Filter Brand",
+            [brand.name for brand in context["brands"]],
+        )
+        self.assertNotIn("COUNT(", str(context["brands"].query).upper())
+
+    def test_fragrantica_products_brand_filter_does_not_count_source_rows(self):
+        from prices.services.catalog_review import (
+            build_fragrantica_product_review_context,
+        )
+
+        FragranticaProduct.objects.create(
+            brand_name="Countless Fragrantica Brand",
+            normalized_brand_name="countless fragrantica brand",
+            name="Quiet Source Scent",
+            normalized_name="quiet source scent",
+        )
+        request = RequestFactory().get(reverse("prices:fragrantica_product_review"))
+
+        context = build_fragrantica_product_review_context(request)
+
+        self.assertIn(
+            "Countless Fragrantica Brand",
+            [brand["brand_name"] for brand in context["brands"]],
+        )
+        self.assertNotIn("COUNT(", str(context["brands"].query).upper())
+
     def test_catalogue_linking_workbench_filters_visible_rows_by_suggestion(self):
         FragranticaProduct.objects.create(
             brand_name="Montale",
@@ -9421,7 +9477,8 @@ class OurProductCatalogueListTests(TestCase):
             "Montale / Vanilla Extasy / Eau de Parfum",
         )
         self.assertNotContains(with_suggestion, "Montale / Quiet Scent")
-        self.assertContains(with_suggestion, "1 shown / 2 visible")
+        self.assertContains(with_suggestion, "1 shown")
+        self.assertNotContains(with_suggestion, "1 shown / 2 visible")
 
         self.assertEqual(without_suggestion.status_code, 200)
         self.assertContains(without_suggestion, "Montale / Quiet Scent")
@@ -9429,7 +9486,8 @@ class OurProductCatalogueListTests(TestCase):
             without_suggestion,
             "Montale / Vanilla Extasy / Eau de Parfum",
         )
-        self.assertContains(without_suggestion, "1 shown / 2 visible")
+        self.assertContains(without_suggestion, "1 shown")
+        self.assertNotContains(without_suggestion, "1 shown / 2 visible")
 
     def test_catalogue_linking_workbench_refills_filtered_page_after_bulk_links(self):
         brand = Brand.objects.create(name="Pagination Brand")
@@ -9728,7 +9786,8 @@ class OurProductCatalogueListTests(TestCase):
         self.assertContains(lower_response, "Montale / Vanilla Extasy")
         self.assertContains(lower_response, "100 Bon / Ambre Et Tonka")
         self.assertNotContains(lower_response, quiet.name)
-        self.assertContains(lower_response, "2 shown / 3 visible")
+        self.assertContains(lower_response, "2 shown")
+        self.assertNotContains(lower_response, "2 shown / 3 visible")
 
     def test_catalogue_linking_high_confidence_page_does_not_verify_all_rows(self):
         brand = Brand.objects.create(name="Bounded High Confidence Brand")
@@ -9758,6 +9817,10 @@ class OurProductCatalogueListTests(TestCase):
                 "prices.services.catalog_review._catalogue_linking_verified_filtered_perfume_ids",
                 side_effect=AssertionError("95+ should not verify every filtered row"),
             ),
+            patch(
+                "prices.services.catalog_review._catalogue_linking_sequence_count",
+                side_effect=AssertionError("95+ should not count every row"),
+            ),
         ):
             response = self.client.get(
                 reverse("prices:catalogue_linking_workbench"),
@@ -9770,6 +9833,89 @@ class OurProductCatalogueListTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Bounded Match 00")
+        self.assertIsNone(response.context["paginator"].count)
+
+    def test_catalogue_linking_high_confidence_pages_batch_candidate_scans(self):
+        from prices.services import catalog_review as catalog_review_service
+
+        brand = Brand.objects.create(name="Batched Candidate Brand")
+        for index in range(120):
+            name = f"Batched Match {index:03d}"
+            Perfume.objects.create(
+                brand=brand,
+                name=name,
+                concentration="Eau de Parfum",
+            )
+            FragranticaProduct.objects.create(
+                brand_name="Batched Candidate Brand",
+                normalized_brand_name="batched candidate brand",
+                name=f"{name} Eau de Parfum",
+                normalized_name=f"{name.lower()} eau de parfum",
+                source_path=f"/perfume/Batched-Candidate-Brand/Batched-{index}.html",
+            )
+
+        with (
+            patch(
+                "prices.views_our_products.CatalogueLinkingWorkbenchView.paginate_by",
+                40,
+            ),
+            patch(
+                "prices.services.catalog_review.build_catalogue_fragrantica_candidates_for_perfumes",
+                wraps=(
+                    catalog_review_service.build_catalogue_fragrantica_candidates_for_perfumes
+                ),
+            ) as candidate_builder,
+        ):
+            response = self.client.get(
+                reverse("prices:catalogue_linking_workbench"),
+                {
+                    "status": "unlinked",
+                    "suggestions": "with",
+                    "confidence": "95",
+                    "page": "3",
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Batched Match 080")
+        self.assertContains(response, "Batched Match 119")
+        self.assertEqual(candidate_builder.call_count, 1)
+
+    def test_catalogue_linking_filtered_page_defers_non_selected_payloads(self):
+        brand = Brand.objects.create(name="Lazy Payload Brand")
+        for index in range(2):
+            name = f"Lazy Match {index:02d}"
+            Perfume.objects.create(
+                brand=brand,
+                name=name,
+                concentration="Eau de Parfum",
+            )
+            FragranticaProduct.objects.create(
+                brand_name="Lazy Payload Brand",
+                normalized_brand_name="lazy payload brand",
+                name=f"{name} Eau de Parfum",
+                normalized_name=f"{name.lower()} eau de parfum",
+                source_path=f"/perfume/Lazy-Payload-Brand/Lazy-{index}.html",
+            )
+
+        with patch(
+            "prices.services.catalog_review.latest_fragrantica_rerank_recommendation",
+            return_value=None,
+        ) as latest_advice:
+            response = self.client.get(
+                reverse("prices:catalogue_linking_workbench"),
+                {
+                    "status": "unlinked",
+                    "suggestions": "with",
+                    "confidence": "95",
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Lazy Match 00")
+        self.assertContains(response, "Lazy Match 01")
+        self.assertContains(response, "data-linking-payload=", count=1)
+        latest_advice.assert_called_once()
 
     def test_catalogue_linking_high_confidence_pages_fill_from_filtered_matches(self):
         brand = Brand.objects.create(name="A Windowed Linking Brand")
@@ -9860,6 +10006,10 @@ class OurProductCatalogueListTests(TestCase):
                 "prices.services.catalog_review._catalogue_linking_verified_filtered_perfume_ids",
                 side_effect=AssertionError("Needs review should not verify every row"),
             ),
+            patch(
+                "prices.services.catalog_review._catalogue_linking_sequence_count",
+                side_effect=AssertionError("Needs review should not count every row"),
+            ),
         ):
             response = self.client.get(
                 reverse("prices:catalogue_linking_workbench"),
@@ -9872,6 +10022,7 @@ class OurProductCatalogueListTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Shared Bounded Mirage")
+        self.assertIsNone(response.context["paginator"].count)
 
     def test_catalogue_linking_workbench_filters_manual_review_separately(self):
         brand = Brand.objects.create(name="Manual Review Brand")
@@ -9923,7 +10074,8 @@ class OurProductCatalogueListTests(TestCase):
         self.assertContains(review_response, "Needs review")
         self.assertContains(review_response, "Shared Mirage")
         self.assertNotContains(review_response, "Quiet Review Scent")
-        self.assertContains(review_response, "2 shown / 2 visible")
+        self.assertContains(review_response, "2 shown")
+        self.assertNotContains(review_response, "2 shown / 2 visible")
         self.assertContains(
             review_response,
             "Manual review: same Fragrantica row is an equal top match",
@@ -9978,7 +10130,8 @@ class OurProductCatalogueListTests(TestCase):
         self.assertContains(
             response, "Manual review: Fragrantica row is already linked"
         )
-        self.assertContains(response, "1 shown / 1 visible")
+        self.assertContains(response, "1 shown")
+        self.assertNotContains(response, "1 shown / 1 visible")
 
     def test_catalogue_linking_skips_generic_base_when_audience_siblings_exist(self):
         from prices.services.catalog_review import (

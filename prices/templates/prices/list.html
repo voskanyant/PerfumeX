@@ -15,7 +15,7 @@
         <div class="products-page-header">
             <div>
                 <h1 class="page-title">{{ list_title }}</h1>
-                <div class="page-meta">{{ total_count }} offers</div>
+                <div class="page-meta">{{ total_count_display }}</div>
             </div>
             <div class="products-page-actions">
                 {% if show_bulk_delete %}
@@ -43,7 +43,7 @@
         <div class="generic-list-header">
             <div>
                 <h1 class="page-title">{{ list_title }}</h1>
-                <div class="page-meta">Total {{ total_count }}</div>
+                <div class="page-meta">{{ total_count_display }}</div>
             </div>
             <div class="generic-list-actions">
                 {% if list_title == "Our Products" %}

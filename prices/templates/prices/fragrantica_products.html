@@ -11,7 +11,7 @@
                 {% for brand in brands %}
                     <option value="{{ brand.brand_name }}"
                             {% if selected_brand == brand.brand_name %}selected{% endif %}>
-                        {{ brand.brand_name }} ({{ brand.perfume_count }})
+                        {{ brand.brand_name }}
                     </option>
                 {% endfor %}
             </select>
@@ -29,9 +29,9 @@
             <button class="button ghost" type="submit">Search</button>
         </form>
         <div class="fragrantica-status-strip">
-            <span>Unlinked {{ status_counts.unlinked|default:0 }}</span>
-            <span>Linked {{ status_counts.linked|default:0 }}</span>
-            <span>Ignored {{ status_counts.ignored|default:0 }}</span>
+            <span>Unlinked</span>
+            <span>Linked</span>
+            <span>Ignored</span>
         </div>
         <div class="our-products-list fragrantica-products-list"
              aria-label="Fragrantica catalogue products">
