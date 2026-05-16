@@ -2682,7 +2682,11 @@ def parse_supplier_product(product: SupplierProduct) -> ParseResult:
 
 
 def save_parse(
-    product: SupplierProduct, *, force: bool = False
+    product: SupplierProduct,
+    *,
+    force: bool = False,
+    apply_catalog_conflicts: bool = True,
+    mark_stats: bool = True,
 ) -> ParsedSupplierProduct:
     existing = getattr(product, "assistant_parse", None)
     if existing and existing.locked_by_human and not force:
@@ -2715,10 +2719,12 @@ def save_parse(
             "last_parsed_at": timezone.now(),
         },
     )
-    _apply_catalog_conflict_manual_review(obj)
-    from assistant_linking.services.normalization_stats import mark_stats_stale
+    if apply_catalog_conflicts:
+        _apply_catalog_conflict_manual_review(obj)
+    if mark_stats:
+        from assistant_linking.services.normalization_stats import mark_stats_stale
 
-    mark_stats_stale()
+        mark_stats_stale()
     return obj
 
 

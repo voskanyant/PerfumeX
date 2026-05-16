@@ -9433,7 +9433,9 @@ class OurProductCatalogueListTests(TestCase):
         broad_queryset = build_catalogue_linking_perfume_queryset(broad_request)
         scoped_queryset = build_catalogue_linking_perfume_queryset(scoped_request)
 
-        self.assertEqual(broad_queryset.query.order_by, CATALOGUE_LINKING_BROAD_ORDERING)
+        self.assertEqual(
+            broad_queryset.query.order_by, CATALOGUE_LINKING_BROAD_ORDERING
+        )
         self.assertEqual(
             scoped_queryset.query.order_by,
             CATALOGUE_LINKING_SCOPED_ORDERING,
@@ -10017,7 +10019,15 @@ class OurProductCatalogueListTests(TestCase):
         self.assertNotContains(page_two, "Windowed Row 000")
 
     def test_catalogue_linking_review_page_does_not_verify_all_rows(self):
+        from prices.services import catalog_review as catalog_review_service
+
         brand = Brand.objects.create(name="Bounded Review Brand")
+        for index in range(80):
+            Perfume.objects.create(
+                brand=brand,
+                name=f"Quiet Bounded Scent {index:02d}",
+                concentration="Eau de Parfum",
+            )
         Perfume.objects.create(
             brand=brand,
             name="Shared Bounded Mirage",
@@ -10038,11 +10048,11 @@ class OurProductCatalogueListTests(TestCase):
 
         with (
             patch(
-                "prices.services.catalog_review._catalogue_linking_strict_exact_perfume_ids",
-                side_effect=AssertionError(
-                    "Needs review should not prefilter every row"
+                "prices.services.catalog_review.build_catalogue_fragrantica_candidates_for_perfumes",
+                wraps=(
+                    catalog_review_service.build_catalogue_fragrantica_candidates_for_perfumes
                 ),
-            ),
+            ) as candidate_builder,
             patch(
                 "prices.services.catalog_review._catalogue_linking_verified_filtered_perfume_ids",
                 side_effect=AssertionError("Needs review should not verify every row"),
@@ -10064,6 +10074,59 @@ class OurProductCatalogueListTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Shared Bounded Mirage")
         self.assertIsNone(response.context["paginator"].count)
+        self.assertTrue(candidate_builder.called)
+        self.assertLessEqual(len(candidate_builder.call_args.args[0]), 2)
+
+    def test_catalogue_linking_review_pages_batch_exact_candidate_scans(self):
+        from prices.services import catalog_review as catalog_review_service
+
+        brand = Brand.objects.create(name="Batched Review Brand")
+        for index in range(120):
+            name = f"Batched Shared Mirage {index:03d}"
+            Perfume.objects.create(
+                brand=brand,
+                name=name,
+                concentration="Eau de Parfum",
+            )
+            Perfume.objects.create(
+                brand=brand,
+                name=name,
+                concentration="Eau de Toilette",
+            )
+            FragranticaProduct.objects.create(
+                brand_name="Batched Review Brand",
+                normalized_brand_name="batched review brand",
+                name=name,
+                normalized_name=name.lower(),
+                source_path=f"/perfume/Batched-Review-Brand/Batched-{index}.html",
+            )
+
+        with (
+            patch(
+                "prices.views_our_products.CatalogueLinkingWorkbenchView.paginate_by",
+                40,
+            ),
+            patch(
+                "prices.services.catalog_review.build_catalogue_fragrantica_candidates_for_perfumes",
+                wraps=(
+                    catalog_review_service.build_catalogue_fragrantica_candidates_for_perfumes
+                ),
+            ) as candidate_builder,
+        ):
+            response = self.client.get(
+                reverse("prices:catalogue_linking_workbench"),
+                {
+                    "status": "unlinked",
+                    "suggestions": "with",
+                    "confidence": "review",
+                    "page": "3",
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Batched Shared Mirage 040")
+        self.assertContains(response, "Batched Shared Mirage 059")
+        self.assertEqual(candidate_builder.call_count, 1)
 
     def test_catalogue_linking_workbench_filters_manual_review_separately(self):
         brand = Brand.objects.create(name="Manual Review Brand")

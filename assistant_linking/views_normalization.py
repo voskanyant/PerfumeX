@@ -128,6 +128,7 @@ class LowConfidenceListView(NormalizationSearchMixin, StaffAssistantMixin, ListV
     paginate_by = 50
     refresh_param = "refresh"
     auto_refresh_stale_visible = False
+    visible_refresh_parse_saver_kwargs = {}
 
     def get_queryset(self):
         return build_low_confidence_queryset(
@@ -144,6 +145,7 @@ class LowConfidenceListView(NormalizationSearchMixin, StaffAssistantMixin, ListV
             context,
             force_refresh=self.request.GET.get(self.refresh_param) == "1",
             auto_refresh_stale=self.auto_refresh_stale_visible,
+            parse_saver_kwargs=self.visible_refresh_parse_saver_kwargs,
             parsed_id_queryset_builder=self.get_refreshed_id_queryset,
         )
 
@@ -299,6 +301,10 @@ class ModifierConflictListView(NormalizationIssueListView):
 class ParsedListView(NormalizationIssueListView):
     issue_title = "Complete parsed products"
     auto_refresh_stale_visible = True
+    visible_refresh_parse_saver_kwargs = {
+        "apply_catalog_conflicts": False,
+        "mark_stats": False,
+    }
 
     def get_queryset(self):
         return build_complete_parsed_queryset(

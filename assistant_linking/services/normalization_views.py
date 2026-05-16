@@ -714,10 +714,12 @@ def refresh_visible_parsed_context(
     force_refresh,
     auto_refresh_stale=False,
     parse_saver=save_parse,
+    parse_saver_kwargs=None,
     parsed_id_queryset_builder=build_complete_parsed_id_queryset,
 ):
     context["allow_refresh_visible"] = True
     visible_parses = list(context.get("parses", []))
+    parse_kwargs = parse_saver_kwargs or {}
     refreshed_count = 0
     refreshed_parses = []
     for parsed in visible_parses:
@@ -727,7 +729,9 @@ def refresh_visible_parsed_context(
             and parsed.parser_version != PARSER_VERSION
         )
         if force_refresh or should_refresh_stale:
-            refreshed_parses.append(parse_saver(parsed.supplier_product, force=True))
+            refreshed_parses.append(
+                parse_saver(parsed.supplier_product, force=True, **parse_kwargs)
+            )
             refreshed_count += 1
         else:
             refreshed_parses.append(parsed)

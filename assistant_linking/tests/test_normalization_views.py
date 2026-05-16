@@ -608,3 +608,37 @@ class NormalizationViewServiceTests(SimpleTestCase):
         self.assertEqual(page_obj.object_list, ["refreshed"])
         self.assertTrue(context["refreshed_visible"])
         self.assertEqual(context["refreshed_visible_count"], 1)
+
+    def test_refresh_visible_parsed_context_passes_parse_saver_kwargs(self):
+        product = object()
+        parsed = SimpleNamespace(
+            pk=1,
+            supplier_product=product,
+            locked_by_human=False,
+            parser_version="deterministic-old",
+        )
+        refreshed = SimpleNamespace(pk=11)
+        context = {"parses": [parsed]}
+        parse_saver = MagicMock(return_value=refreshed)
+        parsed_id_queryset_builder = MagicMock(return_value=["refreshed"])
+
+        returned = refresh_visible_parsed_context(
+            context,
+            force_refresh=False,
+            auto_refresh_stale=True,
+            parse_saver=parse_saver,
+            parse_saver_kwargs={
+                "apply_catalog_conflicts": False,
+                "mark_stats": False,
+            },
+            parsed_id_queryset_builder=parsed_id_queryset_builder,
+        )
+
+        self.assertIs(returned, context)
+        parse_saver.assert_called_once_with(
+            product,
+            force=True,
+            apply_catalog_conflicts=False,
+            mark_stats=False,
+        )
+        parsed_id_queryset_builder.assert_called_once_with([11])

@@ -3436,6 +3436,17 @@ def _build_catalogue_linking_filtered_page_rows(
             min_score=min_score,
             max_scan_rows=max_scan_rows,
         )
+    if confidence_filter == "review" and suggestion_filter in {"all", "with"}:
+        return _build_catalogue_linking_review_page_rows(
+            sequence,
+            page_number=page_number,
+            page_size=page_size,
+            result_size=result_size,
+            min_score=min_score,
+            confidence_filter=confidence_filter,
+            suggestion_filter=suggestion_filter,
+            max_scan_rows=max_scan_rows,
+        )
 
     target_start = max(page_number - 1, 0) * page_size
     target_stop = target_start + (result_size or page_size)
@@ -3457,6 +3468,61 @@ def _build_catalogue_linking_filtered_page_rows(
             break
         visible_rows = build_catalogue_linking_rows(
             perfumes,
+            min_score=min_score,
+            include_candidates=True,
+            include_payload=False,
+        )
+        filtered_rows = filter_catalogue_linking_rows_by_confidence(
+            visible_rows,
+            confidence_filter,
+        )
+        filtered_rows = filter_catalogue_linking_rows_by_suggestion(
+            filtered_rows,
+            suggestion_filter,
+        )
+        for row in filtered_rows:
+            if target_start <= matched_seen < target_stop:
+                page_rows.append(row)
+            matched_seen += 1
+            if matched_seen >= target_stop:
+                return page_rows
+    return page_rows
+
+
+def _build_catalogue_linking_review_page_rows(
+    sequence,
+    *,
+    page_number: int,
+    page_size: int,
+    result_size: int | None,
+    min_score: int,
+    confidence_filter: str,
+    suggestion_filter: str,
+    max_scan_rows: int | None = None,
+) -> list[dict]:
+    target_start = max(page_number - 1, 0) * page_size
+    target_stop = target_start + (result_size or page_size)
+    page_rows: list[dict] = []
+    scan_size = max(page_size * 5, CATALOGUE_LINKING_FILTER_SCAN_MIN_BATCH)
+    scan_limit = max_scan_rows or page_size * CATALOGUE_LINKING_FILTER_SCAN_PAGES
+    matched_seen = 0
+
+    for start in range(0, scan_limit, scan_size):
+        stop = min(start + scan_size, scan_limit)
+        perfumes = list(_catalogue_linking_sequence_slice(sequence, start, stop))
+        if not perfumes:
+            break
+        exact_perfume_ids = _catalogue_linking_strict_exact_perfume_ids(
+            perfumes,
+            include_linked_sources=True,
+        )
+        if not exact_perfume_ids:
+            continue
+        candidate_perfumes = [
+            perfume for perfume in perfumes if perfume.id in exact_perfume_ids
+        ]
+        visible_rows = build_catalogue_linking_rows(
+            candidate_perfumes,
             min_score=min_score,
             include_candidates=True,
             include_payload=False,
