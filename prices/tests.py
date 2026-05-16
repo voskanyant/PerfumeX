@@ -10131,6 +10131,67 @@ class OurProductCatalogueListTests(TestCase):
         )
         self.assertNotContains(review_response, "Review manually")
 
+    def test_catalogue_linking_review_filter_does_not_advertise_empty_next_page(self):
+        brand = Brand.objects.create(name="Sparse Review Page Brand")
+        for index in range(20):
+            Perfume.objects.create(
+                brand=brand,
+                name=f"Quiet Review Scent {index:02d}",
+                concentration="Eau de Parfum",
+            )
+        for index in range(2):
+            Perfume.objects.create(
+                brand=brand,
+                name=f"Shared Review Mirage {index:02d}",
+                concentration="Eau de Parfum",
+            )
+            Perfume.objects.create(
+                brand=brand,
+                name=f"Shared Review Mirage {index:02d}",
+                concentration="Eau de Toilette",
+            )
+            FragranticaProduct.objects.create(
+                brand_name="Sparse Review Page Brand",
+                normalized_brand_name="sparse review page brand",
+                name=f"Shared Review Mirage {index:02d}",
+                normalized_name=f"shared review mirage {index:02d}",
+                source_path=(
+                    "/perfume/Sparse-Review-Page-Brand/"
+                    f"Shared-Review-Mirage-{index}.html"
+                ),
+            )
+
+        request_params = {
+            "brand": str(brand.pk),
+            "status": "all",
+            "suggestions": "with",
+            "confidence": "review",
+        }
+        with patch(
+            "prices.views_our_products.CatalogueLinkingWorkbenchView.paginate_by",
+            4,
+        ):
+            page_one = self.client.get(
+                reverse("prices:catalogue_linking_workbench"),
+                request_params,
+            )
+            page_two = self.client.get(
+                reverse("prices:catalogue_linking_workbench"),
+                {**request_params, "page": "2"},
+            )
+
+        self.assertEqual(page_one.status_code, 200)
+        self.assertContains(page_one, "Shared Review Mirage 00")
+        self.assertContains(page_one, "Shared Review Mirage 01")
+        self.assertContains(page_one, "4 shown")
+        self.assertNotContains(page_one, ">Next</a>")
+        self.assertFalse(page_one.context["page_obj"].has_next())
+
+        self.assertEqual(page_two.status_code, 200)
+        self.assertContains(page_two, "No Our Products rows match these filters.")
+        self.assertFalse(page_two.context["is_paginated"])
+        self.assertNotContains(page_two, ">Next</a>")
+
     def test_catalogue_linking_review_filter_includes_linked_source_conflicts(self):
         brand = Brand.objects.create(name="Linked Review Brand")
         primary = Perfume.objects.create(

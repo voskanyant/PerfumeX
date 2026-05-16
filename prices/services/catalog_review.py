@@ -3373,11 +3373,12 @@ def _build_catalogue_linking_strict_exact_page_rows(
     *,
     page_number: int,
     page_size: int,
+    result_size: int | None = None,
     min_score: int,
     max_scan_rows: int | None = None,
 ) -> list[dict]:
     target_start = max(page_number - 1, 0) * page_size
-    target_stop = target_start + page_size
+    target_stop = target_start + (result_size or page_size)
     total_count = _catalogue_linking_sequence_count(sequence)
     scan_size = max(page_size * 5, page_size)
     scan_limit = max_scan_rows or page_size * CATALOGUE_LINKING_FILTER_SCAN_PAGES
@@ -3420,6 +3421,7 @@ def _build_catalogue_linking_filtered_page_rows(
     *,
     page_number: int,
     page_size: int,
+    result_size: int | None = None,
     min_score: int,
     confidence_filter: str,
     suggestion_filter: str,
@@ -3430,12 +3432,13 @@ def _build_catalogue_linking_filtered_page_rows(
             sequence,
             page_number=page_number,
             page_size=page_size,
+            result_size=result_size,
             min_score=min_score,
             max_scan_rows=max_scan_rows,
         )
 
     target_start = max(page_number - 1, 0) * page_size
-    target_stop = target_start + page_size
+    target_stop = target_start + (result_size or page_size)
     page_rows: list[dict] = []
     scan_size = max(page_size * 5, CATALOGUE_LINKING_FILTER_SCAN_MIN_BATCH)
     scan_limit = max_scan_rows or page_size * CATALOGUE_LINKING_FILTER_SCAN_PAGES
@@ -3473,6 +3476,32 @@ def _build_catalogue_linking_filtered_page_rows(
             if matched_seen >= target_stop:
                 return page_rows
     return page_rows
+
+
+def _catalogue_linking_filtered_countless_page(
+    *,
+    rows: list[dict],
+    page_number: int,
+    page_size: int,
+    object_list,
+) -> tuple[list[dict], CountlessPaginator, CountlessPage]:
+    has_next = len(rows) > page_size
+    page_rows = rows[:page_size]
+    paginator = CountlessPaginator(
+        per_page=page_size,
+        current_page=page_number,
+        has_next=has_next,
+        object_list=object_list,
+    )
+    if not page_rows and page_number > 1:
+        paginator.num_pages = 1
+    page_obj = CountlessPage(
+        object_list=page_rows,
+        number=page_number,
+        paginator=paginator,
+        _has_next=has_next,
+    )
+    return page_rows, paginator, page_obj
 
 
 def build_catalogue_linking_context(
@@ -3531,14 +3560,22 @@ def build_catalogue_linking_context(
     elif row_filter_active and paginator and page_obj:
         visible_rows = []
         display_page_size = page_obj.paginator.per_page
-        rows = _build_catalogue_linking_filtered_page_rows(
+        filtered_page_rows = _build_catalogue_linking_filtered_page_rows(
             paginator.object_list,
             page_number=page_obj.number,
             page_size=display_page_size,
+            result_size=display_page_size + 1,
             min_score=min_score,
             confidence_filter=confidence_filter,
             suggestion_filter=suggestion_filter,
         )
+        rows, paginator, page_obj = _catalogue_linking_filtered_countless_page(
+            rows=filtered_page_rows,
+            page_number=page_obj.number,
+            page_size=display_page_size,
+            object_list=paginator.object_list,
+        )
+        visible_count = None
     else:
         visible_rows = build_catalogue_linking_rows(
             perfumes,
