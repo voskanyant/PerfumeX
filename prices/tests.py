@@ -9415,6 +9415,30 @@ class OurProductCatalogueListTests(TestCase):
         self.assertIn(unlinked_perfume.pk, unlinked_ids)
         self.assertNotIn("COUNT(", str(linked_queryset.query).upper())
 
+    def test_catalogue_linking_broad_default_uses_indexable_order(self):
+        from prices.services.catalog_review import (
+            CATALOGUE_LINKING_BROAD_ORDERING,
+            CATALOGUE_LINKING_SCOPED_ORDERING,
+            build_catalogue_linking_perfume_queryset,
+        )
+
+        broad_request = RequestFactory().get(
+            reverse("prices:catalogue_linking_workbench")
+        )
+        scoped_request = RequestFactory().get(
+            reverse("prices:catalogue_linking_workbench"),
+            {"confidence": "100"},
+        )
+
+        broad_queryset = build_catalogue_linking_perfume_queryset(broad_request)
+        scoped_queryset = build_catalogue_linking_perfume_queryset(scoped_request)
+
+        self.assertEqual(broad_queryset.query.order_by, CATALOGUE_LINKING_BROAD_ORDERING)
+        self.assertEqual(
+            scoped_queryset.query.order_by,
+            CATALOGUE_LINKING_SCOPED_ORDERING,
+        )
+
     def test_catalogue_linking_brand_filter_does_not_count_brand_perfumes(self):
         from prices.services.catalog_review import build_catalogue_linking_context
 

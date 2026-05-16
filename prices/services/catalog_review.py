@@ -96,6 +96,19 @@ CATALOGUE_LINKING_CONFIDENCE_FILTERS = {"all", "review", "0", "80", "90", "95", 
 CATALOGUE_LINKING_FILTER_SCAN_PAGES = 25
 CATALOGUE_LINKING_FILTER_SCAN_MIN_BATCH = 200
 CATALOGUE_LINKING_BULK_FILTERED_BATCH_SIZE = 100
+CATALOGUE_LINKING_BROAD_ORDERING = (
+    "brand_id",
+    "collection_name",
+    "name",
+    "concentration",
+    "id",
+)
+CATALOGUE_LINKING_SCOPED_ORDERING = (
+    "brand__name",
+    "collection_name",
+    "name",
+    "concentration",
+)
 CATALOGUE_CONCENTRATION_AUDIT_SCAN_PAGES = 25
 CATALOGUE_CONCENTRATION_AUDIT_SCAN_MIN_BATCH = 200
 CATALOG_VARIANT_SEARCH_FIELDS = (
@@ -2905,7 +2918,39 @@ def build_catalogue_linking_perfume_queryset(
             ),
         )
         queryset = queryset.filter(pk__in=exact_perfume_ids)
-    return queryset.order_by("brand__name", "collection_name", "name", "concentration")
+    ordering = (
+        CATALOGUE_LINKING_BROAD_ORDERING
+        if _catalogue_linking_request_uses_broad_default_listing(
+            request,
+            selected_brand=selected_brand,
+            search_query=search_query,
+            status_filter=status_filter,
+        )
+        else CATALOGUE_LINKING_SCOPED_ORDERING
+    )
+    return queryset.order_by(*ordering)
+
+
+def _catalogue_linking_request_uses_broad_default_listing(
+    request,
+    *,
+    selected_brand: str,
+    search_query: str,
+    status_filter: str,
+) -> bool:
+    confidence_filter = normalize_catalogue_linking_confidence_filter(
+        request.GET.get("confidence")
+    )
+    suggestion_filter = normalize_catalogue_linking_suggestion_filter(
+        request.GET.get("suggestions")
+    )
+    return (
+        not selected_brand
+        and not search_query
+        and status_filter == "all"
+        and confidence_filter == "all"
+        and suggestion_filter == "all"
+    )
 
 
 def _apply_catalogue_linking_perfume_filters(

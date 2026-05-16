@@ -182,6 +182,10 @@ class Perfume(TimeStampedModel):
         indexes = [
             models.Index(fields=["brand", "name"]),
             models.Index(fields=["brand", "concentration", "audience"]),
+            models.Index(
+                fields=["brand", "collection_name", "name", "concentration", "id"],
+                name="catalog_perf_link_order_idx",
+            ),
         ]
 
     def save(self, *args, **kwargs):
