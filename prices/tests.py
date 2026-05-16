@@ -8382,6 +8382,23 @@ class OurProductCatalogueListTests(TestCase):
         self.assertContains(response, "Eau de Toilette")
         self.assertContains(response, "Eau de Parfum")
 
+    def test_concentration_audit_uses_count_free_pagination(self):
+        for index in range(60):
+            Perfume.objects.create(
+                brand=self.perfume.brand,
+                name=f"Audit Scent {index:02d} Eau de Toilette",
+                concentration="Eau de Parfum",
+            )
+
+        response = self.client.get(reverse("prices:our_product_concentration_audit"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNone(response.context["paginator"].count)
+        self.assertEqual(len(response.context["audit_rows"]), 50)
+        self.assertTrue(response.context["page_obj"].has_next())
+        self.assertEqual(response.context["audit_total_count_display"], "50+ rows")
+        self.assertContains(response, "50+ rows")
+
     def test_concentration_audit_flags_linked_fragrantica_conflict(self):
         self.perfume.name = "The Icon"
         self.perfume.concentration = "Eau de Toilette"

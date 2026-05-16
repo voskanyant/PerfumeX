@@ -690,7 +690,7 @@ def build_complete_parsed_queryset(
     queryset = parsed_supplier_product_queryset(parsed_model)
     queryset = hider(queryset, hidden_keywords)
     queryset = apply_parsed_search(queryset, (query or "").strip())
-    queryset = complete_parses(normal_perfume_parses(exclude_garbage_parses(queryset)))
+    queryset = complete_parses(exclude_garbage_parses(queryset))
     return queryset.order_by(*COMPLETE_PARSED_ORDER)
 
 
@@ -700,7 +700,7 @@ def build_complete_parsed_id_queryset(
     parsed_model=models.ParsedSupplierProduct,
 ):
     queryset = parsed_supplier_product_queryset(parsed_model).filter(pk__in=parsed_ids)
-    queryset = complete_parses(normal_perfume_parses(exclude_garbage_parses(queryset)))
+    queryset = complete_parses(exclude_garbage_parses(queryset))
     return queryset.order_by(*COMPLETE_PARSED_ORDER)
 
 

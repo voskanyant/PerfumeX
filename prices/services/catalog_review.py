@@ -67,7 +67,12 @@ from prices.services.product_visibility import apply_hidden_product_keywords
 from prices.services.job_queue import enqueue_management_command
 from prices.services.catalog_formatting import normalize_catalogue_collection_name
 from prices.services.catalog_formatting import normalize_catalogue_perfume_name
-from prices.services.pagination import paginate_queryset_without_count
+from prices.services.pagination import (
+    CountlessPage,
+    CountlessPaginator,
+    paginate_queryset_without_count,
+    parse_page_number,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -91,6 +96,8 @@ CATALOGUE_LINKING_CONFIDENCE_FILTERS = {"all", "review", "0", "80", "90", "95", 
 CATALOGUE_LINKING_FILTER_SCAN_PAGES = 25
 CATALOGUE_LINKING_FILTER_SCAN_MIN_BATCH = 200
 CATALOGUE_LINKING_BULK_FILTERED_BATCH_SIZE = 100
+CATALOGUE_CONCENTRATION_AUDIT_SCAN_PAGES = 25
+CATALOGUE_CONCENTRATION_AUDIT_SCAN_MIN_BATCH = 200
 CATALOG_VARIANT_SEARCH_FIELDS = (
     "perfume__name",
     "perfume__brand__name",
@@ -1314,45 +1321,75 @@ def _catalogue_concentration_audit_row(
     }
 
 
-def build_our_product_concentration_audit_context(
-    request,
+def _catalogue_concentration_grouped_perfumes(perfumes, queryset) -> dict:
+    perfumes = list(perfumes)
+    base_keys = {
+        _catalogue_concentration_audit_base_key(perfume) for perfume in perfumes
+    }
+    brand_ids = {
+        getattr(perfume, "brand_id", None)
+        for perfume in perfumes
+        if getattr(perfume, "brand_id", None)
+    }
+    if not base_keys or not brand_ids:
+        return defaultdict(list)
+
+    grouped_perfumes: dict[tuple[int, str, str], list] = defaultdict(list)
+    group_queryset = queryset.select_related(None).filter(brand_id__in=brand_ids)
+    if hasattr(group_queryset, "only"):
+        group_queryset = group_queryset.only(
+            "id",
+            "brand_id",
+            "name",
+            "concentration",
+            "audience",
+        )
+    for perfume in group_queryset:
+        key = _catalogue_concentration_audit_base_key(perfume)
+        if key in base_keys:
+            grouped_perfumes[key].append(perfume)
+    return grouped_perfumes
+
+
+def _attach_catalogue_concentration_audit_counts(perfumes) -> None:
+    perfume_ids = [perfume.id for perfume in perfumes if getattr(perfume, "id", None)]
+    if not perfume_ids:
+        return
+    variant_counts = {
+        row["perfume_id"]: row["count"]
+        for row in CatalogPerfumeVariant.objects.filter(perfume_id__in=perfume_ids)
+        .values("perfume_id")
+        .annotate(count=Count("id"))
+    }
+    supplier_counts = {
+        row["catalog_perfume_id"]: row["count"]
+        for row in models.SupplierProduct.objects.filter(
+            catalog_perfume_id__in=perfume_ids,
+        )
+        .values("catalog_perfume_id")
+        .annotate(count=Count("id"))
+    }
+    for perfume in perfumes:
+        perfume_id = getattr(perfume, "id", None)
+        if not perfume_id:
+            continue
+        perfume.variant_count = variant_counts.get(perfume_id, 0)
+        perfume.linked_supplier_count = supplier_counts.get(perfume_id, 0)
+
+
+def _catalogue_concentration_audit_rows_for_perfumes(
+    perfumes,
     *,
-    page_size: int = 50,
-    perfume_manager=None,
-) -> dict:
-    perfume_manager = perfume_manager or CatalogPerfume.objects
-    search_query = request.GET.get("q", "").strip()
-    issue_filter = normalize_catalogue_concentration_audit_issue(
-        request.GET.get("issue")
-    )
-    status_filter = normalize_catalogue_concentration_audit_status(
-        request.GET.get("status")
-    )
-    queryset = perfume_manager.select_related("brand", "collection").annotate(
-        variant_count=Count("variants", distinct=True),
-        linked_supplier_count=Count("supplier_products", distinct=True),
-    )
-    if search_query:
-        queryset = queryset.filter(
-            _catalogue_concentration_audit_search_filter(search_query)
-        )
-    if status_filter == "open":
-        queryset = queryset.exclude(
-            verification_status=CatalogPerfume.VERIFICATION_VERIFIED
-        )
-    elif status_filter != "all":
-        queryset = queryset.filter(verification_status=status_filter)
-    queryset = queryset.order_by("brand__name", "name", "concentration", "id")
-    perfumes = list(queryset)
+    queryset,
+    issue_filter: str,
+) -> list[dict]:
+    perfumes = list(perfumes)
+    if not perfumes:
+        return []
     source_map = build_linked_fragrantica_sources_by_perfume_ids(
         [perfume.id for perfume in perfumes]
     )
-    grouped_perfumes: dict[tuple[int, str, str], list] = defaultdict(list)
-    for perfume in perfumes:
-        grouped_perfumes[_catalogue_concentration_audit_base_key(perfume)].append(
-            perfume
-        )
-
+    grouped_perfumes = _catalogue_concentration_grouped_perfumes(perfumes, queryset)
     rows = []
     for perfume in perfumes:
         row = _catalogue_concentration_audit_row(
@@ -1367,9 +1404,95 @@ def build_our_product_concentration_audit_context(
         if issue_filter != "all" and row["issue_type"] != issue_filter:
             continue
         rows.append(row)
+    _attach_catalogue_concentration_audit_counts([row["perfume"] for row in rows])
+    return rows
 
-    paginator = Paginator(rows, page_size)
-    page_obj = paginator.get_page(request.GET.get("page") or 1)
+
+def _catalogue_concentration_audit_page(
+    queryset,
+    *,
+    page_number,
+    page_size: int,
+    issue_filter: str,
+):
+    page_number = parse_page_number(page_number)
+    target_start = max(page_number - 1, 0) * page_size
+    target_stop = target_start + page_size + 1
+    scan_size = max(page_size * 5, CATALOGUE_CONCENTRATION_AUDIT_SCAN_MIN_BATCH)
+    scan_limit = max(
+        page_size * CATALOGUE_CONCENTRATION_AUDIT_SCAN_PAGES,
+        target_stop * CATALOGUE_CONCENTRATION_AUDIT_SCAN_PAGES,
+    )
+    matched_seen = 0
+    page_rows = []
+
+    for start in range(0, scan_limit, scan_size):
+        batch = list(queryset[start : start + scan_size])
+        if not batch:
+            break
+        batch_rows = _catalogue_concentration_audit_rows_for_perfumes(
+            batch,
+            queryset=queryset,
+            issue_filter=issue_filter,
+        )
+        for row in batch_rows:
+            if target_start <= matched_seen < target_stop:
+                page_rows.append(row)
+            matched_seen += 1
+            if matched_seen >= target_stop:
+                break
+        if matched_seen >= target_stop:
+            break
+
+    has_next = len(page_rows) > page_size
+    visible_rows = page_rows[:page_size]
+    paginator = CountlessPaginator(
+        per_page=page_size,
+        current_page=page_number,
+        has_next=has_next,
+        object_list=queryset,
+    )
+    page_obj = CountlessPage(
+        object_list=visible_rows,
+        number=page_number,
+        paginator=paginator,
+        _has_next=has_next,
+    )
+    return paginator, page_obj, visible_rows, page_obj.has_other_pages()
+
+
+def build_our_product_concentration_audit_context(
+    request,
+    *,
+    page_size: int = 50,
+    perfume_manager=None,
+) -> dict:
+    perfume_manager = perfume_manager or CatalogPerfume.objects
+    search_query = request.GET.get("q", "").strip()
+    issue_filter = normalize_catalogue_concentration_audit_issue(
+        request.GET.get("issue")
+    )
+    status_filter = normalize_catalogue_concentration_audit_status(
+        request.GET.get("status")
+    )
+    queryset = perfume_manager.select_related("brand", "collection")
+    if search_query:
+        queryset = queryset.filter(
+            _catalogue_concentration_audit_search_filter(search_query)
+        )
+    if status_filter == "open":
+        queryset = queryset.exclude(
+            verification_status=CatalogPerfume.VERIFICATION_VERIFIED
+        )
+    elif status_filter != "all":
+        queryset = queryset.filter(verification_status=status_filter)
+    queryset = queryset.order_by("brand__name", "name", "concentration", "id")
+    paginator, page_obj, rows, is_paginated = _catalogue_concentration_audit_page(
+        queryset,
+        page_number=request.GET.get("page"),
+        page_size=page_size,
+        issue_filter=issue_filter,
+    )
     query_without_page = request.GET.copy()
     query_without_page.pop("page", None)
     return {
@@ -1377,11 +1500,15 @@ def build_our_product_concentration_audit_context(
         "search_query": search_query,
         "issue_filter": issue_filter,
         "status_filter": status_filter,
-        "audit_rows": page_obj.object_list,
-        "audit_total_count": len(rows),
+        "audit_rows": rows,
+        "audit_total_count": None,
+        "audit_total_count_display": _countless_page_result_display(
+            page_obj,
+            noun="rows",
+        ),
         "page_obj": page_obj,
         "paginator": paginator,
-        "is_paginated": paginator.num_pages > 1,
+        "is_paginated": is_paginated,
         "query_string": query_without_page.urlencode(),
         "common_concentrations": tuple(FRAGRANCE_CONCENTRATION_DISPLAY_LABELS.values()),
     }

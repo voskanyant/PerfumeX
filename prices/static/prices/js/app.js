@@ -12,6 +12,54 @@
         }
     });
 
+    var sidebarStorageKey = "perfumex.sidebarCollapsed";
+    var sidebarCollapseToggle = document.querySelector("[data-sidebar-collapse-toggle]");
+
+    function getStoredSidebarState() {
+        try {
+            return window.localStorage.getItem(sidebarStorageKey) === "1";
+        } catch (error) {
+            return false;
+        }
+    }
+
+    function storeSidebarState(isCollapsed) {
+        try {
+            window.localStorage.setItem(sidebarStorageKey, isCollapsed ? "1" : "0");
+        } catch (error) {
+            return;
+        }
+    }
+
+    function setSidebarCollapsed(isCollapsed) {
+        document.body.classList.toggle("sidebar-is-collapsed", isCollapsed);
+        if (!sidebarCollapseToggle) return;
+        var label = isCollapsed ? "Expand menu" : "Collapse menu";
+        sidebarCollapseToggle.setAttribute("aria-label", label);
+        sidebarCollapseToggle.setAttribute("title", label);
+        sidebarCollapseToggle.setAttribute("aria-pressed", isCollapsed ? "true" : "false");
+        var textNode = sidebarCollapseToggle.querySelector("span");
+        if (textNode) {
+            textNode.textContent = label;
+        }
+    }
+
+    document.querySelectorAll(".sidebar .sidebar-link").forEach(function (link) {
+        var label = (link.textContent || "").trim();
+        if (!label) return;
+        link.setAttribute("aria-label", link.getAttribute("aria-label") || label);
+        link.setAttribute("title", link.getAttribute("title") || label);
+    });
+
+    if (sidebarCollapseToggle) {
+        setSidebarCollapsed(getStoredSidebarState());
+        sidebarCollapseToggle.addEventListener("click", function () {
+            var nextState = !document.body.classList.contains("sidebar-is-collapsed");
+            setSidebarCollapsed(nextState);
+            storeSidebarState(nextState);
+        });
+    }
+
     document.querySelectorAll("input, textarea").forEach(function (el) {
         if (el.type === "checkbox" || el.type === "radio" || el.type === "hidden") return;
         if (!el.classList.contains("form-field") && !el.classList.contains("select-field") && !el.classList.contains("form-control") && !el.classList.contains("form-select")) {

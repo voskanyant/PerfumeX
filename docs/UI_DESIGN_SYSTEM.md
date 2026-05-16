@@ -72,6 +72,7 @@ Prefer these shared include paths for new templates:
 - Run `python scripts/check_template_layout.py` after adding or moving full-page templates.
 - Base CSS comes from `prices/css/app.css` and `prices/css/pages.css`; page-specific CSS is loaded in `extra_head` (`imports.css`, `products.css`, `detail.css`).
 - Authenticated pages use `.layout`, `.sidebar`, `.topbar`, `.mobile-topbar`, and `.content`.
+- The desktop sidebar may collapse to an icon-only rail through the shared `prices/base.html` toggle and `prices/js/app.js` state; keep mobile navigation as the separate drawer.
 - Page content should use `.page-stack` as the outer wrapper.
 - Use `.layout-grid-12`, `.page-grid-3`, `.layout-row`, `.layout-inline`, `.flex-wrap`, `.gap-sm`, `.gap-md`, `.items-end`, and `.is-full-width` instead of one-off layout CSS.
 - Do not add a new shell, sidebar, topbar, background, or typography scheme.

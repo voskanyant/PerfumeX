@@ -462,6 +462,41 @@ class ParsedSupplierProduct(TimeStampedModel):
         ordering = ("supplier_product__supplier__name", "supplier_product__name")
         indexes = [
             GinIndex(fields=["modifiers"], name="alink_parse_modifiers_gin"),
+            models.Index(
+                fields=[
+                    "normalized_brand",
+                    "concentration",
+                    "size_ml",
+                    "supplier_product",
+                ],
+                name="alink_parse_complete_page_idx",
+                condition=(
+                    ~models.Q(product_name_text="")
+                    & ~models.Q(concentration="")
+                    & models.Q(size_ml__isnull=False)
+                    & models.Q(is_set=False)
+                ),
+            ),
+            models.Index(
+                fields=["supplier_product", "id"],
+                name="alink_parse_missing_brand_idx",
+                condition=models.Q(normalized_brand__isnull=True),
+            ),
+            models.Index(
+                fields=["supplier_product", "id"],
+                name="alink_parse_missing_name_idx",
+                condition=models.Q(product_name_text=""),
+            ),
+            models.Index(
+                fields=["supplier_product", "id"],
+                name="alink_parse_missing_conc_idx",
+                condition=models.Q(concentration=""),
+            ),
+            models.Index(
+                fields=["supplier_product", "id"],
+                name="alink_parse_missing_size_idx",
+                condition=models.Q(size_ml__isnull=True),
+            ),
         ]
 
     def __str__(self) -> str:

@@ -319,6 +319,10 @@ class SupplierProduct(models.Model):
             models.Index(fields=["name"], name="prices_sp_name_idx"),
             models.Index(fields=["supplier_sku"], name="prices_sp_sku_idx"),
             models.Index(
+                fields=["supplier", "name", "id"],
+                name="prices_sp_supplier_name_idx",
+            ),
+            models.Index(
                 fields=["is_active", "supplier"],
                 name="prices_sp_active_supplier_idx",
             ),
