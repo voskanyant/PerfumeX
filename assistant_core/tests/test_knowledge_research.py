@@ -65,11 +65,12 @@ class KnowledgeResearchTests(TestCase):
                 alias_text=f"montale alias {index:02d}",
                 normalized_alias=f"montale alias {index:02d}",
             )
+        expected_total = BrandAlias.objects.count()
 
         response = self.client.get(reverse("assistant_core:knowledge"), {"section": "brand_aliases"})
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Showing 1-50 of 55 entries")
+        self.assertContains(response, f"Showing 1-50 of {expected_total} entries")
         self.assertContains(response, "Next")
 
     def test_aliases_page_supports_sections_search_and_concentration_entries(self):

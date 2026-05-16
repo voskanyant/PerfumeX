@@ -317,7 +317,7 @@ class FragranticaCataloguePromotionTests(TestCase):
         self.assertFalse(rows[0]["ready_for_bulk"])
         self.assertFalse(rows[1]["ready_for_bulk"])
 
-    def test_link_action_does_not_reassign_linked_fragrantica_source(self):
+    def test_link_action_adds_extra_link_without_reassigning_primary_source(self):
         other_perfume = Perfume.objects.create(
             brand=self.brand,
             name="Other Vanilla",
@@ -342,8 +342,15 @@ class FragranticaCataloguePromotionTests(TestCase):
         )
 
         source.refresh_from_db()
-        self.assertEqual(result.level, "error")
+        self.assertEqual(result.level, "success")
         self.assertEqual(source.matched_perfume, self.perfume)
+        self.assertTrue(
+            FragranticaProductLink.objects.filter(
+                source=source,
+                perfume=other_perfume,
+                link_type=FragranticaProductLink.LINK_TYPE_MANUAL_EXTRA,
+            ).exists()
+        )
 
     def test_link_action_can_preserve_local_name(self):
         source = FragranticaProduct.objects.create(

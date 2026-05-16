@@ -219,8 +219,6 @@ class GroupingWorkbenchTests(TestCase):
 
 
 class ConcurrentSuggestionAcceptanceTests(TransactionTestCase):
-    reset_sequences = True
-
     def setUp(self):
         ProductAlias.objects.all().delete()
         self.staff1 = User.objects.create_user(username="staff1", password="pass", is_staff=True)
