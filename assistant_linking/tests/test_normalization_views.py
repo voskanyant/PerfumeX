@@ -571,3 +571,40 @@ class NormalizationViewServiceTests(SimpleTestCase):
         self.assertEqual(page_obj.object_list, ["refreshed"])
         self.assertTrue(context["refreshed_visible"])
         self.assertEqual(context["refreshed_visible_count"], 2)
+
+    def test_refresh_visible_parsed_context_auto_refreshes_stale_unlocked_rows(self):
+        product_1 = object()
+        product_2 = object()
+        parsed_1 = SimpleNamespace(
+            pk=1,
+            supplier_product=product_1,
+            locked_by_human=False,
+            parser_version="deterministic-old",
+        )
+        parsed_2 = SimpleNamespace(
+            pk=2,
+            supplier_product=product_2,
+            locked_by_human=True,
+            parser_version="deterministic-old",
+        )
+        refreshed_1 = SimpleNamespace(pk=11)
+        page_obj = SimpleNamespace(object_list=[parsed_1, parsed_2])
+        context = {"parses": [parsed_1, parsed_2], "page_obj": page_obj}
+        parse_saver = MagicMock(return_value=refreshed_1)
+        parsed_id_queryset_builder = MagicMock(return_value=["refreshed"])
+
+        returned = refresh_visible_parsed_context(
+            context,
+            force_refresh=False,
+            auto_refresh_stale=True,
+            parse_saver=parse_saver,
+            parsed_id_queryset_builder=parsed_id_queryset_builder,
+        )
+
+        self.assertIs(returned, context)
+        parse_saver.assert_called_once_with(product_1, force=True)
+        parsed_id_queryset_builder.assert_called_once_with([11, 2])
+        self.assertEqual(context["parses"], ["refreshed"])
+        self.assertEqual(page_obj.object_list, ["refreshed"])
+        self.assertTrue(context["refreshed_visible"])
+        self.assertEqual(context["refreshed_visible_count"], 1)

@@ -200,3 +200,13 @@ Context: AI can help with normalization and Fragrantica linking, but automatic A
 Decision: AI outputs for normalization and linking must be stored as reviewed recommendations first. Deterministic services still generate candidate sets and business rules; AI receives only bounded context, must return strict JSON referencing existing IDs, and must not create links, aliases, parser rules, or catalogue facts by itself.
 
 Consequences: Future AI UI should expose pending recommendations with reasoning and risk. Accepted advice may create a pending learning proposal, but links, aliases, parser rules, and catalogue facts still have to be applied through the same audited mutation paths already used by deterministic workflows. A proposal apply button is a staff action, not AI auto-publishing.
+
+## 2026-05-16 - Complete parsed page refreshes visible stale parses
+
+Status: Accepted
+
+Context: Operators saw stale saved parse identities on the Complete parsed products page, then opening the product detail refreshed the row and made the list correct after returning.
+
+Decision: The Complete parsed products page may refresh only the visible unlocked saved parses whose `parser_version` is stale during normal GET rendering. Other normalization queues keep explicit refresh behavior, and human-locked parses are preserved.
+
+Consequences: Keep the list/detail display consistent without broad full-table reparses. Do not add automatic refreshes to unparsed or issue queues unless the scope stays visible-row bounded and performance is rechecked.

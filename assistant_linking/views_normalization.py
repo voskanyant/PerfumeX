@@ -127,6 +127,7 @@ class LowConfidenceListView(NormalizationSearchMixin, StaffAssistantMixin, ListV
     context_object_name = "parses"
     paginate_by = 50
     refresh_param = "refresh"
+    auto_refresh_stale_visible = False
 
     def get_queryset(self):
         return build_low_confidence_queryset(
@@ -142,6 +143,7 @@ class LowConfidenceListView(NormalizationSearchMixin, StaffAssistantMixin, ListV
         return refresh_visible_parsed_context(
             context,
             force_refresh=self.request.GET.get(self.refresh_param) == "1",
+            auto_refresh_stale=self.auto_refresh_stale_visible,
             parsed_id_queryset_builder=self.get_refreshed_id_queryset,
         )
 
@@ -296,6 +298,7 @@ class ModifierConflictListView(NormalizationIssueListView):
 
 class ParsedListView(NormalizationIssueListView):
     issue_title = "Complete parsed products"
+    auto_refresh_stale_visible = True
 
     def get_queryset(self):
         return build_complete_parsed_queryset(

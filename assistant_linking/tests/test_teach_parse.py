@@ -7,7 +7,7 @@ from django.urls import reverse
 
 from assistant_linking.models import BrandAlias, ParsedSupplierProduct, ProductAlias
 from assistant_linking.services.catalog_matcher import rule_impact
-from assistant_linking.services.normalizer import save_parse
+from assistant_linking.services.normalizer import PARSER_VERSION, save_parse
 from catalog.models import Brand, Perfume, PerfumeVariant
 from prices.models import Supplier, SupplierProduct, UserPreference
 
@@ -461,7 +461,7 @@ class TeachParseTests(TestCase):
         self.assertIsNone(stale_parse.size_ml)
         self.assertEqual(stale_parse.parser_version, "deterministic-old")
 
-    def test_parsed_products_page_does_not_auto_refresh_stale_visible_saved_parse_rows(
+    def test_parsed_products_page_auto_refreshes_stale_visible_saved_parse_rows(
         self,
     ):
         brand = Brand.objects.create(name="Van Cleef & Arpels")
@@ -494,6 +494,55 @@ class TeachParseTests(TestCase):
             variant_type="tester",
             is_tester=True,
             confidence=95,
+            parser_version="deterministic-old",
+        )
+
+        response = self.client.get(reverse("assistant_linking:normalization_parsed"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "1 visible row reparsed.")
+        self.assertContains(
+            response,
+            "Van Cleef &amp; Arpels / Collection Extraordinaire / Neroli Amara / Eau de Parfum / 15ml / Tester",
+        )
+        stale_parse.refresh_from_db()
+        self.assertEqual(stale_parse.collection_name, "Collection Extraordinaire")
+        self.assertEqual(stale_parse.parser_version, PARSER_VERSION)
+
+    def test_parsed_products_page_preserves_locked_stale_visible_saved_parse_rows(
+        self,
+    ):
+        brand = Brand.objects.create(name="Van Cleef & Arpels")
+        BrandAlias.objects.create(
+            brand=brand,
+            alias_text="VAN CLEEF & ARPELS",
+            normalized_alias="van cleef & arpels",
+        )
+        ProductAlias.objects.create(
+            brand=brand,
+            alias_text="collection extraordinaire",
+            canonical_text="",
+            collection_name="Collection Extraordinaire",
+            priority=30,
+        )
+        product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="vca-visible-locked-stale",
+            name="VAN CLEEF & ARPELS Collection Extraordinaire Neroli Amara edp 15 ml tester",
+        )
+        stale_parse = ParsedSupplierProduct.objects.create(
+            supplier_product=product,
+            raw_name=product.name,
+            normalized_text="van cleef neroli amara",
+            normalized_brand=brand,
+            product_name_text="Neroli Amara",
+            collection_name="",
+            concentration="Eau de Parfum",
+            size_ml=Decimal("15.00"),
+            variant_type="tester",
+            is_tester=True,
+            confidence=95,
+            locked_by_human=True,
             parser_version="deterministic-old",
         )
 

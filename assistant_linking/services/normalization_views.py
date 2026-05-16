@@ -13,7 +13,11 @@ from assistant_linking.services.normalization_stats import (
     refresh_stats_snapshot,
     snapshot_to_stats,
 )
-from assistant_linking.services.normalizer import parse_supplier_product, save_parse
+from assistant_linking.services.normalizer import (
+    PARSER_VERSION,
+    parse_supplier_product,
+    save_parse,
+)
 from prices.models import SupplierProduct
 from prices.services.job_queue import enqueue_management_command
 from prices.services.product_visibility import apply_hidden_product_keywords
@@ -708,6 +712,7 @@ def refresh_visible_parsed_context(
     context,
     *,
     force_refresh,
+    auto_refresh_stale=False,
     parse_saver=save_parse,
     parsed_id_queryset_builder=build_complete_parsed_id_queryset,
 ):
@@ -716,7 +721,12 @@ def refresh_visible_parsed_context(
     refreshed_count = 0
     refreshed_parses = []
     for parsed in visible_parses:
-        if force_refresh:
+        should_refresh_stale = (
+            auto_refresh_stale
+            and not parsed.locked_by_human
+            and parsed.parser_version != PARSER_VERSION
+        )
+        if force_refresh or should_refresh_stale:
             refreshed_parses.append(parse_saver(parsed.supplier_product, force=True))
             refreshed_count += 1
         else:
