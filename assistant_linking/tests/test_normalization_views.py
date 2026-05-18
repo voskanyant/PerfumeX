@@ -466,7 +466,7 @@ class NormalizationViewServiceTests(SimpleTestCase):
             "supplier_product__supplier__name", "supplier_product__name"
         )
 
-    def test_build_complete_parsed_queryset_uses_stable_order(self):
+    def test_build_complete_parsed_queryset_uses_indexed_stable_order(self):
         result = object()
         hidden = MagicMock()
         hidden.filter.return_value = hidden
@@ -492,11 +492,7 @@ class NormalizationViewServiceTests(SimpleTestCase):
         self.assertIs(returned, result)
         self.assertEqual(hider_calls, [(base, ["tester"])])
         hidden.filter.assert_called_once()
-        hidden.order_by.assert_called_once_with(
-            "supplier_product__supplier__name",
-            "supplier_product__name",
-            "pk",
-        )
+        hidden.order_by.assert_called_once_with("supplier_product_id", "pk")
 
     def test_build_complete_parsed_id_queryset_filters_by_ids(self):
         result = object()
@@ -518,11 +514,7 @@ class NormalizationViewServiceTests(SimpleTestCase):
         self.assertIs(returned, result)
         base.filter.assert_called_once_with(pk__in=[5, 7])
         id_queryset.filter.assert_called_once()
-        id_queryset.order_by.assert_called_once_with(
-            "supplier_product__supplier__name",
-            "supplier_product__name",
-            "pk",
-        )
+        id_queryset.order_by.assert_called_once_with("supplier_product_id", "pk")
 
     def test_refresh_visible_parsed_context_keeps_rows_when_not_forced(self):
         parsed = SimpleNamespace(pk=1, supplier_product=object())
@@ -641,4 +633,27 @@ class NormalizationViewServiceTests(SimpleTestCase):
             apply_catalog_conflicts=False,
             mark_stats=False,
         )
+        parsed_id_queryset_builder.assert_called_once_with([11])
+
+    def test_refresh_visible_parsed_context_uses_full_save_on_force_refresh(self):
+        product = object()
+        parsed = SimpleNamespace(pk=1, supplier_product=product)
+        refreshed = SimpleNamespace(pk=11)
+        context = {"parses": [parsed]}
+        parse_saver = MagicMock(return_value=refreshed)
+        parsed_id_queryset_builder = MagicMock(return_value=["refreshed"])
+
+        returned = refresh_visible_parsed_context(
+            context,
+            force_refresh=True,
+            parse_saver=parse_saver,
+            parse_saver_kwargs={
+                "apply_catalog_conflicts": False,
+                "mark_stats": False,
+            },
+            parsed_id_queryset_builder=parsed_id_queryset_builder,
+        )
+
+        self.assertIs(returned, context)
+        parse_saver.assert_called_once_with(product, force=True)
         parsed_id_queryset_builder.assert_called_once_with([11])

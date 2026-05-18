@@ -479,6 +479,17 @@ class ParsedSupplierProduct(TimeStampedModel):
             ),
             models.Index(
                 fields=["supplier_product", "id"],
+                name="alink_parse_complete_sp_idx",
+                condition=(
+                    models.Q(normalized_brand__isnull=False)
+                    & ~models.Q(product_name_text="")
+                    & ~models.Q(concentration="")
+                    & models.Q(size_ml__isnull=False)
+                    & models.Q(is_set=False)
+                ),
+            ),
+            models.Index(
+                fields=["supplier_product", "id"],
                 name="alink_parse_missing_brand_idx",
                 condition=models.Q(normalized_brand__isnull=True),
             ),

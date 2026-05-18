@@ -30,8 +30,7 @@ PARSED_PRODUCT_HIDDEN_FIELDS = (
     "supplier_product__supplier_sku",
 )
 COMPLETE_PARSED_ORDER = (
-    "supplier_product__supplier__name",
-    "supplier_product__name",
+    "supplier_product_id",
     "pk",
 )
 
@@ -729,8 +728,9 @@ def refresh_visible_parsed_context(
             and parsed.parser_version != PARSER_VERSION
         )
         if force_refresh or should_refresh_stale:
+            saver_kwargs = {} if force_refresh else parse_kwargs
             refreshed_parses.append(
-                parse_saver(parsed.supplier_product, force=True, **parse_kwargs)
+                parse_saver(parsed.supplier_product, force=True, **saver_kwargs)
             )
             refreshed_count += 1
         else:
