@@ -68,15 +68,7 @@ MANUAL_REVIEW_QUERY = Q(modifiers__contains=[MANUAL_REVIEW_MODIFIER])
 
 
 def complete_parse_query() -> Q:
-    return (
-        Q(normalized_brand__isnull=False)
-        & ~Q(product_name_text="")
-        & ~Q(concentration="")
-        & Q(size_ml__isnull=False)
-        & Q(is_set=False)
-        & ~NON_PERFUME_QUERY
-        & ~MANUAL_REVIEW_QUERY
-    )
+    return Q(is_complete_parse=True)
 
 
 def snapshot_scope_key(hidden_keywords: list[str]) -> str:
@@ -85,7 +77,11 @@ def snapshot_scope_key(hidden_keywords: list[str]) -> str:
 
 
 def hidden_keywords_hash(hidden_keywords: list[str]) -> str:
-    normalized = "\n".join(sorted(keyword.strip().lower() for keyword in hidden_keywords if keyword.strip()))
+    normalized = "\n".join(
+        sorted(
+            keyword.strip().lower() for keyword in hidden_keywords if keyword.strip()
+        )
+    )
     return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
 
 
@@ -111,7 +107,9 @@ def snapshot_to_stats(snapshot: NormalizationStatsSnapshot | None) -> dict[str, 
     }
 
 
-def get_stats_snapshot(*, hidden_keywords: list[str]) -> NormalizationStatsSnapshot | None:
+def get_stats_snapshot(
+    *, hidden_keywords: list[str]
+) -> NormalizationStatsSnapshot | None:
     return NormalizationStatsSnapshot.objects.filter(
         parser_version=PARSER_VERSION,
         scope_key=snapshot_scope_key(hidden_keywords),
@@ -122,15 +120,21 @@ def mark_stats_stale() -> None:
     NormalizationStatsSnapshot.objects.update(is_stale=True)
 
 
-def refresh_stats_snapshot(*, hidden_keywords: list[str] | None = None) -> NormalizationStatsSnapshot:
+def refresh_stats_snapshot(
+    *, hidden_keywords: list[str] | None = None
+) -> NormalizationStatsSnapshot:
     hidden_keywords = hidden_keywords or []
     parsed_queryset = apply_hidden_product_keywords(
         ParsedSupplierProduct.objects.all(),
         hidden_keywords,
         fields=PARSED_PRODUCT_HIDDEN_FIELDS,
     )
-    non_garbage_queryset = parsed_queryset.exclude(modifiers__contains=[GARBAGE_MODIFIER])
-    bag_queryset = non_garbage_queryset.filter(Q(modifiers__contains=[BAG_MODIFIER]) | Q(variant_type=BAG_MODIFIER))
+    non_garbage_queryset = parsed_queryset.exclude(
+        modifiers__contains=[GARBAGE_MODIFIER]
+    )
+    bag_queryset = non_garbage_queryset.filter(
+        Q(modifiers__contains=[BAG_MODIFIER]) | Q(variant_type=BAG_MODIFIER)
+    )
     cosmetic_queryset = non_garbage_queryset.filter(
         Q(modifiers__contains=[COSMETIC_PUDRE_MODIFIER]) | Q(variant_type="poudre")
     )
@@ -147,8 +151,10 @@ def refresh_stats_snapshot(*, hidden_keywords: list[str] | None = None) -> Norma
         Q(modifiers__contains=[ATOMIZER_MODIFIER]) | Q(variant_type=ATOMIZER_MODIFIER)
     )
     manual_review_queryset = non_garbage_queryset.filter(MANUAL_REVIEW_QUERY)
-    normal_product_queryset = non_garbage_queryset.exclude(is_set=True).exclude(NON_PERFUME_QUERY).exclude(
-        MANUAL_REVIEW_QUERY
+    normal_product_queryset = (
+        non_garbage_queryset.exclude(is_set=True)
+        .exclude(NON_PERFUME_QUERY)
+        .exclude(MANUAL_REVIEW_QUERY)
     )
     unparsed_queryset = apply_hidden_product_keywords(
         SupplierProduct.objects.all(),
@@ -169,7 +175,9 @@ def refresh_stats_snapshot(*, hidden_keywords: list[str] | None = None) -> Norma
             filter=Q(is_tester=True) | Q(is_sample=True) | Q(is_travel=True),
         ),
     )
-    counts["garbage_count"] = parsed_queryset.filter(modifiers__contains=[GARBAGE_MODIFIER]).count()
+    counts["garbage_count"] = parsed_queryset.filter(
+        modifiers__contains=[GARBAGE_MODIFIER]
+    ).count()
     counts["set_count"] = non_garbage_queryset.filter(is_set=True).count()
     counts["bag_count"] = bag_queryset.count()
     counts["cosmetic_count"] = cosmetic_queryset.count()
@@ -178,7 +186,9 @@ def refresh_stats_snapshot(*, hidden_keywords: list[str] | None = None) -> Norma
     counts["vintage_count"] = vintage_queryset.count()
     counts["atomizer_count"] = atomizer_queryset.count()
     counts["manual_review_count"] = manual_review_queryset.count()
-    counts["unparsed_count"] = unparsed_queryset.filter(assistant_parse__isnull=True).count()
+    counts["unparsed_count"] = unparsed_queryset.filter(
+        assistant_parse__isnull=True
+    ).count()
     counts["recent_parse_ids"] = list(
         normal_product_queryset.filter(complete_parse_query())
         .order_by("-updated_at")

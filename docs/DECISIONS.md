@@ -210,3 +210,13 @@ Context: Operators saw stale saved parse identities on the Complete parsed produ
 Decision: The Complete parsed products page may refresh only the visible unlocked saved parses whose `parser_version` is stale during normal GET rendering. Other normalization queues keep explicit refresh behavior, and human-locked parses are preserved.
 
 Consequences: Keep the list/detail display consistent without broad full-table reparses. Do not add automatic refreshes to unparsed or issue queues unless the scope stays visible-row bounded and performance is rechecked.
+
+## 2026-05-19 - Complete parsed queue uses stored membership
+
+Status: Accepted
+
+Context: Production-sized Complete parsed pages were still too slow when each GET recalculated complete-parse predicates across saved parse rows.
+
+Decision: Store Complete parsed queue membership on `ParsedSupplierProduct.is_complete_parse`, maintain it on parse saves/edits, and query the list page through an indexed flag.
+
+Consequences: Do not rebuild this queue with broad JSON/predicate scans during normal page loads. Backfill or refresh the flag whenever future changes alter what "complete parsed" means.

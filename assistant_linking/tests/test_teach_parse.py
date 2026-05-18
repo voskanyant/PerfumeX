@@ -1381,3 +1381,29 @@ class TeachParseTests(TestCase):
         self.assertEqual(len(response.context["parses"]), 50)
         self.assertIsNone(response.context["page_obj"].paginator.count)
         self.assertTrue(response.context["page_obj"].has_next())
+
+    def test_parsed_product_complete_flag_is_maintained_on_save(self):
+        brand = Brand.objects.create(name="Flag Brand")
+        product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="complete-flag-1",
+            name="Flag Brand Hero edp 100ml",
+        )
+        parsed = ParsedSupplierProduct.objects.create(
+            supplier_product=product,
+            raw_name=product.name,
+            normalized_text=product.name.lower(),
+            normalized_brand=brand,
+            product_name_text="Hero",
+            concentration="Eau de Parfum",
+            size_ml=Decimal("100.00"),
+            confidence=100,
+        )
+
+        self.assertTrue(parsed.is_complete_parse)
+
+        parsed.modifiers = ["garbage"]
+        parsed.save(update_fields=["modifiers", "updated_at"])
+        parsed.refresh_from_db()
+
+        self.assertFalse(parsed.is_complete_parse)

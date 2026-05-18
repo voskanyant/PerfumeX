@@ -19,6 +19,7 @@ DECANT_MODIFIER = "decant"
 VINTAGE_MODIFIER = "vintage"
 ATOMIZER_MODIFIER = "atomizer"
 MANUAL_REVIEW_MODIFIER = "manual_review"
+GARBAGE_MODIFIER = "garbage"
 PERFUME_CATEGORY_CONCENTRATIONS = {
     "Eau de Parfum",
     "Eau de Toilette",
@@ -454,6 +455,7 @@ class ParsedSupplierProduct(TimeStampedModel):
     modifiers = models.JSONField(default=list, blank=True)
     warnings = models.JSONField(default=list, blank=True)
     confidence = models.PositiveSmallIntegerField(default=0, db_index=True)
+    is_complete_parse = models.BooleanField(default=False)
     parser_version = models.CharField(max_length=40, default="deterministic-v1")
     locked_by_human = models.BooleanField(default=False, db_index=True)
     last_parsed_at = models.DateTimeField(null=True, blank=True)
@@ -480,13 +482,11 @@ class ParsedSupplierProduct(TimeStampedModel):
             models.Index(
                 fields=["supplier_product", "id"],
                 name="alink_parse_complete_sp_idx",
-                condition=(
-                    models.Q(normalized_brand__isnull=False)
-                    & ~models.Q(product_name_text="")
-                    & ~models.Q(concentration="")
-                    & models.Q(size_ml__isnull=False)
-                    & models.Q(is_set=False)
-                ),
+                condition=models.Q(is_complete_parse=True),
+            ),
+            models.Index(
+                fields=["is_complete_parse", "supplier_product", "id"],
+                name="alink_parse_complete_flag_idx",
             ),
             models.Index(
                 fields=["supplier_product", "id"],
@@ -509,6 +509,40 @@ class ParsedSupplierProduct(TimeStampedModel):
                 condition=models.Q(size_ml__isnull=True),
             ),
         ]
+
+    def compute_is_complete_parse(self) -> bool:
+        modifiers = set(self.modifiers or [])
+        is_non_perfume = (
+            BAG_MODIFIER in modifiers
+            or self.variant_type == BAG_MODIFIER
+            or COSMETIC_PUDRE_MODIFIER in modifiers
+            or self.variant_type == "poudre"
+            or DEODORANT_MODIFIER in modifiers
+            or self.variant_type == DEODORANT_MODIFIER
+            or DECANT_MODIFIER in modifiers
+            or self.variant_type == DECANT_MODIFIER
+            or VINTAGE_MODIFIER in modifiers
+            or self.variant_type == VINTAGE_MODIFIER
+            or ATOMIZER_MODIFIER in modifiers
+            or self.variant_type == ATOMIZER_MODIFIER
+        )
+        return bool(
+            self.normalized_brand_id
+            and self.product_name_text
+            and self.concentration
+            and self.size_ml is not None
+            and not self.is_set
+            and GARBAGE_MODIFIER not in modifiers
+            and MANUAL_REVIEW_MODIFIER not in modifiers
+            and not is_non_perfume
+        )
+
+    def save(self, *args, **kwargs):
+        self.is_complete_parse = self.compute_is_complete_parse()
+        update_fields = kwargs.get("update_fields")
+        if update_fields is not None:
+            kwargs["update_fields"] = set(update_fields) | {"is_complete_parse"}
+        super().save(*args, **kwargs)
 
     def __str__(self) -> str:
         return f"Parsed: {self.supplier_product}"
