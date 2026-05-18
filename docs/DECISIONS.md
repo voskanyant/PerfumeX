@@ -220,3 +220,13 @@ Context: Production-sized Complete parsed pages were still too slow when each GE
 Decision: Store Complete parsed queue membership on `ParsedSupplierProduct.is_complete_parse`, maintain it on parse saves/edits, and query the list page through an indexed flag.
 
 Consequences: Do not rebuild this queue with broad JSON/predicate scans during normal page loads. Backfill or refresh the flag whenever future changes alter what "complete parsed" means.
+
+## 2026-05-19 - Large list pages render first, then hydrate
+
+Status: Accepted
+
+Context: Live operator pages with tens or hundreds of thousands of rows, such as Complete parsed, catalogue linking, and Supplier Products, must stay usable even when exact counts, candidate matching, charts, or later pages are expensive.
+
+Decision: Large list pages must return the first visible page through cheap indexed, count-free queries. Heavy work belongs behind lazy endpoints, explicit queued actions, or bounded background hydration after the first response; do not synchronously scan all matching rows, compute exact totals, or preload every future page on normal GET.
+
+Consequences: Treat Supplier Products AJAX search as the reference pattern. Background loading should hydrate details, suggestions, exact metrics, or nearby pages selectively; it must not start an unbounded "open every page" crawl that increases database pressure.
