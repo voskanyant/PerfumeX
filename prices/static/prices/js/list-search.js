@@ -967,8 +967,18 @@
     }
 
     function bindMobileDetailTooltips(container) {
-        bindTooltipGroup(container, ".cell-imported[data-full-datetime]", "show-full-datetime", "datetime");
-        bindTooltipGroup(container, ".cell-price-main[data-original-price]", "show-original-price", "originalPrice");
+        bindTooltipGroup(
+            container,
+            ".cell-imported[data-full-datetime], .supplier-mobile-card-time[data-full-datetime]",
+            "show-full-datetime",
+            "datetime"
+        );
+        bindTooltipGroup(
+            container,
+            ".cell-price-main[data-original-price], .supplier-mobile-card-price[data-original-price]",
+            "show-original-price",
+            "originalPrice"
+        );
     }
 
     function runAjaxSearch(query, page, force) {

@@ -629,6 +629,17 @@ class SharedUiPartialRenderTests(SimpleTestCase):
         self.assertNotIn('el("nav", "space-top-md")', content)
         self.assertNotIn('"page-item active"', content)
 
+    def test_product_list_mobile_card_tooltips_share_detail_bindings(self):
+        js_content = PRODUCT_LIST_JS.read_text(encoding="utf-8")
+        css_content = (
+            BASE_DIR / "prices/static/prices/css/products.css"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn(".supplier-mobile-card-time[data-full-datetime]", js_content)
+        self.assertIn(".supplier-mobile-card-price[data-original-price]", js_content)
+        self.assertIn(".supplier-mobile-card-time.show-full-datetime::after", css_content)
+        self.assertIn(".supplier-mobile-card-price.show-original-price::after", css_content)
+
     def test_prices_named_paginators_use_shared_include_entrypoint(self):
         for template_path in PRICES_NAMED_PAGINATED_TEMPLATES:
             with self.subTest(template=template_path):
