@@ -19,6 +19,7 @@ from assistant_linking.services.normalization_detail import (
     save_product_alias_for_product,
     teach_parse_for_product,
 )
+from assistant_linking.services.normalization_stats import get_stats_snapshot
 from assistant_linking.services.normalization_views import (
     build_atomizer_queryset,
     build_bag_queryset,
@@ -303,11 +304,19 @@ class ModifierConflictListView(NormalizationIssueListView):
 
 class ParsedListView(NormalizationIssueListView):
     issue_title = "Complete parsed products"
-    auto_refresh_stale_visible = True
+    auto_refresh_stale_visible = False
     visible_refresh_parse_saver_kwargs = {
         "apply_catalog_conflicts": False,
         "mark_stats": False,
     }
+
+    def get_cached_total_count(self):
+        if self.get_search_query():
+            return None
+        snapshot = get_stats_snapshot(
+            hidden_keywords=_hidden_product_keywords(self.request)
+        )
+        return snapshot.parsed_count if snapshot else None
 
     def paginate_queryset(self, queryset, page_size):
         page_number = self.kwargs.get(self.page_kwarg) or self.request.GET.get(
@@ -321,6 +330,7 @@ class ParsedListView(NormalizationIssueListView):
             before=self.request.GET.get("before"),
             first_field="supplier_product_id",
             second_field="pk",
+            total_count=self.get_cached_total_count(),
         )
 
     def get_queryset(self):

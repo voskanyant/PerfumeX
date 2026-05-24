@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 
 from django.core.paginator import EmptyPage, PageNotAnInteger
@@ -66,9 +67,16 @@ class CountlessPaginator:
         has_next: bool,
         object_list=None,
         uses_cursor: bool = False,
+        total_count: int | None = None,
     ):
         self.per_page = per_page
-        self.num_pages = current_page + 1 if has_next else current_page
+        self.count = total_count
+        self.has_exact_count = total_count is not None
+        calculated_pages = (
+            max(math.ceil(total_count / per_page), 1) if total_count is not None else 0
+        )
+        cursor_pages = current_page + 1 if has_next else current_page
+        self.num_pages = max(calculated_pages, cursor_pages)
         self.object_list = object_list
         self.uses_cursor = uses_cursor
 
@@ -164,6 +172,7 @@ def paginate_queryset_by_keyset(
     before=None,
     first_field: str = "id",
     second_field: str = "pk",
+    total_count: int | None = None,
 ):
     page_number = parse_page_number(page_number)
     after_cursor = parse_keyset_cursor(after)
@@ -211,6 +220,7 @@ def paginate_queryset_by_keyset(
         has_next=has_next,
         object_list=queryset,
         uses_cursor=True,
+        total_count=total_count,
     )
     page = CountlessPage(
         object_list=object_list,

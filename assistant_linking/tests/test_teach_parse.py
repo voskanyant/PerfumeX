@@ -5,7 +5,12 @@ from django.core.management import call_command
 from django.test import TestCase
 from django.urls import reverse
 
-from assistant_linking.models import BrandAlias, ParsedSupplierProduct, ProductAlias
+from assistant_linking.models import (
+    BrandAlias,
+    NormalizationStatsSnapshot,
+    ParsedSupplierProduct,
+    ProductAlias,
+)
 from assistant_linking.services.catalog_matcher import rule_impact
 from assistant_linking.services.normalizer import PARSER_VERSION, save_parse
 from catalog.models import Brand, Perfume, PerfumeVariant
@@ -461,7 +466,7 @@ class TeachParseTests(TestCase):
         self.assertIsNone(stale_parse.size_ml)
         self.assertEqual(stale_parse.parser_version, "deterministic-old")
 
-    def test_parsed_products_page_auto_refreshes_stale_visible_saved_parse_rows(
+    def test_parsed_products_page_does_not_auto_refresh_stale_visible_saved_parse_rows(
         self,
     ):
         brand = Brand.objects.create(name="Van Cleef & Arpels")
@@ -500,14 +505,10 @@ class TeachParseTests(TestCase):
         response = self.client.get(reverse("assistant_linking:normalization_parsed"))
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "1 visible row reparsed.")
-        self.assertContains(
-            response,
-            "Van Cleef &amp; Arpels / Collection Extraordinaire / Neroli Amara / Eau de Parfum / 15ml / Tester",
-        )
+        self.assertNotContains(response, "visible row reparsed")
         stale_parse.refresh_from_db()
-        self.assertEqual(stale_parse.collection_name, "Collection Extraordinaire")
-        self.assertEqual(stale_parse.parser_version, PARSER_VERSION)
+        self.assertEqual(stale_parse.collection_name, "")
+        self.assertEqual(stale_parse.parser_version, "deterministic-old")
 
     def test_parsed_products_page_preserves_locked_stale_visible_saved_parse_rows(
         self,
@@ -1382,9 +1383,40 @@ class TeachParseTests(TestCase):
         self.assertIsNone(response.context["page_obj"].paginator.count)
         self.assertTrue(response.context["page_obj"].has_next())
 
+    def test_parsed_products_page_shows_cached_total_count(self):
+        brand = Brand.objects.create(name="Cached Total Brand")
+        for index in range(60):
+            product = SupplierProduct.objects.create(
+                supplier=self.supplier,
+                identity_key=f"parsed-cached-total-{index}",
+                name=f"Cached Total Brand Product {index} edp 100ml",
+            )
+            ParsedSupplierProduct.objects.create(
+                supplier_product=product,
+                raw_name=product.name,
+                normalized_text=product.name.lower(),
+                normalized_brand=brand,
+                product_name_text=f"Product {index}",
+                concentration="Eau de Parfum",
+                size_ml=Decimal("100.00"),
+                confidence=100,
+            )
+        NormalizationStatsSnapshot.objects.create(
+            parser_version=PARSER_VERSION,
+            scope_key="global",
+            parsed_count=60,
+        )
+
+        response = self.client.get(reverse("assistant_linking:normalization_parsed"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["page_obj"].paginator.count, 60)
+        self.assertContains(response, "Page 1 of 2")
+        self.assertContains(response, "60 products")
+
     def test_parsed_products_page_next_uses_keyset_cursor(self):
         brand = Brand.objects.create(name="Cursor Brand")
-        for index in range(60):
+        for index in range(125):
             product = SupplierProduct.objects.create(
                 supplier=self.supplier,
                 identity_key=f"parsed-cursor-{index}",
@@ -1429,6 +1461,20 @@ class TeachParseTests(TestCase):
         self.assertGreater(min(second_ids), max(first_ids))
         self.assertTrue(second_page.previous_cursor)
         self.assertContains(second_response, "before=")
+
+        third_response = self.client.get(
+            reverse("assistant_linking:normalization_parsed"),
+            {"page": "3", "after": second_page.next_cursor},
+        )
+
+        self.assertEqual(third_response.status_code, 200)
+        third_ids = [
+            parsed.supplier_product_id for parsed in third_response.context["parses"]
+        ]
+        self.assertTrue(third_ids)
+        self.assertTrue(set(first_ids).isdisjoint(third_ids))
+        self.assertTrue(set(second_ids).isdisjoint(third_ids))
+        self.assertGreater(min(third_ids), max(second_ids))
 
     def test_parsed_product_complete_flag_is_maintained_on_save(self):
         brand = Brand.objects.create(name="Flag Brand")

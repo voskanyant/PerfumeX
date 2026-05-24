@@ -203,13 +203,13 @@ Consequences: Future AI UI should expose pending recommendations with reasoning 
 
 ## 2026-05-16 - Complete parsed page refreshes visible stale parses
 
-Status: Accepted
+Status: Superseded by 2026-05-24 keyset pagination and cached totals decision
 
 Context: Operators saw stale saved parse identities on the Complete parsed products page, then opening the product detail refreshed the row and made the list correct after returning.
 
 Decision: The Complete parsed products page may refresh only the visible unlocked saved parses whose `parser_version` is stale during normal GET rendering. Other normalization queues keep explicit refresh behavior, and human-locked parses are preserved.
 
-Consequences: Keep the list/detail display consistent without broad full-table reparses. Do not add automatic refreshes to unparsed or issue queues unless the scope stays visible-row bounded and performance is rechecked.
+Consequences: This improved display correctness but made later page navigation do parser writes during GET, so it is no longer the normal list behavior.
 
 ## 2026-05-19 - Complete parsed queue uses stored membership
 
@@ -230,3 +230,13 @@ Context: Live operator pages with tens or hundreds of thousands of rows, such as
 Decision: Large list pages must return the first visible page through cheap indexed, count-free queries. Heavy work belongs behind lazy endpoints, explicit queued actions, or bounded background hydration after the first response; do not synchronously scan all matching rows, compute exact totals, or preload every future page on normal GET.
 
 Consequences: Treat Supplier Products AJAX search as the reference pattern. Background loading should hydrate details, suggestions, exact metrics, or nearby pages selectively; it must not start an unbounded "open every page" crawl that increases database pressure.
+
+## 2026-05-24 - Complete parsed uses cursor paging and cached totals
+
+Status: Accepted
+
+Context: Complete parsed first-page loading became fast, but changing pages still became slow when normal GETs mixed cursor navigation with synchronous stale parser refreshes. Operators also need visible product/page totals without restoring expensive count queries.
+
+Decision: Complete parsed navigation uses keyset/cursor links on `(supplier_product_id, pk)`, displays cached totals from `NormalizationStatsSnapshot`, and does not refresh stale parser rows synchronously during normal GET rendering. Stale correctness work belongs to explicit visible-page refresh actions, queued stale refresh jobs, or future bounded async hydration.
+
+Consequences: Page navigation stays fast and page/product totals stay visible. Counts are only as fresh as the stats snapshot; refresh stats after large parse/link/import jobs when exact dashboard/list totals matter.

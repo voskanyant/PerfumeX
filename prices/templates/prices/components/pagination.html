@@ -54,7 +54,7 @@
             {% if page_obj.paginator.has_exact_count is False %}
                 Page {{ page_obj.number }}{% if page_obj.has_next %}+{% endif %}
             {% else %}
-                Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+                Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }} · {{ page_obj.paginator.count }} products
             {% endif %}
         </div>
     </nav>
