@@ -1382,6 +1382,54 @@ class TeachParseTests(TestCase):
         self.assertIsNone(response.context["page_obj"].paginator.count)
         self.assertTrue(response.context["page_obj"].has_next())
 
+    def test_parsed_products_page_next_uses_keyset_cursor(self):
+        brand = Brand.objects.create(name="Cursor Brand")
+        for index in range(60):
+            product = SupplierProduct.objects.create(
+                supplier=self.supplier,
+                identity_key=f"parsed-cursor-{index}",
+                name=f"Cursor Brand Product {index} edp 100ml",
+            )
+            ParsedSupplierProduct.objects.create(
+                supplier_product=product,
+                raw_name=product.name,
+                normalized_text=product.name.lower(),
+                normalized_brand=brand,
+                product_name_text=f"Product {index}",
+                concentration="Eau de Parfum",
+                size_ml=Decimal("100.00"),
+                confidence=100,
+            )
+
+        first_response = self.client.get(
+            reverse("assistant_linking:normalization_parsed")
+        )
+
+        self.assertEqual(first_response.status_code, 200)
+        first_page = first_response.context["page_obj"]
+        first_ids = [
+            parsed.supplier_product_id for parsed in first_response.context["parses"]
+        ]
+        self.assertTrue(first_page.next_cursor)
+        self.assertContains(first_response, "after=")
+        self.assertNotContains(first_response, "pagination-jump")
+
+        second_response = self.client.get(
+            reverse("assistant_linking:normalization_parsed"),
+            {"page": "2", "after": first_page.next_cursor},
+        )
+
+        self.assertEqual(second_response.status_code, 200)
+        second_page = second_response.context["page_obj"]
+        second_ids = [
+            parsed.supplier_product_id for parsed in second_response.context["parses"]
+        ]
+        self.assertTrue(second_ids)
+        self.assertTrue(set(first_ids).isdisjoint(second_ids))
+        self.assertGreater(min(second_ids), max(first_ids))
+        self.assertTrue(second_page.previous_cursor)
+        self.assertContains(second_response, "before=")
+
     def test_parsed_product_complete_flag_is_maintained_on_save(self):
         brand = Brand.objects.create(name="Flag Brand")
         product = SupplierProduct.objects.create(

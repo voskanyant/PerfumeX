@@ -47,7 +47,10 @@ from assistant_linking.services.normalization_views import (
 )
 from assistant_linking.view_mixins import StaffAssistantMixin
 from prices.models import SupplierProduct
-from prices.services.pagination import paginate_queryset_without_count
+from prices.services.pagination import (
+    paginate_queryset_by_keyset,
+    paginate_queryset_without_count,
+)
 from prices.services.product_visibility import (
     get_hidden_product_keywords_for_user,
 )
@@ -305,6 +308,20 @@ class ParsedListView(NormalizationIssueListView):
         "apply_catalog_conflicts": False,
         "mark_stats": False,
     }
+
+    def paginate_queryset(self, queryset, page_size):
+        page_number = self.kwargs.get(self.page_kwarg) or self.request.GET.get(
+            self.page_kwarg
+        )
+        return paginate_queryset_by_keyset(
+            queryset,
+            page_number=page_number,
+            page_size=page_size,
+            after=self.request.GET.get("after"),
+            before=self.request.GET.get("before"),
+            first_field="supplier_product_id",
+            second_field="pk",
+        )
 
     def get_queryset(self):
         return build_complete_parsed_queryset(

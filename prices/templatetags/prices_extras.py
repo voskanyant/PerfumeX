@@ -55,6 +55,24 @@ def page_query(context, page_number, page_param="page", exclude=""):
 
 
 @register.simple_tag(takes_context=True)
+def cursor_page_query(
+    context, page_number, cursor_name, cursor_value, page_param="page", exclude=""
+):
+    request = context.get("request")
+    if not request:
+        return ""
+    query = request.GET.copy()
+    for key in _excluded_query_keys(page_param, exclude):
+        query.pop(key, None)
+    query.pop("after", None)
+    query.pop("before", None)
+    query[page_param or "page"] = page_number
+    if cursor_name and cursor_value:
+        query[cursor_name] = cursor_value
+    return query.urlencode()
+
+
+@register.simple_tag(takes_context=True)
 def pagination_hidden_inputs(context, page_param="page", exclude=""):
     request = context.get("request")
     if not request:

@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from django.core.paginator import EmptyPage, PageNotAnInteger
+from django.db.models import Q
 
 
 def parse_page_number(raw) -> int:
@@ -18,11 +19,16 @@ class CountlessPage:
     number: int
     paginator: "CountlessPaginator"
     _has_next: bool
+    _has_previous: bool | None = None
+    next_cursor: str = ""
+    previous_cursor: str = ""
 
     def has_next(self) -> bool:
         return self._has_next
 
     def has_previous(self) -> bool:
+        if self._has_previous is not None:
+            return self._has_previous
         return self.number > 1
 
     def has_other_pages(self) -> bool:
@@ -59,10 +65,12 @@ class CountlessPaginator:
         current_page: int,
         has_next: bool,
         object_list=None,
+        uses_cursor: bool = False,
     ):
         self.per_page = per_page
         self.num_pages = current_page + 1 if has_next else current_page
         self.object_list = object_list
+        self.uses_cursor = uses_cursor
 
     def validate_number(self, number) -> int:
         try:
@@ -111,5 +119,106 @@ def paginate_queryset_without_count(queryset, *, page_number, page_size: int):
         number=page_number,
         paginator=paginator,
         _has_next=has_next,
+    )
+    return paginator, page, object_list, page.has_other_pages()
+
+
+def parse_keyset_cursor(raw) -> tuple[int, int] | None:
+    if not raw:
+        return None
+    try:
+        first, second = str(raw).split(":", 1)
+        first_id = int(first)
+        second_id = int(second)
+    except (TypeError, ValueError):
+        return None
+    if first_id <= 0 or second_id <= 0:
+        return None
+    return first_id, second_id
+
+
+def make_keyset_cursor(item, first_field: str, second_field: str) -> str:
+    return f"{getattr(item, first_field)}:{getattr(item, second_field)}"
+
+
+def _keyset_after_filter(first_field: str, second_field: str, cursor: tuple[int, int]):
+    first_value, second_value = cursor
+    return Q(**{f"{first_field}__gt": first_value}) | Q(
+        **{first_field: first_value, f"{second_field}__gt": second_value}
+    )
+
+
+def _keyset_before_filter(first_field: str, second_field: str, cursor: tuple[int, int]):
+    first_value, second_value = cursor
+    return Q(**{f"{first_field}__lt": first_value}) | Q(
+        **{first_field: first_value, f"{second_field}__lt": second_value}
+    )
+
+
+def paginate_queryset_by_keyset(
+    queryset,
+    *,
+    page_number,
+    page_size: int,
+    after=None,
+    before=None,
+    first_field: str = "id",
+    second_field: str = "pk",
+):
+    page_number = parse_page_number(page_number)
+    after_cursor = parse_keyset_cursor(after)
+    before_cursor = parse_keyset_cursor(before)
+    has_previous: bool | None = None
+
+    if before_cursor:
+        page_number = max(page_number, 1)
+        page_queryset = queryset.filter(
+            _keyset_before_filter(first_field, second_field, before_cursor)
+        ).order_by(f"-{first_field}", f"-{second_field}")
+        items = list(page_queryset[: page_size + 1])
+        has_previous = len(items) > page_size
+        object_list = list(reversed(items[:page_size]))
+        has_next = True
+    elif after_cursor:
+        page_queryset = queryset.filter(
+            _keyset_after_filter(first_field, second_field, after_cursor)
+        )
+        items = list(page_queryset[: page_size + 1])
+        object_list = items[:page_size]
+        has_next = len(items) > page_size
+        has_previous = True
+    else:
+        # Keep direct page jumps working, but normal next/previous links use cursors.
+        offset = (page_number - 1) * page_size
+        items = list(queryset[offset : offset + page_size + 1])
+        object_list = items[:page_size]
+        has_next = len(items) > page_size
+
+    previous_cursor = (
+        make_keyset_cursor(object_list[0], first_field, second_field)
+        if object_list
+        and (has_previous if has_previous is not None else page_number > 1)
+        else ""
+    )
+    next_cursor = (
+        make_keyset_cursor(object_list[-1], first_field, second_field)
+        if object_list and has_next
+        else ""
+    )
+    paginator = CountlessPaginator(
+        per_page=page_size,
+        current_page=page_number,
+        has_next=has_next,
+        object_list=queryset,
+        uses_cursor=True,
+    )
+    page = CountlessPage(
+        object_list=object_list,
+        number=page_number,
+        paginator=paginator,
+        _has_next=has_next,
+        _has_previous=has_previous,
+        next_cursor=next_cursor,
+        previous_cursor=previous_cursor,
     )
     return paginator, page, object_list, page.has_other_pages()

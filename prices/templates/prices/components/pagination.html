@@ -1,43 +1,55 @@
 {% load prices_extras %}
 {% if page_obj and page_obj.paginator.num_pages > 1 %}
     <nav class="pagination-shell{% if class_name %} {{ class_name }}{% endif %}"{% if html_id %} id="{{ html_id }}"{% endif %} aria-label="{{ label|default:'Pagination' }}">
-        <div class="pagination-list">
-            {% if page_obj.has_previous %}
-                {% if include_boundary_links %}
-                    <a class="page-link" href="?{% page_query 1 page_param|default:'page' exclude_query_params|default:'' %}">First</a>
+        {% if page_obj.paginator.uses_cursor %}
+            <div class="pagination-list">
+                {% if page_obj.has_previous and page_obj.previous_cursor %}
+                    <a class="page-link" href="?{% cursor_page_query page_obj.previous_page_number 'before' page_obj.previous_cursor page_param|default:'page' exclude_query_params|default:'' %}">Previous</a>
                 {% endif %}
-                <a class="page-link" href="?{% page_query page_obj.previous_page_number page_param|default:'page' exclude_query_params|default:'' %}">Previous</a>
-            {% endif %}
-            {% elided_page_range page_obj as pagination_pages %}
-            {% for page_num in pagination_pages %}
-                {% if page_num == page_obj.paginator.ELLIPSIS %}
-                    <span class="page-link is-disabled" aria-hidden="true">...</span>
-                {% elif page_num == page_obj.number %}
-                    <span class="page-link is-active">{{ page_num }}</span>
-                {% else %}
-                    <a class="page-link" href="?{% page_query page_num page_param|default:'page' exclude_query_params|default:'' %}">{{ page_num }}</a>
+                <span class="page-link is-active">{{ page_obj.number }}</span>
+                {% if page_obj.has_next and page_obj.next_cursor %}
+                    <a class="page-link" href="?{% cursor_page_query page_obj.next_page_number 'after' page_obj.next_cursor page_param|default:'page' exclude_query_params|default:'' %}">Next</a>
                 {% endif %}
-            {% endfor %}
-            {% if page_obj.has_next %}
-                <a class="page-link" href="?{% page_query page_obj.next_page_number page_param|default:'page' exclude_query_params|default:'' %}">Next</a>
-                {% if include_boundary_links %}
-                    <a class="page-link" href="?{% page_query page_obj.paginator.num_pages page_param|default:'page' exclude_query_params|default:'' %}">Last</a>
+            </div>
+        {% else %}
+            <div class="pagination-list">
+                {% if page_obj.has_previous %}
+                    {% if include_boundary_links %}
+                        <a class="page-link" href="?{% page_query 1 page_param|default:'page' exclude_query_params|default:'' %}">First</a>
+                    {% endif %}
+                    <a class="page-link" href="?{% page_query page_obj.previous_page_number page_param|default:'page' exclude_query_params|default:'' %}">Previous</a>
                 {% endif %}
-            {% endif %}
-        </div>
-        <form class="pagination-jump" method="get">
-            {% pagination_hidden_inputs page_param|default:"page" exclude_query_params|default:"" %}
-            <label for="{{ jump_id|default:'page-jump' }}">Page</label>
-            <input
-                id="{{ jump_id|default:'page-jump' }}"
-                type="number"
-                name="{{ page_param|default:'page' }}"
-                min="1"
-                {% if page_obj.paginator.has_exact_count != False %}max="{{ page_obj.paginator.num_pages }}"{% endif %}
-                value="{{ page_obj.number }}"
-            >
-            <button class="button secondary" type="submit">Go</button>
-        </form>
+                {% elided_page_range page_obj as pagination_pages %}
+                {% for page_num in pagination_pages %}
+                    {% if page_num == page_obj.paginator.ELLIPSIS %}
+                        <span class="page-link is-disabled" aria-hidden="true">...</span>
+                    {% elif page_num == page_obj.number %}
+                        <span class="page-link is-active">{{ page_num }}</span>
+                    {% else %}
+                        <a class="page-link" href="?{% page_query page_num page_param|default:'page' exclude_query_params|default:'' %}">{{ page_num }}</a>
+                    {% endif %}
+                {% endfor %}
+                {% if page_obj.has_next %}
+                    <a class="page-link" href="?{% page_query page_obj.next_page_number page_param|default:'page' exclude_query_params|default:'' %}">Next</a>
+                    {% if include_boundary_links %}
+                        <a class="page-link" href="?{% page_query page_obj.paginator.num_pages page_param|default:'page' exclude_query_params|default:'' %}">Last</a>
+                    {% endif %}
+                {% endif %}
+            </div>
+            <form class="pagination-jump" method="get">
+                {% pagination_hidden_inputs page_param|default:"page" exclude_query_params|default:"" %}
+                <label for="{{ jump_id|default:'page-jump' }}">Page</label>
+                <input
+                    id="{{ jump_id|default:'page-jump' }}"
+                    type="number"
+                    name="{{ page_param|default:'page' }}"
+                    min="1"
+                    {% if page_obj.paginator.has_exact_count != False %}max="{{ page_obj.paginator.num_pages }}"{% endif %}
+                    value="{{ page_obj.number }}"
+                >
+                <button class="button secondary" type="submit">Go</button>
+            </form>
+        {% endif %}
         <div class="pagination-summary">
             {% if page_obj.paginator.has_exact_count is False %}
                 Page {{ page_obj.number }}{% if page_obj.has_next %}+{% endif %}
