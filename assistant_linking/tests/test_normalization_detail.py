@@ -243,6 +243,7 @@ class NormalizationDetailServiceTests(SimpleTestCase):
             existing_blockers,
             *,
             hidden_terms,
+            max_examples,
         ):
             calls["rule_impact"] = (
                 given_product,
@@ -250,6 +251,7 @@ class NormalizationDetailServiceTests(SimpleTestCase):
                 product_alias_text,
                 existing_blockers,
                 hidden_terms,
+                max_examples,
             )
             return {"count": 1}
 
@@ -290,6 +292,7 @@ class NormalizationDetailServiceTests(SimpleTestCase):
                 "vanilla extasy",
                 "intense",
                 ["tester"],
+                25,
             ),
         )
 
@@ -755,7 +758,7 @@ class NormalizationDetailDatabaseTests(TestCase):
         parsed.parser_version = "deterministic-v1"
         parsed.save()
 
-        refreshed = get_saved_or_preview_parse(product)
+        refreshed = get_saved_or_preview_parse(product, refresh_stale=True)
 
         self.assertIsInstance(refreshed, ParsedSupplierProduct)
         self.assertEqual(refreshed.parser_version, PARSER_VERSION)
@@ -794,7 +797,7 @@ class NormalizationDetailDatabaseTests(TestCase):
             locked_by_human=False,
         )
 
-        refreshed = get_saved_or_preview_parse(product)
+        refreshed = get_saved_or_preview_parse(product, refresh_stale=True)
 
         self.assertIsInstance(refreshed, ParsedSupplierProduct)
         self.assertEqual(refreshed.parser_version, PARSER_VERSION)

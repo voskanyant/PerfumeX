@@ -241,10 +241,12 @@ def get_saved_or_preview_parse(
     *,
     parse_preview_builder=parse_supplier_product,
     parse_saver=save_parse,
+    refresh_stale=False,
 ):
     existing = getattr(product, "assistant_parse", None)
     if (
-        existing
+        refresh_stale
+        and existing
         and not existing.locked_by_human
         and existing.parser_version != PARSER_VERSION
     ):
@@ -319,6 +321,7 @@ def build_parsed_product_detail_context(
             product_alias_text,
             existing_blockers,
             hidden_terms=hidden_keywords,
+            max_examples=25,
         ),
         **catalog_reference_builder(),
     }

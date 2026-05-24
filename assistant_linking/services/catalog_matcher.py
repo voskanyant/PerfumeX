@@ -40,7 +40,9 @@ def _packaging_key(value: str) -> str:
     return normalize_text((value or "").replace("_", " "))
 
 
-def _variant_score(parsed: ParsedSupplierProduct, variant: PerfumeVariant | None) -> tuple[int, list[str], list[str]]:
+def _variant_score(
+    parsed: ParsedSupplierProduct, variant: PerfumeVariant | None
+) -> tuple[int, list[str], list[str]]:
     if not variant:
         return 0, [], []
     score = 0
@@ -71,9 +73,15 @@ def _variant_score(parsed: ParsedSupplierProduct, variant: PerfumeVariant | None
     return score, reasons, conflicts
 
 
-def candidate_matches(parsed: ParsedSupplierProduct, limit: int = 8) -> list[CatalogCandidate]:
+def candidate_matches(
+    parsed: ParsedSupplierProduct, limit: int = 8
+) -> list[CatalogCandidate]:
     product_text = parsed.product_name_text or parsed.raw_name
-    brand_text = parsed.normalized_brand.name if parsed.normalized_brand_id else parsed.detected_brand_text
+    brand_text = (
+        parsed.normalized_brand.name
+        if parsed.normalized_brand_id
+        else parsed.detected_brand_text
+    )
     perfumes = Perfume.objects.select_related("brand").prefetch_related("variants")
     if parsed.normalized_brand_id:
         perfumes = perfumes.filter(brand=parsed.normalized_brand)
@@ -87,7 +95,9 @@ def candidate_matches(parsed: ParsedSupplierProduct, limit: int = 8) -> list[Cat
         conflicts: list[str] = []
         if score:
             reasons.append("name tokens overlap")
-        if brand_text and normalize_text(brand_text) == normalize_text(perfume.brand.name):
+        if brand_text and normalize_text(brand_text) == normalize_text(
+            perfume.brand.name
+        ):
             score += 25
             reasons.append("brand matches")
         if parsed.concentration and perfume.concentration:
@@ -98,7 +108,9 @@ def candidate_matches(parsed: ParsedSupplierProduct, limit: int = 8) -> list[Cat
                 conflicts.append("concentration differs")
                 score -= 8
         if parsed.supplier_gender_hint and perfume.audience:
-            if audience_group(parsed.supplier_gender_hint) == audience_group(perfume.audience):
+            if audience_group(parsed.supplier_gender_hint) == audience_group(
+                perfume.audience
+            ):
                 score += 5
                 reasons.append("audience matches")
             else:
@@ -106,7 +118,9 @@ def candidate_matches(parsed: ParsedSupplierProduct, limit: int = 8) -> list[Cat
 
         variants = list(perfume.variants.all()) or [None]
         for variant in variants:
-            variant_points, variant_reasons, variant_conflicts = _variant_score(parsed, variant)
+            variant_points, variant_reasons, variant_conflicts = _variant_score(
+                parsed, variant
+            )
             total = max(min(score + variant_points, 100), 0)
             candidates.append(
                 CatalogCandidate(
@@ -118,7 +132,9 @@ def candidate_matches(parsed: ParsedSupplierProduct, limit: int = 8) -> list[Cat
                 )
             )
 
-    return sorted(candidates, key=lambda candidate: candidate.score, reverse=True)[:limit]
+    return sorted(candidates, key=lambda candidate: candidate.score, reverse=True)[
+        :limit
+    ]
 
 
 def similar_supplier_rows(
@@ -141,6 +157,7 @@ def rule_impact(
     product_alias_text: str,
     excluded_terms: str = "",
     hidden_terms: list[str] | None = None,
+    max_examples: int = 25,
 ) -> dict:
     queryset = SupplierProduct.objects.select_related("supplier").exclude(pk=product.pk)
     queryset = apply_hidden_product_keywords(queryset, hidden_terms or [])
@@ -149,13 +166,29 @@ def rule_impact(
     if product_alias_text:
         queryset = queryset.filter(name__icontains=product_alias_text)
     queryset = queryset.order_by("-is_active", "supplier__name", "name")
-    excluded = [normalize_text(term) for term in excluded_terms.replace(";", ",").split(",") if normalize_text(term)]
+    excluded = [
+        normalize_text(term)
+        for term in excluded_terms.replace(";", ",").split(",")
+        if normalize_text(term)
+    ]
     examples = []
     risky = 0
-    for row in queryset:
+    for row in queryset[: max_examples + 1]:
+        if len(examples) >= max_examples:
+            return {
+                "count": len(examples),
+                "risky": risky,
+                "examples": examples,
+                "has_more": True,
+            }
         text = normalize_text(row.name)
         has_blocker = any(term in text for term in excluded)
         if has_blocker:
             risky += 1
         examples.append({"product": row, "blocked": has_blocker})
-    return {"count": len(examples), "risky": risky, "examples": examples}
+    return {
+        "count": len(examples),
+        "risky": risky,
+        "examples": examples,
+        "has_more": False,
+    }

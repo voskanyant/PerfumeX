@@ -1292,7 +1292,7 @@ class TeachParseTests(TestCase):
         self.assertIsNone(parsed_two.normalized_brand)
         self.assertNotEqual(parsed_two.product_name_text, "Romeo on the Rocks")
 
-    def test_rule_impact_returns_all_matching_rows(self):
+    def test_rule_impact_bounds_matching_row_preview(self):
         for index in range(12):
             SupplierProduct.objects.create(
                 supplier=self.supplier,
@@ -1304,10 +1304,12 @@ class TeachParseTests(TestCase):
             self.product,
             brand_alias_text="philly phill",
             product_alias_text="romeo on the rocks",
+            max_examples=5,
         )
 
-        self.assertEqual(impact["count"], 12)
-        self.assertEqual(len(impact["examples"]), 12)
+        self.assertEqual(impact["count"], 5)
+        self.assertEqual(len(impact["examples"]), 5)
+        self.assertTrue(impact["has_more"])
 
     def test_hidden_product_keywords_filter_parsed_products_page(self):
         brand = Brand.objects.create(name="Montale")

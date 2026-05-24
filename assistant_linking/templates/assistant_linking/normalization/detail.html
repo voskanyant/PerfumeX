@@ -297,7 +297,7 @@
                 </p>
             </div>
             <div class="flash flash--warning">
-                Rule preview: {{ rule_impact.count }} other rows match these supplier texts. {{ rule_impact.risky }} examples contain typed blockers.
+                Rule preview: {{ rule_impact.count }}{% if rule_impact.has_more %}+{% endif %} other rows match these supplier texts. {{ rule_impact.risky }} examples contain typed blockers.
             </div>
             {% if rule_impact.examples %}
                 <div class="table-wrap table-scroll-x">

@@ -240,3 +240,13 @@ Context: Complete parsed first-page loading became fast, but changing pages stil
 Decision: Complete parsed navigation uses keyset/cursor links on `(supplier_product_id, pk)`, displays cached totals from `NormalizationStatsSnapshot`, and does not refresh stale parser rows synchronously during normal GET rendering. Stale correctness work belongs to explicit visible-page refresh actions, queued stale refresh jobs, or future bounded async hydration.
 
 Consequences: Page navigation stays fast and page/product totals stay visible. Counts are only as fresh as the stats snapshot; refresh stats after large parse/link/import jobs when exact dashboard/list totals matter.
+
+## 2026-05-24 - Normalization detail opens without write-heavy work
+
+Status: Accepted
+
+Context: Opening a product from Complete parsed could still be slow because the detail GET path refreshed stale parser rows and built unbounded teaching impact previews.
+
+Decision: Normalization detail GETs are read-only by default. They may show the saved parse or an unsaved preview, but stale parser refresh uses the explicit Reparse actions. Teaching impact previews must be capped and indicate when more rows exist instead of scanning every matching supplier row during page open.
+
+Consequences: Product detail pages open quickly and avoid write amplification. Operators still have explicit controls to refresh a row or apply teaching to selected preview rows.
