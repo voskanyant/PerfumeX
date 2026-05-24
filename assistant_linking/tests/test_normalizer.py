@@ -2803,6 +2803,29 @@ class NormalizerTests(TestCase):
             "Hugo Boss / Boss Woman / Eau de Parfum / 90ml / Tester",
         )
 
+    def test_hb_boss_supplier_brand_alias_maps_to_hugo_boss(self):
+        brand = Brand.objects.get(name="Hugo Boss")
+        BrandAlias.objects.update_or_create(
+            brand=brand,
+            alias_text="HB Boss",
+            supplier=None,
+            defaults={"normalized_alias": "hb boss", "priority": 30},
+        )
+        product = SupplierProduct.objects.create(
+            supplier=self.supplier,
+            identity_key="hb-boss-jour-runway",
+            name="HB Boss Jour Runway Edition W edp 50 ml",
+        )
+
+        parsed = save_parse(product, force=True)
+
+        self.assertEqual(parsed.normalized_brand, brand)
+        self.assertEqual(parsed.product_name_text, "jour runway edition")
+        self.assertEqual(parsed.concentration, "Eau de Parfum")
+        self.assertEqual(parsed.size_ml, Decimal("50.00"))
+        self.assertEqual(parsed.supplier_gender_hint, "Woman")
+        self.assertNotIn("brand missing", parsed.warnings)
+
     def test_catalog_base_name_drops_marketing_garbage_even_when_supplier_gender_differs(
         self,
     ):
