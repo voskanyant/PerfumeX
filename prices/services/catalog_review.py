@@ -11,12 +11,14 @@ from dataclasses import replace
 from decimal import Decimal, InvalidOperation
 from difflib import SequenceMatcher
 from functools import lru_cache
+from hashlib import sha256
 from types import SimpleNamespace
 from urllib.parse import urlencode
 
 import regex
 from django.apps import apps
 from django.conf import settings
+from django.core.cache import cache
 from django.core.paginator import Paginator
 from django.db import IntegrityError, transaction
 from django.db.models import Count, Exists, OuterRef, Q, Subquery
@@ -96,6 +98,7 @@ CATALOGUE_LINKING_CONFIDENCE_FILTERS = {"all", "review", "0", "80", "90", "95", 
 CATALOGUE_LINKING_FILTER_SCAN_PAGES = 25
 CATALOGUE_LINKING_FILTER_SCAN_MIN_BATCH = 200
 CATALOGUE_LINKING_BULK_FILTERED_BATCH_SIZE = 100
+CATALOGUE_LINKING_FILTER_CACHE_TTL_SECONDS = 600
 CATALOGUE_LINKING_BROAD_ORDERING = (
     "brand_id",
     "collection_name",
@@ -328,6 +331,13 @@ class CatalogueConcentrationAuditActionResult:
     level: str
     message: str
     redirect_url: str
+
+
+@dataclass(frozen=True)
+class CatalogueLinkingFilteredPageRows:
+    rows: list[dict]
+    known_count: int | None
+    exhausted: bool
 
 
 def catalog_search_tokens(query: str) -> list[str]:
@@ -2953,6 +2963,44 @@ def _catalogue_linking_request_uses_broad_default_listing(
     )
 
 
+def catalogue_linking_request_uses_scored_row_filter(request) -> bool:
+    confidence_filter = normalize_catalogue_linking_confidence_filter(
+        request.GET.get("confidence")
+    )
+    suggestion_filter = normalize_catalogue_linking_suggestion_filter(
+        request.GET.get("suggestions")
+    )
+    return suggestion_filter != "all" or confidence_filter != "all"
+
+
+def _catalogue_linking_filter_cache_key(
+    request,
+    *,
+    page_size: int,
+    min_score: int,
+) -> str:
+    session_key = getattr(getattr(request, "session", None), "session_key", "") or ""
+    if not session_key:
+        session_key = "anonymous"
+    payload = {
+        "v": 2,
+        "session": session_key,
+        "brand": normalize_fragrantica_review_brand_id(request.GET.get("brand") or ""),
+        "q": request.GET.get("q", "").strip(),
+        "status": normalize_catalogue_linking_status(request.GET.get("status")),
+        "suggestions": normalize_catalogue_linking_suggestion_filter(
+            request.GET.get("suggestions")
+        ),
+        "confidence": normalize_catalogue_linking_confidence_filter(
+            request.GET.get("confidence")
+        ),
+        "min_score": min_score,
+        "page_size": page_size,
+    }
+    digest = sha256(json.dumps(payload, sort_keys=True).encode("utf-8")).hexdigest()
+    return f"catalogue-linking-filter:{digest}"
+
+
 def _apply_catalogue_linking_perfume_filters(
     queryset,
     *,
@@ -3334,13 +3382,14 @@ def _catalogue_linking_request_uses_high_confidence_prefilter(request) -> bool:
     status_filter = normalize_catalogue_linking_status(request.GET.get("status"))
     if suggestion_filter not in {"all", "with"} or status_filter == "linked":
         return False
+    is_scoped = bool(
+        normalize_fragrantica_review_brand_id(request.GET.get("brand") or "")
+        or request.GET.get("q", "").strip()
+    )
     if confidence_filter == "100":
-        return True
+        return is_scoped
     if confidence_filter in {"95", "review"}:
-        return bool(
-            normalize_fragrantica_review_brand_id(request.GET.get("brand") or "")
-            or request.GET.get("q", "").strip()
-        )
+        return is_scoped
     return False
 
 
@@ -3361,10 +3410,15 @@ def _catalogue_linking_request_uses_verified_candidate_filter(request) -> bool:
         request.GET.get("suggestions")
     )
     status_filter = normalize_catalogue_linking_status(request.GET.get("status"))
+    is_scoped = bool(
+        normalize_fragrantica_review_brand_id(request.GET.get("brand") or "")
+        or request.GET.get("q", "").strip()
+    )
     return (
         confidence_filter == "100"
         and suggestion_filter in {"all", "with"}
         and status_filter != "linked"
+        and is_scoped
     )
 
 
@@ -3379,20 +3433,17 @@ def _build_catalogue_linking_strict_exact_page_rows(
 ) -> list[dict]:
     target_start = max(page_number - 1, 0) * page_size
     target_stop = target_start + (result_size or page_size)
-    total_count = _catalogue_linking_sequence_count(sequence)
     scan_size = max(page_size * 5, page_size)
     scan_limit = max_scan_rows or page_size * CATALOGUE_LINKING_FILTER_SCAN_PAGES
-    scan_start = min(target_start, total_count)
-    scan_stop_limit = min(total_count, scan_start + scan_limit)
-    matched_seen = target_start
+    matched_seen = 0
     page_rows: list[dict] = []
 
-    for start in range(scan_start, scan_stop_limit, scan_size):
+    for start in range(0, scan_limit, scan_size):
         perfumes = list(
             _catalogue_linking_sequence_slice(
                 sequence,
                 start,
-                min(start + scan_size, scan_stop_limit),
+                start + scan_size,
             )
         )
         if not perfumes:
@@ -3416,6 +3467,160 @@ def _build_catalogue_linking_strict_exact_page_rows(
     return page_rows
 
 
+def _catalogue_linking_filter_batch_rows(
+    perfumes,
+    *,
+    min_score: int,
+    confidence_filter: str,
+    suggestion_filter: str,
+) -> list[dict]:
+    perfumes = list(perfumes)
+    if not perfumes:
+        return []
+    if confidence_filter in {"100", "review"} and suggestion_filter in {"all", "with"}:
+        exact_perfume_ids = _catalogue_linking_strict_exact_perfume_ids(
+            perfumes,
+            include_linked_sources=confidence_filter == "review",
+        )
+        if not exact_perfume_ids:
+            return []
+        perfumes = [perfume for perfume in perfumes if perfume.id in exact_perfume_ids]
+        if not perfumes:
+            return []
+    rows = build_catalogue_linking_rows(
+        perfumes,
+        min_score=min_score,
+        include_candidates=True,
+        include_payload=False,
+    )
+    rows = filter_catalogue_linking_rows_by_confidence(rows, confidence_filter)
+    return filter_catalogue_linking_rows_by_suggestion(rows, suggestion_filter)
+
+
+def _catalogue_linking_filtered_cache_state(cache_key: str | None) -> dict:
+    if not cache_key:
+        return {"ids": [], "scan_offset": 0, "exhausted": False}
+    cached = cache.get(cache_key)
+    if not isinstance(cached, dict):
+        return {"ids": [], "scan_offset": 0, "exhausted": False}
+    ids = cached.get("ids")
+    if not isinstance(ids, list):
+        ids = []
+    try:
+        scan_offset = max(int(cached.get("scan_offset") or 0), 0)
+    except (TypeError, ValueError):
+        scan_offset = 0
+    return {
+        "ids": [int(value) for value in ids if str(value).isdigit()],
+        "scan_offset": scan_offset,
+        "exhausted": bool(cached.get("exhausted")),
+    }
+
+
+def _catalogue_linking_store_filtered_cache_state(
+    cache_key: str | None,
+    state: dict,
+) -> None:
+    if not cache_key:
+        return
+    cache.set(cache_key, state, timeout=CATALOGUE_LINKING_FILTER_CACHE_TTL_SECONDS)
+
+
+def _build_catalogue_linking_cached_filtered_page_rows(
+    sequence,
+    *,
+    page_number: int,
+    page_size: int,
+    result_size: int | None,
+    min_score: int,
+    confidence_filter: str,
+    suggestion_filter: str,
+    cache_key: str | None,
+    max_scan_rows: int | None,
+    perfume_manager=None,
+) -> CatalogueLinkingFilteredPageRows:
+    perfume_manager = perfume_manager or CatalogPerfume.objects
+    target_start = max(page_number - 1, 0) * page_size
+    target_stop = target_start + (result_size or page_size)
+    scan_size = max(page_size * 5, CATALOGUE_LINKING_FILTER_SCAN_MIN_BATCH)
+    scan_limit = max_scan_rows or page_size * CATALOGUE_LINKING_FILTER_SCAN_PAGES
+    state = _catalogue_linking_filtered_cache_state(cache_key)
+    matched_ids = state["ids"]
+    scan_offset = state["scan_offset"]
+    exhausted = state["exhausted"]
+    page_rows: list[dict] = []
+
+    while len(matched_ids) < target_stop and not exhausted and scan_offset < scan_limit:
+        perfumes = list(
+            _catalogue_linking_sequence_slice(
+                sequence,
+                scan_offset,
+                scan_offset + scan_size,
+            )
+        )
+        if not perfumes:
+            exhausted = True
+            break
+        scan_offset += len(perfumes)
+        filtered_rows = _catalogue_linking_filter_batch_rows(
+            perfumes,
+            min_score=min_score,
+            confidence_filter=confidence_filter,
+            suggestion_filter=suggestion_filter,
+        )
+        for row in filtered_rows:
+            matched_index = len(matched_ids)
+            matched_ids.append(row["perfume"].id)
+            if target_start <= matched_index < target_stop:
+                page_rows.append(row)
+
+    if scan_offset >= scan_limit and len(matched_ids) < target_stop:
+        exhausted = True
+
+    state = {
+        "ids": matched_ids,
+        "scan_offset": scan_offset,
+        "exhausted": exhausted,
+    }
+    _catalogue_linking_store_filtered_cache_state(cache_key, state)
+
+    page_ids = matched_ids[target_start:target_stop]
+    if not page_ids:
+        return CatalogueLinkingFilteredPageRows(
+            rows=[],
+            known_count=len(matched_ids) if exhausted else None,
+            exhausted=exhausted,
+        )
+    if page_rows and len(page_rows) == len(page_ids):
+        return CatalogueLinkingFilteredPageRows(
+            rows=page_rows,
+            known_count=len(matched_ids) if exhausted else None,
+            exhausted=exhausted,
+        )
+    perfumes_by_id = {
+        perfume.id: perfume
+        for perfume in perfume_manager.select_related("brand", "collection").filter(
+            pk__in=page_ids,
+        )
+    }
+    page_perfumes = [
+        perfumes_by_id[perfume_id]
+        for perfume_id in page_ids
+        if perfume_id in perfumes_by_id
+    ]
+    rows = _catalogue_linking_filter_batch_rows(
+        page_perfumes,
+        min_score=min_score,
+        confidence_filter=confidence_filter,
+        suggestion_filter=suggestion_filter,
+    )
+    return CatalogueLinkingFilteredPageRows(
+        rows=rows,
+        known_count=len(matched_ids) if exhausted else None,
+        exhausted=exhausted,
+    )
+
+
 def _build_catalogue_linking_filtered_page_rows(
     sequence,
     *,
@@ -3425,10 +3630,23 @@ def _build_catalogue_linking_filtered_page_rows(
     min_score: int,
     confidence_filter: str,
     suggestion_filter: str,
+    cache_key: str | None = None,
     max_scan_rows: int | None = None,
-) -> list[dict]:
+) -> CatalogueLinkingFilteredPageRows:
+    if cache_key:
+        return _build_catalogue_linking_cached_filtered_page_rows(
+            sequence,
+            page_number=page_number,
+            page_size=page_size,
+            result_size=result_size,
+            min_score=min_score,
+            confidence_filter=confidence_filter,
+            suggestion_filter=suggestion_filter,
+            cache_key=cache_key,
+            max_scan_rows=max_scan_rows,
+        )
     if confidence_filter == "100" and suggestion_filter in {"all", "with"}:
-        return _build_catalogue_linking_strict_exact_page_rows(
+        rows = _build_catalogue_linking_strict_exact_page_rows(
             sequence,
             page_number=page_number,
             page_size=page_size,
@@ -3436,8 +3654,11 @@ def _build_catalogue_linking_filtered_page_rows(
             min_score=min_score,
             max_scan_rows=max_scan_rows,
         )
+        return CatalogueLinkingFilteredPageRows(
+            rows=rows, known_count=None, exhausted=False
+        )
     if confidence_filter == "review" and suggestion_filter in {"all", "with"}:
-        return _build_catalogue_linking_review_page_rows(
+        rows = _build_catalogue_linking_review_page_rows(
             sequence,
             page_number=page_number,
             page_size=page_size,
@@ -3446,6 +3667,9 @@ def _build_catalogue_linking_filtered_page_rows(
             confidence_filter=confidence_filter,
             suggestion_filter=suggestion_filter,
             max_scan_rows=max_scan_rows,
+        )
+        return CatalogueLinkingFilteredPageRows(
+            rows=rows, known_count=None, exhausted=False
         )
 
     target_start = max(page_number - 1, 0) * page_size
@@ -3485,8 +3709,16 @@ def _build_catalogue_linking_filtered_page_rows(
                 page_rows.append(row)
             matched_seen += 1
             if matched_seen >= target_stop:
-                return page_rows
-    return page_rows
+                return CatalogueLinkingFilteredPageRows(
+                    rows=page_rows,
+                    known_count=None,
+                    exhausted=False,
+                )
+    return CatalogueLinkingFilteredPageRows(
+        rows=page_rows,
+        known_count=None,
+        exhausted=len(page_rows) < (result_size or page_size),
+    )
 
 
 def _build_catalogue_linking_review_page_rows(
@@ -3550,6 +3782,7 @@ def _catalogue_linking_filtered_countless_page(
     page_number: int,
     page_size: int,
     object_list,
+    total_count: int | None = None,
 ) -> tuple[list[dict], CountlessPaginator, CountlessPage]:
     has_next = len(rows) > page_size
     page_rows = rows[:page_size]
@@ -3558,6 +3791,7 @@ def _catalogue_linking_filtered_countless_page(
         current_page=page_number,
         has_next=has_next,
         object_list=object_list,
+        total_count=total_count,
     )
     if not page_rows and page_number > 1:
         paginator.num_pages = 1
@@ -3626,7 +3860,7 @@ def build_catalogue_linking_context(
     elif row_filter_active and paginator and page_obj:
         visible_rows = []
         display_page_size = page_obj.paginator.per_page
-        filtered_page_rows = _build_catalogue_linking_filtered_page_rows(
+        filtered_page_result = _build_catalogue_linking_filtered_page_rows(
             paginator.object_list,
             page_number=page_obj.number,
             page_size=display_page_size,
@@ -3634,14 +3868,20 @@ def build_catalogue_linking_context(
             min_score=min_score,
             confidence_filter=confidence_filter,
             suggestion_filter=suggestion_filter,
+            cache_key=_catalogue_linking_filter_cache_key(
+                request,
+                page_size=display_page_size,
+                min_score=min_score,
+            ),
         )
         rows, paginator, page_obj = _catalogue_linking_filtered_countless_page(
-            rows=filtered_page_rows,
+            rows=filtered_page_result.rows,
             page_number=page_obj.number,
             page_size=display_page_size,
             object_list=paginator.object_list,
+            total_count=filtered_page_result.known_count,
         )
-        visible_count = None
+        visible_count = filtered_page_result.known_count
     else:
         visible_rows = build_catalogue_linking_rows(
             perfumes,

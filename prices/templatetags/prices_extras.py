@@ -94,13 +94,21 @@ def pagination_hidden_inputs(context, page_param="page", exclude=""):
 
 
 @register.simple_tag
-def elided_page_range(page_obj):
+def elided_page_range(page_obj, on_each_side=3, on_ends=3):
     if not page_obj:
         return []
+    try:
+        on_each_side = int(on_each_side)
+    except (TypeError, ValueError):
+        on_each_side = 3
+    try:
+        on_ends = int(on_ends)
+    except (TypeError, ValueError):
+        on_ends = 3
     return page_obj.paginator.get_elided_page_range(
         number=page_obj.number,
-        on_each_side=1,
-        on_ends=2,
+        on_each_side=on_each_side,
+        on_ends=on_ends,
     )
 
 

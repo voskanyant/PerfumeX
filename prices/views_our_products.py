@@ -17,6 +17,7 @@ from .services.catalog_review import (
     build_catalogue_linking_ai_advice_review_payload,
     build_catalogue_linking_candidate_payload,
     build_catalogue_linking_context,
+    catalogue_linking_request_uses_scored_row_filter,
     build_catalogue_linking_fragrantica_search_payload,
     build_catalogue_linking_perfume_queryset,
     build_fragrantica_product_review_context,
@@ -153,10 +154,16 @@ class CatalogueLinkingWorkbenchView(LoginRequiredMixin, ListView):
         return build_catalogue_linking_perfume_queryset(self.request)
 
     def paginate_queryset(self, queryset, page_size):
+        total_count = (
+            None
+            if catalogue_linking_request_uses_scored_row_filter(self.request)
+            else queryset.count()
+        )
         return paginate_queryset_without_count(
             queryset,
             page_number=self.request.GET.get(self.page_kwarg),
             page_size=page_size,
+            total_count=total_count,
         )
 
     def get_context_data(self, **kwargs):

@@ -110,7 +110,9 @@ class CountlessPaginator:
             previous = page
 
 
-def paginate_queryset_without_count(queryset, *, page_number, page_size: int):
+def paginate_queryset_without_count(
+    queryset, *, page_number, page_size: int, total_count: int | None = None
+):
     page_number = parse_page_number(page_number)
     offset = (page_number - 1) * page_size
     items = list(queryset[offset : offset + page_size + 1])
@@ -121,6 +123,7 @@ def paginate_queryset_without_count(queryset, *, page_number, page_size: int):
         current_page=page_number,
         has_next=has_next,
         object_list=queryset,
+        total_count=total_count,
     )
     page = CountlessPage(
         object_list=object_list,

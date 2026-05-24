@@ -337,7 +337,7 @@ class SharedUiPartialRenderTests(SimpleTestCase):
 
     def test_pagination_include_renders_standard_gap_marker(self):
         request = RequestFactory().get("/products/", {"page": "2"})
-        page_obj = Paginator(list(range(100)), 10).page(2)
+        page_obj = Paginator(list(range(200)), 10).page(2)
 
         html = self.render_include(
             "includes/pagination.html",
@@ -365,6 +365,8 @@ class SharedUiPartialRenderTests(SimpleTestCase):
         self.assertIn('class="page-link is-active">500</span>', html)
         self.assertIn("Page 500 of 1000", html)
         self.assertIn('aria-hidden="true">...</span>', html)
+        self.assertIn(">497</a>", html)
+        self.assertIn(">503</a>", html)
         self.assertNotIn(">250</a>", html)
         self.assertNotIn(">750</a>", html)
 
@@ -631,14 +633,18 @@ class SharedUiPartialRenderTests(SimpleTestCase):
 
     def test_product_list_mobile_card_tooltips_share_detail_bindings(self):
         js_content = PRODUCT_LIST_JS.read_text(encoding="utf-8")
-        css_content = (
-            BASE_DIR / "prices/static/prices/css/products.css"
-        ).read_text(encoding="utf-8")
+        css_content = (BASE_DIR / "prices/static/prices/css/products.css").read_text(
+            encoding="utf-8"
+        )
 
         self.assertIn(".supplier-mobile-card-time[data-full-datetime]", js_content)
         self.assertIn(".supplier-mobile-card-price[data-original-price]", js_content)
-        self.assertIn(".supplier-mobile-card-time.show-full-datetime::after", css_content)
-        self.assertIn(".supplier-mobile-card-price.show-original-price::after", css_content)
+        self.assertIn(
+            ".supplier-mobile-card-time.show-full-datetime::after", css_content
+        )
+        self.assertIn(
+            ".supplier-mobile-card-price.show-original-price::after", css_content
+        )
 
     def test_prices_named_paginators_use_shared_include_entrypoint(self):
         for template_path in PRICES_NAMED_PAGINATED_TEMPLATES:

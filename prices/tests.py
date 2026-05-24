@@ -9366,6 +9366,27 @@ class OurProductCatalogueListTests(TestCase):
         )
         self.assertContains(response, reverse("prices:catalogue_linking_candidates"))
 
+    def test_catalogue_linking_default_page_shows_exact_count_pagination(self):
+        for index in range(5):
+            Perfume.objects.create(
+                brand=self.perfume.brand,
+                name=f"Paged Scent {index:02d}",
+                concentration="Eau de Parfum",
+            )
+
+        with patch(
+            "prices.views_our_products.CatalogueLinkingWorkbenchView.paginate_by",
+            2,
+        ):
+            response = self.client.get(reverse("prices:catalogue_linking_workbench"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["paginator"].count, 6)
+        self.assertContains(response, "Page 1 of 3")
+        self.assertContains(response, "6 products")
+        self.assertContains(response, ">2</a>")
+        self.assertContains(response, ">3</a>")
+
     def test_catalogue_linking_queryset_filters_link_status_without_global_counts(self):
         from prices.services.catalog_review import (
             build_catalogue_linking_perfume_queryset,
@@ -10073,7 +10094,7 @@ class OurProductCatalogueListTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Shared Bounded Mirage")
-        self.assertIsNone(response.context["paginator"].count)
+        self.assertEqual(response.context["paginator"].count, 2)
         self.assertTrue(candidate_builder.called)
         self.assertLessEqual(len(candidate_builder.call_args.args[0]), 2)
 

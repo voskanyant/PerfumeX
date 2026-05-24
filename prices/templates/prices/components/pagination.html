@@ -19,7 +19,7 @@
                     {% endif %}
                     <a class="page-link" href="?{% page_query page_obj.previous_page_number page_param|default:'page' exclude_query_params|default:'' %}">Previous</a>
                 {% endif %}
-                {% elided_page_range page_obj as pagination_pages %}
+                {% elided_page_range page_obj pagination_on_each_side|default:3 pagination_on_ends|default:3 as pagination_pages %}
                 {% for page_num in pagination_pages %}
                     {% if page_num == page_obj.paginator.ELLIPSIS %}
                         <span class="page-link is-disabled" aria-hidden="true">...</span>
