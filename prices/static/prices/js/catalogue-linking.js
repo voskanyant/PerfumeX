@@ -8,6 +8,8 @@
     var searchForm = document.querySelector("[data-fragrantica-search-form]");
     var searchInput = document.querySelector("[data-fragrantica-search-input]");
     var searchResultsNode = document.querySelector("[data-fragrantica-search-results]");
+    var workbench = document.querySelector(".catalogue-linking-workbench");
+    var filterForm = document.querySelector(".catalogue-linking-filters");
 
     if (!panel || !candidatesNode || !selectedNode) return;
 
@@ -115,6 +117,31 @@
         text.textContent = message;
         empty.appendChild(text);
         target.appendChild(empty);
+    }
+
+    function renderCandidateGroup(title, targetNode) {
+        var target = targetNode || candidatesNode;
+        var group = document.createElement("div");
+        group.className = "catalogue-linking-candidate-group";
+        var heading = document.createElement("div");
+        heading.className = "catalogue-linking-candidate-group-title";
+        heading.textContent = title;
+        group.appendChild(heading);
+        target.appendChild(group);
+        return group;
+    }
+
+    function renderReasonChips(parent, reasons) {
+        var values = (reasons || []).filter(Boolean);
+        if (!values.length) return;
+        var chips = document.createElement("span");
+        chips.className = "catalogue-linking-reason-chips";
+        values.forEach(function (reason) {
+            var chip = document.createElement("span");
+            chip.textContent = reason;
+            chips.appendChild(chip);
+        });
+        parent.appendChild(chips);
     }
 
     function clearSearchResults() {
@@ -247,6 +274,12 @@
         form.method = "post";
         form.action = candidate.link_url;
         form.className = "catalogue-linking-candidate";
+        if (candidate.is_best_match) {
+            form.classList.add("catalogue-linking-candidate-best");
+        }
+        if (candidate.manual_review_reason) {
+            form.classList.add("catalogue-linking-candidate-review");
+        }
         form.setAttribute("data-fragrantica-link-form", "1");
 
         appendHidden(form, "csrfmiddlewaretoken", csrfToken());
@@ -273,7 +306,7 @@
 
         var meta = document.createElement("span");
         meta.className = "catalogue-linking-candidate-meta";
-        var metaParts = [candidate.reason];
+        var metaParts = [];
         if (typeof candidate.score === "number") {
             metaParts.push("Score " + candidate.score);
         }
@@ -284,6 +317,7 @@
         main.appendChild(title);
         appendCollectionSubname(main, candidate.collection);
         main.appendChild(meta);
+        renderReasonChips(main, candidate.reason_parts || [candidate.reason]);
 
         var actions = document.createElement("div");
         actions.className = "catalogue-linking-candidate-actions";
@@ -412,12 +446,29 @@
             renderEmpty("No Fragrantica suggestions meet the current confidence filter.");
             return;
         }
-        renderAIAdvice(data.ai_advice);
+        var toolsGroup = renderCandidateGroup("Tools");
+        if (data.ai_advice) {
+            renderAIAdvice(data.ai_advice);
+            toolsGroup.appendChild(candidatesNode.lastElementChild);
+        }
         if (!data.ai_advice || data.ai_advice.status !== "pending") {
             renderAIAdviceAction(data.selected);
+            toolsGroup.appendChild(candidatesNode.lastElementChild);
         }
-        candidates.forEach(function (candidate) {
-            renderCandidate(data.selected, candidate);
+        var candidateGroups = {};
+        candidates.forEach(function (candidate, index) {
+            candidate.is_best_match = index === 0 && !candidate.manual_review_reason;
+            var groupTitle = candidate.manual_review_reason
+                ? "Needs review"
+                : index === 0
+                    ? "Best match"
+                    : "More candidates";
+            var group = candidateGroups[groupTitle];
+            if (!group) {
+                group = renderCandidateGroup(groupTitle);
+                candidateGroups[groupTitle] = group;
+            }
+            renderCandidate(data.selected, candidate, group);
         });
     }
 
@@ -433,8 +484,9 @@
             );
             return;
         }
+        var group = renderCandidateGroup("Manual results", searchResultsNode);
         results.forEach(function (candidate) {
-            renderCandidate(data.selected, candidate, searchResultsNode);
+            renderCandidate(data.selected, candidate, group);
         });
     }
 
@@ -465,6 +517,7 @@
         var payload = linkingPayloadFromResponse(data);
         row.classList.add("is-linked");
         row.removeAttribute("data-catalogue-link-pair");
+        row.removeAttribute("data-catalogue-ready-link");
         row.setAttribute("data-linking-payload", JSON.stringify(payload));
 
         var title = row.querySelector(".catalogue-linking-row-title");
@@ -699,6 +752,44 @@
             submitManualSearch(searchForm, event.submitter);
         });
     }
+
+    function setWorkbenchLoading() {
+        if (!workbench) return;
+        workbench.classList.add("is-loading");
+        var template = document.getElementById("catalogue-linking-loading-template");
+        var list = document.querySelector("[data-linking-list]");
+        if (!template || !list || list.querySelector(".catalogue-linking-loading-rows")) return;
+        list.appendChild(template.content.cloneNode(true));
+    }
+
+    function prefetchPaginationLinks() {
+        var links = Array.from(document.querySelectorAll(".catalogue-linking-pagination .page-link[href]"));
+        links.slice(0, 6).forEach(function (link) {
+            if (link.dataset.prefetched) return;
+            link.dataset.prefetched = "1";
+            var prefetch = function () {
+                fetch(link.href, {
+                    method: "GET",
+                    credentials: "same-origin",
+                    headers: { "X-Requested-With": "prefetch" }
+                }).catch(function () {});
+            };
+            if ("requestIdleCallback" in window) {
+                window.requestIdleCallback(prefetch, { timeout: 2500 });
+            } else {
+                window.setTimeout(prefetch, 900);
+            }
+        });
+    }
+
+    document.addEventListener("click", function (event) {
+        var link = event.target.closest(".catalogue-linking-pagination .page-link[href]");
+        if (link) setWorkbenchLoading();
+    });
+    if (filterForm) {
+        filterForm.addEventListener("submit", setWorkbenchLoading);
+    }
+    prefetchPaginationLinks();
 
     if (selectionRoot) {
         selectionRoot.addEventListener("catalogue-selection:row-selected", function (event) {

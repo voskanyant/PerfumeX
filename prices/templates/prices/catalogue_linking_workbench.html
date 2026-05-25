@@ -88,14 +88,24 @@
                     <input type="hidden" name="status" value="{{ status_filter }}">
                     <input type="hidden" name="suggestions" value="{{ suggestion_filter }}">
                     <input type="hidden" name="confidence" value="{{ confidence_filter }}">
-                    <div class="catalogue-linking-bulk-bar">
+                    <div class="catalogue-linking-bulk-bar" data-catalogue-bulk-bar>
                         <label class="catalogue-linking-check-all">
                             <input type="checkbox" data-catalogue-check-all>
                             <span>Visible rows</span>
                         </label>
-                        <span class="tone-muted text-small">
-                            <span data-catalogue-selected-count>0</span> selected / {{ ready_bulk_count }} ready link suggestion{{ ready_bulk_count|pluralize }}
-                        </span>
+                        <div class="catalogue-linking-bulk-status">
+                            <span>
+                                <strong data-catalogue-selected-count>0</strong> selected
+                            </span>
+                            <span>
+                                <strong data-catalogue-selected-ready-count>0</strong> ready to link
+                            </span>
+                            <span class="tone-muted text-small">
+                                {{ ready_bulk_count }} visible ready suggestion{{ ready_bulk_count|pluralize }}
+                            </span>
+                            <span class="tone-muted text-small"
+                                  data-catalogue-bulk-reason>No rows selected.</span>
+                        </div>
                         <div class="catalogue-selection-actions">
                             <button class="button ghost"
                                     type="button"
@@ -130,6 +140,7 @@
                                      data-catalogue-selectable-row
                                      data-catalogue-row-id="{{ row.perfume.pk }}"
                                      {% if row.ready_for_bulk %}data-catalogue-link-pair="{{ row.top_candidate.source.pk }}:{{ row.perfume.pk }}:{% if row.top_candidate.creates_alias %}1{% else %}0{% endif %}"{% endif %}
+                                     {% if row.ready_for_bulk %}data-catalogue-ready-link="1"{% endif %}
                                      data-perfume-id="{{ row.perfume.pk }}"
                                      {% if row.payload_json %}data-linking-payload="{{ row.payload_json }}"{% endif %}
                                      data-candidates-url="{% url 'prices:catalogue_linking_candidates' %}?perfume={{ row.perfume.pk }}&min_score={{ min_score }}">
@@ -162,7 +173,7 @@
                                         </span>
                                     {% endif %}
                                     <span class="catalogue-linking-row-meta">
-                                        {{ row.perfume.variant_count|default:0 }} variant{{ row.perfume.variant_count|default:0|pluralize }} ·
+                                        {{ row.perfume.variant_count|default:0 }} variant{{ row.perfume.variant_count|default:0|pluralize }} &middot;
                                         {{ row.perfume.linked_fragrantica_count|default:0 }} linked Fragrantica
                                     </span>
                                     {% if row.top_linked_source %}
@@ -205,7 +216,7 @@
                     </div>
                 </form>
                 {% if is_paginated %}
-                    {% include "includes/pagination.html" with page_obj=page_obj page_param="page" label="Catalogue linking pages" jump_id="catalogue-linking-page-jump" %}
+                    {% include "includes/pagination.html" with page_obj=page_obj page_param="page" label="Catalogue linking pages" jump_id="catalogue-linking-page-jump" class_name="catalogue-linking-pagination" include_boundary_links=True pagination_on_each_side=4 pagination_on_ends=2 %}
                 {% endif %}
             </section>
 
@@ -316,27 +327,40 @@
                             </article>
                         {% endfor %}
                     {% elif selected_row and selected_row.candidates %}
-                        <form method="post"
-                              action="{% url 'prices:catalogue_linking_ai_advice' %}"
-                              class="catalogue-linking-candidate catalogue-linking-ai-action"
-                              data-ai-advice-form>
-                            {% csrf_token %}
-                            <input type="hidden" name="perfume" value="{{ selected_row.perfume.pk }}">
-                            <input type="hidden" name="min_score" value="{{ min_score }}">
-                            <div class="catalogue-linking-candidate-main">
-                                <span class="catalogue-linking-candidate-title">AI advice</span>
-                                <span class="catalogue-linking-candidate-meta">Review-only rerank of the visible Fragrantica candidates.</span>
-                            </div>
-                            <div class="catalogue-linking-candidate-actions">
-                                <button class="button ghost"
-                                        type="submit"
-                                        data-ai-advice-submit>Ask AI</button>
-                            </div>
-                        </form>
+                        <div class="catalogue-linking-candidate-group">
+                            <div class="catalogue-linking-candidate-group-title">Tools</div>
+                            <form method="post"
+                                  action="{% url 'prices:catalogue_linking_ai_advice' %}"
+                                  class="catalogue-linking-candidate catalogue-linking-ai-action"
+                                  data-ai-advice-form>
+                                {% csrf_token %}
+                                <input type="hidden" name="perfume" value="{{ selected_row.perfume.pk }}">
+                                <input type="hidden" name="min_score" value="{{ min_score }}">
+                                <div class="catalogue-linking-candidate-main">
+                                    <span class="catalogue-linking-candidate-title">AI advice</span>
+                                    <span class="catalogue-linking-candidate-meta">Review-only rerank of the visible Fragrantica candidates.</span>
+                                </div>
+                                <div class="catalogue-linking-candidate-actions">
+                                    <button class="button ghost"
+                                            type="submit"
+                                            data-ai-advice-submit>Ask AI</button>
+                                </div>
+                            </form>
+                        </div>
                         {% for candidate in selected_row.candidates %}
+                            {% if forloop.first %}
+                                <div class="catalogue-linking-candidate-group">
+                                    <div class="catalogue-linking-candidate-group-title">
+                                        {% if candidate.manual_review_reason %}Needs review{% else %}Best match{% endif %}
+                                    </div>
+                            {% elif forloop.counter == 2 %}
+                                </div>
+                                <div class="catalogue-linking-candidate-group">
+                                    <div class="catalogue-linking-candidate-group-title">More candidates</div>
+                            {% endif %}
                             <form method="post"
                                   action="{% url 'prices:fragrantica_product_link' candidate.source.pk %}"
-                                  class="catalogue-linking-candidate"
+                                  class="catalogue-linking-candidate {% if forloop.first and not candidate.manual_review_reason %}catalogue-linking-candidate-best{% elif candidate.manual_review_reason %}catalogue-linking-candidate-review{% endif %}"
                                   data-fragrantica-link-form>
                                 {% csrf_token %}
                                 <input type="hidden" name="next" value="{{ request.get_full_path }}">
@@ -361,7 +385,14 @@
                                         </span>
                                     {% endif %}
                                     <span class="catalogue-linking-candidate-meta">
-                                        {{ candidate.reason }} · Score {{ candidate.score }}{% if candidate.source.audience %} · {{ candidate.source.audience }}{% endif %}{% if candidate.source.release_year %} · {{ candidate.source.release_year }}{% endif %}
+                                        Score {{ candidate.score }}{% if candidate.source.audience %} &middot; {{ candidate.source.audience }}{% endif %}{% if candidate.source.release_year %} &middot; {{ candidate.source.release_year }}{% endif %}
+                                    </span>
+                                    <span class="catalogue-linking-reason-chips">
+                                        {% for reason in candidate.reason_parts %}
+                                            <span>{{ reason }}</span>
+                                        {% empty %}
+                                            <span>{{ candidate.reason }}</span>
+                                        {% endfor %}
                                     </span>
                                 </div>
                                 <div class="catalogue-linking-candidate-actions">
@@ -388,6 +419,7 @@
                                     {% endif %}
                                 </div>
                             </form>
+                            {% if forloop.last %}</div>{% endif %}
                         {% endfor %}
                     {% elif selected_row and selected_row.candidates_deferred %}
                         {% include "includes/empty_state.html" with message="Select this row to load Fragrantica suggestions." %}
@@ -400,6 +432,13 @@
             </section>
         </div>
     </div>
+    <template id="catalogue-linking-loading-template">
+        <div class="catalogue-linking-loading-rows" aria-hidden="true">
+            <div></div>
+            <div></div>
+            <div></div>
+        </div>
+    </template>
 {% endblock %}
 {% block extra_scripts %}
 {{ block.super }}

@@ -9346,10 +9346,13 @@ class OurProductCatalogueListTests(TestCase):
             reverse("prices:catalogue_linking_fragrantica_search"),
         )
         self.assertContains(response, "Bulk link checked")
+        self.assertContains(response, "ready to link")
+        self.assertContains(response, "data-catalogue-bulk-reason")
         self.assertContains(response, "data-catalogue-selection-root")
         self.assertContains(response, "data-catalogue-select-toggle")
         self.assertContains(response, "data-catalogue-select-checkbox")
         self.assertContains(response, "data-catalogue-bulk-primary")
+        self.assertContains(response, "catalogue-linking-loading-template")
         self.assertContains(response, "Montale / Vanilla Extasy / Eau de Parfum")
         self.assertContains(response, "Classic")
         self.assertContains(response, "Audience")
@@ -9384,8 +9387,10 @@ class OurProductCatalogueListTests(TestCase):
         self.assertEqual(response.context["paginator"].count, 6)
         self.assertContains(response, "Page 1 of 3")
         self.assertContains(response, "6 products")
+        self.assertContains(response, "catalogue-linking-pagination")
         self.assertContains(response, ">2</a>")
         self.assertContains(response, ">3</a>")
+        self.assertContains(response, ">Last</a>")
 
     def test_catalogue_linking_queryset_filters_link_status_without_global_counts(self):
         from prices.services.catalog_review import (
@@ -10405,6 +10410,10 @@ class OurProductCatalogueListTests(TestCase):
             "Exact brand, scent, and concentration match",
         )
         self.assertEqual(
+            payload["candidates"][0]["reason_parts"],
+            ["Exact brand", "scent", "concentration match"],
+        )
+        self.assertEqual(
             payload["candidates"][0]["link_url"],
             reverse("prices:fragrantica_product_link", args=[source.pk]),
         )
@@ -10434,6 +10443,10 @@ class OurProductCatalogueListTests(TestCase):
         self.assertEqual(
             payload["results"][0]["reason"],
             "Manual Fragrantica search result",
+        )
+        self.assertEqual(
+            payload["results"][0]["reason_parts"],
+            ["Manual search result"],
         )
         self.assertEqual(payload["results"][0]["collection"], "Search Collection")
         self.assertEqual(payload["results"][0]["audience"], "Women")

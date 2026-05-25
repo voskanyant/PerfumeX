@@ -311,6 +311,10 @@ class FragranticaMatchCandidate:
     def source_label(self) -> str:
         return f"{self.source.brand_name} / {self.source_display_name}"
 
+    @property
+    def reason_parts(self) -> list[str]:
+        return catalogue_linking_reason_parts(self.reason)
+
 
 @dataclass(frozen=True)
 class FragranticaPerfumeCandidate:
@@ -338,6 +342,17 @@ class CatalogueLinkingFilteredPageRows:
     rows: list[dict]
     known_count: int | None
     exhausted: bool
+
+
+def catalogue_linking_reason_parts(reason: str) -> list[str]:
+    reason = (reason or "").strip()
+    if not reason:
+        return []
+    parts = [
+        part.strip(" .")
+        for part in re.split(r",|\band\b|;", reason, flags=re.IGNORECASE)
+    ]
+    return [part for part in parts if part]
 
 
 def catalog_search_tokens(query: str) -> list[str]:
@@ -2694,6 +2709,7 @@ def serialize_catalogue_linking_candidate(candidate: FragranticaMatchCandidate) 
         {
             "score": candidate.score,
             "reason": candidate.reason,
+            "reason_parts": candidate.reason_parts,
             "match_type": candidate.match_type,
             "creates_alias": candidate.creates_alias,
             "manual_review_reason": candidate.manual_review_reason,
@@ -2731,6 +2747,7 @@ def serialize_catalogue_linking_manual_source(source, perfume) -> dict:
         {
             "score": None,
             "reason": "Manual Fragrantica search result",
+            "reason_parts": ["Manual search result"],
             "match_type": "manual_search",
             "creates_alias": normalized_fragrance_key(source_name)
             != normalized_fragrance_key(perfume.name),

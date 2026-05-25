@@ -52,6 +52,12 @@
         return row.getAttribute("data-catalogue-row-id") || "";
     }
 
+    function readyLinkRows(root) {
+        return selectedRows(root).filter(function (row) {
+            return row.getAttribute("data-catalogue-ready-link") === "1";
+        });
+    }
+
     function prepareSelectionSubmit(button) {
         if (!button || button.disabled) return false;
         var form = button.form || button.closest("form");
@@ -94,8 +100,23 @@
 
     function updateStatus(root) {
         var count = selectedRows(root).length;
+        var readyCount = readyLinkRows(root).length;
         root.querySelectorAll("[data-catalogue-selected-count]").forEach(function (node) {
             node.textContent = String(count);
+        });
+        root.querySelectorAll("[data-catalogue-selected-ready-count]").forEach(function (node) {
+            node.textContent = String(readyCount);
+        });
+        root.querySelectorAll("[data-catalogue-bulk-reason]").forEach(function (node) {
+            if (!count) {
+                node.textContent = "No rows selected.";
+            } else if (!readyCount) {
+                node.textContent = "No selected rows have a ready suggestion.";
+            } else if (readyCount < count) {
+                node.textContent = String(count - readyCount) + " selected row" + (count - readyCount === 1 ? "" : "s") + " need manual review.";
+            } else {
+                node.textContent = "Ready to bulk link.";
+            }
         });
         root.querySelectorAll("[data-catalogue-selection-bar]").forEach(function (bar) {
             bar.hidden = count === 0;
