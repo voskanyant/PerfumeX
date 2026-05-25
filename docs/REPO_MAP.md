@@ -157,7 +157,7 @@ Should not own:
 - Shared CSS/JS: `prices/static/prices/`; linking-only keyboard shortcuts stay under `assistant_linking/static/assistant_linking/`.
 - Tests: the owning app's tests package/file. Add narrow tests near the behavior changed.
 - Durable agent docs: `docs/`; deep linking-assistant operating docs: `assistant_linking/docs/`.
-- Project-managed Codex skills: `codex-skills/`, linked into `%USERPROFILE%\.codex\skills` by `scripts/sync_codex_skills.ps1`.
+- Project-managed Codex skills: `codex-skills/`, linked into `%USERPROFILE%\.codex\skills` by `scripts/sync_codex_skills.ps1`; these are tool assets and stay outside app lint/format ownership.
 
 ## Where Not To Put New Code
 
