@@ -8,6 +8,8 @@ Related docs: [AGENTS.md](../AGENTS.md), [README.md](../README.md), [docs/REPO_M
 
 Do not redesign the UI when adding a feature.
 
+Before UI/UX work, use the project `ui-ux-pro-max` skill for design judgment, interaction quality, accessibility, responsive behavior, and perceived polish. If Codex has not loaded the skill in the current session, read `codex-skills/ui-ux-pro-max/SKILL.md` directly and apply its relevant rules alongside this document.
+
 ## Before adding UI, Codex must search for examples
 
 First find an existing similar component and copy its structure/classes before inventing anything new.

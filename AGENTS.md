@@ -33,7 +33,7 @@ PerfumeX imports supplier price files manually or from email, stores current sup
 For every task:
 1. Read this file first.
 2. For any non-trivial change, read `docs/REPO_MAP.md`, `docs/DOMAIN_MODEL.md`, and `docs/CODEX_TASKS.md`.
-3. If UI/templates/static files are touched, read `docs/UI_DESIGN_SYSTEM.md`.
+3. If UI/templates/static files are touched, read `docs/UI_DESIGN_SYSTEM.md` and use the project `ui-ux-pro-max` skill for UI/UX judgment. If the skill is not loaded in the current Codex session, read `codex-skills/ui-ux-pro-max/SKILL.md` directly before making UI decisions.
 4. If business behavior, architecture, file placement, or app ownership is touched, read `docs/DECISIONS.md`.
 5. Reuse existing patterns before creating new ones.
 6. Do not invent a new design if an existing pattern exists.
@@ -56,7 +56,7 @@ Before any non-trivial change, inspect:
 - `docs/REPO_MAP.md`
 - `docs/DOMAIN_MODEL.md`
 - `docs/CODEX_TASKS.md`
-- `docs/UI_DESIGN_SYSTEM.md` if UI/templates/static files are touched
+- `docs/UI_DESIGN_SYSTEM.md` and the project `ui-ux-pro-max` skill if UI/templates/static files are touched
 - `docs/DECISIONS.md` if architecture or business behavior is touched
 
 Also read app-local docs when the task enters their area, especially `assistant_linking/docs/assistant_learning_design.md` for assistant learning, aliases, parsing, catalogue imports, and linking workflows.
