@@ -10,6 +10,8 @@
     var searchResultsNode = document.querySelector("[data-fragrantica-search-results]");
     var workbench = document.querySelector(".catalogue-linking-workbench");
     var filterForm = document.querySelector(".catalogue-linking-filters");
+    var rowCountNode = document.querySelector("[data-linking-row-count]");
+    var paginationSlot = document.querySelector("[data-linking-pagination-slot]");
 
     if (!panel || !candidatesNode || !selectedNode) return;
 
@@ -782,6 +784,142 @@
         });
     }
 
+    function updateExactCounts(data) {
+        if (!data) return;
+        if (rowCountNode && typeof data.count === "number") {
+            var shown = rows.length;
+            rowCountNode.textContent = shown + " shown / " + data.count + " products";
+        }
+        renderExactPagination(data);
+    }
+
+    function pageHref(pageNumber) {
+        var currentUrl = new URL(window.location.href);
+        currentUrl.searchParams.set("page", String(pageNumber));
+        return "?" + currentUrl.searchParams.toString();
+    }
+
+    function appendPageLink(list, pageNumber, label) {
+        var link = document.createElement("a");
+        link.className = "page-link";
+        link.href = pageHref(pageNumber);
+        link.textContent = label || String(pageNumber);
+        list.appendChild(link);
+    }
+
+    function exactPageRange(currentPage, pages) {
+        var pageSet = new Set();
+        var page;
+        for (page = Math.max(1, currentPage - 4); page <= Math.min(pages, currentPage + 4); page += 1) {
+            pageSet.add(page);
+        }
+        for (page = 1; page <= Math.min(pages, 2); page += 1) {
+            pageSet.add(page);
+        }
+        for (page = Math.max(1, pages - 1); page <= pages; page += 1) {
+            pageSet.add(page);
+        }
+        return Array.from(pageSet).sort(function (left, right) {
+            return left - right;
+        });
+    }
+
+    function appendPaginationJump(nav, currentPage, pages) {
+        var form = document.createElement("form");
+        form.className = "pagination-jump";
+        form.method = "get";
+        new URL(window.location.href).searchParams.forEach(function (value, key) {
+            if (key === "page") return;
+            appendHidden(form, key, value);
+        });
+        var label = document.createElement("label");
+        label.htmlFor = "catalogue-linking-page-jump";
+        label.textContent = "Page";
+        var input = document.createElement("input");
+        input.id = "catalogue-linking-page-jump";
+        input.type = "number";
+        input.name = "page";
+        input.min = "1";
+        input.max = String(pages);
+        input.value = String(currentPage);
+        var button = document.createElement("button");
+        button.className = "button secondary";
+        button.type = "submit";
+        button.textContent = "Go";
+        form.appendChild(label);
+        form.appendChild(input);
+        form.appendChild(button);
+        nav.appendChild(form);
+    }
+
+    function renderExactPagination(data) {
+        if (!paginationSlot || typeof data.pages !== "number" || typeof data.page !== "number") return;
+        clearNode(paginationSlot);
+        if (data.pages <= 1) return;
+
+        var nav = document.createElement("nav");
+        nav.className = "pagination-shell catalogue-linking-pagination";
+        nav.setAttribute("aria-label", "Catalogue linking pages");
+        var list = document.createElement("div");
+        list.className = "pagination-list";
+        if (data.page > 1) {
+            appendPageLink(list, 1, "First");
+            appendPageLink(list, data.page - 1, "Previous");
+        }
+        var previous = 0;
+        exactPageRange(data.page, data.pages).forEach(function (pageNumber) {
+            if (previous && pageNumber > previous + 1) {
+                var gap = document.createElement("span");
+                gap.className = "page-link is-disabled";
+                gap.setAttribute("aria-hidden", "true");
+                gap.textContent = "...";
+                list.appendChild(gap);
+            }
+            if (pageNumber === data.page) {
+                var active = document.createElement("span");
+                active.className = "page-link is-active";
+                active.textContent = String(pageNumber);
+                list.appendChild(active);
+            } else {
+                appendPageLink(list, pageNumber);
+            }
+            previous = pageNumber;
+        });
+        if (data.page < data.pages) {
+            appendPageLink(list, data.page + 1, "Next");
+            appendPageLink(list, data.pages, "Last");
+        }
+        nav.appendChild(list);
+        appendPaginationJump(nav, data.page, data.pages);
+        var summary = document.createElement("div");
+        summary.className = "pagination-summary";
+        summary.textContent = "Page " + data.page + " of " + data.pages + " · " + data.count + " products";
+        nav.appendChild(summary);
+        paginationSlot.appendChild(nav);
+        prefetchPaginationLinks();
+    }
+
+    function loadExactCounts() {
+        if (!workbench) return;
+        var countsUrl = workbench.getAttribute("data-linking-counts-url");
+        if (!countsUrl) return;
+        var url = new URL(countsUrl, window.location.origin);
+        new URL(window.location.href).searchParams.forEach(function (value, key) {
+            url.searchParams.set(key, value);
+        });
+        fetch(url.toString(), {
+            method: "GET",
+            credentials: "same-origin",
+            headers: { "X-Requested-With": "XMLHttpRequest" }
+        })
+            .then(function (response) {
+                if (!response.ok) throw new Error("Count request failed");
+                return response.json();
+            })
+            .then(updateExactCounts)
+            .catch(function () {});
+    }
+
     document.addEventListener("click", function (event) {
         var link = event.target.closest(".catalogue-linking-pagination .page-link[href]");
         if (link) setWorkbenchLoading();
@@ -790,6 +928,11 @@
         filterForm.addEventListener("submit", setWorkbenchLoading);
     }
     prefetchPaginationLinks();
+    if ("requestIdleCallback" in window) {
+        window.requestIdleCallback(loadExactCounts, { timeout: 1200 });
+    } else {
+        window.setTimeout(loadExactCounts, 700);
+    }
 
     if (selectionRoot) {
         selectionRoot.addEventListener("catalogue-selection:row-selected", function (event) {

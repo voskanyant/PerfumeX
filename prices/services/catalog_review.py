@@ -2500,12 +2500,15 @@ def build_catalogue_fragrantica_candidates_for_perfumes(
         .filter(Q(brand_id__in=brand_ids) | Q(brand__isnull=True))
         .order_by("priority", "alias_text")
     )
+    source_name_candidates_by_perfume_id: dict[int, set[str]] = {}
     if min_score >= 95:
         source_name_candidates = set()
         for perfume in perfumes:
-            source_name_candidates.update(
-                _fragrantica_normalized_name_candidates_for_perfume(perfume)
+            perfume_candidates = _fragrantica_normalized_name_candidates_for_perfume(
+                perfume
             )
+            source_name_candidates_by_perfume_id[perfume.id] = set(perfume_candidates)
+            source_name_candidates.update(perfume_candidates)
         perfumes_by_id = {perfume.id: perfume for perfume in perfumes}
         perfumes_by_brand_id = _group_perfumes_by_brand_id(perfumes)
         for alias in aliases:
@@ -2519,13 +2522,16 @@ def build_catalogue_fragrantica_candidates_for_perfumes(
             else:
                 alias_perfumes = perfumes
             for perfume in alias_perfumes:
-                source_name_candidates.update(
-                    _fragrantica_normalized_name_candidates_for_alias(
-                        alias,
-                        brand_name=perfume.brand.name,
-                        concentration=perfume.concentration,
-                    )
+                alias_candidates = _fragrantica_normalized_name_candidates_for_alias(
+                    alias,
+                    brand_name=perfume.brand.name,
+                    concentration=perfume.concentration,
                 )
+                source_name_candidates_by_perfume_id.setdefault(
+                    perfume.id,
+                    set(),
+                ).update(alias_candidates)
+                source_name_candidates.update(alias_candidates)
         if source_name_candidates:
             source_queryset = source_queryset.filter(
                 normalized_name__in=source_name_candidates
@@ -2548,6 +2554,9 @@ def build_catalogue_fragrantica_candidates_for_perfumes(
         perfume.id: {} for perfume in perfumes
     }
     for source in source_rows:
+        source_name_key = source.normalized_name or normalized_fragrance_key(
+            strip_leading_fragrantica_brand_name(source.brand_name, source.name)
+        )
         source_brand_ids = _source_brand_ids(
             source,
             brand_key_to_ids,
@@ -2560,6 +2569,12 @@ def build_catalogue_fragrantica_candidates_for_perfumes(
                 source,
                 perfume,
                 allow_manual_extra_link=True,
+            ):
+                continue
+            if (
+                min_score >= 95
+                and source_name_key
+                not in source_name_candidates_by_perfume_id.get(perfume.id, set())
             ):
                 continue
             candidate_aliases = aliases_by_brand_id.get(
@@ -3000,7 +3015,7 @@ def _catalogue_linking_filter_cache_key(
     if not session_key:
         session_key = "anonymous"
     payload = {
-        "v": 2,
+        "v": 3,
         "session": session_key,
         "brand": normalize_fragrantica_review_brand_id(request.GET.get("brand") or ""),
         "q": request.GET.get("q", "").strip(),
@@ -3591,9 +3606,6 @@ def _build_catalogue_linking_cached_filtered_page_rows(
             if target_start <= matched_index < target_stop:
                 page_rows.append(row)
 
-    if scan_offset >= scan_limit and len(matched_ids) < target_stop:
-        exhausted = True
-
     state = {
         "ids": matched_ids,
         "scan_offset": scan_offset,
@@ -3636,6 +3648,65 @@ def _build_catalogue_linking_cached_filtered_page_rows(
         known_count=len(matched_ids) if exhausted else None,
         exhausted=exhausted,
     )
+
+
+def _catalogue_linking_extend_filtered_cache_to_exhaustion(
+    sequence,
+    *,
+    page_size: int,
+    min_score: int,
+    confidence_filter: str,
+    suggestion_filter: str,
+    cache_key: str | None,
+) -> dict:
+    state = _catalogue_linking_filtered_cache_state(cache_key)
+    if state["exhausted"]:
+        return state
+
+    matched_ids = state["ids"]
+    seen_ids = set(matched_ids)
+    scan_offset = state["scan_offset"]
+    scan_size = max(page_size * 5, CATALOGUE_LINKING_FILTER_SCAN_MIN_BATCH)
+
+    while True:
+        perfumes = list(
+            _catalogue_linking_sequence_slice(
+                sequence,
+                scan_offset,
+                scan_offset + scan_size,
+            )
+        )
+        if not perfumes:
+            state = {
+                "ids": matched_ids,
+                "scan_offset": scan_offset,
+                "exhausted": True,
+            }
+            _catalogue_linking_store_filtered_cache_state(cache_key, state)
+            return state
+
+        scan_offset += len(perfumes)
+        filtered_rows = _catalogue_linking_filter_batch_rows(
+            perfumes,
+            min_score=min_score,
+            confidence_filter=confidence_filter,
+            suggestion_filter=suggestion_filter,
+        )
+        for row in filtered_rows:
+            perfume_id = row["perfume"].id
+            if perfume_id in seen_ids:
+                continue
+            seen_ids.add(perfume_id)
+            matched_ids.append(perfume_id)
+
+        _catalogue_linking_store_filtered_cache_state(
+            cache_key,
+            {
+                "ids": matched_ids,
+                "scan_offset": scan_offset,
+                "exhausted": False,
+            },
+        )
 
 
 def _build_catalogue_linking_filtered_page_rows(
@@ -3819,6 +3890,72 @@ def _catalogue_linking_filtered_countless_page(
         _has_next=has_next,
     )
     return page_rows, paginator, page_obj
+
+
+def build_catalogue_linking_count_payload(
+    request,
+    *,
+    page_size: int,
+    perfume_manager=None,
+) -> dict:
+    min_score = normalize_catalogue_linking_min_score(request.GET.get("min_score"))
+    confidence_filter = normalize_catalogue_linking_confidence_filter(
+        request.GET.get("confidence")
+    )
+    if confidence_filter != "all":
+        min_score = normalize_catalogue_linking_min_score(confidence_filter)
+    if confidence_filter == "review":
+        min_score = max(min_score, 95)
+    suggestion_filter = normalize_catalogue_linking_suggestion_filter(
+        request.GET.get("suggestions")
+    )
+    row_filter_active = suggestion_filter != "all" or confidence_filter != "all"
+    sequence = build_catalogue_linking_perfume_queryset(
+        request,
+        perfume_manager=perfume_manager,
+    )
+    if row_filter_active:
+        state = _catalogue_linking_extend_filtered_cache_to_exhaustion(
+            sequence,
+            page_size=page_size,
+            min_score=min_score,
+            confidence_filter=confidence_filter,
+            suggestion_filter=suggestion_filter,
+            cache_key=_catalogue_linking_filter_cache_key(
+                request,
+                page_size=page_size,
+                min_score=min_score,
+            ),
+        )
+        total_count = len(state["ids"])
+    else:
+        total_count = _catalogue_linking_sequence_count(sequence)
+
+    page_number = parse_page_number(request.GET.get("page"))
+    num_pages = max((total_count + page_size - 1) // page_size, 1)
+    page_number = min(page_number, num_pages)
+    paginator = CountlessPaginator(
+        per_page=page_size,
+        current_page=page_number,
+        has_next=page_number < num_pages,
+        object_list=sequence,
+        total_count=total_count,
+    )
+    page_obj = CountlessPage(
+        object_list=[],
+        number=page_number,
+        paginator=paginator,
+        _has_next=page_number < num_pages,
+    )
+    return {
+        "count": total_count,
+        "pages": num_pages,
+        "page": page_number,
+        "row_count_display": f"{total_count} rows",
+        "visible_count_display": str(total_count),
+        "page_obj": page_obj,
+        "paginator": paginator,
+    }
 
 
 def build_catalogue_linking_context(

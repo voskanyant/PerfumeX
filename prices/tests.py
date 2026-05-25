@@ -9558,6 +9558,103 @@ class OurProductCatalogueListTests(TestCase):
         self.assertContains(without_suggestion, "1 shown")
         self.assertNotContains(without_suggestion, "1 shown / 2 visible")
 
+    def test_catalogue_linking_high_confidence_prefilter_stays_row_specific(self):
+        brand = Brand.objects.create(name="Calvin Klein")
+        women_intense = Perfume.objects.create(
+            brand=brand,
+            name="Women Intense",
+            concentration="Eau de Parfum",
+        )
+        euphoria_intense = Perfume.objects.create(
+            brand=brand,
+            name="Euphoria Intense",
+            concentration="Eau de Parfum",
+        )
+        source = FragranticaProduct.objects.create(
+            brand_name="Calvin Klein",
+            normalized_brand_name="calvin klein",
+            name="Euphoria Intense",
+            normalized_name="euphoria intense",
+            source_path="/perfume/Calvin-Klein/Euphoria-Intense.html",
+        )
+
+        response = self.client.get(
+            reverse("prices:catalogue_linking_workbench"),
+            {"q": "intense", "suggestions": "with", "confidence": "95"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            "Calvin Klein / Euphoria Intense / Eau de Parfum",
+        )
+        self.assertContains(response, "Calvin Klein / Euphoria Intense")
+        self.assertContains(
+            response,
+            reverse("prices:fragrantica_product_link", args=[source.pk]),
+        )
+        self.assertNotContains(
+            response,
+            "Calvin Klein / Women Intense / Eau de Parfum",
+        )
+
+        candidate_response = self.client.get(
+            reverse("prices:catalogue_linking_candidates"),
+            {"perfume": women_intense.pk, "min_score": "95"},
+        )
+        self.assertEqual(candidate_response.status_code, 200)
+        self.assertEqual(candidate_response.json()["candidates"], [])
+        self.assertNotEqual(euphoria_intense.pk, self.perfume.pk)
+
+    def test_catalogue_linking_count_endpoint_returns_exact_filtered_pages(self):
+        brand = Brand.objects.create(name="Count Brand")
+        for index in range(3):
+            Perfume.objects.create(
+                brand=brand,
+                name=f"Count Scent {index}",
+                concentration="Eau de Parfum",
+            )
+            FragranticaProduct.objects.create(
+                brand_name="Count Brand",
+                normalized_brand_name="count brand",
+                name=f"Count Scent {index}",
+                normalized_name=f"count scent {index}",
+                source_path=f"/perfume/Count-Brand/Count-Scent-{index}.html",
+            )
+
+        with patch(
+            "prices.views_our_products.CatalogueLinkingWorkbenchView.paginate_by",
+            2,
+        ):
+            response = self.client.get(
+                reverse("prices:catalogue_linking_counts"),
+                {"q": "count scent", "suggestions": "with", "confidence": "95"},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["count"], 3)
+        self.assertEqual(payload["pages"], 2)
+        self.assertEqual(payload["row_count_display"], "3 rows")
+
+        with patch(
+            "prices.views_our_products.CatalogueLinkingWorkbenchView.paginate_by",
+            2,
+        ):
+            page_response = self.client.get(
+                reverse("prices:catalogue_linking_workbench"),
+                {
+                    "q": "count scent",
+                    "suggestions": "with",
+                    "confidence": "95",
+                    "page": "2",
+                },
+            )
+
+        self.assertEqual(page_response.status_code, 200)
+        self.assertContains(page_response, "Count Brand / Count Scent 2")
+        self.assertContains(page_response, "Page 2 of 2")
+
     def test_catalogue_linking_workbench_refills_filtered_page_after_bulk_links(self):
         brand = Brand.objects.create(name="Pagination Brand")
         for index in range(40):

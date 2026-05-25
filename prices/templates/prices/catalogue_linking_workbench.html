@@ -11,7 +11,9 @@
         {% include "includes/tabs.html" with class_name="catalogue-tabs" label="Our Products catalogue tabs" items_template="prices/_our_products_catalog_tab_items.html" %}
         {% include "includes/tabs.html" with class_name="catalogue-tabs" label="Fragrantica catalogue tabs" items_template="prices/_fragrantica_catalogue_tab_items.html" active_fragrantica_tab="linking" %}
     </div>
-    <div class="workspace-block catalogue-linking-workbench" data-catalogue-selection-root>
+    <div class="workspace-block catalogue-linking-workbench"
+         data-catalogue-selection-root
+         data-linking-counts-url="{% url 'prices:catalogue_linking_counts' %}">
         <form method="get" class="catalogue-linking-filters" aria-label="Linking filters">
             <label class="catalogue-linking-filter">
                 <span>Brand</span>
@@ -71,9 +73,9 @@
                         <span class="card-label">Left column</span>
                         <h2 class="card-title">Our Products</h2>
                     </div>
-                    <span class="catalogue-linking-count">
+                    <span class="catalogue-linking-count" data-linking-row-count>
                         {% if row_filter_active %}
-                            {{ suggestion_filtered_count }} shown{% if suggestion_visible_count_display %} / {{ suggestion_visible_count_display }} visible{% endif %}
+                            {{ suggestion_filtered_count }} shown{% if suggestion_visible_count_display %} / {{ suggestion_visible_count_display }} visible{% else %} / counting totals...{% endif %}
                         {% else %}
                             {{ catalogue_linking_row_count_display }}
                         {% endif %}
@@ -215,9 +217,11 @@
                         {% endfor %}
                     </div>
                 </form>
-                {% if is_paginated %}
-                    {% include "includes/pagination.html" with page_obj=page_obj page_param="page" label="Catalogue linking pages" jump_id="catalogue-linking-page-jump" class_name="catalogue-linking-pagination" include_boundary_links=True pagination_on_each_side=4 pagination_on_ends=2 %}
-                {% endif %}
+                <div data-linking-pagination-slot>
+                    {% if is_paginated %}
+                        {% include "includes/pagination.html" with page_obj=page_obj page_param="page" label="Catalogue linking pages" jump_id="catalogue-linking-page-jump" class_name="catalogue-linking-pagination" include_boundary_links=True pagination_on_each_side=4 pagination_on_ends=2 %}
+                    {% endif %}
+                </div>
             </section>
 
             <section class="catalogue-linking-panel catalogue-linking-panel-right"
