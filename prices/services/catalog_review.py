@@ -3015,7 +3015,7 @@ def _catalogue_linking_filter_cache_key(
     if not session_key:
         session_key = "anonymous"
     payload = {
-        "v": 3,
+        "v": 4,
         "session": session_key,
         "brand": normalize_fragrantica_review_brand_id(request.GET.get("brand") or ""),
         "q": request.GET.get("q", "").strip(),
@@ -3613,6 +3613,19 @@ def _build_catalogue_linking_cached_filtered_page_rows(
     }
     _catalogue_linking_store_filtered_cache_state(cache_key, state)
 
+    if target_start == 0 and not matched_ids and not exhausted:
+        state = _catalogue_linking_extend_filtered_cache_to_exhaustion(
+            sequence,
+            page_size=page_size,
+            min_score=min_score,
+            confidence_filter=confidence_filter,
+            suggestion_filter=suggestion_filter,
+            cache_key=cache_key,
+            target_match_count=1,
+        )
+        matched_ids = state["ids"]
+        exhausted = state["exhausted"]
+
     page_ids = matched_ids[target_start:target_stop]
     if not page_ids:
         return CatalogueLinkingFilteredPageRows(
@@ -3658,12 +3671,16 @@ def _catalogue_linking_extend_filtered_cache_to_exhaustion(
     confidence_filter: str,
     suggestion_filter: str,
     cache_key: str | None,
+    target_match_count: int | None = None,
 ) -> dict:
     state = _catalogue_linking_filtered_cache_state(cache_key)
     if state["exhausted"]:
         return state
 
     matched_ids = state["ids"]
+    if target_match_count is not None and len(matched_ids) >= target_match_count:
+        return state
+
     seen_ids = set(matched_ids)
     scan_offset = state["scan_offset"]
     scan_size = max(page_size * 5, CATALOGUE_LINKING_FILTER_SCAN_MIN_BATCH)
@@ -3707,6 +3724,12 @@ def _catalogue_linking_extend_filtered_cache_to_exhaustion(
                 "exhausted": False,
             },
         )
+        if target_match_count is not None and len(matched_ids) >= target_match_count:
+            return {
+                "ids": matched_ids,
+                "scan_offset": scan_offset,
+                "exhausted": False,
+            }
 
 
 def _build_catalogue_linking_filtered_page_rows(

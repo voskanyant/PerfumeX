@@ -9655,6 +9655,50 @@ class OurProductCatalogueListTests(TestCase):
         self.assertContains(page_response, "Count Brand / Count Scent 2")
         self.assertContains(page_response, "Page 2 of 2")
 
+    def test_catalogue_linking_sparse_first_page_continues_past_fast_scan(self):
+        brand = Brand.objects.create(name="Sparse Broad Brand")
+        for index in range(6):
+            Perfume.objects.create(
+                brand=brand,
+                name=f"Quiet Sparse Scent {index:02d}",
+                concentration="Eau de Parfum",
+            )
+        ready = Perfume.objects.create(
+            brand=brand,
+            name="Ready Sparse Scent",
+            concentration="Eau de Parfum",
+        )
+        FragranticaProduct.objects.create(
+            brand_name="Sparse Broad Brand",
+            normalized_brand_name="sparse broad brand",
+            name="Ready Sparse Scent Eau de Parfum",
+            normalized_name="ready sparse scent eau de parfum",
+            source_path="/perfume/Sparse-Broad-Brand/Ready-Sparse-Scent.html",
+        )
+
+        with (
+            patch(
+                "prices.views_our_products.CatalogueLinkingWorkbenchView.paginate_by",
+                1,
+            ),
+            patch(
+                "prices.services.catalog_review.CATALOGUE_LINKING_FILTER_SCAN_PAGES",
+                1,
+            ),
+            patch(
+                "prices.services.catalog_review.CATALOGUE_LINKING_FILTER_SCAN_MIN_BATCH",
+                1,
+            ),
+        ):
+            response = self.client.get(
+                reverse("prices:catalogue_linking_workbench"),
+                {"status": "all", "suggestions": "with", "confidence": "95"},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, catalogue_linking_perfume_label(ready))
+        self.assertNotContains(response, "No Our Products rows match these filters.")
+
     def test_catalogue_linking_workbench_refills_filtered_page_after_bulk_links(self):
         brand = Brand.objects.create(name="Pagination Brand")
         for index in range(40):
