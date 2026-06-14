@@ -154,7 +154,7 @@ jobs:
             set -e
             echo "User: $(whoami)"
             echo "Host: $(hostname)"
-            cd /opt/perfumex/PerfumeX
+            cd /srv/apps/perfumex/PerfumeX
             pwd
             OLD_SHA="$(git rev-parse HEAD)"
             if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
@@ -167,84 +167,31 @@ jobs:
             CHANGED_FILES="$(git diff --name-only "$OLD_SHA" "$NEW_SHA" || true)"
             echo "Deploying $OLD_SHA -> $NEW_SHA"
 
-            REQ_HASH="$(sha256sum requirements.txt | awk '{print $1}')"
-            REQ_STAMP="/opt/perfumex/PerfumeX/.venv/.requirements.sha256"
-            if [ "${FORCE_PIP_INSTALL:-0}" = "1" ] || [ ! -f "$REQ_STAMP" ] || [ "$(cat "$REQ_STAMP")" != "$REQ_HASH" ]; then
-              echo "Installing Python requirements"
-              /opt/perfumex/PerfumeX/.venv/bin/pip install -r requirements.txt
-              printf '%s\n' "$REQ_HASH" > "$REQ_STAMP"
-            else
-              echo "requirements.txt unchanged; skipping pip install"
-            fi
-
-            if ! command -v redis-server >/dev/null 2>&1; then
-              apt-get update
-              DEBIAN_FRONTEND=noninteractive apt-get install -y redis-server
-            fi
-            if systemctl is-active --quiet redis-server 2>/dev/null || systemctl is-active --quiet redis 2>/dev/null; then
-              echo "Redis is already active"
-            elif systemctl list-unit-files redis-server.service >/dev/null 2>&1; then
-              systemctl enable --now redis-server
-            elif systemctl list-unit-files redis.service >/dev/null 2>&1; then
-              systemctl enable --now redis
-            else
-              echo "Redis service unit was not found after install"
-              exit 1
-            fi
-            while IFS='=' read -r key value || [ -n "$key" ]; do
-              key="${key%%[[:space:]]*}"
-              case "$key" in
-                ''|\#*) continue ;;
-              esac
-              case "$key" in
-                [A-Za-z_][A-Za-z0-9_]*)
-                  value="$(printf '%s' "$value" | tr -d '\r' | sed -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'$//")"
-                  export "$key=$value"
-                  ;;
-              esac
-            done < /opt/perfumex/PerfumeX/.env
-            if [ -z "${FERNET_KEYS:-}" ] && [ -z "${SALT_KEY:-}" ]; then
-              if [ -z "${SECRET_KEY:-}" ]; then
-                echo "SECRET_KEY is required before deriving FERNET_KEYS"
-                exit 1
-              fi
-              umask 077
-              FERNET_KEYS="$(printf '%s' "$SECRET_KEY" | sha256sum | awk '{print $1}')"
-              printf '\nFERNET_KEYS=%s\n' "$FERNET_KEYS" >> /opt/perfumex/PerfumeX/.env
-              export FERNET_KEYS
-            elif [ -z "${FERNET_KEYS:-}" ]; then
-              export FERNET_KEYS="$SALT_KEY"
-            fi
-            /opt/perfumex/PerfumeX/.venv/bin/python manage.py migrate
+            docker compose build web worker
+            docker compose up -d db redis
+            docker compose run --rm web python manage.py migrate
 
             if [ -n "${DEPLOY_REPARSE_TERMS:-}" ]; then
               printf '%s' "$DEPLOY_REPARSE_TERMS" | tr '|' '\n' | while IFS= read -r term; do
                 [ -z "$term" ] && continue
-                /opt/perfumex/PerfumeX/.venv/bin/python manage.py reparse_supplier_products --only-stale --name-contains "$term"
+                docker compose run --rm web python manage.py reparse_supplier_products --only-stale --name-contains "$term"
               done
             else
               echo "No DEPLOY_REPARSE_TERMS configured; skipping reparses"
             fi
 
             if printf '%s\n' "$CHANGED_FILES" | grep -Eq '^(assistant_linking/|assistant_core/migrations/|catalog/migrations/)'; then
-              /opt/perfumex/PerfumeX/.venv/bin/python manage.py refresh_normalization_stats --all-user-scopes
+              docker compose run --rm web python manage.py refresh_normalization_stats --all-user-scopes
             else
               echo "No normalization-affecting files changed; skipping normalization stats refresh"
             fi
 
-            if [ ! -f /opt/perfumex/PerfumeX/staticfiles/staticfiles.json ] || printf '%s\n' "$CHANGED_FILES" | grep -Eq '(^|/)static/|[.](css|js)$'; then
-              /opt/perfumex/PerfumeX/.venv/bin/python manage.py collectstatic --noinput
+            if [ ! -f /srv/apps/perfumex/PerfumeX/staticfiles/staticfiles.json ] || printf '%s\n' "$CHANGED_FILES" | grep -Eq '(^|/)static/|[.](css|js)$'; then
+              docker compose run --rm web python manage.py collectstatic --noinput
             else
               echo "No static asset changes; skipping collectstatic"
             fi
-            if [ -f /opt/perfumex/PerfumeX/deploy/systemd/perfumex-worker.service ]; then
-              cp /opt/perfumex/PerfumeX/deploy/systemd/perfumex-worker.service /etc/systemd/system/perfumex-worker.service
-              systemctl daemon-reload
-              systemctl enable --now perfumex-worker
-              systemctl restart perfumex-worker
-            else
-              echo "perfumex-worker service template not found"
-              exit 1
-            fi
-            systemctl restart perfumex
-            echo "Application restarted; nginx reload not required for app-only deploy"
+
+            docker compose up -d web worker
+            docker compose ps
+            echo "Application containers restarted; nginx reload not required for app-only deploy"

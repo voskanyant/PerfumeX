@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+from urllib.parse import urlencode
+
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.http import JsonResponse
 from django.shortcuts import redirect
+from django.urls import reverse
 from django.views.generic import DetailView, ListView, TemplateView, View
+from django.views.generic.edit import FormView
 
 from catalog.models import Perfume as CatalogPerfume
 from catalog.models import PerfumeVariant as CatalogPerfumeVariant
@@ -102,6 +106,33 @@ class FragranticaProductReviewView(LoginRequiredMixin, TemplateView):
             )
         )
         return context
+
+
+class FragranticaProductCreateView(LoginRequiredMixin, FormView):
+    template_name = "prices/fragrantica_product_form.html"
+    form_class = forms.ManualFragranticaProductForm
+    success_url = None
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["fragrantica_review_url"] = reverse("prices:fragrantica_product_review")
+        return context
+
+    def form_valid(self, form):
+        product = form.save()
+        action = "Updated" if form.existing_product else "Added"
+        self.success_url = (
+            f"{reverse('prices:fragrantica_product_review')}"
+            f"?{urlencode({'brand': product.brand_name, 'q': product.name})}"
+        )
+        messages.success(
+            self.request,
+            f"{action} Fragrantica row: {product.brand_name} / {product.name}.",
+        )
+        return redirect(self.get_success_url())
+
+    def get_success_url(self):
+        return self.success_url or reverse("prices:fragrantica_product_review")
 
 
 class FragranticaProductLinkView(LoginRequiredMixin, View):
