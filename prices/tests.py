@@ -8555,6 +8555,77 @@ class OurProductCatalogueListTests(TestCase):
         self.assertNotContains(response, "1 parsed supplier rows")
         self.assertNotContains(response, "1 linked supplier rows")
 
+    def test_fragrantica_products_links_to_manual_add_form(self):
+        response = self.client.get(reverse("prices:fragrantica_product_review"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, reverse("prices:fragrantica_product_create"))
+        self.assertContains(response, "Add product")
+
+    def test_manual_fragrantica_product_create_stages_source_row(self):
+        response = self.client.post(
+            reverse("prices:fragrantica_product_create"),
+            {
+                "brand_name": "Montale",
+                "name": "Vanilla Extasy Source",
+                "collection_name": "Fragrantica Collection",
+                "audience": "Women",
+                "release_year": "2008",
+                "source_url": "https://www.fragrantica.com/perfume/Montale/Vanilla-Extasy-1.html",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("brand=Montale", response["Location"])
+        self.assertIn("q=Vanilla+Extasy+Source", response["Location"])
+        source = FragranticaProduct.objects.get(name="Vanilla Extasy Source")
+        self.assertEqual(source.normalized_brand_name, "montale")
+        self.assertEqual(source.normalized_name, "vanilla extasy source")
+        self.assertEqual(
+            source.source_path,
+            "/perfume/Montale/Vanilla-Extasy-1.html",
+        )
+        self.assertEqual(source.source_domain, "www.fragrantica.com")
+        self.assertEqual(source.collection_name, "Fragrantica Collection")
+        messages = [message.message for message in get_messages(response.wsgi_request)]
+        self.assertIn(
+            "Added Fragrantica row: Montale / Vanilla Extasy Source.",
+            messages,
+        )
+
+    def test_manual_fragrantica_product_create_updates_existing_source_row(self):
+        source = FragranticaProduct.objects.create(
+            brand_name="Montale",
+            normalized_brand_name="montale",
+            name="Vanilla Extasy Source",
+            normalized_name="vanilla extasy source",
+            source_path="/perfume/Montale/Vanilla-Extasy-1.html",
+        )
+
+        response = self.client.post(
+            reverse("prices:fragrantica_product_create"),
+            {
+                "brand_name": "Montale",
+                "name": "Vanilla Extasy Source",
+                "collection_name": "Updated Collection",
+                "audience": "Women",
+                "release_year": "2008",
+                "source_url": "https://www.fragrantica.com/perfume/Montale/Vanilla-Extasy-1.html",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(FragranticaProduct.objects.count(), 1)
+        source.refresh_from_db()
+        self.assertEqual(source.collection_name, "Updated Collection")
+        self.assertEqual(source.audience, "Women")
+        self.assertEqual(source.release_year, 2008)
+        messages = [message.message for message in get_messages(response.wsgi_request)]
+        self.assertIn(
+            "Updated Fragrantica row: Montale / Vanilla Extasy Source.",
+            messages,
+        )
+
     def test_fragrantica_products_does_not_show_supplier_missing_comparison(self):
         supplier = models.Supplier.objects.create(name="Antonina")
         supplier_product = models.SupplierProduct.objects.create(

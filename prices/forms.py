@@ -2,7 +2,11 @@ from django import forms
 from django.utils import timezone
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group, Permission
+from urllib.parse import urlparse
 
+from assistant_linking.models import FragranticaProduct
+from assistant_linking.models import normalized_fragrantica_brand_name
+from assistant_linking.models import normalized_fragrantica_product_name
 from . import models
 from .services.product_visibility import normalize_hidden_product_keywords
 
@@ -91,6 +95,92 @@ class OurProductForm(forms.ModelForm):
     class Meta:
         model = models.OurProduct
         fields = "__all__"
+
+
+class ManualFragranticaProductForm(forms.ModelForm):
+    class Meta:
+        model = FragranticaProduct
+        fields = (
+            "brand_name",
+            "name",
+            "collection_name",
+            "audience",
+            "release_year",
+            "source_url",
+            "source_path",
+        )
+        labels = {
+            "brand_name": "Brand",
+            "name": "Fragrantica product name",
+            "collection_name": "Collection",
+            "audience": "Audience",
+            "release_year": "Release year",
+            "source_url": "Fragrantica URL",
+            "source_path": "Source path",
+        }
+        help_texts = {
+            "name": "Use the product title as it appears on Fragrantica.",
+            "source_url": "Optional but preferred. A Fragrantica product page URL keeps the source auditable.",
+            "source_path": "Optional. Filled from the URL path when left blank.",
+        }
+        widgets = {
+            "source_url": forms.URLInput(
+                attrs={"placeholder": "https://www.fragrantica.com/perfume/..."}
+            ),
+            "source_path": forms.TextInput(
+                attrs={"placeholder": "/perfume/Brand/Product-123.html"}
+            ),
+        }
+
+    existing_product: FragranticaProduct | None = None
+
+    def clean(self):
+        cleaned_data = super().clean()
+        brand_name = (cleaned_data.get("brand_name") or "").strip()
+        name = (cleaned_data.get("name") or "").strip()
+        source_url = (cleaned_data.get("source_url") or "").strip()
+        source_path = (cleaned_data.get("source_path") or "").strip()
+        if source_url:
+            parsed = urlparse(source_url)
+            if not source_path and parsed.path:
+                source_path = parsed.path
+                cleaned_data["source_path"] = source_path
+            if parsed.netloc:
+                cleaned_data["source_domain"] = parsed.netloc.lower()
+        if not brand_name or not name:
+            return cleaned_data
+        existing = FragranticaProduct.objects.filter(
+            normalized_brand_name=normalized_fragrantica_brand_name(brand_name),
+            normalized_name=normalized_fragrantica_product_name(brand_name, name),
+            source_path=source_path,
+        ).first()
+        if existing and existing.pk != getattr(self.instance, "pk", None):
+            self.existing_product = existing
+        return cleaned_data
+
+    def save(self, commit=True):
+        if self.existing_product is not None:
+            product = self.existing_product
+            for field in self.Meta.fields:
+                value = self.cleaned_data.get(field)
+                if value not in (None, "") or field in {"collection_name", "audience"}:
+                    setattr(product, field, value or "")
+            product.source_domain = self.cleaned_data.get(
+                "source_domain",
+                product.source_domain or "fragrantica.com",
+            )
+            if commit:
+                product.save()
+            return product
+        product = super().save(commit=False)
+        product.source_domain = self.cleaned_data.get(
+            "source_domain",
+            product.source_domain or "fragrantica.com",
+        )
+        if commit:
+            product.save()
+            self.save_m2m()
+        return product
 
 
 class ImportBatchForm(forms.ModelForm):

@@ -1,0 +1,18 @@
+{% extends "prices/base.html" %}
+{% block title %}Add Fragrantica Product{% endblock %}
+{% block topbar_label %}Fragrantica Products{% endblock %}
+{% block content %}
+    {% include "includes/page_header.html" with kicker="Catalogue review" title="Add Fragrantica product" meta="Stage one external source row for review and linking." secondary_url=fragrantica_review_url secondary_label="Back" %}
+    {% include "includes/tabs.html" with class_name="catalogue-tabs" label="Fragrantica catalogue tabs" items_template="prices/_fragrantica_catalogue_tab_items.html" active_fragrantica_tab="products" %}
+    <div class="workspace-block form-shell">
+        <form method="post">
+            {% csrf_token %}
+            {{ form.as_p }}
+            <div class="form-actions">
+                <button class="button primary" type="submit">Add product</button>
+                <a class="button ghost"
+                   href="{% url 'prices:fragrantica_product_review' %}">Cancel</a>
+            </div>
+        </form>
+    </div>
+{% endblock %}
