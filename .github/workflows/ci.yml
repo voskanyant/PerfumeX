@@ -162,7 +162,8 @@ jobs:
               echo "Server worktree has local tracked changes; preserving them in stash ${STASH_NAME}"
               git stash push -m "$STASH_NAME"
             fi
-            git pull --ff-only origin main
+            git fetch origin main
+            git merge --ff-only FETCH_HEAD
             NEW_SHA="$(git rev-parse HEAD)"
             CHANGED_FILES="$(git diff --name-only "$OLD_SHA" "$NEW_SHA" || true)"
             echo "Deploying $OLD_SHA -> $NEW_SHA"
