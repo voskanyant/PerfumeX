@@ -82,10 +82,20 @@ def _decode_header(value):
     parts = []
     for text, encoding in decoded:
         if isinstance(text, bytes):
-            parts.append(text.decode(encoding or "utf-8", errors="ignore"))
+            candidates = [encoding] if encoding else []
+            candidates.extend(("utf-8", "cp1251", "latin-1"))
+            for candidate in dict.fromkeys(candidates):
+                try:
+                    parts.append(text.decode(candidate))
+                    break
+                except (LookupError, UnicodeDecodeError):
+                    continue
+            else:
+                parts.append(text.decode("utf-8", errors="replace"))
         else:
             parts.append(text)
     return "".join(parts)
+
 
 def _get_part_filename(part):
     filename = part.get_filename()
