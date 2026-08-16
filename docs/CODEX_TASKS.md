@@ -24,6 +24,7 @@ Related docs: [AGENTS.md](../AGENTS.md), [README.md](../README.md), [docs/REPO_M
 - `db.sqlite3` is present but the app is PostgreSQL-only.
 - Import and email code has a large data blast radius: supplier products, snapshots, diagnostics, and active/inactive state.
 - 2026-08-03 - Email imports: treat encoded-header charset labels as untrusted input. Unknown labels such as `unknown-8bit` must use the shared UTF-8, Windows-1251, then Latin-1 fallback instead of aborting the mailbox run and forcing later cron ticks to rescan old messages.
+- 2026-08-16 - Email imports: one bad attachment must not abort later mailboxes. Validate prices against database decimal bounds before writes, isolate each attachment import in a savepoint, then record quarantine diagnostics and advance its cursor after rollback.
 - `SupplierProduct` can link to both legacy `OurProduct` and canonical catalogue models; link changes need care.
 - Assistant parsing can regress many rows if one rule or alias is too broad.
 - Local `run_python_server.cmd` uses `--noreload`; stale server processes can hide template/Python changes.

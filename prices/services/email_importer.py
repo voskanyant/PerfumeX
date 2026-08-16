@@ -1544,7 +1544,13 @@ def run_import(
                             )
                             processed_any = True
                             try:
-                                process_import_file(import_file)
+                                # Keep database-level import failures inside a savepoint.
+                                # PostgreSQL marks a transaction as broken after errors such
+                                # as numeric overflow; leaving this inner atomic block rolls
+                                # back the file import and makes the outer message transaction
+                                # usable for quarantine, diagnostics, and cursor advancement.
+                                with transaction.atomic():
+                                    process_import_file(import_file)
                                 import_file.status = models.ImportStatus.PROCESSED
                                 import_file.save(update_fields=["status"])
                                 summary["processed_files"] += 1
@@ -1920,7 +1926,8 @@ def run_import(
                                         continue
                                     import_file.file.save(filename, ContentFile(payload), save=True)
                                     try:
-                                        process_import_file(import_file)
+                                        with transaction.atomic():
+                                            process_import_file(import_file)
                                         import_file.status = models.ImportStatus.PROCESSED
                                         import_file.save(update_fields=["status"])
                                         batch.status = models.ImportStatus.PROCESSED

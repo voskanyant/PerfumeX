@@ -22,6 +22,23 @@ class ParsedRow:
     currency: str
 
 
+def _maximum_decimal_value(model, field_name: str) -> Decimal:
+    field = model._meta.get_field(field_name)
+    integer_digits = int(field.max_digits) - int(field.decimal_places)
+    return Decimal(10) ** integer_digits
+
+
+MAX_STORABLE_PRICE = _maximum_decimal_value(models.SupplierProduct, "current_price")
+
+
+def _validate_storable_price(price: Decimal, product_name: str) -> None:
+    if not price.is_finite() or price.copy_abs() >= MAX_STORABLE_PRICE:
+        raise RuntimeError(
+            f"Price for '{product_name}' is outside the supported range. "
+            f"Its absolute value must be less than {MAX_STORABLE_PRICE}."
+        )
+
+
 def _parse_decimal(value) -> Decimal | None:
     if value is None:
         return None
@@ -366,6 +383,7 @@ def _parse_rows(
         if not detected_currency:
             detected_currency = _detect_currency(row[price_idx])
         detected_currency = detected_currency or default_currency
+        _validate_storable_price(price, name)
         found_data = True
         if parse_stats is not None:
             parse_stats["parsed"] = parse_stats.get("parsed", 0) + 1
